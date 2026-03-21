@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.21.38
+- Released at: 2026-03-21T23:42:12Z
+- Release id: 20260321T234212Z-de87c15
+- Previous version: 2026.03.21.37
+- Trigger: managed service update
+
+Trivial README wording cleanup.
+No runtime behavior changes in this release; this version exists so the Discord /update flow on krysalstis has a fresh prepared update to pull.
+
 ## 2026.03.21.37
 - Released at: 2026-03-21T23:41:02Z
 - Release id: 20260321T234102Z-6d3092c
