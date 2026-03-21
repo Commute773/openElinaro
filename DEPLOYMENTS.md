@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.21.34
+- Released at: 2026-03-21T23:33:24Z
+- Release id: 20260321T233324Z-1d7151a
+- Previous version: 2026.03.21.33
+- Trigger: managed service update
+
+Trivial README touch to exercise the prepare-update flow.
+- Add a short operator-oriented overview note.
+
 ## 2026.03.21.33
 - Released at: 2026-03-21T23:01:00Z
 - Release id: 20260321T230100Z-c2486b1
