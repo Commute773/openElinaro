@@ -172,6 +172,7 @@ Example:
 - Use `update_preview` to inspect the prepared source-root update and the changelog entries newer than the running service version.
 - `bun run service:prepare-update` now requires a non-empty change block so `DEPLOYMENTS.md` captures actual release notes instead of metadata only.
 - `bun run service:prepare-update` now also refuses detached `HEAD` so the prepared-update commit cannot be left orphaned outside a branch tip.
+- `bun run service:prepare-update` now also requires the current branch to track an upstream and pushes the prepared update commit immediately after writing it.
 - Use `update` only when you intentionally want to run `git pull --ff-only` in the source workspace.
 - When `update` is invoked from the live managed service, the chat reply should be a short queued notice; the detached helper sends the follow-up completion DM after the new version passes healthcheck.
 - The underlying managed-service transition scripts are internal; invoke updates and rollbacks through the root-only agent tools instead of running those scripts directly.

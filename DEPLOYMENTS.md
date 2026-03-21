@@ -1,5 +1,16 @@
 # Deployments
 
+## 2026.03.21.35
+- Released at: 2026-03-21T23:34:59Z
+- Release id: 20260321T233459Z-bc46e80
+- Previous version: 2026.03.21.34
+- Trigger: managed service update
+
+Make prepare-update push upstream after committing.
+- Require the current branch to track an upstream before preparing.
+- Push the prepared update commit after writing VERSION.json and DEPLOYMENTS.md.
+- Cover the new push behavior with a tracked-upstream test.
+
 ## 2026.03.21.34
 - Released at: 2026-03-21T23:33:24Z
 - Release id: 20260321T233324Z-1d7151a

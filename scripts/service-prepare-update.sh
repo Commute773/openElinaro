@@ -88,6 +88,12 @@ if ! git -C "${ROOT_DIR}" symbolic-ref --quiet HEAD >/dev/null 2>&1; then
   exit 1
 fi
 
+CURRENT_BRANCH="$(git -C "${ROOT_DIR}" symbolic-ref --quiet --short HEAD)"
+if ! git -C "${ROOT_DIR}" rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" >/dev/null 2>&1; then
+  echo "service-prepare-update.sh requires the current branch (${CURRENT_BRANCH}) to track an upstream branch so the prepared update commit can be pushed." >&2
+  exit 1
+fi
+
 openelinaro_ensure_deployment_dirs
 
 CURRENT_VERSION="$(openelinaro_current_deploy_version)"
@@ -107,6 +113,8 @@ openelinaro_apply_deploy_metadata "${METADATA_DIR}" "${ROOT_DIR}"
 
 git -C "${ROOT_DIR}" add -A
 git -C "${ROOT_DIR}" commit -m "update: ${UPDATE_VERSION}"
+git -C "${ROOT_DIR}" push
 
 echo "Prepared openelinaro update metadata in ${ROOT_DIR}."
 echo "Version: ${UPDATE_VERSION}"
+echo "Pushed branch: ${CURRENT_BRANCH}"

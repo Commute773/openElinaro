@@ -20,6 +20,14 @@ function initGitRepo(repoPath: string) {
   execFileSync("git", ["commit", "-m", "init"], { cwd: repoPath, stdio: "ignore" });
 }
 
+function addTrackedOrigin(repoPath: string, remotePath: string) {
+  execFileSync("git", ["init", "--bare", remotePath], { stdio: "ignore" });
+  execFileSync("git", ["remote", "add", "origin", remotePath], { cwd: repoPath, stdio: "ignore" });
+  const branch = execFileSync("git", ["branch", "--show-current"], { cwd: repoPath, encoding: "utf8" }).trim();
+  execFileSync("git", ["push", "-u", "origin", branch], { cwd: repoPath, stdio: "ignore" });
+  return branch;
+}
+
 function writeFakeBun(repoPath: string) {
   const fakeBunPath = path.join(repoPath, "fake-bun.sh");
   fs.writeFileSync(
@@ -71,6 +79,40 @@ describe("service-prepare-update.sh", () => {
       },
     )).toThrow("refuses to commit from a detached HEAD");
     expect(fs.existsSync(path.join(tempRoot, "VERSION.json"))).toBe(false);
+  });
+
+  test("commits and pushes the prepared update to the tracked upstream branch", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-prepare-update-push-"));
+    tempRoots.push(tempRoot);
+    initGitRepo(tempRoot);
+    const remoteRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-prepare-update-remote-"));
+    tempRoots.push(remoteRoot);
+    const branch = addTrackedOrigin(tempRoot, remoteRoot);
+    fs.mkdirSync(path.join(tempRoot, "scripts"), { recursive: true });
+    fs.copyFileSync(serviceCommonPath, path.join(tempRoot, "scripts/service-common.sh"));
+    const fakeBunPath = writeFakeBun(tempRoot);
+
+    const output = execFileSync(
+      scriptPath,
+      ["--changes", "- verify prepare-update pushes upstream"],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          OPENELINARO_ROOT_DIR: tempRoot,
+          BUN_BIN: fakeBunPath,
+        },
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+
+    expect(output).toContain("Version:");
+    expect(output).toContain(`Pushed branch: ${branch}`);
+
+    const localHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: tempRoot, encoding: "utf8" }).trim();
+    const remoteHead = execFileSync("git", ["rev-parse", branch], { cwd: remoteRoot, encoding: "utf8" }).trim();
+    expect(remoteHead).toBe(localHead);
   });
 
   test("migrates legacy deployment symlinks into release pointer files", () => {
