@@ -965,7 +965,34 @@ describe("RoutineToolRegistry tool catalog", () => {
       consumeConversationNotifications: () => [],
     };
     const previous = process.env.OPENELINARO_SERVICE_ROOT_DIR;
-    process.env.OPENELINARO_SERVICE_ROOT_DIR = "/tmp/openelinaro-release";
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = runtimeRoot;
+    fs.writeFileSync(
+      path.join(runtimeRoot, "VERSION.json"),
+      `${JSON.stringify({
+        version: "2026.03.21.34",
+        releasedAt: "2026-03-21T23:45:00Z",
+        previousVersion: "2026.03.21.33",
+        releaseId: "20260321T234500Z-1234567",
+        changelogPath: "DEPLOYMENTS.md",
+      }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(runtimeRoot, "DEPLOYMENTS.md"),
+      [
+        "# Deployments",
+        "",
+        "## 2026.03.21.35",
+        "- Released at: 2026-03-21T23:55:00Z",
+        "- Previous version: 2026.03.21.34",
+        "",
+        "## 2026.03.21.34",
+        "- Released at: 2026-03-21T23:45:00Z",
+        "- Previous version: 2026.03.21.33",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
 
     try {
       const harness = createHarnessWithOptions({ shell: shellStub });
@@ -979,7 +1006,9 @@ describe("RoutineToolRegistry tool catalog", () => {
       expect(commands[0]).toContain("'pull' '--ff-only'");
       expect(commands[1]).toContain("OPENELINARO_AGENT_SERVICE_CONTROL='1'");
       expect(commands[1]).toContain("scripts/service-rollback-detached.sh");
-      expect(updateResult).toContain("scheduled");
+      expect(updateResult).toContain("Deployments since 2026.03.21.34: 1 entry.");
+      expect(updateResult).toContain("## 2026.03.21.35");
+      expect(updateResult).not.toContain("stdout:");
       expect(rollbackResult).toContain("detached helper");
     } finally {
       if (previous === undefined) {

@@ -1,5 +1,15 @@
 # Deployments
 
+## 2026.03.21.36
+- Released at: 2026-03-21T23:38:56Z
+- Release id: 20260321T233856Z-16e9a18
+- Previous version: 2026.03.21.35
+- Trigger: managed service update
+
+/update now pulls before showing deployments since the current runtime version.
+Successful updates return the deployment changelog instead of raw git pull output.
+Added coverage for the new success-path behavior and documented the operator-facing change.
+
 ## 2026.03.21.35
 - Released at: 2026-03-21T23:34:59Z
 - Release id: 20260321T233459Z-bc46e80

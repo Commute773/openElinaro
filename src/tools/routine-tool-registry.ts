@@ -3166,11 +3166,25 @@ export class RoutineToolRegistry {
         operation,
         async () => {
           const timeoutMs = input.timeoutMs ?? 60_000;
+          const previousVersion = this.deploymentVersion.load().version;
           const result = await this.shell.exec({
             command: buildGitPullCommand(false),
             timeoutMs,
           });
-          return renderShellExecResult(result);
+          if (result.exitCode !== 0) {
+            return renderShellExecResult(result);
+          }
+          try {
+            return this.deploymentVersion.formatChangelogSinceVersion(previousVersion);
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            return [
+              `Pull completed, but could not load deployments since ${previousVersion}.`,
+              `Reason: ${detail}`,
+              "",
+              renderShellExecResult(result),
+            ].join("\n");
+          }
         },
         { attributes: input },
       );
@@ -5476,7 +5490,7 @@ export class RoutineToolRegistry {
         {
           name: "update",
           description:
-            "Run `git pull --ff-only` in the source workspace.",
+            "Run `git pull --ff-only` in the source workspace, then summarize deployments newer than the current runtime version.",
           schema: serviceActionSchema,
         },
       ),
