@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "root",
+      "name": "Root",
+      "roles": [
+        "root"
+      ],
+      "memoryNamespace": "root",
+      "preferredProvider": "claude",
+      "defaultModelId": "claude-opus-4-6-20260301",
+      "toolSummarizerProvider": "claude",
+      "toolSummarizerModelId": "claude-haiku-4-5",
+      "defaultThinkingLevel": "low",
+      "maxContextTokens": 200000,
+      "subagentPreferredProvider": "openai-codex",
+      "subagentDefaultModelId": "gpt-5.4",
+      "maxSubagentDepth": 1,
+      "memoryProvider": "claude",
+      "memoryModelId": "claude-haiku-4-5"
+    }
+  ]
+}

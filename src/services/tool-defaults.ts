@@ -1,0 +1,3 @@
+export const DEFAULT_CODING_AGENT_TIMEOUT_MS = 3_600_000;
+export const DEFAULT_WEB_SEARCH_LANGUAGE = "en";
+export const DEFAULT_WEB_SEARCH_UI_LANG = "en-US";

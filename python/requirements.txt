@@ -1,0 +1,17 @@
+openbrowser-ai==0.1.34
+playwright
+crawl4ai
+fastapi
+misaki; platform_system == "Darwin"
+mlx; platform_system == "Darwin"
+mlx-audio; platform_system == "Darwin"
+mlx-lm; platform_system == "Darwin"
+mlx-embedding-models; platform_system == "Darwin"
+num2words; platform_system == "Darwin"
+numpy
+phonemizer-fork; platform_system == "Darwin"
+espeakng_loader; platform_system == "Darwin"
+pydantic
+spacy; platform_system == "Darwin"
+transformers
+uvicorn

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "description": "Starter project registry copied into ~/.openelinaro/projects/registry.json on first run. Live project docs and state belong under ~/.openelinaro, not in the committed repo tree.",
+  "projects": [],
+  "jobs": []
+}

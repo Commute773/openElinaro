@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["bun", "vite/client"],
+    "allowJs": true,
+    "rootDir": "../.."
+  },
+  "include": [
+    "./server.ts",
+    "./src/**/*.ts",
+    "./src/**/*.tsx",
+    "./vite.config.ts",
+    "../../src/**/*.ts"
+  ],
+  "exclude": [
+    "../../references",
+    "../../node_modules",
+    "../../dist",
+    "../../coverage"
+  ]
+}
