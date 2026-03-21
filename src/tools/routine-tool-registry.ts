@@ -1783,13 +1783,13 @@ const UNTRUSTED_TOOL_DESCRIPTOR_MAP: Record<string, Omit<UntrustedContentDescrip
   },
   update_preview: {
     sourceType: "shell",
-    sourceName: "git pull dry-run output",
-    notes: "Git output can echo attacker-controlled content from the remote repository.",
+    sourceName: "source-sync and deploy-summary output",
+    notes: "Pull/update output can echo attacker-controlled content from the remote repository.",
   },
   update: {
     sourceType: "shell",
-    sourceName: "git pull output",
-    notes: "Git output can echo attacker-controlled content from the remote repository.",
+    sourceName: "service update shell output",
+    notes: "Service update output can echo attacker-controlled content from local scripts and logs.",
   },
   service_rollback: {
     sourceType: "shell",
@@ -2206,9 +2206,9 @@ function inferToolExamples(name: string) {
     case "service_healthcheck":
       return ["run service healthcheck", "verify the live agent is up"];
     case "update_preview":
-      return ["preview git pull output", "check if origin has new commits"];
+      return ["sync source checkout without deploying", "show pending deploy notes after pulling"];
     case "update":
-      return ["pull latest git changes", "sync from origin with ff-only"];
+      return ["deploy prepared update", "apply the latest prepared service version"];
     case "service_rollback":
       return ["roll back the service", "restore the previous deployed version"];
     case "launch_coding_agent":
@@ -3161,12 +3161,11 @@ export class RoutineToolRegistry {
       ...ROUTINE_TOOL_NAMES,
       "model_context_usage",
     ]);
-    const runUpdate = async (input: z.infer<typeof serviceActionSchema>, operation: string) =>
+    const runUpdatePreview = async (input: z.infer<typeof serviceActionSchema>, operation: string) =>
       traceSpan(
         operation,
         async () => {
           const timeoutMs = input.timeoutMs ?? 60_000;
-          const previousVersion = this.deploymentVersion.load().version;
           const result = await this.shell.exec({
             command: buildGitPullCommand(false),
             timeoutMs,
@@ -3175,16 +3174,32 @@ export class RoutineToolRegistry {
             return renderShellExecResult(result);
           }
           try {
-            return this.deploymentVersion.formatChangelogSinceVersion(previousVersion);
+            return this.deploymentVersion.formatPreparedUpdate();
           } catch (error) {
             const detail = error instanceof Error ? error.message : String(error);
             return [
-              `Pull completed, but could not load deployments since ${previousVersion}.`,
+              "Pull completed, but could not load the prepared update summary.",
               `Reason: ${detail}`,
               "",
               renderShellExecResult(result),
             ].join("\n");
           }
+        },
+        { attributes: input },
+      );
+    const runUpdate = async (input: z.infer<typeof serviceActionSchema>, operation: string) =>
+      traceSpan(
+        operation,
+        async () => {
+          const timeoutMs = input.timeoutMs ?? 60_000;
+          const result = await this.shell.exec({
+            command: buildServiceCommand("update", timeoutMs, {
+              conversationKey: input.conversationKey,
+            }),
+            timeoutMs: timeoutMs + 180_000,
+            sudo: requiresPrivilegedServiceControl(this.runtimePlatform, "update"),
+          });
+          return `${renderShellExecResult(result)}${describeServiceTransition("update")}`;
         },
         { attributes: input },
       );
@@ -5465,23 +5480,11 @@ export class RoutineToolRegistry {
         },
       ),
       tool(
-        async (input) =>
-          traceSpan(
-            "tool.update_preview",
-            async () => {
-              const timeoutMs = input.timeoutMs ?? 60_000;
-              const result = await this.shell.exec({
-                command: buildGitPullCommand(true),
-                timeoutMs,
-              });
-              return renderShellExecResult(result);
-            },
-            { attributes: input },
-          ),
+        async (input) => runUpdatePreview(input, "tool.update_preview"),
         {
           name: "update_preview",
           description:
-            "Preview a fast-forward-only git pull against the source workspace without changing the checkout.",
+            "Fast-forward the source workspace to the latest prepared code without deploying, then summarize deployment entries newer than the current running version.",
           schema: serviceActionSchema,
         },
       ),
@@ -5490,7 +5493,7 @@ export class RoutineToolRegistry {
         {
           name: "update",
           description:
-            "Run `git pull --ff-only` in the source workspace, then summarize deployments newer than the current runtime version.",
+            "Deploy the already prepared source version into the local managed installation and verify it with the service healthcheck.",
           schema: serviceActionSchema,
         },
       ),

@@ -1,5 +1,15 @@
 # Deployments
 
+## 2026.03.21.39
+- Released at: 2026-03-21T23:50:40Z
+- Release id: 20260321T235040Z-0c21ac6
+- Previous version: 2026.03.21.38
+- Trigger: managed service update
+
+/update now fast-forwards the source checkout before showing deploy notes newer than the running version.
+/update confirm:true now runs the managed-service deploy step instead of another git pull.
+Updated the Discord flow, backend service tools, tests, and operator docs to match the source-sync then deploy-confirm workflow.
+
 ## 2026.03.21.38
 - Released at: 2026-03-21T23:42:12Z
 - Release id: 20260321T234212Z-de87c15

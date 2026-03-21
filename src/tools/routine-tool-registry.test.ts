@@ -788,10 +788,10 @@ describe("RoutineToolRegistry tool catalog", () => {
     expect(healthcheckTool?.authorization.access).toBe("root");
     expect(healthcheckTool?.description).toContain("HEALTHCHECK_OK");
     expect(updatePreviewTool?.authorization.access).toBe("root");
-    expect(updatePreviewTool?.examples).toContain("preview git pull output");
+    expect(updatePreviewTool?.examples).toContain("sync source checkout without deploying");
     expect(updateTool?.authorization.access).toBe("root");
     expect(updateTool?.aliasOf).toBeUndefined();
-    expect(updateTool?.examples).toContain("pull latest git changes");
+    expect(updateTool?.examples).toContain("deploy prepared update");
     expect(rollbackTool?.authorization.access).toBe("root");
     expect(secretPasswordTool?.authorization.access).toBe("root");
     expect(secretPasswordTool?.description).toContain("Generate a strong password");
@@ -939,7 +939,7 @@ describe("RoutineToolRegistry tool catalog", () => {
     }
   });
 
-  test("uses git pull for update even when running inside the managed service", async () => {
+  test("update_preview pulls source changes and update deploys the prepared version when running inside the managed service", async () => {
     const commands: string[] = [];
     const shellStub = {
       exec: async (params: { command: string; timeoutMs?: number }) => {
@@ -965,14 +965,27 @@ describe("RoutineToolRegistry tool catalog", () => {
       consumeConversationNotifications: () => [],
     };
     const previous = process.env.OPENELINARO_SERVICE_ROOT_DIR;
-    process.env.OPENELINARO_SERVICE_ROOT_DIR = runtimeRoot;
+    const serviceRoot = path.join(runtimeRoot, "service-release");
+    fs.mkdirSync(serviceRoot, { recursive: true });
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = serviceRoot;
     fs.writeFileSync(
-      path.join(runtimeRoot, "VERSION.json"),
+      path.join(serviceRoot, "VERSION.json"),
       `${JSON.stringify({
         version: "2026.03.21.34",
         releasedAt: "2026-03-21T23:45:00Z",
         previousVersion: "2026.03.21.33",
         releaseId: "20260321T234500Z-1234567",
+        changelogPath: "DEPLOYMENTS.md",
+      }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(runtimeRoot, "VERSION.json"),
+      `${JSON.stringify({
+        version: "2026.03.21.35",
+        releasedAt: "2026-03-21T23:55:00Z",
+        previousVersion: "2026.03.21.34",
+        releaseId: "20260321T235500Z-abcdef0",
         changelogPath: "DEPLOYMENTS.md",
       }, null, 2)}\n`,
       "utf8",
@@ -997,18 +1010,21 @@ describe("RoutineToolRegistry tool catalog", () => {
     try {
       const harness = createHarnessWithOptions({ shell: shellStub });
 
-      const updateResult = await harness.registry.invoke("update", {}, {
-        conversationKey: "123456789012345678",
-      });
+      const updatePreviewResult = await harness.registry.invoke("update_preview", {});
+      const updateResult = await harness.registry.invoke("update", { conversationKey: "123456789012345678" });
       const rollbackResult = await harness.registry.invoke("service_rollback", {});
 
       expect(commands[0]).toContain("'git' '-C'");
       expect(commands[0]).toContain("'pull' '--ff-only'");
       expect(commands[1]).toContain("OPENELINARO_AGENT_SERVICE_CONTROL='1'");
-      expect(commands[1]).toContain("scripts/service-rollback-detached.sh");
-      expect(updateResult).toContain("Deployments since 2026.03.21.34: 1 entry.");
-      expect(updateResult).toContain("## 2026.03.21.35");
-      expect(updateResult).not.toContain("stdout:");
+      expect(commands[1]).toContain("OPENELINARO_NOTIFY_DISCORD_USER_ID='123456789012345678'");
+      expect(commands[1]).toContain("scripts/service-update-detached.sh");
+      expect(commands[2]).toContain("scripts/service-rollback-detached.sh");
+      expect(updatePreviewResult).toContain("Prepared update available: 2026.03.21.34 -> 2026.03.21.35.");
+      expect(updatePreviewResult).toContain("Pending deployment entries since 2026.03.21.34: 1.");
+      expect(updatePreviewResult).toContain("## 2026.03.21.35");
+      expect(updateResult).toContain("scripts/service-update-detached.sh");
+      expect(updateResult).toContain("detached helper");
       expect(rollbackResult).toContain("detached helper");
     } finally {
       if (previous === undefined) {
@@ -1022,7 +1038,9 @@ describe("RoutineToolRegistry tool catalog", () => {
   test("update and rollback shell output is not wrapped as untrusted content", async () => {
     const shellStub = {
       exec: async (params: { command: string; timeoutMs?: number }) => {
-        const stderr = params.command.includes("pull")
+        const stderr = params.command.includes("service-update")
+          ? "Managed-service update failed while installing the new release.\n"
+          : params.command.includes("pull")
           ? "fatal: Not possible to fast-forward, aborting.\n"
           : "Managed-service update and rollback scripts are internal. Use the root-only agent update flow instead.\n";
         return {
@@ -1047,16 +1065,19 @@ describe("RoutineToolRegistry tool catalog", () => {
     };
     const harness = createHarnessWithOptions({ shell: shellStub });
 
+    const updatePreviewResult = await harness.registry.invoke("update_preview", {});
     const updateResult = await harness.registry.invoke("update", {});
     const rollbackResult = await harness.registry.invoke("service_rollback", {});
 
-    expect(updateResult).toContain("Not possible to fast-forward");
+    expect(updatePreviewResult).toContain("Not possible to fast-forward");
+    expect(updatePreviewResult).not.toContain("UNTRUSTED CONTENT WARNING");
+    expect(updateResult).toContain("Managed-service update failed while installing the new release.");
     expect(updateResult).not.toContain("UNTRUSTED CONTENT WARNING");
     expect(rollbackResult).toContain("Managed-service update and rollback scripts are internal.");
     expect(rollbackResult).not.toContain("UNTRUSTED CONTENT WARNING");
   });
 
-  test("uses git pull without sudo on Linux", async () => {
+  test("uses git pull without sudo on Linux for update_preview", async () => {
     const calls: Array<{ command: string; sudo?: boolean }> = [];
     const shellStub = {
       exec: async (params: { command: string; timeoutMs?: number; sudo?: boolean }) => {
@@ -1087,7 +1108,7 @@ describe("RoutineToolRegistry tool catalog", () => {
       runtimePlatform: resolveRuntimePlatform("linux"),
     });
 
-    await harness.registry.invoke("update", {});
+    await harness.registry.invoke("update_preview", {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toContain("'git' '-C'");

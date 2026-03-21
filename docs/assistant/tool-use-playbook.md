@@ -12,7 +12,7 @@ Default rule:
 - Ask for the capability you want, not the tool name you hope exists.
 - `tool_search` matches against tool names, descriptions, tags, domains, and short example intents.
 - Let `tool_search` activate a few likely tools, then use those tools directly.
-- Discord `/update` is preview-only by default and tells the operator to rerun with `confirm:true` before applying changes. The root-only `update` tool itself still pulls the source checkout first, then replies with the deployment changelog entries newer than the currently running runtime version. Use `update_preview` when you only want the raw dry-run git result.
+- Discord `/update` now fast-forwards the source checkout and replies with the pending deployment changelog entries newer than the running version. `confirm:true` is the actual deploy step. The root-only `update_preview` tool is the non-deploying source-sync-plus-summary step, while `update` is the managed-service deploy step.
 
 Good `tool_search` queries:
 
@@ -170,12 +170,12 @@ Example:
 - Use `service_changelog_since_version` when you need the deployment entries whose version is numerically greater than a requested version instead of reading all of `DEPLOYMENTS.md`.
 - Deployment versions are `YYYY.MM.DD` or `YYYY.MM.DD.N`; the `.N` sequence resets each UTC day, so compare the full version rather than only the numeric suffix.
 - Deploys are explicit. Do not assume code changes should redeploy the service automatically, even when the change affects runtime or managed-service behavior.
-- Use `update_preview` to inspect the prepared source-root update and the changelog entries newer than the running service version.
+- Use `update_preview` when you want to fast-forward the source checkout without deploying, then inspect the prepared source-root update and the changelog entries newer than the running service version.
 - `bun run service:prepare-update` now requires a non-empty change block so `DEPLOYMENTS.md` captures actual release notes instead of metadata only.
 - `bun run service:prepare-update` now also refuses detached `HEAD` so the prepared-update commit cannot be left orphaned outside a branch tip.
 - `bun run service:prepare-update` now also requires the current branch to track an upstream and pushes the prepared update commit immediately after writing it.
-- Use `update` only when you intentionally want to run `git pull --ff-only` in the source workspace.
-- When `update` is invoked from the live managed service, the chat reply should be a short queued notice; the detached helper sends the follow-up completion DM after the new version passes healthcheck.
+- Use `update` only when you intentionally want to deploy the already prepared source version into the managed service.
+- When `update` is invoked from the live managed service, the deploy runs through a detached helper so the current bot process can hand off the restart safely.
 - The underlying managed-service transition scripts are internal; invoke updates and rollbacks through the root-only agent tools instead of running those scripts directly.
 
 ## Coding-Agent Workspaces

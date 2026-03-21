@@ -115,8 +115,8 @@ The app now treats routines as a first-class subsystem rather than scattered cha
 - The shared tool set also includes `fnew`, which starts a fresh conversation immediately but skips compaction and any durable-memory writeback from the prior thread while preserving the existing system-prompt snapshot.
 - The shared tool set also includes `benchmark`, which runs a live TTFT/TPS check on the active chat model plus an items-per-second check on the local memory embedding model.
 - The shared tool set also includes the root-only `update_preview`, `update`, `service_healthcheck`, and `service_rollback` operations for repo sync and managed-service control from the agent itself.
-- The Discord `/update` command is custom and now previews the pending fast-forward update by default; pass `confirm:true` to actually run `git pull --ff-only`, then it summarizes deployment entries newer than the current runtime version.
-- `update_preview` runs a `git pull --ff-only --dry-run` preview against the source workspace.
+- The Discord `/update` command is custom and now fast-forwards the source checkout by default, then formats the `DEPLOYMENTS.md` entries whose versions are newer than the current running version; pass `confirm:true` to actually deploy the prepared source version into the local installation.
+- `update_preview` fast-forwards the source workspace without deploying, then summarizes the pending deployment entries newer than the current running version.
 - `service_rollback` still uses the managed-service rollback helpers when invoked from inside the live service process.
 - The shared tool set also includes `launch_coding_agent`, which lets the foreground conversation agent enqueue a goal-driven background coding worker built in LangGraph.
 - The shared tool set also includes `resume_coding_agent`, which lets the foreground conversation agent send follow-up instructions back to a returned coding run on the same run id.
@@ -195,7 +195,7 @@ bun run setup:python
 - `bun run service:healthcheck` sends a simulated local message to the live main agent that says `this is a healthcheck, reply with HEALTHCHECK_OK to confirm you are up and active` and waits up to 60 seconds for `HEALTHCHECK_OK`.
 - `bun run service:prepare-update` runs `bun run check`, requires a non-empty human-written change block via `--changes`, `--changes-file`, `OPENELINARO_DEPLOY_CHANGES`, or piped stdin, requires the current branch to track an upstream, then computes the next deploy version in `yyyy.mm.dd` or `yyyy.mm.dd.n` form, writes `VERSION.json` plus `DEPLOYMENTS.md` into the source workspace, commits the current code plus metadata as `update: <version>`, and pushes that branch upstream.
 - Managed-service rollback is still an agent-only path. Use the root-only `service_rollback` tool instead of invoking transition scripts manually.
-- `/update` now syncs the source checkout with `git pull --ff-only`; code changes still do not auto-deploy.
+- `/update` now syncs the source checkout and formats the pending `DEPLOYMENTS.md` entries newer than the running version; `/update confirm:true` performs the actual managed-service deploy.
 - The agent-facing service tools use detached helper jobs when they are invoked from inside the live managed service, so the current bot process can hand the work off to the service manager instead of terminating itself mid-command. On macOS those helpers are one-shot launchd agents so the transition runs exactly once per request.
 - The managed service sets `OPENELINARO_ROOT_DIR` for code/assets and `OPENELINARO_USER_DATA_DIR` for runtime state, so the service does not depend on the caller's current working directory.
 - Release snapshots copy code and shared prompt assets, inject the stamped deploy metadata, and read shared mutable state from `~/.openelinaro/` via environment so rollback restores the prior code without discarding local state.

@@ -978,7 +978,7 @@ if (RUN_CHILD_SUITE) {
         async invokeRoutineTool(name: string) {
           invoked.push(name);
           if (name === "update_preview") {
-            return "Already up to date.";
+            return "## 2026.03.21.38\n- Trivial README wording cleanup.";
           }
           throw new Error(`Unexpected tool: ${name}`);
         },
@@ -1011,8 +1011,8 @@ if (RUN_CHILD_SUITE) {
 
     expect(invoked).toEqual(["update_preview"]);
     const replyText = interaction.replies.map((reply) => reply.content).join("\n");
-    expect(replyText).toContain("Already up to date.");
-    expect(replyText).toContain("No changes were applied. Run `/update confirm:true` to perform the real update.");
+    expect(replyText).toContain("## 2026.03.21.38");
+    expect(replyText).toContain("The source checkout is now up to date. Run `/update confirm:true` to deploy this prepared version into the local installation.");
   });
 
   test("still runs the update tool when confirm is passed", async () => {
@@ -1034,7 +1034,7 @@ if (RUN_CHILD_SUITE) {
         async invokeRoutineTool(name: string) {
           invoked.push(name);
           if (name === "update") {
-            return "Updated openelinaro service to /tmp/release.";
+            return "Updated openelinaro service to /tmp/release.\nnote: this update was scheduled through a detached helper because the live service cannot safely update itself in-process.";
           }
           throw new Error(`Unexpected tool: ${name}`);
         },
