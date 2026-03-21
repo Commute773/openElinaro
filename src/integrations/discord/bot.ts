@@ -923,6 +923,19 @@ async function handleSlashCommand(params: {
   }
 
   if (interaction.commandName === "update") {
+    const confirm = interaction.options.getBoolean("confirm") ?? false;
+    if (!confirm) {
+      const preview = await app.invokeRoutineTool("update_preview", {});
+      await replyWithChunks(
+        interaction,
+        [
+          preview,
+          "",
+          "No changes were applied. Run `/update confirm:true` to perform the real update.",
+        ].join("\n"),
+      );
+      return;
+    }
     await invokeDiscordToolAndReply(interaction, app, "update", {});
     return;
   }
@@ -1126,7 +1139,13 @@ function buildSlashCommands() {
       ),
     new SlashCommandBuilder()
       .setName("update")
-      .setDescription("Pull the latest fast-forward git changes into the source workspace"),
+      .setDescription("Preview or apply the latest fast-forward git changes into the source workspace")
+      .addBooleanOption((option) =>
+        option
+          .setName("confirm")
+          .setDescription("Set true to apply the update. Omit or set false to preview only.")
+          .setRequired(false),
+      ),
     new SlashCommandBuilder()
       .setName("stop")
       .setDescription("Immediately halt the current Discord conversation agent"),

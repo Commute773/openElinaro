@@ -115,7 +115,7 @@ The app now treats routines as a first-class subsystem rather than scattered cha
 - The shared tool set also includes `fnew`, which starts a fresh conversation immediately but skips compaction and any durable-memory writeback from the prior thread while preserving the existing system-prompt snapshot.
 - The shared tool set also includes `benchmark`, which runs a live TTFT/TPS check on the active chat model plus an items-per-second check on the local memory embedding model.
 - The shared tool set also includes the root-only `update_preview`, `update`, `service_healthcheck`, and `service_rollback` operations for repo sync and managed-service control from the agent itself.
-- The Discord `/update` command is custom and now runs `git pull --ff-only` in the source workspace immediately, then summarizes deployment entries newer than the current runtime version.
+- The Discord `/update` command is custom and now previews the pending fast-forward update by default; pass `confirm:true` to actually run `git pull --ff-only`, then it summarizes deployment entries newer than the current runtime version.
 - `update_preview` runs a `git pull --ff-only --dry-run` preview against the source workspace.
 - `service_rollback` still uses the managed-service rollback helpers when invoked from inside the live service process.
 - The shared tool set also includes `launch_coding_agent`, which lets the foreground conversation agent enqueue a goal-driven background coding worker built in LangGraph.

@@ -12,7 +12,7 @@ Default rule:
 - Ask for the capability you want, not the tool name you hope exists.
 - `tool_search` matches against tool names, descriptions, tags, domains, and short example intents.
 - Let `tool_search` activate a few likely tools, then use those tools directly.
-- Root-only `update` pulls the source checkout first, then replies with the deployment changelog entries newer than the currently running runtime version. Use `update_preview` when you only want the raw dry-run git result.
+- Discord `/update` is preview-only by default and tells the operator to rerun with `confirm:true` before applying changes. The root-only `update` tool itself still pulls the source checkout first, then replies with the deployment changelog entries newer than the currently running runtime version. Use `update_preview` when you only want the raw dry-run git result.
 
 Good `tool_search` queries:
 

@@ -1,5 +1,15 @@
 # Deployments
 
+## 2026.03.21.37
+- Released at: 2026-03-21T23:41:02Z
+- Release id: 20260321T234102Z-6d3092c
+- Previous version: 2026.03.21.36
+- Trigger: managed service update
+
+/update is now preview-only by default in Discord and requires confirm:true to apply changes.
+The slash command now exposes a confirm boolean option and shows an explicit no-changes-applied prompt on preview runs.
+Added Discord e2e coverage and updated operator docs for the gated update flow.
+
 ## 2026.03.21.36
 - Released at: 2026-03-21T23:38:56Z
 - Release id: 20260321T233856Z-16e9a18

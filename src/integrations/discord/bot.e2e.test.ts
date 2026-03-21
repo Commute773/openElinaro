@@ -959,7 +959,7 @@ if (RUN_CHILD_SUITE) {
     expect((message.replyPayloads[0]?.files ?? [])).toHaveLength(1);
   });
 
-  test("runs update immediately through the custom command", async () => {
+  test("uses update preview by default through the custom command", async () => {
     const invoked: string[] = [];
     const authManager = new authSessionManagerModule.DiscordAuthSessionManager();
     const handlers = botModule.createDiscordEventHandlers({
@@ -977,7 +977,7 @@ if (RUN_CHILD_SUITE) {
         },
         async invokeRoutineTool(name: string) {
           invoked.push(name);
-          if (name === "update") {
+          if (name === "update_preview") {
             return "Already up to date.";
           }
           throw new Error(`Unexpected tool: ${name}`);
@@ -1009,10 +1009,10 @@ if (RUN_CHILD_SUITE) {
 
     await handlers.handleInteraction(interaction as unknown as ChatInputCommandInteraction);
 
-    expect(invoked).toEqual(["update"]);
+    expect(invoked).toEqual(["update_preview"]);
     const replyText = interaction.replies.map((reply) => reply.content).join("\n");
     expect(replyText).toContain("Already up to date.");
-    expect(replyText).not.toContain("UNTRUSTED CONTENT WARNING");
+    expect(replyText).toContain("No changes were applied. Run `/update confirm:true` to perform the real update.");
   });
 
   test("still runs the update tool when confirm is passed", async () => {
