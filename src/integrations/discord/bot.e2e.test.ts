@@ -867,6 +867,37 @@ if (RUN_CHILD_SUITE) {
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/webp")).toBe(true);
   });
 
+  test("prefers detected image bytes over Discord attachment mime metadata", async () => {
+    const harness = createDiscordAppHarness();
+    const authManager = new authSessionManagerModule.DiscordAuthSessionManager();
+    const handlers = botModule.createDiscordEventHandlers({
+      app: harness.app,
+      authManager,
+      profileId: harness.profile.id,
+    });
+
+    const imageBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO0pQn8AAAAASUVORK5CYII=";
+    const message = new FakeDirectMessage("");
+    message.author.id = "discord-user-mime-mismatch";
+    message.attachments.set("image-1", {
+      name: "pixel.png",
+      contentType: "image/webp",
+      size: Buffer.from(imageBase64, "base64").length,
+      url: `data:image/png;base64,${imageBase64}`,
+    });
+
+    await handlers.handleMessage(message as unknown as Message);
+
+    const storedConversation = harness.conversations.get(message.author.id);
+    const firstMessage = [...storedConversation.messages].reverse().find((entry) =>
+      entry instanceof HumanMessage && typeof entry.content !== "string"
+    );
+    const blocks = firstMessage?.content as ChatPromptContentBlock[];
+
+    expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/png")).toBe(true);
+    expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/webp")).toBe(false);
+  });
+
   test("combines continued DM fragments before dispatching to the assistant", async () => {
     const seenTexts: string[] = [];
     const harness = createDiscordAppHarness({

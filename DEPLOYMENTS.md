@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.18
+- Released at: 2026-03-22T02:09:03Z
+- Release id: 20260322T020903Z-619e5f7
+- Previous version: 2026.03.22.17
+- Trigger: managed service update
+
+- Fix Discord image attachment ingestion by detecting the actual image MIME type from downloaded bytes instead of trusting attachment metadata.
+- Add a Discord regression test for mismatched WebP-labelled PNG uploads and document the behavior in the tool-use playbook.
+
 ## 2026.03.22.17
 - Released at: 2026-03-22T02:00:00Z
 - Release id: 20260322T020000Z-069d54f

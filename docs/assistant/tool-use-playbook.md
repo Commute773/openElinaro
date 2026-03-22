@@ -192,6 +192,7 @@ Example:
 - Relative local paths are resolved against the runtime root (`OPENELINARO_ROOT_DIR`) rather than the managed-service release cwd.
 - This keeps repo-relative paths such as `docs/report.md` pointing at the source workspace even when the live service is running from a staged release snapshot.
 - Discord delivery unwraps `UNTRUSTED CONTENT WARNING` envelopes before posting, so channel messages show only the guarded payload content rather than the metadata wrapper.
+- Discord image ingestion now prefers the downloaded file signature over Discord attachment MIME metadata, because uploaded images can arrive with mismatched metadata (for example WebP-labelled PNG bytes).
 
 ## Routines And Alerts
 
