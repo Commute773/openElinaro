@@ -18,6 +18,7 @@ const repoRoot = process.cwd();
 
 let previousCwd = "";
 let tempRoot = "";
+let previousRootDirEnv: string | undefined;
 
 let appRuntimeModule: typeof import("./runtime");
 let activeConnectorModule: typeof import("../connectors/active-model-connector");
@@ -962,9 +963,11 @@ function buildRateLimitRecoveryResponse(request: ScriptedConnectorRequest) {
 describe("OpenElinaro runtime workflow e2e", () => {
   beforeAll(async () => {
     previousCwd = process.cwd();
+    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
     tempRoot = fs.realpathSync.native(
       fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-runtime-workflow-e2e-")),
     );
+    process.env.OPENELINARO_ROOT_DIR = tempRoot;
 
     writeTestProfileRegistry();
     writeTestProjectRegistry();
@@ -1002,6 +1005,11 @@ describe("OpenElinaro runtime workflow e2e", () => {
     memoryServiceModule.MemoryService.prototype.ensureReady = originalEnsureReady;
     shellServiceModule.ShellService.prototype.exec = originalShellExec;
     shellServiceModule.ShellService.prototype.execVerification = originalShellExecVerification;
+    if (previousRootDirEnv === undefined) {
+      delete process.env.OPENELINARO_ROOT_DIR;
+    } else {
+      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+    }
     process.chdir(previousCwd);
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });

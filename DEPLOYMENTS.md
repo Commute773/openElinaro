@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.23
+- Released at: 2026-03-22T15:19:11Z
+- Release id: 20260322T151911Z-f2336e9
+- Previous version: 2026.03.22.22
+- Trigger: managed service update
+
+Add managed-service restart notices so interrupted coding agents resume with a continuation message after restart.
+Make feature_manage apply restart the managed service by default, cover feature status/apply/restart behavior in tests, and fix workflow e2e isolation by pinning OPENELINARO_ROOT_DIR.
+
 ## 2026.03.22.22
 - Released at: 2026-03-22T15:17:12Z
 - Release id: 20260322T151712Z-e946662
