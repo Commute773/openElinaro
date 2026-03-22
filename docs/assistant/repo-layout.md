@@ -30,11 +30,13 @@ That means `projects/` is part of the assistant's world model, but not part of t
 - `src/index.ts`: Discord entrypoint
 - `src/demo.ts`: local demo runner without Discord
 - `src/app/`: runtime composition and request handling
-- `src/orchestration/`: imperative background workflow runners
-- `src/services/`: stateful application services, persistence, auth, model routing, tools, memory, logging, shell, and access control
-- `src/tools/`: tool registry definitions exposed to the agent and to Discord
+- `src/orchestration/`: workflow execution engine, decomposed into `workflow-graph.ts`, `workflow-executor.ts`, `workflow-planner.ts`, `workflow-agent-runner.ts`, `workflow-state.ts`, `workflow-timeout.ts`, and `workflow-types.ts`
+- `src/services/`: stateful application services, persistence, auth, model routing, tools, memory, logging, shell, and access control. Includes subdirectories `finance/` (extracted finance modules) and `gemini-live/` (extracted live phone modules)
+- `src/tools/`: tool definitions via `tool-registry.ts` and domain-specific tool groups under `groups/`
+- `src/config/`: runtime configuration and extracted constants (`runtime-config.ts`, `service-constants.ts`)
+- `src/utils/`: shared utility modules (`timestamp.ts`, `text-utils.ts`, `file-utils.ts`, `time-helpers.ts`, `telemetry-helpers.ts`, `sqlite-helpers.ts`)
 - `src/connectors/`: provider/model connectors
-- `src/domain/`: schemas and runtime domain objects
+- `src/domain/`: schemas, runtime domain objects, and structured error types (`errors.ts`)
 - `src/auth/`: provider-specific auth helpers
 - `src/integrations/`: external surfaces such as Discord and the local HTTP webhook listener
 - `src/workers/`: background worker entrypoints
