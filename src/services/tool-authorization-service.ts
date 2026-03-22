@@ -103,11 +103,11 @@ export const TOOL_AUTH_DECLARATIONS: Record<string, ToolAuthorizationDeclaration
   update_preview: { access: "root", behavior: "uniform", note: "Reads the prepared source-root update metadata and changelog entries newer than the running service version." },
   update: { access: "root", behavior: "uniform", note: "Applies the latest prepared local update to the managed service, runs the healthcheck, and rolls back on failure." },
   service_rollback: { access: "root", behavior: "uniform", note: "Restarts the managed service on the previous release and verifies it with the healthcheck." },
-  launch_coding_agent: { access: "anyone", behavior: "role-sensitive", note: "Subagent profile selection is restricted by the caller's roles." },
-  resume_coding_agent: { access: "anyone", behavior: "role-sensitive", note: "Only coding-agent runs visible to the active profile can be resumed with follow-up instructions." },
-  steer_coding_agent: { access: "anyone", behavior: "role-sensitive", note: "Only coding-agent runs visible to the active profile can receive mid-run steering instructions." },
-  cancel_coding_agent: { access: "anyone", behavior: "role-sensitive", note: "Only coding-agent runs visible to the active profile can be cancelled." },
-  workflow_status: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile are returned." },
+  launch_agent: { access: "anyone", behavior: "role-sensitive", note: "Subagent profile selection is restricted by the caller's roles." },
+  resume_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can be resumed." },
+  steer_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can receive steering instructions." },
+  cancel_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can be cancelled." },
+  agent_status: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile are returned." },
 };
 
 export function getToolAuthorizationDeclaration(name: string): ToolAuthorizationDeclaration {

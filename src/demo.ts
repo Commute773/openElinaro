@@ -21,7 +21,6 @@ const immediateResponses = [
     medicationName: "Ibuprofen",
     medicationDueAt: "2026-03-11T21:00:00-04:00",
   }),
-  await app.handleRequest(app.createDemoWorkflowRequest("req-workflow")),
 ];
 
 await new Promise((resolve) => setTimeout(resolve, 10));
@@ -31,9 +30,9 @@ console.log(
     {
       name: "openelinaro",
       runtime: "bun",
-      orchestration: "imperative-runner",
+      orchestration: "tmux-subagent",
       immediateResponses,
-      workflowRuns: app.listWorkflowRuns(),
+      agentRuns: app.listAgentRuns(),
     },
     null,
     2,

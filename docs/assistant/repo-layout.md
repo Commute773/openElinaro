@@ -30,7 +30,7 @@ That means `projects/` is part of the assistant's world model, but not part of t
 - `src/index.ts`: Discord entrypoint
 - `src/demo.ts`: local demo runner without Discord
 - `src/app/`: runtime composition and request handling
-- `src/orchestration/`: workflow execution engine, decomposed into `workflow-graph.ts`, `workflow-executor.ts`, `workflow-planner.ts`, `workflow-agent-runner.ts`, `workflow-state.ts`, `workflow-timeout.ts`, and `workflow-types.ts`
+- `src/subagent/`: tmux-based subagent subsystem — event sidecar (`sidecar.ts`), tmux session management (`tmux.ts`), agent spawning (`spawn.ts`), run registry (`registry.ts`), timeout management (`timeout.ts`), and event types (`events.ts`)
 - `src/services/`: stateful application services, persistence, auth, model routing, tools, memory, logging, shell, and access control. Includes subdirectories `finance/` (extracted finance modules) and `gemini-live/` (extracted live phone modules)
 - `src/tools/`: tool definitions via `tool-registry.ts` and domain-specific tool groups under `groups/`
 - `src/config/`: runtime configuration and extracted constants (`runtime-config.ts`, `service-constants.ts`)

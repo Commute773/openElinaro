@@ -226,9 +226,8 @@ export interface DiscordAppRuntime {
   ): Promise<string>;
   getActiveModel(): { providerId: ModelProviderId };
   getActiveProfile(): { id: string };
-  createDemoWorkflowRequest(requestId: string): AppRequest;
-  getWorkflowRun(runId: string): ReturnType<OpenElinaroApp["getWorkflowRun"]>;
-  listWorkflowRuns(): ReturnType<OpenElinaroApp["listWorkflowRuns"]>;
+  getAgentRun(runId: string): ReturnType<OpenElinaroApp["getAgentRun"]>;
+  listAgentRuns(): ReturnType<OpenElinaroApp["listAgentRuns"]>;
 }
 
 export interface DiscordBatchedDirectMessage {
@@ -904,22 +903,14 @@ async function handleSlashCommand(params: {
     const action = interaction.options.getString("action", true);
 
     if (action === "demo") {
-      const response = await app.handleRequest(
-        app.createDemoWorkflowRequest(nextRequestId("workflow")),
-      );
-      await replyWithChunks(
-        interaction,
-        response.workflowRunId
-          ? `${response.message} Run id: ${response.workflowRunId}`
-          : response.message,
-      );
+      await replyWithChunks(interaction, "Demo workflow is no longer available. Use launch_agent tool from chat instead.");
       return;
     }
 
     const runId = interaction.options.getString("run_id") ?? undefined;
-    const run = runId ? app.getWorkflowRun(runId) : app.listWorkflowRuns().at(-1);
+    const run = runId ? app.getAgentRun(runId) : app.listAgentRuns().at(-1);
     if (!run) {
-      await replyWithChunks(interaction, "No workflow run found.");
+      await replyWithChunks(interaction, "No agent run found.");
       return;
     }
 
@@ -927,11 +918,10 @@ async function handleSlashCommand(params: {
       interaction,
       [
         `Run: ${run.id}`,
-        `Kind: ${run.kind}`,
+        `Provider: ${run.provider}`,
         `Status: ${run.status}`,
         `Goal: ${run.goal}`,
         run.workspaceCwd ? `Workspace: ${run.workspaceCwd}` : "",
-        run.plan ? `Tasks: ${run.plan.tasks.filter((task) => task.status === "completed").length}/${run.plan.tasks.length} completed` : "",
         `Summary: ${run.resultSummary ?? "pending"}`,
       ].join("\n"),
     );

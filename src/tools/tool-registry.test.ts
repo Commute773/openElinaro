@@ -220,52 +220,65 @@ function writeSharedPythonFixture(rootDir: string) {
 
 function createWorkflowStub() {
   return {
-    launchCodingAgent: () => ({
+    launchAgent: async () => ({
       id: "workflow-test-run",
-      kind: "coding-agent" as const,
       profileId: "root",
+      provider: "codex" as const,
       goal: "test goal",
-      status: "queued" as const,
+      status: "starting" as const,
+      tmuxSession: "openelinaro",
+      tmuxWindow: "workflow-test-run",
+      workspaceCwd: "/tmp/test",
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      executionLog: [],
-      taskReports: [],
+      launchDepth: 1,
+      timeoutMs: 300_000,
+      eventLog: [],
     }),
-    resumeCodingAgent: () => ({
+    resumeAgent: async () => ({
       id: "workflow-test-run",
-      kind: "coding-agent" as const,
       profileId: "root",
-      goal: "test goal",
-      status: "queued" as const,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      executionLog: [],
-      taskReports: [],
-    }),
-    steerCodingAgent: () => ({
-      id: "workflow-test-run",
-      kind: "coding-agent" as const,
-      profileId: "root",
+      provider: "codex" as const,
       goal: "test goal",
       status: "running" as const,
+      tmuxSession: "openelinaro",
+      tmuxWindow: "workflow-test-run",
+      workspaceCwd: "/tmp/test",
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      executionLog: [],
-      taskReports: [],
+      launchDepth: 1,
+      timeoutMs: 300_000,
+      eventLog: [],
     }),
-    cancelCodingAgent: () => ({
+    steerAgent: async () => ({
       id: "workflow-test-run",
-      kind: "coding-agent" as const,
       profileId: "root",
+      provider: "codex" as const,
+      goal: "test goal",
+      status: "running" as const,
+      tmuxSession: "openelinaro",
+      tmuxWindow: "workflow-test-run",
+      workspaceCwd: "/tmp/test",
+      createdAt: new Date().toISOString(),
+      launchDepth: 1,
+      timeoutMs: 300_000,
+      eventLog: [],
+    }),
+    cancelAgent: async () => ({
+      id: "workflow-test-run",
+      profileId: "root",
+      provider: "codex" as const,
       goal: "test goal",
       status: "cancelled" as const,
+      tmuxSession: "openelinaro",
+      tmuxWindow: "workflow-test-run",
+      workspaceCwd: "/tmp/test",
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      executionLog: [],
-      taskReports: [],
+      launchDepth: 1,
+      timeoutMs: 300_000,
+      eventLog: [],
     }),
-    getWorkflowRun: () => undefined,
-    listWorkflowRuns: () => [],
+    getAgentRun: () => undefined,
+    listAgentRuns: () => [],
+    captureAgentPane: async () => "",
   };
 }
 
@@ -740,11 +753,10 @@ describe("ToolRegistry tool catalog", () => {
     expect(result).toContain("conversation=thread-2");
   });
 
-  test("recommends a one-hour timeout for launch_coding_agent", () => {
+  test("recommends a one-hour timeout for launch_agent", () => {
     const catalog = createRegistry().getToolCatalog();
-    const launchTool = catalog.find((card) => card.name === "launch_coding_agent");
+    const launchTool = catalog.find((card) => card.name === "launch_agent");
 
-    expect(launchTool?.description).toContain("3,600,000 ms");
     expect(launchTool?.description).toContain("one hour");
     expect(launchTool?.description).toContain("Omit timeoutMs");
   });

@@ -125,18 +125,20 @@ Prepared-update commits must be made from a real branch tip, not a detached `HEA
 
 When an update or rollback is triggered from inside the live managed-service process itself, the runtime must hand that transition off to a detached helper job first. The managed service cannot safely restart itself in-process and still finish the transition sequence. Detached updates now acknowledge the request immediately in chat, then DM the operator again once the new version finishes booting and passes healthcheck. On macOS, those helpers must run as one-shot launchd agents rather than keepalive submitted jobs so a successful transition is not replayed in a loop.
 
-## 11. Local Coding Subagents Must Not Share A Mutable Checkout
+## 11. Subagents Run As External CLI Processes In tmux
 
-Background coding agents used to operate directly in the requested cwd. That made timeouts, cleanup, or explicit git restore operations dangerous because the child agent could mutate or discard the same worktree the operator was still using.
+Subagents are real CLI processes (Claude Code or Codex) running in individual tmux windows with isolated Git worktrees. Each profile can configure binary paths for one or both agent types via `subagentPaths` in the profile registry.
 
-Local `launch_coding_agent` runs now default to linked Git worktrees when the target cwd is part of a Git repository. The source workspace must be clean before the fork happens, because linked worktrees only capture committed state. If the source checkout is dirty, the launch is rejected instead of silently starting from an incomplete snapshot. The linked worktree is preserved after the run so unfinished edits or local commits remain recoverable.
+Completion tracking uses each agent's native event surface — Claude Code hooks (Stop, Notification) and Codex notify — which POST structured events to a local Unix socket sidecar. The runtime watches the event stream, not tmux pane output. tmux provides persistence across runtime restarts and manual attach for debugging.
+
+The source workspace must be clean before forking a linked worktree. Worktrees are preserved after completion so unfinished edits or local commits remain recoverable.
 
 Where to look:
 
-- `src/services/project-workspace-service.ts`
-- `src/services/access-control-service.ts`
-- `src/app/runtime.ts`
-- `src/tools/tool-registry.ts`
+- `src/subagent/` — sidecar, tmux manager, spawning, registry, timeouts
+- `src/app/runtime-subagent.ts` — controller and completion injection
+- `src/services/project-workspace-service.ts` — worktree isolation
+- `src/domain/subagent-run.ts` — run domain model
 
 Where to look:
 

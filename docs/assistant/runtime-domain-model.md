@@ -190,36 +190,31 @@ Thread-start continuity now combines:
 
 The generic recent-thread digest intentionally excludes `identity/` documents so the journal is only surfaced through the dedicated reflection bootstrap formatter.
 
-## Background coding runs
+## Background subagent runs
 
-Background coding-agent runs persist task-level reports in `~/.openelinaro/workflows.json`, and their in-flight planner/worker session transcripts live in `~/.openelinaro/workflow-sessions.json`.
+Subagents are external CLI processes (Claude Code or Codex) that run in individual tmux windows. Run state is persisted in `~/.openelinaro/subagent-runs.json`. The domain model is `SubagentRun` in `src/domain/subagent-run.ts`.
 
-The workflow execution pipeline is decomposed across dedicated orchestration modules: `workflow-executor.ts` (batch task execution and verification), `workflow-planner.ts` (plan generation and replanning), `workflow-agent-runner.ts` (structured tool-agent loop shared by planners and workers), `workflow-state.ts` (session history helpers, pruning, and resume-context builders), `workflow-types.ts` (shared type definitions, schemas, and error classes), and `workflow-timeout.ts` (time-awareness blocks and hard-timeout guards).
+Each profile can configure subagent binary paths via `subagentPaths.claude` and `subagentPaths.codex` in the profile registry. The `subagentPreferredProvider` field determines which agent type to use by default.
 
-- Planning and coding workers are bounded by `timeoutMs`; they do not have a fixed model-step cap.
-- `launch_coding_agent` defaults to a one-hour timeout when `timeoutMs` is omitted, and `resume_coding_agent` keeps the stored timeout or falls back to one hour.
-- Planner and worker subagents inherit the compiled `system_prompt/*.md` base prompt, then add explicit background-run runtime context including profile/project context, workspace identity, launch depth, and their planner/worker role.
-- Planner and worker sessions now record per-turn traces including model id, finish reason, token counts, the tools the model called, and the full tool bundle that was visible at the start of the turn. Those live on the in-flight session state and are archived to `~/.openelinaro/workflow-session-history.json` when the run reaches a terminal state.
-- In test-mode workflow runs (`NODE_ENV=test`), planner and worker sessions also expose an internal `report_progress` tool. The agent is instructed to call it before non-submission tool use so workflow logs capture short decision summaries in addition to raw tool events.
-- Large outputs from designated high-volume tools are persisted under `~/.openelinaro/tool-results/` and injected back into planner/worker and chat transcripts as compact refs. Raw payloads are reopened on demand with `tool_result_read` instead of being replayed automatically on every turn.
-- `launch_coding_agent` now saves the run directly as `running`; there is no queued pickup delay before the planner starts.
-- In-flight `running` coding runs are reloaded as `interrupted` on startup, then resumed from the persisted workflow-session state instead of being downgraded to a terminal interruption.
-- When the managed service restarts intentionally for config/feature changes, startup injects a short human continuation note into each recoverable persisted coding session so the agent knows the system restarted and should keep going.
-- Transient harness/provider disconnects and 429 rate limits keep the run in `running` with `runningState=backoff`, `retryCount`, and `nextAttemptAt` instead of converting the current task into a normal execution failure.
-- Task failures and blockers are recorded on the run instead of immediately aborting the whole subagent.
-- Coding runs now track `taskIssueCount`, `taskErrorCount`, and `consecutiveTaskErrorCount`.
-- Default tool visibility now differs between the main agent and coding subagents. Coding planners start with a narrow repo-inspection bundle; coding workers start with repo-inspection plus edit primitives (`write_file`, `edit_file`, `apply_patch`) and shell execution. Other tool families are loaded on demand through `load_tool_library` and are not part of the default subagent bundle. The narrow default bundles are assembled from per-family group builders in `src/tools/groups/` (e.g. `buildFilesystemTools`, `buildShellTools`, `buildProjectTools`).
-- Parent agents can now steer a live coding run with `steer_coding_agent` while it is still running. Steering messages are appended to the active planner or worker session and are consumed on the next model step instead of waiting for the run to finish.
-- Parent agents can now stop a pending or running coding run with `cancel_coding_agent`.
-- Coding-agent runs are no longer driven by a central queue runner; each run owns its own async lifecycle, and the only shared timer is for delayed retry/recovery wakeups.
-- `workflow_status` now reports elapsed runtime, `runningState`, retry metadata, last progress time, and stuck-state details so operators can tell the difference between active work, backoff, and a no-progress run.
-- When a coding run returns control to the parent thread, the foreground agent can either answer the user or call `resume_coding_agent` on the same run id with follow-up instructions. Resume requests clear the terminal state, requeue the same run, and pass the parent instruction back into the planner context.
-- A nightly docs indexer can sync generated markdown inventories plus AGENTS/system-prompt doc references and write `~/.openelinaro/docs-index.json`; it only runs when `core.app.docsIndexerEnabled` is true, and the default is disabled.
-- A coding run now ends as terminal `failed` whenever any task finishes `failed` or `blocked`, even if the run continued past an isolated issue and the consecutive task error threshold was not reached. The threshold still controls when the runner aborts early after repeated failures. The default threshold is `3` and lives in `core.app.workflow.maxConsecutiveTaskErrors`.
-- Local retry backoff defaults to five seconds and can be shortened or lengthened with `core.app.workflow.resumeRetryDelayMs` when needed for testing or operators.
-- Verification commands run through an internal harness verifier path rather than the worker's visible tool bundle, so sandboxed workers can still be auto-verified without exposing `exec_command` as a default worker tool. Cargo/rustdoc temp-directory permission failures are retried with a shared writable `TMPDIR` under `/tmp/openelinaro-workflow-verification/<profile>`.
-- Older workflow tool-result messages are pruned out of the model-visible session history only after stale tool output has piled up substantially, while recent tool results stay in context. The workflow pruner now protects roughly the most recent 40k estimated tokens of tool output and only starts clearing older tool messages when the stale remainder exceeds about 20k estimated tokens.
-- Timeouts and hard timeouts are still terminal failures; they keep the timeout handoff behavior described in the architecture docs.
+The subagent subsystem lives under `src/subagent/`:
+
+- **Sidecar** (`sidecar.ts`): In-process Bun HTTP server on a Unix domain socket (`~/.openelinaro/subagent-sidecar.sock`) that receives structured events from Claude Code hooks and Codex notify scripts.
+- **tmux** (`tmux.ts`): Manages a single tmux session with one window per active agent. Provides `runInWindow`, `sendKeys`, `killWindow`, `hasWindow`, and `capturePane` for debugging.
+- **Spawn** (`spawn.ts`): Builds spawn commands for Claude (interactive mode) and Codex (`--approval-mode full-auto`). Writes Claude hook configs (`.claude/settings.json`) and Codex notify scripts into the worktree before spawning.
+- **Registry** (`registry.ts`): Tracks `SubagentRun` objects with status transitions (`starting` → `running` → `completed`/`failed`/`cancelled`).
+- **Timeouts** (`timeout.ts`): Per-run `setTimeout` timers. On timeout: polite stop via tmux send-keys, grace period, then kill.
+
+Key behaviors:
+
+- `launch_agent` defaults to a one-hour timeout when `timeoutMs` is omitted.
+- Each launch creates an isolated linked Git worktree via `ProjectWorkspaceService`.
+- Completion is detected via the sidecar event stream (Claude Stop hook or Codex notify), not by polling tmux.
+- On completion or failure, a synthetic message is injected into the parent conversation automatically.
+- `steer_agent` injects text into the running agent's stdin via `tmux send-keys`.
+- `resume_agent` spawns a fresh agent process in the same worktree with continuation instructions.
+- `cancel_agent` kills the tmux window immediately.
+- On runtime restart, in-flight runs are recovered by checking if their tmux windows still exist; surviving agents get their timeouts re-registered for the remaining duration.
+- A nightly docs indexer can sync generated markdown inventories and write `~/.openelinaro/docs-index.json`; it only runs when `core.app.docsIndexerEnabled` is true.
 
 ## Routines, alarms, and timers
 

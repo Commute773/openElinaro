@@ -23,13 +23,6 @@ export const DISCORD_MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 export const DISCORD_MAX_TEXT_ATTACHMENT_BYTES = 256 * 1024;
 
 // ---------------------------------------------------------------------------
-// Workflow
-// ---------------------------------------------------------------------------
-export const WORKFLOW_DEFAULT_STUCK_AFTER_MS = 15 * 60_000;
-export const WORKFLOW_DEFAULT_HARD_TIMEOUT_GRACE_MS = 300_000;
-export const WORKFLOW_DEFAULT_MAX_CONSECUTIVE_TASK_ERRORS = 3;
-
-// ---------------------------------------------------------------------------
 // Profiles
 // ---------------------------------------------------------------------------
 export const DEFAULT_PROFILE_ID = "root";

@@ -4,6 +4,7 @@ import { parse, stringify } from "yaml";
 import { z } from "zod";
 import { DEFAULT_FINANCE, FinanceConfigSchema } from "./finance-config";
 import { resolveRuntimePath } from "../services/runtime-root";
+import { migrateConfigFile } from "./config-migrations";
 
 const MessageChannelSchema = z.enum(["sms", "mms", "whatsapp", "messenger", "viber"]);
 const DEFAULT_CORE_PROFILE = { activeProfileId: "root" };
@@ -17,17 +18,17 @@ const DEFAULT_CORE_CACHE_MISS = {
   maxCacheReadRatio: 0.2,
   discordCooldownMs: 15 * 60 * 1_000,
 };
-const DEFAULT_CORE_WORKFLOW = {
-  stuckAfterMs: 15 * 60_000,
-  maxConsecutiveTaskErrors: 3,
-  hardTimeoutGraceMs: 300_000,
-  resumeRetryDelayMs: 5_000,
+const DEFAULT_CORE_SUBAGENT = {
+  tmuxSession: "openelinaro",
+  defaultTimeoutMs: 3_600_000,
+  timeoutGraceMs: 30_000,
+  sidecarSocketPath: "",
 };
 const DEFAULT_CORE_APP = {
   automaticConversationMemoryEnabled: true,
   docsIndexerEnabled: false,
   cacheMissMonitor: DEFAULT_CORE_CACHE_MISS,
-  workflow: DEFAULT_CORE_WORKFLOW,
+  subagent: DEFAULT_CORE_SUBAGENT,
 };
 const DEFAULT_CORE_HTTP = { host: "0.0.0.0", port: 3000 };
 const DEFAULT_CORE = {
@@ -97,6 +98,7 @@ const DEFAULT_MEDIA = { enabled: false, roots: [] as string[] };
 const DEFAULT_AUTONOMOUS_TIME = { enabled: false, promptPath: "assistant_context/autonomous-time.md" };
 
 export const RuntimeConfigSchema = z.object({
+  configVersion: z.number().int().nonnegative().default(0),
   core: z.object({
     profile: z.object({
       activeProfileId: z.string().min(1).default("root"),
@@ -124,12 +126,12 @@ export const RuntimeConfigSchema = z.object({
         maxCacheReadRatio: z.number().min(0).max(1).default(0.2),
         discordCooldownMs: z.number().int().nonnegative().default(15 * 60 * 1_000),
       }).default(DEFAULT_CORE_CACHE_MISS),
-      workflow: z.object({
-        stuckAfterMs: z.number().int().positive().default(15 * 60_000),
-        maxConsecutiveTaskErrors: z.number().int().positive().default(3),
-        hardTimeoutGraceMs: z.number().int().nonnegative().default(300_000),
-        resumeRetryDelayMs: z.number().int().positive().default(5_000),
-      }).default(DEFAULT_CORE_WORKFLOW),
+      subagent: z.object({
+        tmuxSession: z.string().min(1).default("openelinaro"),
+        defaultTimeoutMs: z.number().int().positive().default(3_600_000),
+        timeoutGraceMs: z.number().int().nonnegative().default(30_000),
+        sidecarSocketPath: z.string().default(""),
+      }).default(DEFAULT_CORE_SUBAGENT),
     }).default(DEFAULT_CORE_APP),
     http: z.object({
       host: z.string().min(1).default("0.0.0.0"),
@@ -283,6 +285,7 @@ export function ensureRuntimeConfigFile() {
 }
 
 function loadFromDisk(configPath = ensureRuntimeConfigFile()) {
+  migrateConfigFile(configPath);
   const validated = validateRuntimeConfigFile(configPath);
   cachedConfigPath = configPath;
   return validated;

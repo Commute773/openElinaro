@@ -32,6 +32,10 @@ export const ProfileRecordSchema = z.object({
   subagentPreferredProvider: ModelProviderSchema.optional(),
   subagentDefaultModelId: z.string().min(1).optional(),
   maxSubagentDepth: z.number().int().min(0).optional(),
+  subagentPaths: z.object({
+    claude: z.string().min(1).optional(),
+    codex: z.string().min(1).optional(),
+  }).optional(),
 });
 export type ProfileRecord = z.infer<typeof ProfileRecordSchema>;
 

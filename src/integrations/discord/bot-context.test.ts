@@ -100,17 +100,10 @@ function createFakeApp(calls: Array<{ name: string; input: unknown }>): DiscordA
     getActiveProfile() {
       return { id: "root" };
     },
-    createDemoWorkflowRequest(requestId: string) {
-      return {
-        id: requestId,
-        kind: "workflow" as const,
-        text: "demo",
-      };
-    },
-    getWorkflowRun() {
+    getAgentRun() {
       return undefined;
     },
-    listWorkflowRuns() {
+    listAgentRuns() {
       return [];
     },
   };

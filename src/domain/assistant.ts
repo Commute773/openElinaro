@@ -1,7 +1,6 @@
 import { z } from "zod";
-import type { TaskPlan } from "./task-plan";
 
-export const RequestKindSchema = z.enum(["chat", "todo", "medication", "workflow"]);
+export const RequestKindSchema = z.enum(["chat", "todo", "medication"]);
 
 export type RequestKind = z.infer<typeof RequestKindSchema>;
 
@@ -43,7 +42,6 @@ export interface AppRequest {
   todoTitle?: string;
   medicationName?: string;
   medicationDueAt?: string;
-  workflowPlan?: TaskPlan;
 }
 
 export interface AppResponse {
@@ -52,5 +50,4 @@ export interface AppResponse {
   message: string;
   warnings?: string[];
   attachments?: AppResponseAttachment[];
-  workflowRunId?: string;
 }
