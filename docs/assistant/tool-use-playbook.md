@@ -13,6 +13,7 @@ Default rule:
 - `tool_search` matches against tool names, descriptions, tags, domains, and short example intents.
 - Let `tool_search` activate a few likely tools, then use those tools directly.
 - Discord `/update` now fast-forwards the source checkout and replies with the pending deployment changelog entries newer than the running version. `confirm:true` is the actual deploy step. The root-only `update_preview` tool is the non-deploying source-sync-plus-summary step, while `update` is the managed-service deploy step.
+- Managed-service installs now export their configured service identity into the runtime environment so detached `/update confirm:true` helpers can reinstall the service with the same user, group, and unit metadata.
 
 Good `tool_search` queries:
 

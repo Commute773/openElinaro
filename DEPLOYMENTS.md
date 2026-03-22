@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.11
+- Released at: 2026-03-22T00:44:45Z
+- Release id: 20260322T004445Z-868b95f
+- Previous version: 2026.03.22.10
+- Trigger: managed service update
+
+Document that detached managed-service updates inherit the installed service identity from the live unit metadata.
+This is a docs-only follow-up release after validating the real /update confirm:true flow on krysalstis.
+
 ## 2026.03.22.10
 - Released at: 2026-03-22T00:41:22Z
 - Release id: 20260322T004122Z-4234728
