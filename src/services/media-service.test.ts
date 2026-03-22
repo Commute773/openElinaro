@@ -83,7 +83,7 @@ describe("MediaService", () => {
     const originalRootDir = process.env.OPENELINARO_ROOT_DIR;
     try {
       process.env.OPENELINARO_ROOT_DIR = tempRoot;
-      const runtimeMediaRoot = path.join(tempRoot, "media");
+      const runtimeMediaRoot = path.join(tempRoot, ".openelinarotest", "media");
       const speakerConfigPath = path.join(tempRoot, "speakers.json");
       const stateRoot = path.join(tempRoot, ".openelinarotest", "media");
       writeFile(path.join(runtimeMediaRoot, "ambience", "thunder.mp3"));
