@@ -57,11 +57,15 @@ function createHarness(options?: {
     docsIndexer?: Pick<DocsIndexService, "isEnabled" | "getNextScheduledRunAt" | "sync">;
     docsIndexState?: Pick<DocsIndexStateService, "load" | "save">;
   };
+  nextAutonomousTimeAt?: string | null;
+  autonomousTriggered?: boolean;
+  throwAutonomousTime?: boolean;
 }) {
   const sent: string[] = [];
   const recorded: Array<{ conversationKey: string; message: string }> = [];
   const deliveredAlarmIds: string[] = [];
   let heartbeatCalls = 0;
+  let autonomousTimeCalls = 0;
   let nextAlarmDueAt: string | null = null;
   let alarmScheduleChangedListener: (() => void) | null = null;
   const client = {
@@ -82,6 +86,7 @@ function createHarness(options?: {
     getNotificationTargetUserId: () => options?.userId ?? "discord-user",
     getNextAlarmDueAt: () => nextAlarmDueAt,
     getNextRoutineAttentionAt: () => null,
+    getNextAutonomousTimeAt: () => options?.nextAutonomousTimeAt ?? null,
     listDueAlarms: () => options?.dueAlarms ?? [],
     markAlarmDelivered: (alarmId: string) => {
       deliveredAlarmIds.push(alarmId);
@@ -132,6 +137,19 @@ function createHarness(options?: {
         completed: options?.heartbeatCompleted ?? true,
       };
     },
+    runAutonomousTimeSession: async () => {
+      autonomousTimeCalls += 1;
+      if (options?.throwAutonomousTime) {
+        throw new Error("autonomous time failed");
+      }
+      return {
+        requestId: "autonomous-time-request",
+        mode: "accepted" as const,
+        message: "",
+        warnings: [],
+        triggered: options?.autonomousTriggered ?? true,
+      };
+    },
     runAlarmNotification: async (
       _conversationKey: string,
       alarm: { id: string },
@@ -166,6 +184,7 @@ function createHarness(options?: {
     recorded,
     deliveredAlarmIds,
     heartbeatCalls: () => heartbeatCalls,
+    autonomousTimeCalls: () => autonomousTimeCalls,
     setNextAlarmDueAt: (value: string | null) => {
       nextAlarmDueAt = value;
     },
@@ -539,5 +558,58 @@ describe("DiscordRoutinesNotifier", () => {
     harness.notifier.stop();
 
     expect(syncCalls).toBe(1);
+  });
+
+  test("runs autonomous time when it is due even without a Discord target user", async () => {
+    const harness = createHarness({
+      userId: null,
+      nextAutonomousTimeAt: new Date(Date.now() - 60_000).toISOString(),
+    });
+
+    await (harness.notifier as never as { runTick: () => Promise<void> }).runTick();
+    harness.notifier.stop();
+
+    expect(harness.autonomousTimeCalls()).toBe(1);
+    expect(harness.sent).toEqual([]);
+    expect(harness.recorded).toEqual([]);
+  });
+
+  test("schedules autonomous time when it is earlier than the next heartbeat", () => {
+    const realSetTimeout = globalThis.setTimeout;
+    const realClearTimeout = globalThis.clearTimeout;
+    const scheduled: number[] = [];
+    let nextHandle = 0;
+
+    globalThis.setTimeout = ((callback: (...args: never[]) => void, delay?: number) => {
+      void callback;
+      scheduled.push(delay as number);
+      return (++nextHandle) as unknown as ReturnType<typeof setTimeout>;
+    }) as unknown as typeof setTimeout;
+    globalThis.clearTimeout = (() => {}) as unknown as typeof clearTimeout;
+
+    try {
+      const now = new Date("2026-03-22T06:55:00.000Z");
+      const harness = createHarness({
+        nextAutonomousTimeAt: "2026-03-22T07:00:00.000Z",
+      });
+      const notifier = harness.notifier as never as {
+        nextHeartbeatAt: number;
+      };
+      notifier.nextHeartbeatAt = new Date("2026-03-22T08:00:00.000Z").getTime();
+
+      const realNow = Date.now;
+      Date.now = () => now.getTime();
+      try {
+        harness.notifier.start();
+      } finally {
+        Date.now = realNow;
+      }
+      harness.notifier.stop();
+
+      expect(scheduled[0]).toBe(300_000);
+    } finally {
+      globalThis.setTimeout = realSetTimeout;
+      globalThis.clearTimeout = realClearTimeout;
+    }
   });
 });

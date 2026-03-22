@@ -24,11 +24,19 @@ In test mode, each test creates an isolated temp directory and sets `OPENELINARO
 - `tickets`
 - `localVoice`
 - `media`
+- `autonomousTime`
 
 Each optional feature has:
 
 - `enabled`
 - feature-specific config fields
+
+`autonomousTime` is a runtime automation block rather than a tool-surface feature:
+
+- `autonomousTime.enabled`
+- `autonomousTime.promptPath`
+
+When enabled, the runtime launches one private autonomous session per local day after 4:00 AM using the Markdown prompt loaded from `autonomousTime.promptPath` under `~/.openelinaro/` unless the path is absolute.
 
 `core` now also owns the shared Python runtime path for every Python-backed feature:
 

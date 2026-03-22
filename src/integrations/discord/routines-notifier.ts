@@ -33,7 +33,7 @@ export class DiscordRoutinesNotifier {
   private readonly docsIndexState: DocsIndexStateService;
   private readonly docsIndexer: DocsIndexService;
   private nextHeartbeatAt = this.computeInitialNextHeartbeatAt();
-  private nextAutonomousTimeAt = this.computeInitialNextAutonomousTimeAt();
+  private nextAutonomousTimeAt: number;
   private nextDocsIndexAt: number;
   private running = false;
 
@@ -47,6 +47,7 @@ export class DiscordRoutinesNotifier {
   ) {
     this.docsIndexState = options?.docsIndexState ?? new DocsIndexStateService();
     this.docsIndexer = options?.docsIndexer ?? new DocsIndexService();
+    this.nextAutonomousTimeAt = this.computeInitialNextAutonomousTimeAt();
     this.nextDocsIndexAt = this.computeInitialNextDocsIndexAt();
   }
 
@@ -162,7 +163,12 @@ export class DiscordRoutinesNotifier {
   }
 
   private computeInitialNextAutonomousTimeAt(reference = new Date()) {
-    const nextRunAt = this.app.getNextAutonomousTimeAt?.(reference);
+    const getNextAutonomousTimeAt = (this.app as OpenElinaroApp & {
+      getNextAutonomousTimeAt?: (reference?: Date) => string | undefined;
+    }).getNextAutonomousTimeAt;
+    const nextRunAt = typeof getNextAutonomousTimeAt === "function"
+      ? getNextAutonomousTimeAt.call(this.app, reference)
+      : undefined;
     return nextRunAt ? new Date(nextRunAt).getTime() : Number.POSITIVE_INFINITY;
   }
 
