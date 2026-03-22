@@ -1,7 +1,6 @@
 import type { AppProgressEvent, AppRequest, AppResponse } from "../domain/assistant";
 import type { ProfileRecord } from "../domain/profiles";
-import { createTaskPlan } from "../domain/task-plan";
-import type { WorkflowRun } from "../domain/workflow-run";
+import type { SubagentRun } from "../domain/subagent-run";
 import { ConversationStore } from "../services/conversation-store";
 import { FinanceService } from "../services/finance-service";
 import { HealthTrackingService } from "../services/health-tracking-service";
@@ -13,20 +12,24 @@ import { RoutinesService } from "../services/routines-service";
 import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
 import { SystemPromptService } from "../services/system-prompt-service";
 import { telemetry } from "../services/telemetry";
-import { WorkflowRegistry } from "../services/workflow-registry";
-import { WorkflowSessionStore } from "../services/workflow-session-store";
 import { AlarmNotificationService } from "../services/alarm-notification-service";
 import { AlarmService, type ScheduledAlarm } from "../services/alarm-service";
 import { WorkPlanningService } from "../services/work-planning-service";
 import { CalendarSyncService } from "../services/calendar-sync-service";
+import { getRuntimeConfig } from "../config/runtime-config";
+import { resolveRuntimePath } from "../services/runtime-root";
 
 import { type RuntimeScope, createRuntimeScope } from "./runtime-scope";
 import {
-  createWorkflowController,
-  startWorkflowRun,
-  injectPendingServiceRestartContinuations,
-  kickBackgroundRunner,
-} from "./runtime-workflow";
+  createSubagentController,
+  recoverSubagentRuns,
+} from "./runtime-subagent";
+import {
+  SubagentRegistry,
+  SubagentSidecar,
+  SubagentTimeoutManager,
+  TmuxManager,
+} from "../subagent";
 import {
   finalizeAppResponse,
   buildThreadStartSystemContext,
@@ -41,8 +44,8 @@ type BackgroundConversationResponseNotifier = (params: {
 
 export class OpenElinaroApp {
   private readonly appTelemetry = telemetry.child({ component: "app" });
-  private readonly registry = this.appTelemetry.instrumentMethods(new WorkflowRegistry(), {
-    component: "workflow_registry",
+  private readonly subagentRegistry = this.appTelemetry.instrumentMethods(new SubagentRegistry(), {
+    component: "subagent_registry",
   });
   private readonly routines = this.appTelemetry.instrumentMethods(new RoutinesService(), {
     component: "routine",
@@ -74,9 +77,6 @@ export class OpenElinaroApp {
   private readonly calendar = this.appTelemetry.instrumentMethods(new CalendarSyncService(this.routines), {
     component: "calendar",
   });
-  private readonly workflowSessions = this.appTelemetry.instrumentMethods(new WorkflowSessionStore(), {
-    component: "workflow_session_store",
-  });
   private readonly workspaces = this.appTelemetry.instrumentMethods(new ProjectWorkspaceService(), {
     component: "project_workspace",
   });
@@ -89,14 +89,102 @@ export class OpenElinaroApp {
     conversationKey: string;
     active: boolean;
   }) => Promise<void> | void;
-  private readonly activeWorkflowControllers = new Map<string, AbortController>();
-  private readonly backgroundRetryTimerRef: { current: ReturnType<typeof setTimeout> | null } = { current: null };
+  private readonly tmux: TmuxManager;
+  private readonly subagentTimeouts: SubagentTimeoutManager;
+  private readonly subagentSidecar: SubagentSidecar;
 
   constructor(options?: { profileId?: string }) {
     this.profiles = this.appTelemetry.instrumentMethods(new ProfileService(options?.profileId), {
       component: "profile",
     });
     this.activeProfile = this.profiles.getActiveProfile();
+
+    // Initialize subagent infrastructure
+    const subagentConfig = getRuntimeConfig().core.app.subagent;
+    this.tmux = new TmuxManager(subagentConfig.tmuxSession);
+    const sidecarSocketPath = subagentConfig.sidecarSocketPath || resolveRuntimePath("subagent-sidecar.sock");
+    this.subagentSidecar = new SubagentSidecar(sidecarSocketPath);
+    this.subagentTimeouts = new SubagentTimeoutManager(this.tmux, subagentConfig.timeoutGraceMs);
+
+    // Start sidecar and subscribe to events
+    this.subagentSidecar.start();
+    this.subagentSidecar.onEvent((event) => {
+      const run = this.subagentRegistry.get(event.runId);
+      if (!run) return;
+
+      this.subagentRegistry.appendEvent(event.runId, {
+        kind: event.kind,
+        timestamp: event.timestamp,
+        summary: (event.payload.result as string) || (event.payload.output as string) || undefined,
+      });
+
+      if (event.kind === "worker.completed") {
+        this.subagentTimeouts.clear(event.runId);
+        const completedRun = this.subagentRegistry.markCompleted(
+          event.runId,
+          (event.payload.result as string) || (event.payload.output as string) || undefined,
+        );
+        if (completedRun) {
+          const controller = this.buildSubagentController(this.activeProfile.id);
+          // Inject completion into parent conversation
+          void this.handleRequest(
+            {
+              id: `subagent-complete-${completedRun.id}`,
+              kind: "chat",
+              text: `Background subagent completion update.\n\nRun id: ${completedRun.id}\nProvider: ${completedRun.provider}\nProfile: ${completedRun.profileId}\nSubagent depth: ${completedRun.launchDepth}\n\n${completedRun.completionMessage ?? ""}\n\nDecide what to do next in the main thread. This completion update was pushed into the parent conversation automatically. If the same subagent should continue, call resume_agent with runId ${completedRun.id}. If more work should happen in a fresh worker, launch a new agent.`,
+              conversationKey: completedRun.originConversationKey ?? completedRun.id,
+            },
+            { typingEligible: false },
+          ).catch((error) => {
+            this.appTelemetry.recordError(error, {
+              subagentRunId: completedRun.id,
+              operation: "subagent.completion_injection",
+            });
+          });
+        }
+      }
+
+      if (event.kind === "worker.failed") {
+        this.subagentTimeouts.clear(event.runId);
+        const failedRun = this.subagentRegistry.markFailed(
+          event.runId,
+          (event.payload.error as string) || "Agent failed",
+        );
+        if (failedRun) {
+          void this.handleRequest(
+            {
+              id: `subagent-complete-${failedRun.id}`,
+              kind: "chat",
+              text: `Background subagent completion update.\n\nRun id: ${failedRun.id}\nProvider: ${failedRun.provider}\nProfile: ${failedRun.profileId}\nSubagent depth: ${failedRun.launchDepth}\n\n${failedRun.completionMessage ?? ""}\n\nDecide what to do next in the main thread. This completion update was pushed into the parent conversation automatically. If the same subagent should continue, call resume_agent with runId ${failedRun.id}. If more work should happen in a fresh worker, launch a new agent.`,
+              conversationKey: failedRun.originConversationKey ?? failedRun.id,
+            },
+            { typingEligible: false },
+          ).catch((error) => {
+            this.appTelemetry.recordError(error, {
+              subagentRunId: failedRun.id,
+              operation: "subagent.completion_injection",
+            });
+          });
+        }
+      }
+    });
+
+    // Recover any in-flight runs from previous session
+    void recoverSubagentRuns({
+      registry: this.subagentRegistry,
+      tmux: this.tmux,
+      timeouts: this.subagentTimeouts,
+      onTimeout: (runId) => {
+        const run = this.subagentRegistry.get(runId);
+        if (run && run.status !== "completed" && run.status !== "failed" && run.status !== "cancelled") {
+          this.subagentRegistry.markFailed(runId, "Agent timed out.");
+        }
+      },
+    }).catch((error) => {
+      this.appTelemetry.recordError(error, {
+        operation: "subagent.recovery",
+      });
+    });
 
     void this.getScope().memory.ensureReady().catch((error) => {
       this.appTelemetry.recordError(error, {
@@ -110,13 +198,6 @@ export class OpenElinaroApp {
         operation: "calendar.initial_sync",
       });
     });
-
-    injectPendingServiceRestartContinuations({
-      serviceRestartNotices: this.serviceRestartNotices,
-      registry: this.registry,
-      workflowSessions: this.workflowSessions,
-    });
-    this.doKickBackgroundRunner();
   }
 
   async handleRequest(
@@ -219,62 +300,47 @@ export class OpenElinaroApp {
           });
         }
 
-        if (!request.workflowPlan) {
-          throw new Error("Workflow requests require a workflowPlan.");
-        }
-
-        const run = this.registry.enqueuePlan(request.workflowPlan, {
-          profileId: scope.profile.id,
-          originConversationKey: request.conversationKey,
-          requestedBy: "app-runtime",
-        });
-        this.doKickBackgroundRunner();
-
-        return finalizeAppResponse(scope, {
-          requestId: request.id,
-          mode: "accepted",
-          message: "Complex work accepted into the background workflow lane.",
-          workflowRunId: run.id,
-        });
+        throw new Error(`Unsupported request kind: ${request.kind}`);
       },
     );
   }
 
-  listWorkflowRuns(): WorkflowRun[] {
-    return this.buildWorkflowController(this.activeProfile.id).listWorkflowRuns();
+  listAgentRuns(): SubagentRun[] {
+    return this.buildSubagentController(this.activeProfile.id).listAgentRuns();
   }
 
-  launchCodingAgent(params: {
+  launchAgent(params: {
     goal: string;
     cwd?: string;
     profileId?: string;
+    provider?: "claude" | "codex";
     originConversationKey?: string;
     requestedBy?: string;
     timeoutMs?: number;
     subagentDepth?: number;
   }) {
-    return this.buildWorkflowController(this.activeProfile.id).launchCodingAgent(params);
+    return this.buildSubagentController(this.activeProfile.id).launchAgent(params);
   }
 
-  resumeCodingAgent(params: {
+  resumeAgent(params: {
     runId: string;
     message?: string;
     timeoutMs?: number;
   }) {
-    return this.buildWorkflowController(this.activeProfile.id).resumeCodingAgent(params);
+    return this.buildSubagentController(this.activeProfile.id).resumeAgent(params);
   }
 
-  steerCodingAgent(params: {
+  steerAgent(params: {
     runId: string;
     message: string;
   }) {
-    return this.buildWorkflowController(this.activeProfile.id).steerCodingAgent(params);
+    return this.buildSubagentController(this.activeProfile.id).steerAgent(params);
   }
 
-  cancelCodingAgent(params: {
+  cancelAgent(params: {
     runId: string;
   }) {
-    return this.buildWorkflowController(this.activeProfile.id).cancelCodingAgent(params);
+    return this.buildSubagentController(this.activeProfile.id).cancelAgent(params);
   }
 
   noteDiscordUser(userId: string) {
@@ -729,46 +795,8 @@ export class OpenElinaroApp {
     return this.routines.getNextRoutineAttentionAt(reference);
   }
 
-  getWorkflowRun(runId: string): WorkflowRun | undefined {
-    return this.buildWorkflowController(this.activeProfile.id).getWorkflowRun(runId);
-  }
-
-  createDemoWorkflowRequest(requestId: string): AppRequest {
-    return {
-      id: requestId,
-      kind: "workflow",
-      text: "Prepare the full care update and task plan",
-      workflowPlan: createTaskPlan("Prepare a care and operations update", [
-        {
-          id: "collect-notes",
-          title: "Collect recent notes",
-          status: "completed",
-          executionMode: "serial",
-          dependsOn: [],
-        },
-        {
-          id: "review-meds",
-          title: "Review medication schedule",
-          status: "ready",
-          executionMode: "serial",
-          dependsOn: ["collect-notes"],
-        },
-        {
-          id: "draft-summary",
-          title: "Draft summary",
-          status: "ready",
-          executionMode: "parallel",
-          dependsOn: ["review-meds"],
-        },
-        {
-          id: "update-todos",
-          title: "Update todo list",
-          status: "ready",
-          executionMode: "parallel",
-          dependsOn: ["review-meds"],
-        },
-      ]),
-    };
+  getAgentRun(runId: string): SubagentRun | undefined {
+    return this.buildSubagentController(this.activeProfile.id).getAgentRun(runId);
   }
 
   private getScope(
@@ -818,42 +846,23 @@ export class OpenElinaroApp {
             });
           }
         : undefined,
-      createWorkflowController: (pid: string) => this.buildWorkflowController(pid),
+      createSubagentController: (pid: string) => this.buildSubagentController(pid),
     });
     this.scopes.set(scopeKey, scope);
     return scope;
   }
 
-  private buildWorkflowController(sourceProfileId: string) {
+  private buildSubagentController(sourceProfileId: string) {
     const getNotifier = () => this.onBackgroundConversationResponse;
-    return createWorkflowController({
+    return createSubagentController({
       sourceProfileId,
       profiles: this.profiles,
       activeProfile: this.activeProfile,
-      appTelemetry: this.appTelemetry,
-      registry: this.registry,
-      workflowSessions: this.workflowSessions,
+      registry: this.subagentRegistry,
+      tmux: this.tmux,
+      timeouts: this.subagentTimeouts,
+      sidecar: this.subagentSidecar,
       workspaces: this.workspaces,
-      systemPrompts: this.systemPrompts,
-      activeWorkflowControllers: this.activeWorkflowControllers,
-      backgroundRetryTimer: this.backgroundRetryTimerRef,
-      getScope: (profileId, options) => this.getScope(profileId, options),
-      handleRequest: (request: AppRequest, options?: any) => this.handleRequest(request, options),
-      get onBackgroundConversationResponse() { return getNotifier(); },
-    });
-  }
-
-  private doKickBackgroundRunner(): void {
-    const getNotifier = () => this.onBackgroundConversationResponse;
-    kickBackgroundRunner({
-      registry: this.registry,
-      activeWorkflowControllers: this.activeWorkflowControllers,
-      backgroundRetryTimer: this.backgroundRetryTimerRef,
-      appTelemetry: this.appTelemetry,
-      workflowSessions: this.workflowSessions,
-      systemPrompts: this.systemPrompts,
-      profiles: this.profiles,
-      activeProfile: this.activeProfile,
       getScope: (profileId, options) => this.getScope(profileId, options),
       handleRequest: (request: AppRequest, options?: any) => this.handleRequest(request, options),
       get onBackgroundConversationResponse() { return getNotifier(); },

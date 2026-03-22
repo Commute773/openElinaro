@@ -246,52 +246,65 @@ function createScriptedConnector(
 
 function createWorkflowStub() {
   return {
-    launchCodingAgent: () => ({
+    launchAgent: async () => ({
       id: "workflow-test-run",
-      kind: "coding-agent" as const,
       profileId: "root",
+      provider: "codex" as const,
       goal: "test goal",
-      status: "queued" as const,
+      status: "starting" as const,
+      tmuxSession: "openelinaro",
+      tmuxWindow: "workflow-test-run",
+      workspaceCwd: "/tmp/test",
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      executionLog: [],
-      taskReports: [],
+      launchDepth: 1,
+      timeoutMs: 300_000,
+      eventLog: [],
     }),
-    resumeCodingAgent: () => ({
+    resumeAgent: async () => ({
       id: "workflow-test-run",
-      kind: "coding-agent" as const,
       profileId: "root",
-      goal: "test goal",
-      status: "queued" as const,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      executionLog: [],
-      taskReports: [],
-    }),
-    steerCodingAgent: () => ({
-      id: "workflow-test-run",
-      kind: "coding-agent" as const,
-      profileId: "root",
+      provider: "codex" as const,
       goal: "test goal",
       status: "running" as const,
+      tmuxSession: "openelinaro",
+      tmuxWindow: "workflow-test-run",
+      workspaceCwd: "/tmp/test",
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      executionLog: [],
-      taskReports: [],
+      launchDepth: 1,
+      timeoutMs: 300_000,
+      eventLog: [],
     }),
-    cancelCodingAgent: () => ({
+    steerAgent: async () => ({
       id: "workflow-test-run",
-      kind: "coding-agent" as const,
       profileId: "root",
+      provider: "codex" as const,
+      goal: "test goal",
+      status: "running" as const,
+      tmuxSession: "openelinaro",
+      tmuxWindow: "workflow-test-run",
+      workspaceCwd: "/tmp/test",
+      createdAt: new Date().toISOString(),
+      launchDepth: 1,
+      timeoutMs: 300_000,
+      eventLog: [],
+    }),
+    cancelAgent: async () => ({
+      id: "workflow-test-run",
+      profileId: "root",
+      provider: "codex" as const,
       goal: "test goal",
       status: "cancelled" as const,
+      tmuxSession: "openelinaro",
+      tmuxWindow: "workflow-test-run",
+      workspaceCwd: "/tmp/test",
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      executionLog: [],
-      taskReports: [],
+      launchDepth: 1,
+      timeoutMs: 300_000,
+      eventLog: [],
     }),
-    getWorkflowRun: () => undefined,
-    listWorkflowRuns: () => [],
+    getAgentRun: () => undefined,
+    listAgentRuns: () => [],
+    captureAgentPane: async () => "",
   };
 }
 
@@ -471,17 +484,10 @@ function createDiscordAppHarness(options?: {
       getActiveProfile() {
         return profile;
       },
-      createDemoWorkflowRequest(requestId: string) {
-        return {
-          id: requestId,
-          kind: "workflow" as const,
-          text: "Test workflow request",
-        };
-      },
-      getWorkflowRun() {
+      getAgentRun() {
         return undefined;
       },
-      listWorkflowRuns() {
+      listAgentRuns() {
         return [] as never[];
       },
     },
@@ -972,17 +978,10 @@ if (RUN_CHILD_SUITE) {
         getActiveProfile() {
           return { id: "root" };
         },
-        createDemoWorkflowRequest(requestId: string) {
-          return {
-            id: requestId,
-            kind: "workflow" as const,
-            text: "demo",
-          };
-        },
-        getWorkflowRun() {
+          getAgentRun() {
           return undefined;
         },
-        listWorkflowRuns() {
+        listAgentRuns() {
           return [];
         },
       },
@@ -1026,17 +1025,10 @@ if (RUN_CHILD_SUITE) {
         getActiveProfile() {
           return { id: "root" };
         },
-        createDemoWorkflowRequest(requestId: string) {
-          return {
-            id: requestId,
-            kind: "workflow" as const,
-            text: "demo",
-          };
-        },
-        getWorkflowRun() {
+          getAgentRun() {
           return undefined;
         },
-        listWorkflowRuns() {
+        listAgentRuns() {
           return [];
         },
       },
@@ -1082,17 +1074,10 @@ if (RUN_CHILD_SUITE) {
         getActiveProfile() {
           return { id: "root" };
         },
-        createDemoWorkflowRequest(requestId: string) {
-          return {
-            id: requestId,
-            kind: "workflow" as const,
-            text: "demo",
-          };
-        },
-        getWorkflowRun() {
+          getAgentRun() {
           return undefined;
         },
-        listWorkflowRuns() {
+        listAgentRuns() {
           return [];
         },
       },

@@ -86,7 +86,7 @@ function createHarness(options?: {
     getNotificationTargetUserId: () => options?.userId ?? "discord-user",
     getNextAlarmDueAt: () => nextAlarmDueAt,
     getNextRoutineAttentionAt: () => null,
-    getNextAutonomousTimeAt: () => options?.nextAutonomousTimeAt ?? null,
+    getNextAutonomousTimeAt: () => options?.nextAutonomousTimeAt ?? undefined,
     listDueAlarms: () => options?.dueAlarms ?? [],
     markAlarmDelivered: (alarmId: string) => {
       deliveredAlarmIds.push(alarmId);

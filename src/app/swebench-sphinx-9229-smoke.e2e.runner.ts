@@ -52,7 +52,7 @@ type WorkflowSessionStoreSnapshot = {
 };
 
 type LiveStreamState = {
-  executionLogCount: number;
+  eventLogCount: number;
   sessionProgressCounts: Map<string, number>;
   sessionMessageCounts: Map<string, number>;
   lastRunStatus?: string;
@@ -242,7 +242,7 @@ function streamNewWorkflowOutput(
   state: LiveStreamState,
   run: {
     status: string;
-    executionLog: string[];
+    eventLog: Array<{ kind: string; timestamp: string; summary?: string }>;
   } | undefined,
   sessionStorePath: string,
 ) {
@@ -252,11 +252,11 @@ function streamNewWorkflowOutput(
   }
 
   if (run) {
-    const newExecutionLog = run.executionLog.slice(state.executionLogCount);
-    for (const entry of newExecutionLog) {
-      streamLine(`[smoke][run] ${entry}`);
+    const newEventLog = run.eventLog.slice(state.eventLogCount);
+    for (const entry of newEventLog) {
+      streamLine(`[smoke][run] ${entry.kind}${entry.summary ? `: ${entry.summary}` : ""}`);
     }
-    state.executionLogCount = run.executionLog.length;
+    state.eventLogCount = run.eventLog.length;
   }
 
   const sessions = readJsonIfExists<WorkflowSessionStoreSnapshot>(sessionStorePath)?.sessions ?? {};
@@ -634,7 +634,7 @@ async function main() {
   const originalDoGenerate = activeConnectorModule.ActiveModelConnector.prototype.doGenerate;
   const turnRecords: TurnRecord[] = [];
   const liveStreamState: LiveStreamState = {
-    executionLogCount: 0,
+    eventLogCount: 0,
     sessionProgressCounts: new Map<string, number>(),
     sessionMessageCounts: new Map<string, number>(),
   };
@@ -706,7 +706,7 @@ async function main() {
 
     try {
       await waitFor(() => {
-        const run = app.getWorkflowRun(runId!);
+        const run = app.getAgentRun(runId!);
         streamNewWorkflowOutput(
           liveStreamState,
           run,
@@ -723,7 +723,7 @@ async function main() {
         realModelTurnCount,
         launchResponse,
         workspaceRoot,
-        run: app.getWorkflowRun(runId!),
+        run: app.getAgentRun(runId!),
         turnRecords,
         workflowSessions: readJsonIfExists<Record<string, unknown>>(resolveTestPath("workflow-sessions.json")),
         workflows: readJsonIfExists<Record<string, unknown>>(resolveTestPath("workflows.json")),
@@ -735,7 +735,7 @@ async function main() {
       throw error;
     }
 
-    const run = app.getWorkflowRun(runId!);
+    const run = app.getAgentRun(runId!);
     assert.ok(run, "Expected workflow run to be readable after completion.");
     streamNewWorkflowOutput(
       liveStreamState,

@@ -438,29 +438,33 @@ describe("profile-scoped auth and permissions", () => {
       systemPrompts,
       transitions,
       {
-        launchCodingAgent: () =>
+        launchAgent: async () =>
           ({
             id: "run-1",
-            kind: "coding-agent",
             profileId: "restricted",
+            provider: "codex" as const,
             goal: "goal",
-            status: "queued",
+            status: "starting" as const,
+            tmuxSession: "openelinaro",
+            tmuxWindow: "run-1",
+            workspaceCwd: "/tmp/test",
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            executionLog: [],
-            taskReports: [],
+            launchDepth: 1,
+            timeoutMs: 300_000,
+            eventLog: [],
           }),
-        resumeCodingAgent: () => {
+        resumeAgent: async () => {
           throw new Error("not used in this test");
         },
-        steerCodingAgent: () => {
+        steerAgent: async () => {
           throw new Error("not used in this test");
         },
-        cancelCodingAgent: () => {
+        cancelAgent: async () => {
           throw new Error("not used in this test");
         },
-        getWorkflowRun: () => undefined,
-        listWorkflowRuns: () => [],
+        getAgentRun: () => undefined,
+        listAgentRuns: () => [],
+        captureAgentPane: async () => "",
       },
       access,
     );
@@ -527,29 +531,33 @@ describe("profile-scoped auth and permissions", () => {
       systemPrompts,
       transitions,
       {
-        launchCodingAgent: () =>
+        launchAgent: async () =>
           ({
             id: "run-1",
-            kind: "coding-agent",
             profileId: "root",
+            provider: "codex" as const,
             goal: "goal",
-            status: "queued",
+            status: "starting" as const,
+            tmuxSession: "openelinaro",
+            tmuxWindow: "run-1",
+            workspaceCwd: "/tmp/test",
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            executionLog: [],
-            taskReports: [],
+            launchDepth: 1,
+            timeoutMs: 300_000,
+            eventLog: [],
           }),
-        resumeCodingAgent: () => {
+        resumeAgent: async () => {
           throw new Error("not used in this test");
         },
-        steerCodingAgent: () => {
+        steerAgent: async () => {
           throw new Error("not used in this test");
         },
-        cancelCodingAgent: () => {
+        cancelAgent: async () => {
           throw new Error("not used in this test");
         },
-        getWorkflowRun: () => undefined,
-        listWorkflowRuns: () => [],
+        getAgentRun: () => undefined,
+        listAgentRuns: () => [],
+        captureAgentPane: async () => "",
       },
       access,
     );
@@ -620,29 +628,33 @@ describe("profile-scoped auth and permissions", () => {
       systemPrompts,
       transitions,
       {
-        launchCodingAgent: () =>
+        launchAgent: async () =>
           ({
             id: "run-1",
-            kind: "coding-agent",
             profileId: "root",
+            provider: "codex" as const,
             goal: "goal",
-            status: "queued",
+            status: "starting" as const,
+            tmuxSession: "openelinaro",
+            tmuxWindow: "run-1",
+            workspaceCwd: "/tmp/test",
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            executionLog: [],
-            taskReports: [],
+            launchDepth: 1,
+            timeoutMs: 300_000,
+            eventLog: [],
           }),
-        resumeCodingAgent: () => {
+        resumeAgent: async () => {
           throw new Error("not used in this test");
         },
-        steerCodingAgent: () => {
+        steerAgent: async () => {
           throw new Error("not used in this test");
         },
-        cancelCodingAgent: () => {
+        cancelAgent: async () => {
           throw new Error("not used in this test");
         },
-        getWorkflowRun: () => undefined,
-        listWorkflowRuns: () => [],
+        getAgentRun: () => undefined,
+        listAgentRuns: () => [],
+        captureAgentPane: async () => "",
       },
       access,
     );
@@ -711,29 +723,33 @@ describe("profile-scoped auth and permissions", () => {
       systemPrompts,
       transitions,
       {
-        launchCodingAgent: () =>
+        launchAgent: async () =>
           ({
             id: "run-1",
-            kind: "coding-agent",
             profileId: "root",
+            provider: "codex" as const,
             goal: "goal",
-            status: "queued",
+            status: "starting" as const,
+            tmuxSession: "openelinaro",
+            tmuxWindow: "run-1",
+            workspaceCwd: "/tmp/test",
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            executionLog: [],
-            taskReports: [],
+            launchDepth: 1,
+            timeoutMs: 300_000,
+            eventLog: [],
           }),
-        resumeCodingAgent: () => {
+        resumeAgent: async () => {
           throw new Error("not used in this test");
         },
-        steerCodingAgent: () => {
+        steerAgent: async () => {
           throw new Error("not used in this test");
         },
-        cancelCodingAgent: () => {
+        cancelAgent: async () => {
           throw new Error("not used in this test");
         },
-        getWorkflowRun: () => undefined,
-        listWorkflowRuns: () => [],
+        getAgentRun: () => undefined,
+        listAgentRuns: () => [],
+        captureAgentPane: async () => "",
       },
       access,
     );
@@ -868,29 +884,33 @@ describe("profile-scoped auth and permissions", () => {
       systemPrompts,
       transitions,
       {
-        launchCodingAgent: () =>
+        launchAgent: async () =>
           ({
             id: "run-1",
-            kind: "coding-agent",
             profileId: "restricted",
+            provider: "codex" as const,
             goal: "goal",
-            status: "queued",
+            status: "starting" as const,
+            tmuxSession: "openelinaro",
+            tmuxWindow: "run-1",
+            workspaceCwd: "/tmp/test",
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            executionLog: [],
-            taskReports: [],
+            launchDepth: 1,
+            timeoutMs: 300_000,
+            eventLog: [],
           }),
-        resumeCodingAgent: () => {
+        resumeAgent: async () => {
           throw new Error("not used in this test");
         },
-        steerCodingAgent: () => {
+        steerAgent: async () => {
           throw new Error("not used in this test");
         },
-        cancelCodingAgent: () => {
+        cancelAgent: async () => {
           throw new Error("not used in this test");
         },
-        getWorkflowRun: () => undefined,
-        listWorkflowRuns: () => [],
+        getAgentRun: () => undefined,
+        listAgentRuns: () => [],
+        captureAgentPane: async () => "",
       },
       access,
     );

@@ -163,12 +163,7 @@ export class DiscordRoutinesNotifier {
   }
 
   private computeInitialNextAutonomousTimeAt(reference = new Date()) {
-    const getNextAutonomousTimeAt = (this.app as OpenElinaroApp & {
-      getNextAutonomousTimeAt?: (reference?: Date) => string | undefined;
-    }).getNextAutonomousTimeAt;
-    const nextRunAt = typeof getNextAutonomousTimeAt === "function"
-      ? getNextAutonomousTimeAt.call(this.app, reference)
-      : undefined;
+    const nextRunAt = this.app?.getNextAutonomousTimeAt?.(reference);
     return nextRunAt ? new Date(nextRunAt).getTime() : Number.POSITIVE_INFINITY;
   }
 

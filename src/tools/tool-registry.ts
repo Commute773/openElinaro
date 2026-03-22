@@ -121,10 +121,9 @@ import {
 } from "../config/runtime-config";
 import type { ThinkingLevel } from "@mariozechner/pi-ai";
 import { getAuthStatus } from "../auth/store";
-import type { WorkflowRun } from "../domain/workflow-run";
+import type { SubagentRun } from "../domain/subagent-run";
 import type { AgentToolScope, ToolCatalogCard } from "../domain/tool-catalog";
 import {
-  DEFAULT_CODING_AGENT_TIMEOUT_MS,
   DEFAULT_WEB_SEARCH_LANGUAGE,
   DEFAULT_WEB_SEARCH_UI_LANG,
 } from "../services/tool-defaults";
@@ -1026,45 +1025,44 @@ const healthLogCheckinSchema = z.object({
   notes: z.string().optional(),
 });
 
-const launchCodingAgentSchema = z.object({
+const launchAgentSchema = z.object({
   goal: z.string().min(12),
   cwd: z.string().optional(),
   profile: z.string().min(1).optional(),
+  provider: z.enum(["claude", "codex"]).optional(),
   timeoutMs: z.number()
     .int()
     .min(1_000)
     .max(86_400_000)
-    .describe(
-      `Optional wall-clock timeout in milliseconds. Defaults to ${DEFAULT_CODING_AGENT_TIMEOUT_MS.toLocaleString()} ms (one hour); omit unless overriding.`,
-    )
+    .describe("Optional wall-clock timeout in milliseconds. Defaults to one hour; omit unless overriding.")
     .optional(),
 });
 
-const resumeCodingAgentSchema = z.object({
+const resumeAgentSchema = z.object({
   runId: z.string().min(1),
   message: z.string().min(1).optional(),
   timeoutMs: z.number()
     .int()
     .min(1_000)
     .max(86_400_000)
-    .describe(
-      `Optional replacement wall-clock timeout in milliseconds. Defaults to the stored run timeout, or ${DEFAULT_CODING_AGENT_TIMEOUT_MS.toLocaleString()} ms (one hour) when none is stored.`,
-    )
+    .describe("Optional replacement wall-clock timeout in milliseconds.")
     .optional(),
 });
 
-const steerCodingAgentSchema = z.object({
+const steerAgentSchema = z.object({
   runId: z.string().min(1),
   message: z.string().min(1),
 });
 
-const cancelCodingAgentSchema = z.object({
+const cancelAgentSchema = z.object({
   runId: z.string().min(1),
 });
 
-const workflowStatusSchema = z.object({
+const agentStatusSchema = z.object({
   runId: z.string().optional(),
   limit: z.number().int().min(1).max(10).optional(),
+  capture: z.boolean().optional().describe("When true, include the last N lines of the agent's tmux pane output."),
+  captureLines: z.number().int().min(1).max(200).optional().describe("Number of tmux pane lines to capture. Defaults to 50."),
   format: responseFormatSchema.optional(),
 });
 
@@ -1200,11 +1198,11 @@ export const ROUTINE_TOOL_NAMES = [
   "update_preview",
   "update",
   "service_rollback",
-  "launch_coding_agent",
-  "resume_coding_agent",
-  "steer_coding_agent",
-  "cancel_coding_agent",
-  "workflow_status",
+  "launch_agent",
+  "resume_agent",
+  "steer_agent",
+  "cancel_agent",
+  "agent_status",
 ] as const;
 
 const BASE_USER_FACING_TOOL_NAMES = [
@@ -1274,11 +1272,11 @@ const BASE_USER_FACING_TOOL_NAMES = [
   "secret_import_file",
   "secret_generate_password",
   "secret_delete",
-  "workflow_status",
-  "launch_coding_agent",
-  "resume_coding_agent",
-  "steer_coding_agent",
-  "cancel_coding_agent",
+  "agent_status",
+  "launch_agent",
+  "resume_agent",
+  "steer_agent",
+  "cancel_agent",
 ] as const;
 
 const BASE_AGENT_DEFAULT_VISIBLE_TOOL_NAMES: Record<AgentToolScope, readonly string[]> = {
@@ -1374,30 +1372,32 @@ export type ToolContext = {
   subagentDepth?: number;
 };
 
-type WorkflowController = {
-  launchCodingAgent: (params: {
+type SubagentController = {
+  launchAgent: (params: {
     goal: string;
     cwd?: string;
     profileId?: string;
+    provider?: "claude" | "codex";
     originConversationKey?: string;
     requestedBy?: string;
     timeoutMs?: number;
     subagentDepth?: number;
-  }) => WorkflowRun;
-  resumeCodingAgent: (params: {
+  }) => Promise<SubagentRun>;
+  resumeAgent: (params: {
     runId: string;
     message?: string;
     timeoutMs?: number;
-  }) => WorkflowRun;
-  steerCodingAgent: (params: {
+  }) => Promise<SubagentRun>;
+  steerAgent: (params: {
     runId: string;
     message: string;
-  }) => WorkflowRun;
-  cancelCodingAgent: (params: {
+  }) => Promise<SubagentRun>;
+  cancelAgent: (params: {
     runId: string;
-  }) => WorkflowRun;
-  getWorkflowRun: (runId: string) => WorkflowRun | undefined;
-  listWorkflowRuns: () => WorkflowRun[];
+  }) => Promise<SubagentRun>;
+  getAgentRun: (runId: string) => SubagentRun | undefined;
+  listAgentRuns: () => SubagentRun[];
+  captureAgentPane: (runId: string, lines?: number) => Promise<string>;
 };
 
 const TOOL_SUMMARY_KEY_LIMIT = 4;
@@ -1829,7 +1829,7 @@ function inferToolDomains(name: string) {
   ) {
     return ["filesystem", "code"];
   }
-  if (["launch_coding_agent", "resume_coding_agent", "steer_coding_agent", "cancel_coding_agent", "workflow_status"].includes(name)) {
+  if (["launch_agent", "resume_agent", "steer_agent", "cancel_agent", "agent_status"].includes(name)) {
     return ["workflow", "agents"];
   }
   return ["general"];
@@ -1930,9 +1930,9 @@ function inferToolExamples(name: string) {
       return ["resume this routine", "restart reminders"];
     case "model":
       return ["list models for the current provider", "set thinking high on the active model"];
-    case "steer_coding_agent":
+    case "steer_agent":
       return ["tell the subagent to focus tests first", "send a new instruction to a running agent"];
-    case "cancel_coding_agent":
+    case "cancel_agent":
       return ["stop run-123", "abort a running coding agent"];
     case "context":
       return ["show context usage", "show context full"];
@@ -2049,11 +2049,11 @@ function inferToolExamples(name: string) {
       return ["deploy prepared update", "apply the latest prepared service version"];
     case "service_rollback":
       return ["roll back the service", "restore the previous deployed version"];
-    case "launch_coding_agent":
+    case "launch_agent":
       return ["launch background coding task", "run longer code workflow"];
-    case "resume_coding_agent":
+    case "resume_agent":
       return ["send follow-up to returned subagent", "resume an existing coding run"];
-    case "workflow_status":
+    case "agent_status":
       return ["spot-check coding agent run", "list recent workflows"];
     default:
       return [];
@@ -2127,8 +2127,8 @@ function buildToolCatalogCard(entry: StructuredToolInterface): ToolCatalogCard {
     ),
     supportsBackground:
       entry.name === "exec_command"
-      || entry.name === "launch_coding_agent"
-      || entry.name === "resume_coding_agent",
+      || entry.name === "launch_agent"
+      || entry.name === "resume_agent",
     mutatesState:
       [
         "routine_add",
@@ -2149,10 +2149,10 @@ function buildToolCatalogCard(entry: StructuredToolInterface): ToolCatalogCard {
         "move_path",
         "copy_path",
         "delete_path",
-        "launch_coding_agent",
-        "resume_coding_agent",
-        "steer_coding_agent",
-        "cancel_coding_agent",
+        "launch_agent",
+        "resume_agent",
+        "steer_agent",
+        "cancel_agent",
         "profile_set_defaults",
         "reload",
         "new_chat",
@@ -2406,25 +2406,7 @@ function formatDurationMs(durationMs: number | null) {
   return `${durationMs.toFixed(2)}ms`;
 }
 
-function getWorkflowElapsedMs(run: Pick<WorkflowRun, "executionStartedAt" | "updatedAt" | "status">) {
-  if (!run.executionStartedAt) {
-    return undefined;
-  }
-
-  const startedAt = Date.parse(run.executionStartedAt);
-  if (Number.isNaN(startedAt)) {
-    return undefined;
-  }
-
-  const endedAt = run.status === "running"
-    ? Date.now()
-    : Date.parse(run.updatedAt);
-  if (Number.isNaN(endedAt)) {
-    return undefined;
-  }
-
-  return Math.max(0, endedAt - startedAt);
-}
+// getWorkflowElapsedMs removed — elapsed time now computed inline in agent_status tool
 
 function shellQuote(value: string) {
   return `'${value.replaceAll("'", "'\\''")}'`;
@@ -2648,7 +2630,7 @@ export class ToolRegistry {
     private readonly memory: MemoryService,
     private readonly systemPrompts: SystemPromptService,
     private readonly transitions: ConversationStateTransitionService,
-    private readonly workflows: WorkflowController,
+    private readonly subagents: SubagentController,
     private readonly access: AccessControlService,
     shell?: ShellRuntime,
     filesystem?: FilesystemRuntime,
@@ -2736,11 +2718,11 @@ export class ToolRegistry {
       "compact",
       "reload",
       "new_chat",
-      "launch_coding_agent",
-      "resume_coding_agent",
-      "steer_coding_agent",
-      "cancel_coding_agent",
-      "workflow_status",
+      "launch_agent",
+      "resume_agent",
+      "steer_agent",
+      "cancel_agent",
+      "agent_status",
     ]);
     this.toolsByName = new Map(this.tools.map((entry) => [entry.name, entry]));
   }
@@ -2959,16 +2941,16 @@ export class ToolRegistry {
         ? this.createReloadTool(context)
         : name === "new_chat"
           ? this.createNewChatTool(context)
-            : name === "launch_coding_agent"
-              ? this.createLaunchCodingAgentTool(context)
-              : name === "resume_coding_agent"
-                ? this.createResumeCodingAgentTool(context)
-                : name === "steer_coding_agent"
-                ? this.createSteerCodingAgentTool(context)
-                  : name === "cancel_coding_agent"
-                    ? this.createCancelCodingAgentTool(context)
-                : name === "workflow_status"
-                  ? this.createWorkflowStatusTool(context)
+            : name === "launch_agent"
+              ? this.createLaunchAgentTool(context)
+              : name === "resume_agent"
+                ? this.createResumeAgentTool(context)
+                : name === "steer_agent"
+                ? this.createSteerAgentTool(context)
+                  : name === "cancel_agent"
+                    ? this.createCancelAgentTool(context)
+                : name === "agent_status"
+                  ? this.createAgentStatusTool(context)
                   : name === "load_tool_library"
                   ? this.createLoadToolLibraryTool(context)
                   : name === "tool_result_read"
@@ -2988,11 +2970,11 @@ export class ToolRegistry {
       this.createCompactTool(context),
       this.createReloadTool(context),
       this.createNewChatTool(context),
-      this.createLaunchCodingAgentTool(context),
-      this.createResumeCodingAgentTool(context),
-      this.createSteerCodingAgentTool(context),
-      this.createCancelCodingAgentTool(context),
-      this.createWorkflowStatusTool(context),
+      this.createLaunchAgentTool(context),
+      this.createResumeAgentTool(context),
+      this.createSteerAgentTool(context),
+      this.createCancelAgentTool(context),
+      this.createAgentStatusTool(context),
     ].filter((entry) => this.access.canUseTool(entry.name));
   }
 
@@ -3284,121 +3266,119 @@ export class ToolRegistry {
       : this.conversations.ensureSystemPrompt(latest.key, this.systemPrompts.load());
   }
 
-  private createLaunchCodingAgentTool(context?: ToolContext) {
+  private createLaunchAgentTool(context?: ToolContext) {
     return tool(
       async (input) =>
         traceSpan(
-          "tool.launch_coding_agent",
+          "tool.launch_agent",
           async () => {
-            const run = this.workflows.launchCodingAgent({
+            const run = await this.subagents.launchAgent({
               goal: input.goal,
               cwd: input.cwd,
               profileId: input.profile,
+              provider: input.provider,
               originConversationKey: context?.conversationKey,
               requestedBy: context?.conversationKey ? "chat-tool" : "direct-tool",
               timeoutMs: input.timeoutMs,
               subagentDepth: context?.subagentDepth ?? 0,
             });
             return [
-              "Background coding agent launched.",
+              `Background ${run.provider} agent launched.`,
               `Run id: ${run.id}`,
               `Goal: ${run.goal}`,
-              `Profile: ${run.profileId ?? "root"}`,
-              `Subagent depth: ${run.launchDepth ?? 1}`,
-              `Timeout: ${run.timeoutMs ?? 3_600_000}ms`,
-              `Workspace: ${run.workspaceCwd ?? process.cwd()}`,
-              "Chat-launched subagent completion updates are pushed back automatically.",
-              "Use workflow_status only for occasional manual spot checks.",
+              `Profile: ${run.profileId}`,
+              `Provider: ${run.provider}`,
+              `Subagent depth: ${run.launchDepth}`,
+              `Timeout: ${run.timeoutMs}ms`,
+              `Workspace: ${run.workspaceCwd}`,
+              "Completion updates are pushed back automatically.",
+              "Use agent_status only for occasional manual spot checks.",
             ].join("\n");
           },
           { attributes: input },
         ),
         {
-          name: "launch_coding_agent",
+          name: "launch_agent",
           description:
-          `Launch a goal-driven background coding agent in the current repository or a provided cwd. Optionally target a permitted profile for the child agent. Chat-launched runs push completion updates back automatically, so use workflow_status only for occasional manual spot checks. Omit timeoutMs to use the default ${DEFAULT_CODING_AGENT_TIMEOUT_MS.toLocaleString()} ms (one hour).`,
-          schema: launchCodingAgentSchema,
+          "Launch a background agent (Claude Code or Codex) in the current repository or a provided cwd. The agent runs in its own tmux window with an isolated worktree. Optionally target a permitted profile and/or provider. Completion updates are pushed back automatically. Omit timeoutMs to use the default (one hour).",
+          schema: launchAgentSchema,
         },
     );
   }
 
-  private createResumeCodingAgentTool(_context?: ToolContext) {
+  private createResumeAgentTool(_context?: ToolContext) {
     return tool(
       async (input) =>
         traceSpan(
-          "tool.resume_coding_agent",
+          "tool.resume_agent",
           async () => {
-            const run = this.workflows.resumeCodingAgent({
+            const run = await this.subagents.resumeAgent({
               runId: input.runId,
               message: input.message,
               timeoutMs: input.timeoutMs,
             });
             return [
-              "Background coding agent resumed.",
+              `Background ${run.provider} agent resumed.`,
               `Run id: ${run.id}`,
               `Goal: ${run.goal}`,
-              `Profile: ${run.profileId ?? "root"}`,
-              `Subagent depth: ${run.launchDepth ?? 1}`,
+              `Profile: ${run.profileId}`,
               input.message ? `Instruction: ${input.message}` : "Instruction: continue from the current run state.",
-              `Timeout: ${run.timeoutMs ?? 3_600_000}ms`,
-              `Workspace: ${run.workspaceCwd ?? process.cwd()}`,
-              "Chat-launched subagent completion updates are pushed back automatically.",
-              "Use workflow_status only for occasional manual spot checks.",
+              `Timeout: ${run.timeoutMs}ms`,
+              `Workspace: ${run.workspaceCwd}`,
+              "Completion updates are pushed back automatically.",
             ].join("\n");
           },
           { attributes: input },
         ),
         {
-          name: "resume_coding_agent",
+          name: "resume_agent",
           description:
-          `Resume a returned background coding agent run. Optionally attach follow-up instructions for the same subagent instead of launching a fresh worker. Completion updates are pushed back automatically, so use workflow_status only for occasional manual spot checks. Omit timeoutMs to keep the stored run timeout, or fall back to ${DEFAULT_CODING_AGENT_TIMEOUT_MS.toLocaleString()} ms (one hour) when none is stored.`,
-          schema: resumeCodingAgentSchema,
+          "Resume a completed or failed background agent run. Spawns a fresh agent process in the same worktree with optional follow-up instructions. Completion updates are pushed back automatically.",
+          schema: resumeAgentSchema,
         },
     );
   }
 
-  private createSteerCodingAgentTool(_context?: ToolContext) {
+  private createSteerAgentTool(_context?: ToolContext) {
     return tool(
       async (input) =>
         traceSpan(
-          "tool.steer_coding_agent",
+          "tool.steer_agent",
           async () => {
-            const run = this.workflows.steerCodingAgent({
+            const run = await this.subagents.steerAgent({
               runId: input.runId,
               message: input.message,
             });
             return [
-              "Background coding agent steered.",
+              "Background agent steered.",
               `Run id: ${run.id}`,
               `Status: ${run.status}`,
               `Instruction: ${input.message}`,
-              run.currentSessionId
-                ? `Delivered to session: ${run.currentSessionId}`
-                : "The instruction was queued for the next planner/worker step.",
+              "The message was sent to the agent's tmux window via stdin.",
             ].join("\n");
           },
           { attributes: input },
         ),
       {
-        name: "steer_coding_agent",
+        name: "steer_agent",
         description:
-          "Send a new instruction to a running coding-agent subagent. The message is delivered on the next planner or worker step without waiting for the run to finish.",
-        schema: steerCodingAgentSchema,
+          "Send a new instruction to a running background agent. The message is injected into the agent's stdin via tmux send-keys.",
+        schema: steerAgentSchema,
       },
     );
   }
 
-  private createCancelCodingAgentTool(_context?: ToolContext) {
+  private createCancelAgentTool(_context?: ToolContext) {
     return tool(
       async (input) =>
         traceSpan(
-          "tool.cancel_coding_agent",
+          "tool.cancel_agent",
           async () => {
-            const run = this.workflows.cancelCodingAgent({
+            const run = await this.subagents.cancelAgent({
               runId: input.runId,
             });
             return [
-              "Background coding agent cancellation requested.",
+              "Background agent cancelled.",
               `Run id: ${run.id}`,
               `Status: ${run.status}`,
             ].join("\n");
@@ -3406,105 +3386,88 @@ export class ToolRegistry {
           { attributes: input },
         ),
         {
-          name: "cancel_coding_agent",
+          name: "cancel_agent",
           description:
-          "Cancel a pending or running coding-agent subagent. Running agents are aborted as soon as the runtime can interrupt the current step.",
-          schema: cancelCodingAgentSchema,
+          "Cancel a running background agent. Kills the tmux window and marks the run as cancelled.",
+          schema: cancelAgentSchema,
         },
     );
   }
 
-  private createWorkflowStatusTool(_context?: ToolContext) {
+  private createAgentStatusTool(_context?: ToolContext) {
     return tool(
       async (input) =>
         traceSpan(
-          "tool.workflow_status",
+          "tool.agent_status",
           async () => {
             const selectedRuns = input.runId
-              ? [this.workflows.getWorkflowRun(input.runId)].filter(
-                  (run): run is WorkflowRun => run !== undefined,
+              ? [this.subagents.getAgentRun(input.runId)].filter(
+                  (run): run is SubagentRun => run !== undefined,
                 )
-              : this.workflows.listWorkflowRuns().slice(-(input.limit ?? 3));
+              : this.subagents.listAgentRuns().slice(-(input.limit ?? 3));
             if (selectedRuns.length === 0) {
               if (input.format === "json") {
                 return {
                   runs: [],
                   count: 0,
                   message: input.runId
-                    ? `No workflow run found for ${input.runId}.`
-                    : "No workflow runs have been recorded yet.",
+                    ? `No agent run found for ${input.runId}.`
+                    : "No agent runs have been recorded yet.",
                 };
               }
               return input.runId
-                ? `No workflow run found for ${input.runId}.`
-                : "No workflow runs have been recorded yet.";
+                ? `No agent run found for ${input.runId}.`
+                : "No agent runs have been recorded yet.";
             }
 
-            const runs = selectedRuns.map((run) => {
-              const completedTasks =
-                run.plan?.tasks.filter((task) => task.status === "completed").length ?? 0;
-              const totalTasks = run.plan?.tasks.length ?? 0;
-              const lastReport = run.taskReports?.at(-1);
+            const wantCapture = input.capture === true;
+            const captureLines = input.captureLines ?? 50;
+
+            const runs = await Promise.all(selectedRuns.map(async (run) => {
+              const elapsedMs = run.startedAt
+                ? Date.now() - Date.parse(run.startedAt)
+                : undefined;
+              const paneOutput = wantCapture
+                ? await this.subagents.captureAgentPane(run.id, captureLines)
+                : undefined;
               return {
                 id: run.id,
-                kind: run.kind,
+                provider: run.provider,
                 status: run.status,
-                runningState: run.runningState,
                 goal: run.goal,
+                profileId: run.profileId,
                 launchDepth: run.launchDepth,
                 timeoutMs: run.timeoutMs,
-                workspace: run.workspaceCwd || undefined,
-                retryCount: run.retryCount ?? 0,
-                nextAttemptAt: run.nextAttemptAt,
-                elapsedMs: getWorkflowElapsedMs(run),
-                lastProgressAt: run.lastProgressAt,
-                stuckSinceAt: run.stuckSinceAt,
-                stuckReason: run.stuckReason,
-                canResume: run.kind === "coding-agent" && run.status !== "running",
-                completedTasks,
-                totalTasks,
-                taskIssueCount: run.taskIssueCount ?? 0,
-                taskErrorCount: run.taskErrorCount ?? 0,
-                consecutiveTaskErrorCount: run.consecutiveTaskErrorCount ?? 0,
+                workspace: run.workspaceCwd,
+                elapsedMs,
+                canResume: run.status === "completed" || run.status === "failed",
                 summary: run.resultSummary || undefined,
-                latestTask: lastReport
-                  ? {
-                      title: lastReport.title,
-                      status: lastReport.status,
-                    }
-                  : undefined,
+                error: run.error || undefined,
+                eventCount: run.eventLog.length,
+                paneOutput,
               };
-            });
+            }));
 
             if (input.format === "json") {
-              return {
-                runs,
-                count: runs.length,
-              };
+              return { runs, count: runs.length };
             }
 
             return runs.map((run) =>
               [
                 `Run: ${run.id}`,
-                `Kind: ${run.kind}`,
-                `Status: ${run.status}${run.runningState ? ` (${run.runningState})` : ""}`,
+                `Provider: ${run.provider}`,
+                `Status: ${run.status}`,
                 `Goal: ${run.goal}`,
-                run.launchDepth !== undefined ? `Subagent depth: ${run.launchDepth}` : "",
-                run.kind === "coding-agent" ? `Timeout: ${run.timeoutMs ?? 3_600_000}ms` : "",
+                `Profile: ${run.profileId}`,
+                `Subagent depth: ${run.launchDepth}`,
+                `Timeout: ${run.timeoutMs}ms`,
                 run.workspace ? `Workspace: ${run.workspace}` : "",
                 run.elapsedMs !== undefined ? `Elapsed: ${formatDurationMs(run.elapsedMs)}` : "",
-                run.retryCount > 0 ? `Retry count: ${run.retryCount}` : "",
-                run.nextAttemptAt ? `Next attempt: ${run.nextAttemptAt}` : "",
-                run.lastProgressAt ? `Last progress: ${run.lastProgressAt}` : "",
-                run.stuckSinceAt ? `Stuck since: ${run.stuckSinceAt}` : "",
-                run.stuckReason ? `Stuck reason: ${run.stuckReason}` : "",
                 run.canResume ? "Resume ready: yes" : "",
-                run.totalTasks > 0 ? `Tasks: ${run.completedTasks}/${run.totalTasks} completed` : "",
-                run.taskIssueCount > 0
-                  ? `Task issues: ${run.taskIssueCount} (${run.taskErrorCount} errors, consecutive error streak ${run.consecutiveTaskErrorCount})`
-                  : "",
                 run.summary ? `Summary: ${run.summary}` : "",
-                run.latestTask ? `Latest task: ${run.latestTask.title} -> ${run.latestTask.status}` : "",
+                run.error ? `Error: ${run.error}` : "",
+                `Events: ${run.eventCount}`,
+                run.paneOutput ? `\n--- tmux pane (last ${captureLines} lines) ---\n${run.paneOutput}` : "",
               ]
                 .filter(Boolean)
                 .join("\n"))
@@ -3513,10 +3476,10 @@ export class ToolRegistry {
           { attributes: input },
         ),
         {
-          name: "workflow_status",
+          name: "agent_status",
           description:
-          "Inspect one workflow run by id or list the most recent background workflow and coding-agent runs. Use this for occasional manual spot checks, not tight polling. Status output includes active/backoff/stuck state for coding runs, and format=json returns structured fields.",
-          schema: workflowStatusSchema,
+          "Inspect one agent run by id or list the most recent background agent runs. Set capture=true to include what the agent's tmux pane is currently displaying. Use this for occasional manual spot checks, not tight polling.",
+          schema: agentStatusSchema,
         },
     );
   }

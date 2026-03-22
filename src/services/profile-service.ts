@@ -344,6 +344,18 @@ export class ProfileService {
     return currentDepth < this.getMaxSubagentDepth(profile);
   }
 
+  getSubagentBinaryPath(profile: Pick<ProfileRecord, "subagentPaths">, provider: "claude" | "codex"): string | undefined {
+    return profile.subagentPaths?.[provider];
+  }
+
+  resolveSubagentProvider(profile: ProfileRecord): "claude" | "codex" {
+    if (profile.subagentPreferredProvider === "claude" && profile.subagentPaths?.claude) return "claude";
+    if (profile.subagentPreferredProvider === "openai-codex" && profile.subagentPaths?.codex) return "codex";
+    if (profile.subagentPaths?.claude) return "claude";
+    if (profile.subagentPaths?.codex) return "codex";
+    throw new Error(`No subagent binary configured for profile ${profile.id}. Set subagentPaths in the profile registry.`);
+  }
+
   listLaunchableProfiles(source: ProfileRecord, currentDepth = 0) {
     if (!this.canLaunchSubagents(source, currentDepth)) {
       return [];
@@ -447,6 +459,8 @@ export class ProfileService {
         ? `Subagent preferred model provider: ${profile.subagentPreferredProvider}`
         : "",
       profile.subagentDefaultModelId ? `Subagent default model: ${profile.subagentDefaultModelId}` : "",
+      profile.subagentPaths?.claude ? `Subagent Claude binary: ${profile.subagentPaths.claude}` : "",
+      profile.subagentPaths?.codex ? `Subagent Codex binary: ${profile.subagentPaths.codex}` : "",
     ]
       .filter(Boolean)
       .join("\n");
