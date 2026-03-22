@@ -30,7 +30,13 @@ Background coding-agent runs are wall-clock bounded only; the default timeout is
 Where to look:
 
 - `src/app/runtime.ts`
+- `src/app/runtime-scope.ts`
+- `src/app/runtime-workflow.ts`
+- `src/app/runtime-automation.ts`
 - `src/orchestration/workflow-graph.ts`
+- `src/orchestration/workflow-executor.ts`
+- `src/orchestration/workflow-planner.ts`
+- `src/orchestration/workflow-agent-runner.ts`
 
 ## 4. Agent Execution Is Loop-Based
 
@@ -130,7 +136,7 @@ Where to look:
 - `src/services/project-workspace-service.ts`
 - `src/services/access-control-service.ts`
 - `src/app/runtime.ts`
-- `src/tools/routine-tool-registry.ts`
+- `src/tools/tool-registry.ts`
 
 Where to look:
 
