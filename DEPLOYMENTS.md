@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.22.5
+- Released at: 2026-03-22T19:37:14Z
+- Release id: 20260322T193714Z-4e65bcd
+- Previous version: 2026.03.22.4
+- Trigger: ci/release workflow
+
+- fix: use remote image urls for claude attachments
+
 ## 2026.03.22.4
 - Released at: 2026-03-22T19:24:28Z
 - Release id: 20260322T192428Z-71cdf31
