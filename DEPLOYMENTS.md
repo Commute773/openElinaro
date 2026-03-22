@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.22
+- Released at: 2026-03-22T17:31:55Z
+- Release id: 20260322T173155Z-28f0923
+- Previous version: 2026.03.22.25
+- Trigger: ci/release workflow
+
+- Initial release
+
 ## 2026.03.22.25
 - Released at: 2026-03-22T17:18:14Z
 - Release id: 20260322T171814Z-4b766ed
