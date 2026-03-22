@@ -411,6 +411,9 @@ openelinaro_apply_deploy_metadata() {
 openelinaro_copy_entry() {
   local source_path="$1"
   local target_path="$2"
+  if [[ ! -e "${source_path}" ]]; then
+    return 0
+  fi
   if [[ -d "${source_path}" ]]; then
     cp -R "${source_path}" "${target_path}"
     return 0

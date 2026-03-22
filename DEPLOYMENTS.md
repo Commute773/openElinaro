@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.3
+- Released at: 2026-03-22T00:08:18Z
+- Release id: 20260322T000818Z-77f2952
+- Previous version: 2026.03.22.2
+- Trigger: managed service update
+
+Fix release-snapshot bootstrapping to skip optional repo entries that are not present, such as media/.
+This unblocks first-time managed-service release bootstraps on hosts like krysalstis.
+
 ## 2026.03.22.2
 - Released at: 2026-03-22T00:07:41Z
 - Release id: 20260322T000741Z-7b5e388
