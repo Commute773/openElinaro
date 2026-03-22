@@ -28,6 +28,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Reset the tool-authorization mock so it delegates back to the real
+  // function and does not leak stale mockReturnValue/mockImplementation
+  // state into other test files.
+  mockGetToolAuthorizationDeclaration.mockImplementation(
+    (name: string) => _realGetDeclaration(name),
+  );
   if (previousRootDir === undefined) {
     delete process.env.OPENELINARO_ROOT_DIR;
   } else {
@@ -49,10 +55,15 @@ afterEach(() => {
 // runtime-root is NOT mocked via mock.module because Bun's module mocks
 // persist across test files and would cause EROFS errors in later tests.
 
+// Mock getToolAuthorizationDeclaration: starts with real behavior, individual
+// tests override via mockReturnValue/mockImplementation, afterEach resets.
+const _realToolAuthModule = require("./tool-authorization-service");
+const _realGetDeclaration = _realToolAuthModule.getToolAuthorizationDeclaration as (name: string) => { access: string; behavior: string; note?: string };
 const mockGetToolAuthorizationDeclaration = mock(
-  () => ({ access: "anyone" as const, behavior: "uniform" as const }),
+  (name: string) => _realGetDeclaration(name),
 );
 mock.module("./tool-authorization-service", () => ({
+  ..._realToolAuthModule,
   getToolAuthorizationDeclaration: mockGetToolAuthorizationDeclaration,
 }));
 

@@ -25,11 +25,11 @@ if (!process.env.OPENELINARO_ROOT_DIR) {
   });
 }
 
-if (!process.env.OPENELINARO_USER_DATA_DIR) {
-  const userDataDir = path.join(process.env.OPENELINARO_ROOT_DIR, ".openelinarotest");
-  fs.mkdirSync(userDataDir, { recursive: true });
-  process.env.OPENELINARO_USER_DATA_DIR = userDataDir;
-}
+// Do NOT set OPENELINARO_USER_DATA_DIR here.  The runtime-root module
+// already derives it from OPENELINARO_ROOT_DIR when NODE_ENV=test.
+// Setting it in the preload would freeze the value, so tests that later
+// override OPENELINARO_ROOT_DIR would still read from the preload's
+// user-data directory instead of their own isolated root.
 
 if (!process.env.NODE_ENV) {
   process.env.NODE_ENV = "test";

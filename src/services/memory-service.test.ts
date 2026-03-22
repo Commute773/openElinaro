@@ -13,14 +13,10 @@ mock.module("./text-embedding-service", () => ({
   embedTexts: mockEmbedTexts,
 }));
 
-mock.module("./telemetry", () => ({
-  telemetry: {
-    child: () => ({
-      event: () => {},
-      span: (_op: string, _attrs: Record<string, unknown>, fn: () => unknown) => fn(),
-    }),
-  },
-}));
+// NOTE: Do NOT mock.module("./telemetry") here.  Bun's module mocks are
+// process-wide and persist across test files, breaking any later module that
+// imports telemetry (e.g. web-fetch-service, discord bot).  The real telemetry
+// singleton already falls back to an in-memory SQLite store in tests.
 
 const TEST_PROFILE = {
   id: "test-profile",
