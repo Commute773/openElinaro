@@ -15,6 +15,7 @@ Useful docs:
 - `docs/assistant/README.md`
 - `docs/assistant/architecture-decisions.md`
 - `docs/assistant/communications.md`
+- `docs/assistant/configuration.md`
 - `docs/assistant/decision-support.md`
 - `docs/assistant/harness-smoke-tests.md`
 - `docs/assistant/media.md`
