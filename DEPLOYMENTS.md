@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.14
+- Released at: 2026-03-22T01:01:19Z
+- Release id: 20260322T010119Z-e731885
+- Previous version: 2026.03.22.13
+- Trigger: managed service update
+
+Document that detached update helpers also inherit the live release root from the running service.
+This is a docs-only follow-up release after re-validating the real /update flow on krysalstis.
+
 ## 2026.03.22.13
 - Released at: 2026-03-22T00:58:43Z
 - Release id: 20260322T005843Z-b55d9b2
