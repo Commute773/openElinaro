@@ -11,7 +11,6 @@ This runtime now treats phone calls and text messaging as first-class concepts t
 - `src/tools/routine-tool-registry.ts` exposes root-only communications tools:
   - `communications_status`
   - `make_phone_call`
-  - `call_create`
   - `call_list`
   - `call_get`
   - `call_control`

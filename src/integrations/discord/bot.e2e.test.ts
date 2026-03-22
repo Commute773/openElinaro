@@ -216,7 +216,7 @@ function createScriptedConnector(
     }
 
     const latestMessage = request.messages.at(-1);
-    if (latestMessage instanceof ToolMessage && latestMessage.name === "new") {
+    if (latestMessage instanceof ToolMessage && latestMessage.name === "new_chat") {
       return new AIMessage("Fresh thread prepared.");
     }
 
@@ -231,7 +231,7 @@ function createScriptedConnector(
         tool_calls: [
           {
             id: "tool-new-1",
-            name: "new",
+            name: "new_chat",
             args: {},
             type: "tool_call",
           },
@@ -1043,7 +1043,7 @@ if (RUN_CHILD_SUITE) {
     expect(invoked).toEqual(["update_preview"]);
     const replyText = interaction.replies.map((reply) => reply.content).join("\n");
     expect(replyText).toContain("## 2026.03.21.38");
-    expect(replyText).toContain("The source checkout is now up to date. Run `/update confirm:true` to deploy this prepared version into the local installation.");
+    expect(replyText).toContain("This only previews the fast-forward and pending deployment notes.");
   });
 
   test("still runs the update tool when confirm is passed", async () => {
@@ -1143,7 +1143,7 @@ if (RUN_CHILD_SUITE) {
     expect(listRelativeFiles(path.join(machineTestRoot, "memory"))).toEqual(liveStateBefore.memoryFiles);
   });
 
-  test("supports fnew as a fast Discord reset without durable memory writes", async () => {
+  test("supports new_chat force=true as a fast Discord reset without durable memory writes", async () => {
     const harness = createDiscordAppHarness();
     const authManager = new authSessionManagerModule.DiscordAuthSessionManager();
     const handlers = botModule.createDiscordEventHandlers({
@@ -1152,9 +1152,9 @@ if (RUN_CHILD_SUITE) {
       profileId: harness.profile.id,
     });
     const conversationKey = "discord-user";
-    const helloMessage = new FakeDirectMessage("hello before fnew");
+    const helloMessage = new FakeDirectMessage("hello before force reset");
     helloMessage.author.id = conversationKey;
-    const fastResetInteraction = new FakeInteraction("fnew");
+    const fastResetInteraction = new FakeInteraction("new_chat", { force: true });
     fastResetInteraction.user.id = conversationKey;
     const tempMemoryRoot = path.join(tempRoot, ".openelinarotest", "memory");
     const memoryFilesBefore = listRelativeFiles(tempMemoryRoot);
@@ -1164,7 +1164,7 @@ if (RUN_CHILD_SUITE) {
 
     const storedConversation = harness.conversations.get(conversationKey);
 
-    expect(helloMessage.replies[0]).toContain("Acknowledged: hello before fnew");
+    expect(helloMessage.replies[0]).toContain("Acknowledged: hello before force reset");
     expect(fastResetInteraction.replies.map((reply) => reply.content).join("\n"))
       .toContain(`Started a new conversation for ${conversationKey}.`);
     expect(fastResetInteraction.replies.map((reply) => reply.content).join("\n"))

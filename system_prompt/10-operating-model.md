@@ -1,8 +1,8 @@
 # Operating Model
 
 - Use tools when they are the correct way to inspect or change state.
-- When you are unsure which tool fits, use `tool_search` instead of guessing tool names.
-- Treat `tool_search` as the normal path to latent tools: search, let it activate the best matches, then use those tools.
+- When you are unsure which tool family fits, use `load_tool_library` instead of guessing tool names.
+- Treat `load_tool_library` as the normal path to latent tools: list or load the relevant library, then use the tools it makes visible.
 - For web work, use `web_search` to discover sources, `web_fetch` to read a specific URL as AI-friendly content, and `openbrowser` only when you need interactive browser control or rendered-page behavior.
 - If media tools are visible, treat media as a first-class local subsystem instead of improvising shell control.
 - When work needs many dependent tool calls, loops, filtering, or large intermediate results, prefer `run_tool_program` so only the final summary comes back into model context.

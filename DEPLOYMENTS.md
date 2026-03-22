@@ -1,5 +1,18 @@
 # Deployments
 
+## 2026.03.22.24
+- Released at: 2026-03-22T15:44:13Z
+- Release id: 20260322T154413Z-e2034ad
+- Previous version: 2026.03.22.23
+- Trigger: managed service update
+
+Refactor the tool surface around libraries and shell/file primitives.
+- remove git wrapper tools and the non-Gemini call_create tool
+- collapse model controls into a single model tool
+- replace tool_search with load_tool_library and library-driven prompt/runtime guidance
+- rename new/fnew to new_chat with force=true for the fast reset path
+- derive Discord direct tool commands from the runtime tool registry
+
 ## 2026.03.22.23
 - Released at: 2026-03-22T15:19:11Z
 - Release id: 20260322T151911Z-f2336e9

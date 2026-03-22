@@ -2,29 +2,29 @@
 
 Use this playbook when the right tool is not already visible or when a task needs many tool calls.
 
-## Search First
+## Load Libraries
 
 Default rule:
 
-- Treat tool visibility as three layers: user-facing commands, the agent's default-visible bundle for the current scope, and the larger searchable backend catalog.
-- Treat the main agent and coding subagents as different scopes: the main agent keeps a broader default bundle, while coding subagents start narrower and are expected to use `tool_search` when they need web, service, todo, or other non-core tools.
-- Use the currently visible tools first. If the exact tool name is not already visible, call `tool_search` before guessing.
+- Treat tool visibility as three layers: user-facing commands, the agent's default-visible bundle for the current scope, and the larger latent library catalog.
+- Treat the main agent and coding subagents as different scopes: the main agent keeps a broader default bundle, while coding subagents start narrower and are expected to use `load_tool_library` when they need web, service, browser, or other non-core tool families.
+- Use the currently visible tools first. If the exact tool is not already visible, call `load_tool_library` before guessing.
 - Ask for the capability you want, not the tool name you hope exists.
-- `tool_search` matches against tool names, descriptions, tags, domains, and short example intents.
-- Let `tool_search` activate a few likely tools, then use those tools directly.
+- `load_tool_library` lists the available libraries and activates one exact library id at a time.
+- Load the smallest relevant library, then use those tools directly.
 - For runtime settings under `~/.openelinaro/config.yaml`, prefer `config_edit` or `feature_manage` over shell-editing the file by hand.
 - Discord `/update` now fast-forwards the source checkout and replies with the pending deployment changelog entries newer than the running version. `confirm:true` is the actual deploy step. The root-only `update_preview` tool is the non-deploying source-sync-plus-summary step, while `update` is the managed-service deploy step.
 - Managed-service installs now export their configured service identity into the runtime environment so detached `/update confirm:true` helpers can reinstall the service with the same user, group, and unit metadata.
 - Detached `/update confirm:true` helpers also inherit the live release root from the running service so rollback and release-state updates stay aligned even if `current-release.txt` was stale.
 
-Good `tool_search` queries:
+Common library loads:
 
-- `list and inspect routines`
-- `search repository files and read matching code`
-- `launch background coding workflow`
-- `show context window usage for this conversation`
-- `search web and summarize results`
-- `fetch a specific docs URL as markdown`
+- `planning`
+- `filesystem_read`
+- `filesystem_write`
+- `web_research`
+- `browser_automation`
+- `service_ops`
 
 Avoid:
 
@@ -168,8 +168,7 @@ Example:
 
 - Use `service_version` when you need the running agent's stamped deploy version or release metadata.
 - Prefer `service_version` over guessing from git state when the managed service may be running from a staged release snapshot.
-- Prefer the native `git_status`, `git_diff`, `git_stage`, and `git_commit` tools over ad hoc shell git commands when you are working inside an allowed repo/workspace.
-- `git_revert` is now a chat/direct operator tool, not a background coding-agent default. Use it only for explicit human-directed cleanup.
+- Use `exec_command` for git operations when shell access is appropriate instead of expecting dedicated git wrapper tools.
 - Use `service_changelog_since_version` when you need the deployment entries whose version is numerically greater than a requested version instead of reading all of `DEPLOYMENTS.md`.
 - Deployment versions are `YYYY.MM.DD` or `YYYY.MM.DD.N`; the `.N` sequence resets each UTC day, so compare the full version rather than only the numeric suffix.
 - Deploys are explicit. Do not assume code changes should redeploy the service automatically, even when the change affects runtime or managed-service behavior.
@@ -209,7 +208,7 @@ Example:
 
 ```js
 const matches = await tools.invokeTool("grep", {
-  pattern: "tool_search|run_tool_program",
+  pattern: "load_tool_library|run_tool_program",
   path: ".",
   include: "*.ts",
   limit: 200,
@@ -259,14 +258,14 @@ return {
 };
 ```
 
-## Template: Search Then Act
+## Template: Load Then Act
 
-Use `tool_search` first in a normal turn, then after the right tools are visible, call them directly or via `run_tool_program`.
+Use `load_tool_library` first in a normal turn when the needed tool family is not already visible, then call the tools directly or via `run_tool_program`.
 
 Example sequence:
 
-1. `tool_search` with `query="search repository files and inspect matching code"`
-2. Let it activate `glob`, `grep`, `read_file`
+1. `load_tool_library` with `library="filesystem_read"`
+2. Use `glob`, `grep`, `read_file`
 3. If the task turns into many repeated searches/reads, switch to `run_tool_program`
 
 ## Rules Of Thumb

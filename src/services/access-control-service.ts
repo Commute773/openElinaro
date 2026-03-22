@@ -45,11 +45,6 @@ const SHELL_BACKED_TOOL_NAMES = new Set([
   "exec_command",
   "exec_status",
   "exec_output",
-  "git_status",
-  "git_diff",
-  "git_stage",
-  "git_commit",
-  "git_revert",
 ]);
 
 export class AccessControlService {

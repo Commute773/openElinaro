@@ -155,9 +155,9 @@ function buildCodingAgentResponse(request: ScriptedConnectorRequest) {
         tool_calls: [
           {
             id: "plan-search",
-            name: "tool_search",
+            name: "load_tool_library",
             args: {
-              query: "list files and inspect repository structure",
+              library: "filesystem_read",
               scope: "coding-planner",
             },
             type: "tool_call",
@@ -166,7 +166,7 @@ function buildCodingAgentResponse(request: ScriptedConnectorRequest) {
       });
     }
 
-    if (tool.name === "tool_search") {
+    if (tool.name === "load_tool_library") {
       return new AIMessage({
         content: "",
         tool_calls: [
@@ -239,9 +239,9 @@ function buildCodingAgentResponse(request: ScriptedConnectorRequest) {
         tool_calls: [
           {
             id: "task-search",
-            name: "tool_search",
+            name: "load_tool_library",
             args: {
-              query: "write and edit files in the workspace",
+              library: "filesystem_write",
               scope: "coding-worker",
             },
             type: "tool_call",
@@ -250,7 +250,7 @@ function buildCodingAgentResponse(request: ScriptedConnectorRequest) {
       });
     }
 
-    if (tool.name === "tool_search") {
+    if (tool.name === "load_tool_library") {
       return new AIMessage({
         content: "",
         tool_calls: [
@@ -666,7 +666,7 @@ function buildPersistedWorkerResumeResponse(request: ScriptedConnectorRequest) {
       throw new Error("worker session restarted from scratch instead of resuming persisted state");
     }
 
-    if (tool.name === "tool_search") {
+    if (tool.name === "load_tool_library") {
       return new AIMessage({
         content: "",
         tool_calls: [
@@ -721,7 +721,7 @@ function buildPersistedWorkerResumeWithRestartNoticeResponse(request: ScriptedCo
       throw new Error("restart continuation note was not injected into the resumed worker session");
     }
 
-    if (tool.name === "tool_search") {
+    if (tool.name === "load_tool_library") {
       return new AIMessage({
         content: "",
         tool_calls: [
@@ -800,9 +800,9 @@ function buildTransientHarnessRecoveryResponse(request: ScriptedConnectorRequest
         tool_calls: [
           {
             id: "transient-search",
-            name: "tool_search",
+            name: "load_tool_library",
             args: {
-              query: "write and edit files in the workspace",
+              library: "filesystem_write",
               scope: "coding-worker",
             },
             type: "tool_call",
@@ -811,7 +811,7 @@ function buildTransientHarnessRecoveryResponse(request: ScriptedConnectorRequest
       });
     }
 
-    if (tool.name === "tool_search") {
+    if (tool.name === "load_tool_library") {
       if (transientHarnessOfflineOnce) {
         transientHarnessOfflineOnce = false;
         throw new Error("Harness offline during workflow step.");
@@ -896,9 +896,9 @@ function buildRateLimitRecoveryResponse(request: ScriptedConnectorRequest) {
         tool_calls: [
           {
             id: "rate-limit-search",
-            name: "tool_search",
+            name: "load_tool_library",
             args: {
-              query: "write and edit files in the workspace",
+              library: "filesystem_write",
               scope: "coding-worker",
             },
             type: "tool_call",
@@ -907,7 +907,7 @@ function buildRateLimitRecoveryResponse(request: ScriptedConnectorRequest) {
       });
     }
 
-    if (tool.name === "tool_search") {
+    if (tool.name === "load_tool_library") {
       if (rateLimitOnce) {
         rateLimitOnce = false;
         throw Object.assign(new Error("429 rate limit from provider"), {
@@ -1180,7 +1180,7 @@ describe("OpenElinaro runtime workflow e2e", () => {
     expect(run?.taskReports?.[0]?.filesTouched).toEqual(["GENERATED_NOTE.md"]);
     expect(run?.taskReports?.[0]?.verification[0]?.exitCode).toBe(0);
     expect(run?.completionMessage).toContain("Files touched: GENERATED_NOTE.md");
-    expect(run?.executionLog.some((entry) => entry.includes("tool: `tool_search`"))).toBe(true);
+    expect(run?.executionLog.some((entry) => entry.includes("tool: `load_tool_library`"))).toBe(true);
     expect(run?.executionLog.some((entry) => entry.includes("tool: `write_file`"))).toBe(true);
 
     const generatedFile = path.join(tempRoot, "GENERATED_NOTE.md");
@@ -1440,21 +1440,21 @@ describe("OpenElinaro runtime workflow e2e", () => {
           tool_calls: [
             {
               id: "resume-search",
-              name: "tool_search",
-              args: { query: "write and edit files in the workspace", scope: "coding-worker" },
+              name: "load_tool_library",
+              args: { library: "filesystem_write", scope: "coding-worker" },
               type: "tool_call",
             },
           ],
         }),
         new ToolMessage({
-          content: "Newly activated: write_file\nVisible tool count after search: 2",
+          content: "Library: filesystem_write\nVisible tool count after load: 19",
           tool_call_id: "resume-search",
-          name: "tool_search",
+          name: "load_tool_library",
           status: "success",
         }),
       ],
-      activeToolNames: ["tool_search", "write_file"],
-      progressLog: ["[resume-task] tool: `tool_search`"],
+      activeToolNames: [],
+      progressLog: ["[resume-task] tool: `load_tool_library`"],
       turns: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1539,21 +1539,21 @@ describe("OpenElinaro runtime workflow e2e", () => {
           tool_calls: [
             {
               id: "resume-search-restart-note",
-              name: "tool_search",
-              args: { query: "write and edit files in the workspace", scope: "coding-worker" },
+              name: "load_tool_library",
+              args: { library: "filesystem_write", scope: "coding-worker" },
               type: "tool_call",
             },
           ],
         }),
         new ToolMessage({
-          content: "Newly activated: write_file\nVisible tool count after search: 2",
+          content: "Library: filesystem_write\nVisible tool count after load: 19",
           tool_call_id: "resume-search-restart-note",
-          name: "tool_search",
+          name: "load_tool_library",
           status: "success",
         }),
       ],
-      activeToolNames: ["tool_search", "write_file"],
-      progressLog: ["[resume-task] tool: `tool_search`"],
+      activeToolNames: [],
+      progressLog: ["[resume-task] tool: `load_tool_library`"],
       turns: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

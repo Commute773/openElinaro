@@ -68,7 +68,7 @@ describe("ai-sdk message service tool-result refs", () => {
     expect(stored?.namespace).toBe("conversation:test");
   });
 
-  test("keeps large tool_search payloads inline even above the spill threshold", async () => {
+  test("keeps large load_tool_library payloads inline even above the spill threshold", async () => {
     const messageModule = await import("./ai-sdk-message-service");
     const toolResultStoreModule = await import("./tool-result-store");
     const store = new toolResultStoreModule.ToolResultStore();
@@ -81,7 +81,7 @@ describe("ai-sdk message service tool-result refs", () => {
         content: [{
           type: "tool-result",
           toolCallId: "call-tool-search",
-          toolName: "tool_search",
+          toolName: "load_tool_library",
           output: {
             type: "text",
             value: longOutput,

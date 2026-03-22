@@ -48,16 +48,6 @@ type EditParams = ResolvedPathInput & {
   replaceAll?: boolean;
 };
 
-type MultiEditParams = ResolvedPathInput & {
-  edits: Array<{
-    oldString?: string;
-    old_string?: string;
-    newString?: string;
-    new_string?: string;
-    replaceAll?: boolean;
-  }>;
-};
-
 type PatchParams = {
   patchText: string;
   cwd?: string;
@@ -547,50 +537,6 @@ export class FilesystemService {
         attributes: {
           path: getRequestedPath(params),
           replaceAll: params.replaceAll === true,
-        },
-      },
-    );
-  }
-
-  async multiEdit(params: MultiEditParams) {
-    return traceSpan(
-      "tool.multi_edit",
-      async () => {
-        const { resolved } = resolveToolPath(params);
-        this.authorizePath(resolved);
-        const stat = await ensurePathExists(resolved, "File");
-        if (stat.isDirectory()) {
-          throw new Error(`Path is a directory, not a file: ${resolved}`);
-        }
-        if (params.edits.length === 0) {
-          throw new Error("edits must contain at least one edit");
-        }
-
-        const originalContent = await fs.readFile(resolved, "utf8");
-        const ending = detectLineEnding(originalContent);
-        let content = originalContent;
-        const summaries: string[] = [];
-        for (const [index, edit] of params.edits.entries()) {
-          const normalized = normalizeEditStrings(edit);
-          const oldString = convertToLineEnding(normalizeLineEndings(normalized.oldString), ending);
-          const newString = convertToLineEnding(normalizeLineEndings(normalized.newString), ending);
-          const result = applyOneEdit(
-            content,
-            { oldString, newString, replaceAll: edit.replaceAll },
-            resolved,
-            index,
-          );
-          content = result.content;
-          summaries.push(result.message);
-        }
-
-        await fs.writeFile(resolved, content, "utf8");
-        return `Applied ${params.edits.length} edits to ${resolved}.\n${summaries.join("\n")}`;
-      },
-      {
-        attributes: {
-          path: getRequestedPath(params),
-          editCount: params.edits.length,
         },
       },
     );

@@ -338,7 +338,7 @@ export class AgentChatService {
       onToolUse,
       invocationSource: "chat" as const,
       getActiveToolNames: () => [...session.activatedToolNames],
-      activateDiscoveredTools: (toolNames: string[]) => {
+      activateToolNames: (toolNames: string[]) => {
         for (const name of toolNames) {
           session.activatedToolNames.add(name);
         }
@@ -508,7 +508,7 @@ export class AgentChatService {
         conversationKey: job.conversationKey,
         invocationSource: "chat",
         getActiveToolNames: () => [...session.activatedToolNames],
-        activateDiscoveredTools: (toolNames) => {
+        activateToolNames: (toolNames) => {
           for (const name of toolNames) {
             session.activatedToolNames.add(name);
           }

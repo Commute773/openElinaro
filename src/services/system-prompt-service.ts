@@ -4,6 +4,7 @@ import path from "node:path";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { buildAssistantIdentityPromptContext, getAssistantDisplayName } from "../config/runtime-identity";
 import { FEATURE_IDS } from "./feature-config-service";
+import { getPromptToolLibraries } from "./tool-library-service";
 import {
   formatUserDataRelativePath,
   getRepoSystemPromptRoot,
@@ -97,6 +98,7 @@ function buildRuntimeOverviewPrompt() {
   const config = getRuntimeConfig();
   const enabledFeatures = FEATURE_IDS.filter((featureId) => config[featureId].enabled);
   const disabledFeatures = FEATURE_IDS.filter((featureId) => !config[featureId].enabled);
+  const toolLibraries = getPromptToolLibraries();
   const configPath = formatUserDataRelativePath("config.yaml");
   const secretStorePath = formatUserDataRelativePath("secret-store.json");
   const coreToggles = [
@@ -112,6 +114,8 @@ function buildRuntimeOverviewPrompt() {
     `Optional features disabled in config: ${formatPromptList(disabledFeatures)}.`,
     "Optional feature tools stay hidden until the feature is enabled and fully configured.",
     `To inspect or enable features, use \`feature_manage\` (\`action=status\` then \`action=apply\`) or update ${configPath} and ${secretStorePath}. Run \`bun run setup:python\` for Python-backed features.`,
+    "Tool libraries load latent tool groups into the active run. Use `load_tool_library` with one library id when the tool you need is not already visible.",
+    `Available tool libraries: ${toolLibraries.map((library) => `${library.id} (${library.description})`).join("; ")}.`,
   ].join("\n");
 }
 

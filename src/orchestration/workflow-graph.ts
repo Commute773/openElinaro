@@ -1196,7 +1196,7 @@ async function planCodingRun(
     onToolUse: recordProgress,
     invocationSource: "direct" as const,
     getActiveToolNames: () => [...activatedToolNames],
-    activateDiscoveredTools: (toolNames: string[]) => {
+    activateToolNames: (toolNames: string[]) => {
       for (const name of toolNames) {
         activatedToolNames.add(name);
       }
@@ -1234,11 +1234,11 @@ async function planCodingRun(
       roleInstructions: [
         "You are a background coding planner.",
         "Inspect the repository before planning. Use the available tools to understand the codebase, constraints, and validation commands.",
-        "Use the currently visible tools first. Call tool_search only when the needed tool is not already visible.",
+        "Use the currently visible tools first. Call load_tool_library only when the needed tool family is not already visible.",
         ...(isWorkflowReasonToolEnabled()
           ? ["In this test-mode run, include report_progress immediately before non-submission tool calls when practical, ideally in the same response. Do not spend extra turns only to satisfy observability."]
           : []),
-        "If repository inspection turns into repeated searches, reads, or filtering, look up run_tool_program with tool_search so intermediate results stay out of model context.",
+        "If repository inspection turns into repeated searches, reads, or filtering, use run_tool_program so intermediate results stay out of model context.",
         "Treat the timeout as real wall-clock budget, not turn count. Re-check the remaining time from the prompt before starting another broad scan or deep loop.",
         "Produce a compact execution plan that advances the user's goal in the current workspace.",
         "Use serial tasks for anything that edits shared files or depends on the output of prior tasks.",
@@ -1398,7 +1398,7 @@ async function executeCodingTask(params: {
     onToolUse: recordProgress,
     invocationSource: "direct" as const,
     getActiveToolNames: () => [...activatedToolNames],
-    activateDiscoveredTools: (toolNames: string[]) => {
+    activateToolNames: (toolNames: string[]) => {
       for (const name of toolNames) {
         activatedToolNames.add(name);
       }
@@ -1440,12 +1440,12 @@ async function executeCodingTask(params: {
         "You are a background coding worker.",
         "Work only inside the provided workspace.",
         "Start by inspecting the relevant files before editing them.",
-        "Use the currently visible tools first. Call tool_search only when the needed tool is not already visible.",
+        "Use the currently visible tools first. Call load_tool_library only when the needed tool family is not already visible.",
         "If exec_command is visible, use it directly for targeted verification instead of searching for a command runner.",
         ...(isWorkflowReasonToolEnabled()
           ? ["In this test-mode run, include report_progress immediately before non-submission tool calls when practical, ideally in the same response. Do not spend extra turns only to satisfy observability."]
           : []),
-        "If the task requires repeated searches, reads, filtering, or aggregation, look up run_tool_program with tool_search instead of bouncing every intermediate result through the model.",
+        "If the task requires repeated searches, reads, filtering, or aggregation, use run_tool_program instead of bouncing every intermediate result through the model.",
         "Treat the timeout as real wall-clock budget, not turn count. Re-check the remaining time from the prompt before starting another implementation loop or full verification sweep.",
         "Make the smallest coherent set of changes that fully satisfies the assigned task.",
         "Run the relevant validation commands before declaring success whenever the task changes code or behavior.",

@@ -45,16 +45,6 @@ type EditParams = ResolvedPathInput & {
   replaceAll?: boolean;
 };
 
-type MultiEditParams = ResolvedPathInput & {
-  edits: Array<{
-    oldString?: string;
-    old_string?: string;
-    newString?: string;
-    new_string?: string;
-    replaceAll?: boolean;
-  }>;
-};
-
 type PatchParams = {
   patchText: string;
   cwd?: string;
@@ -711,56 +701,6 @@ export class SshFilesystemService {
         attributes: {
           path: getRequestedPath(params),
           replaceAll: params.replaceAll === true,
-        },
-      },
-    );
-  }
-
-  async multiEdit(params: MultiEditParams) {
-    return traceSpan(
-      "tool.multi_edit",
-      async () => {
-        const { resolved } = this.resolveToolPath(params);
-        this.authorizePath(resolved);
-        if (params.edits.length === 0) {
-          throw new Error("edits must contain at least one edit");
-        }
-        const current = await this.runOperation<{ type: "file"; content: string }>({
-          op: "read",
-          path: resolved,
-        });
-        if (current.type !== "file") {
-          throw new Error(`Path is a directory, not a file: ${resolved}`);
-        }
-
-        const ending = detectLineEnding(current.content);
-        let content = current.content;
-        const summaries: string[] = [];
-        for (const [index, edit] of params.edits.entries()) {
-          const normalized = normalizeEditStrings(edit);
-          const oldString = convertToLineEnding(normalizeLineEndings(normalized.oldString), ending);
-          const newString = convertToLineEnding(normalizeLineEndings(normalized.newString), ending);
-          const result = applyOneEdit(
-            content,
-            { oldString, newString, replaceAll: edit.replaceAll },
-            resolved,
-            index,
-          );
-          content = result.content;
-          summaries.push(result.message);
-        }
-        await this.runOperation({
-          op: "write",
-          path: resolved,
-          content,
-          append: false,
-        });
-        return `Applied ${params.edits.length} edits to ${resolved}.\n${summaries.join("\n")}`;
-      },
-      {
-        attributes: {
-          path: getRequestedPath(params),
-          editCount: params.edits.length,
         },
       },
     );

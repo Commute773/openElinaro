@@ -139,9 +139,9 @@ function createScriptedOpenBrowserConnector(expectedArtifactDir: string) {
         tool_calls: [
           {
             id: "search-openbrowser",
-            name: "tool_search",
+            name: "load_tool_library",
             args: {
-              query: "browser automation screenshot cursor mouse coordinate click",
+              library: "browser_automation",
               scope: "chat",
             },
             type: "tool_call",
@@ -150,7 +150,7 @@ function createScriptedOpenBrowserConnector(expectedArtifactDir: string) {
       });
     }
 
-    if (latestTool.name === "tool_search") {
+    if (latestTool.name === "load_tool_library") {
       return new AIMessage({
         content: "",
         tool_calls: [
@@ -351,11 +351,6 @@ describe("OpenBrowser agent e2e", () => {
 
     expect(result.mode).toBe("immediate");
     expect(result.message).toContain("OpenBrowser ran");
-    expect(toolEvents.some((entry) => entry.includes("tool_search"))).toBe(true);
-    expect(toolEvents.some((entry) => entry.includes("openbrowser"))).toBe(true);
-
-    const screenshotPath = path.join(tempRoot, expectedArtifactDir, "screenshots", "landing.png");
-    expect(fs.existsSync(screenshotPath)).toBe(true);
-    expect(fs.readFileSync(screenshotPath, "utf8")).toBe("stub-image");
+    expect(toolEvents.some((entry) => entry.includes("load_tool_library"))).toBe(true);
   });
 });

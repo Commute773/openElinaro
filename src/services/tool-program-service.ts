@@ -278,7 +278,7 @@ export class ToolProgramService {
         this.host.getToolCatalog(params.context)
           .filter((card) => !card.aliasOf)
           .filter((card) => card.agentScopes.includes(params.scope))
-          .filter((card) => !["run_tool_program", "tool_search"].includes(card.canonicalName))
+          .filter((card) => !["run_tool_program", "load_tool_library"].includes(card.canonicalName))
           .map((card) => card.canonicalName),
       ),
     );

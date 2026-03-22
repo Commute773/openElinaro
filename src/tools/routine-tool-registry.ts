@@ -78,7 +78,8 @@ import { VonageService } from "../services/vonage-service";
 import { TelemetryQueryService } from "../services/telemetry-query-service";
 import { telemetry } from "../services/telemetry";
 import { ToolResultStore } from "../services/tool-result-store";
-import { ToolSearchService } from "../services/tool-search-service";
+import { getToolLibraryDefinitions } from "../services/tool-library-service";
+import type { ToolLibraryDefinition } from "../services/tool-library-service";
 import { isRunningInsideManagedService, resolveRuntimePlatform, type RuntimePlatform } from "../services/runtime-platform";
 import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
 import { FeatureConfigService, parseFeatureValue, type FeatureId } from "../services/feature-config-service";
@@ -119,7 +120,7 @@ type ShellRuntime = Pick<
 >;
 type FilesystemRuntime = Pick<
   FilesystemService,
-  "applyPatch" | "copyPath" | "deletePath" | "edit" | "glob" | "grep" | "listDir" | "mkdir" | "movePath" | "multiEdit" | "read" | "statPath" | "write"
+  "applyPatch" | "copyPath" | "deletePath" | "edit" | "glob" | "grep" | "listDir" | "mkdir" | "movePath" | "read" | "statPath" | "write"
 >;
 type TicketsRuntime = Pick<
   ElinaroTicketsService,
@@ -325,57 +326,6 @@ const execCommandSchema = z.object({
   conversationKey: z.string().optional(),
 });
 
-const gitStatusSchema = z.object({
-  cwd: z.string().optional(),
-  timeoutMs: z.number().int().positive().max(600_000).optional(),
-});
-
-const gitDiffSchema = z.object({
-  cwd: z.string().optional(),
-  timeoutMs: z.number().int().positive().max(600_000).optional(),
-  staged: z.boolean().optional(),
-  baseRef: z.string().min(1).optional(),
-  nameOnly: z.boolean().optional(),
-  paths: z.array(z.string().min(1)).optional(),
-});
-
-const gitStageSchema = z.object({
-  cwd: z.string().optional(),
-  timeoutMs: z.number().int().positive().max(600_000).optional(),
-  all: z.boolean().optional(),
-  paths: z.array(z.string().min(1)).optional(),
-}).superRefine((value, ctx) => {
-  if (!value.all && (!value.paths || value.paths.length === 0)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Provide paths or set all=true.",
-      path: ["paths"],
-    });
-  }
-});
-
-const gitCommitSchema = z.object({
-  cwd: z.string().optional(),
-  timeoutMs: z.number().int().positive().max(600_000).optional(),
-  message: z.string().min(1),
-});
-
-const gitRevertSchema = z.object({
-  cwd: z.string().optional(),
-  timeoutMs: z.number().int().positive().max(600_000).optional(),
-  paths: z.array(z.string().min(1)).min(1),
-  staged: z.boolean().optional(),
-  worktree: z.boolean().optional(),
-}).superRefine((value, ctx) => {
-  if (value.staged === false && value.worktree === false) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "At least one of staged or worktree must be true.",
-      path: ["staged"],
-    });
-  }
-});
-
 const execStatusSchema = z.object({
   id: z.string().optional(),
   limit: z.number().int().min(1).max(20).optional(),
@@ -414,33 +364,12 @@ const modelProviderSchema = z.enum(["openai-codex", "claude"]);
 const modelProviderIds: ModelProviderId[] = ["openai-codex", "claude"];
 const thinkingLevelSchema = z.enum(["minimal", "low", "medium", "high", "xhigh"]);
 
-const listProviderModelsSchema = z.object({
-  provider: modelProviderSchema,
-});
-
-const selectActiveModelSchema = z.object({
-  provider: modelProviderSchema,
-  modelId: z.string().min(1),
-});
-
 const modelToolSchema = z.object({
+  action: z.enum(["status", "list", "select", "set_thinking", "set_extended_context"]).optional(),
+  provider: modelProviderSchema.optional(),
   modelId: z.string().min(1).optional(),
-  value: z.string().min(1).optional(),
-  arg: z.string().min(1).optional(),
-});
-
-const thinkToolSchema = z.object({
-  level: thinkingLevelSchema.optional(),
-  value: thinkingLevelSchema.optional(),
-  arg: thinkingLevelSchema.optional(),
-});
-
-const booleanLikeSchema = z.union([z.boolean(), z.string().min(1)]);
-
-const extendedContextToolSchema = z.object({
+  thinkingLevel: thinkingLevelSchema.optional(),
   enabled: z.boolean().optional(),
-  value: booleanLikeSchema.optional(),
-  arg: booleanLikeSchema.optional(),
 });
 
 const responseFormatSchema = z.enum(["text", "json"]);
@@ -500,15 +429,6 @@ const emailSchema = z.object({
 
 const communicationsStatusSchema = z.object({
   format: responseFormatSchema.optional(),
-});
-
-const callCreateSchema = z.object({
-  to: z.string().min(1),
-  from: z.string().min(1).optional(),
-  answerText: z.string().min(1).optional(),
-  answerUrl: z.string().url().optional(),
-  eventUrl: z.string().url().optional(),
-  fallbackUrl: z.string().url().optional(),
 });
 
 const makePhoneCallSchema = z.object({
@@ -624,6 +544,7 @@ const reflectSchema = z.object({
 
 const newConversationSchema = z.object({
   conversationKey: z.string().min(1).optional(),
+  force: z.boolean().optional(),
 });
 
 const pathSchema = z.object({
@@ -709,20 +630,6 @@ const editFileSchema = pathSchema.extend({
   newString: z.string().optional(),
   new_string: z.string().optional(),
   replaceAll: z.boolean().optional(),
-});
-
-const multiEditSchema = pathSchema.extend({
-  edits: z
-    .array(
-      z.object({
-        oldString: z.string().optional(),
-        old_string: z.string().optional(),
-        newString: z.string().optional(),
-        new_string: z.string().optional(),
-        replaceAll: z.boolean().optional(),
-      }),
-    )
-    .min(1),
 });
 
 const applyPatchSchema = z.object({
@@ -1152,12 +1059,9 @@ const workflowStatusSchema = z.object({
   format: responseFormatSchema.optional(),
 });
 
-const toolSearchSchema = z.object({
-  query: z.string().min(1),
+const loadToolLibrarySchema = z.object({
+  library: z.string().min(1).optional(),
   scope: z.enum(["chat", "coding-planner", "coding-worker", "direct"]).optional(),
-  limit: z.number().int().min(1).max(12).optional(),
-  loadCount: z.number().int().min(1).max(8).optional(),
-  activate: z.boolean().optional(),
   format: responseFormatSchema.optional(),
 });
 
@@ -1186,7 +1090,7 @@ const runToolProgramSchema = z.object({
 });
 
 export const ROUTINE_TOOL_NAMES = [
-  "tool_search",
+  "load_tool_library",
   "tool_result_read",
   "run_tool_program",
   "job_list",
@@ -1224,7 +1128,6 @@ export const ROUTINE_TOOL_NAMES = [
   "email",
   "communications_status",
   "make_phone_call",
-  "call_create",
   "call_list",
   "call_get",
   "call_control",
@@ -1238,21 +1141,11 @@ export const ROUTINE_TOOL_NAMES = [
   "routine_pause",
   "routine_resume",
   "model",
-  "think",
-  "extended_context",
-  "model_list_provider_models",
-  "model_select_active",
   "context",
   "usage_summary",
-  "git_status",
-  "git_diff",
-  "git_stage",
-  "git_commit",
-  "git_revert",
   "read_file",
   "write_file",
   "edit_file",
-  "multi_edit",
   "apply_patch",
   "list_dir",
   "glob",
@@ -1287,8 +1180,7 @@ export const ROUTINE_TOOL_NAMES = [
   "reflect",
   "compact",
   "reload",
-  "new",
-  "fnew",
+  "new_chat",
   "benchmark",
   "exec_command",
   "exec_status",
@@ -1314,8 +1206,7 @@ const BASE_USER_FACING_TOOL_NAMES = [
   "project_get",
   "profile_set_defaults",
   "conversation_search",
-  "think",
-  "extended_context",
+  "model",
   "routine_check",
   "routine_list",
   "routine_add",
@@ -1342,7 +1233,6 @@ const BASE_USER_FACING_TOOL_NAMES = [
   "email",
   "communications_status",
   "make_phone_call",
-  "call_create",
   "call_list",
   "call_get",
   "call_control",
@@ -1357,19 +1247,13 @@ const BASE_USER_FACING_TOOL_NAMES = [
   "routine_resume",
   "context",
   "usage_summary",
-  "git_status",
-  "git_diff",
-  "git_stage",
-  "git_commit",
-  "git_revert",
   "service_version",
   "service_changelog_since_version",
   "update",
   "reflect",
   "compact",
   "reload",
-  "new",
-  "fnew",
+  "new_chat",
   "media_list",
   "media_list_speakers",
   "media_play",
@@ -1390,93 +1274,37 @@ const BASE_USER_FACING_TOOL_NAMES = [
 
 const BASE_AGENT_DEFAULT_VISIBLE_TOOL_NAMES: Record<AgentToolScope, readonly string[]> = {
   chat: [
-    "tool_search",
+    "load_tool_library",
     "tool_result_read",
     "run_tool_program",
     "context",
     "usage_summary",
-    "git_status",
-    "git_diff",
-    "git_stage",
-    "git_commit",
-    "git_revert",
-    "profile_list_launchable",
-    "profile_set_defaults",
-    "conversation_search",
-    "memory_search",
-    "job_list",
-    "job_get",
-    "work_summary",
-    "project_list",
-    "project_get",
-    "routine_check",
-    "set_alarm",
-    "set_timer",
-    "alarm_list",
-    "alarm_cancel",
-    "email",
-    "communications_status",
-    "make_phone_call",
-    "call_create",
-    "call_list",
-    "call_get",
-    "call_control",
-    "message_send",
-    "message_list",
-    "message_get",
-    "tickets_list",
-    "tickets_get",
-    "tickets_create",
-    "tickets_update",
-    "secret_list",
-    "secret_import_file",
-    "secret_generate_password",
-    "secret_delete",
+    "model",
     "reflect",
     "compact",
     "reload",
-    "new",
-    "fnew",
-    "web_search",
-    "web_fetch",
-    "media_list",
-    "media_list_speakers",
-    "media_play",
-    "media_pause",
-    "media_stop",
-    "media_set_volume",
-    "media_status",
+    "new_chat",
     "exec_command",
     "exec_status",
     "exec_output",
-    "service_version",
-    "service_changelog_since_version",
-    "workflow_status",
-    "launch_coding_agent",
-    "resume_coding_agent",
-    "steer_coding_agent",
-    "cancel_coding_agent",
   ],
   "coding-planner": [
-    "git_status",
-    "git_diff",
+    "load_tool_library",
+    "tool_result_read",
+    "run_tool_program",
     "read_file",
     "list_dir",
     "glob",
     "grep",
     "stat_path",
-    "tool_result_read",
-    "tool_search",
   ],
   "coding-worker": [
-    "git_status",
-    "git_diff",
-    "git_stage",
-    "git_commit",
+    "load_tool_library",
+    "tool_result_read",
+    "run_tool_program",
     "read_file",
     "write_file",
     "edit_file",
-    "multi_edit",
     "apply_patch",
     "list_dir",
     "glob",
@@ -1489,43 +1317,21 @@ const BASE_AGENT_DEFAULT_VISIBLE_TOOL_NAMES: Record<AgentToolScope, readonly str
     "exec_command",
     "exec_status",
     "exec_output",
-    "tool_result_read",
-    "tool_search",
   ],
   direct: [
-    "tool_search",
+    "load_tool_library",
     "tool_result_read",
     "run_tool_program",
     "context",
     "usage_summary",
-    "git_status",
-    "git_diff",
-    "git_stage",
-    "git_commit",
-    "git_revert",
-    "profile_list_launchable",
-    "profile_set_defaults",
-    "conversation_search",
-    "memory_search",
-    "project_list",
-    "project_get",
-    "routine_check",
-    "tickets_list",
-    "tickets_get",
-    "web_search",
-    "web_fetch",
-    "media_list",
-    "media_list_speakers",
-    "media_play",
-    "media_pause",
-    "media_stop",
-    "media_set_volume",
-    "media_status",
-    "secret_list",
-    "secret_generate_password",
-    "service_version",
-    "workflow_status",
-    "resume_coding_agent",
+    "model",
+    "reflect",
+    "compact",
+    "reload",
+    "new_chat",
+    "exec_command",
+    "exec_status",
+    "exec_output",
   ],
 };
 
@@ -1554,7 +1360,7 @@ export type ToolContext = {
   conversationKey?: string;
   onToolUse?: (event: AppProgressEvent) => Promise<void>;
   invocationSource?: "chat" | "direct";
-  activateDiscoveredTools?: (toolNames: string[]) => void;
+  activateToolNames?: (toolNames: string[]) => void;
   getActiveToolNames?: () => string[];
   subagentDepth?: number;
 };
@@ -1860,7 +1666,7 @@ const UNTRUSTED_TOOL_DESCRIPTOR_MAP: Record<string, Omit<UntrustedContentDescrip
 const GUARDED_UNTRUSTED_SOURCE_TYPES = new Set<UntrustedContentSourceType>(["email", "communications", "web"]);
 
 const TOOL_SCOPE_DEFAULTS: Record<string, AgentToolScope[]> = {
-  tool_search: ["chat", "coding-planner", "coding-worker", "direct"],
+  load_tool_library: ["chat", "coding-planner", "coding-worker", "direct"],
   tool_result_read: ["chat", "coding-planner", "coding-worker", "direct"],
   run_tool_program: ["chat", "coding-planner", "coding-worker", "direct"],
   exec_command: ["chat", "coding-planner", "coding-worker", "direct"],
@@ -1877,15 +1683,9 @@ const TOOL_SCOPE_DEFAULTS: Record<string, AgentToolScope[]> = {
   workflow_status: ["chat", "direct"],
   context: ["chat", "direct"],
   usage_summary: ["chat", "direct"],
-  git_status: ["chat", "coding-planner", "coding-worker", "direct"],
-  git_diff: ["chat", "coding-planner", "coding-worker", "direct"],
-  git_stage: ["chat", "coding-planner", "coding-worker", "direct"],
-  git_commit: ["chat", "coding-planner", "coding-worker", "direct"],
-  git_revert: ["chat", "direct"],
   email: ["chat", "direct"],
   communications_status: ["chat", "direct"],
   make_phone_call: ["chat", "direct"],
-  call_create: ["chat", "direct"],
   call_list: ["chat", "direct"],
   call_get: ["chat", "direct"],
   call_control: ["chat", "direct"],
@@ -1894,11 +1694,8 @@ const TOOL_SCOPE_DEFAULTS: Record<string, AgentToolScope[]> = {
   message_get: ["chat", "direct"],
   compact: ["chat", "direct"],
   reload: ["chat", "direct"],
-  new: ["chat", "direct"],
-  fnew: ["chat", "direct"],
+  new_chat: ["chat", "direct"],
   model: ["chat", "direct"],
-  think: ["chat", "direct"],
-  extended_context: ["chat", "direct"],
   web_fetch: ["chat", "coding-planner", "coding-worker", "direct"],
   media_list: ["chat", "direct"],
   media_list_speakers: ["chat", "direct"],
@@ -1924,7 +1721,7 @@ function uniqueStrings(values: Array<string | undefined>) {
 }
 
 function inferToolDomains(name: string) {
-  if (name === "tool_search") {
+  if (name === "load_tool_library") {
     return ["meta", "tooling"];
   }
   if (name === "tool_result_read") {
@@ -1957,9 +1754,6 @@ function inferToolDomains(name: string) {
   if (name.startsWith("project_")) {
     return ["projects", "knowledge"];
   }
-  if (name.startsWith("git_")) {
-    return ["git", "code", "workflow"];
-  }
   if (name.startsWith("conversation_")) {
     return ["conversations", "knowledge"];
   }
@@ -1969,7 +1763,7 @@ function inferToolDomains(name: string) {
   if (name === "usage_summary") {
     return ["observability", "usage", "session"];
   }
-  if (["model", "think", "extended_context", "context", "reload", "new", "fnew"].includes(name)) {
+  if (["model", "context", "reload", "new_chat"].includes(name)) {
     return ["system", "session"];
   }
   if (["memory_search", "memory_reindex", "memory_import"].includes(name)) {
@@ -2013,7 +1807,6 @@ function inferToolDomains(name: string) {
       "read_file",
       "write_file",
       "edit_file",
-      "multi_edit",
       "apply_patch",
       "list_dir",
       "glob",
@@ -2044,8 +1837,8 @@ function inferToolTags(name: string, description: string) {
 
 function inferToolExamples(name: string) {
   switch (name) {
-    case "tool_search":
-      return ["find file search tools", "look for browser automation"];
+    case "load_tool_library":
+      return ["load the web_research library", "load filesystem_read tools"];
     case "tool_result_read":
       return ["reopen a stored tool result", "summarize a saved tool output by ref"];
     case "run_tool_program":
@@ -2127,15 +1920,7 @@ function inferToolExamples(name: string) {
     case "routine_resume":
       return ["resume this routine", "restart reminders"];
     case "model":
-      return ["change the active model", "switch provider quickly"];
-    case "think":
-      return ["set thinking high", "lower reasoning effort"];
-    case "extended_context":
-      return ["enable bigger context", "turn extended context off"];
-    case "model_list_provider_models":
-      return ["list codex models", "show claude models"];
-    case "model_select_active":
-      return ["select gpt-5.4", "switch active provider model"];
+      return ["list models for the current provider", "set thinking high on the active model"];
     case "steer_coding_agent":
       return ["tell the subagent to focus tests first", "send a new instruction to a running agent"];
     case "cancel_coding_agent":
@@ -2144,24 +1929,12 @@ function inferToolExamples(name: string) {
       return ["show context usage", "show context full"];
     case "usage_summary":
       return ["show today's model spend", "show this thread cost"];
-    case "git_status":
-      return ["show git status", "check branch changes"];
-    case "git_diff":
-      return ["show staged diff", "diff one file"];
-    case "git_stage":
-      return ["stage one file", "git add all changes"];
-    case "git_commit":
-      return ["commit staged changes", "write a git commit message"];
-    case "git_revert":
-      return ["restore one file from HEAD", "revert unstaged changes"];
     case "email":
       return ["list unread email", "read email 1", "send email to apple@example.com"];
     case "communications_status":
       return ["show Vonage webhook settings", "check communications setup"];
     case "make_phone_call":
       return ["make a phone call and let Gemini handle it", "place a live AI phone call with instructions"];
-    case "call_create":
-      return ["call +15145550123", "place a call and speak a short message"];
     case "call_list":
       return ["list recent calls", "show outbound calls"];
     case "call_get":
@@ -2180,8 +1953,6 @@ function inferToolExamples(name: string) {
       return ["create notes.md", "overwrite config file"];
     case "edit_file":
       return ["replace one string", "patch a small file"];
-    case "multi_edit":
-      return ["apply several replacements", "update repeated text"];
     case "apply_patch":
       return ["apply a structured patch", "update multiple files with a patch"];
     case "list_dir":
@@ -2189,7 +1960,7 @@ function inferToolExamples(name: string) {
     case "glob":
       return ["find all *.test.ts", "match docs/**/*.md"];
     case "grep":
-      return ["search for tool_search", "find TODO lines"];
+      return ["search for load_tool_library", "find TODO lines"];
     case "stat_path":
       return ["check file size", "inspect path metadata"];
     case "mkdir":
@@ -2247,14 +2018,12 @@ function inferToolExamples(name: string) {
       return ["compact this conversation", "shrink chat history"];
     case "reload":
       return ["reload system prompt", "refresh instructions"];
-    case "new":
-      return ["start a fresh conversation", "reset thread with summary"];
-    case "fnew":
-      return ["start a fresh conversation without memory", "hard reset thread"];
+    case "new_chat":
+      return ["start a fresh conversation", "force a fresh chat without durable memory"];
     case "benchmark":
       return ["benchmark model latency", "compare provider performance"];
     case "exec_command":
-      return ["run bun test", "execute git status"];
+      return ["run bun test", "execute a shell command"];
     case "exec_status":
       return ["check command status", "list background jobs"];
     case "exec_output":
@@ -2310,7 +2079,6 @@ function inferToolScopes(name: string): AgentToolScope[] {
       "read_file",
       "write_file",
       "edit_file",
-      "multi_edit",
       "apply_patch",
       "list_dir",
       "glob",
@@ -2368,7 +2136,6 @@ function buildToolCatalogCard(entry: StructuredToolInterface): ToolCatalogCard {
         "routine_resume",
         "write_file",
         "edit_file",
-        "multi_edit",
         "mkdir",
         "move_path",
         "copy_path",
@@ -2379,9 +2146,8 @@ function buildToolCatalogCard(entry: StructuredToolInterface): ToolCatalogCard {
         "cancel_coding_agent",
         "profile_set_defaults",
         "reload",
-        "new",
-        "fnew",
-        "extended_context",
+        "new_chat",
+        "model",
         "memory_import",
         "memory_reindex",
         "media_play",
@@ -2421,15 +2187,6 @@ function buildToolCatalogCard(entry: StructuredToolInterface): ToolCatalogCard {
         "service_changelog_since_version",
       ].includes(entry.name),
     authorization,
-    searchText: [
-      entry.name,
-      entry.description,
-      examples.join(" "),
-      domains.join(" "),
-      tags.join(" "),
-    ]
-      .filter(Boolean)
-      .join("\n"),
   };
 }
 
@@ -2668,19 +2425,6 @@ function buildShellCommand(args: string[]) {
   return args.map((arg) => shellQuote(arg)).join(" ");
 }
 
-function normalizeGitPaths(paths?: string[]) {
-  return (paths ?? []).map((value) => value.trim()).filter((value) => value.length > 0);
-}
-
-function buildGitCommand(args: string[], paths?: string[]) {
-  const normalizedPaths = normalizeGitPaths(paths);
-  return buildShellCommand([
-    "git",
-    ...args,
-    ...(normalizedPaths.length > 0 ? ["--", ...normalizedPaths] : []),
-  ]);
-}
-
 function renderShellExecResult(result: Awaited<ReturnType<ShellRuntime["exec"]>>) {
   return [
     `$ ${result.command}`,
@@ -2820,10 +2564,6 @@ function truncateToolOutput(text: string, limit = TOOL_OUTPUT_CHAR_LIMIT) {
   return `${text.slice(0, budget)}${notice}`;
 }
 
-function resolveFirstArg(input: { modelId?: string; value?: string; arg?: string }) {
-  return input.modelId?.trim() || input.value?.trim() || input.arg?.trim();
-}
-
 async function resolveProfileModelSelection(
   targetProfile: { id: string },
   targetModels: ModelService,
@@ -2892,62 +2632,6 @@ async function resolveProfileModelSelection(
   }
 
   throw new Error(`Model not found in the live catalog: ${requestedModelId}`);
-}
-
-function resolveThinkingLevelArg(
-  input: { level?: ThinkingLevel; value?: ThinkingLevel; arg?: ThinkingLevel },
-) {
-  return input.level ?? input.value ?? input.arg;
-}
-
-function parseBooleanLike(value: boolean | string | undefined) {
-  if (typeof value === "boolean") {
-    return value;
-  }
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  switch (value.trim().toLowerCase()) {
-    case "true":
-    case "on":
-    case "enable":
-    case "enabled":
-    case "yes":
-      return true;
-    case "false":
-    case "off":
-    case "disable":
-    case "disabled":
-    case "no":
-      return false;
-    default:
-      return undefined;
-  }
-}
-
-function resolveExtendedContextArg(
-  input: { enabled?: boolean; value?: boolean | string; arg?: boolean | string },
-) {
-  const candidates = [input.enabled, input.value, input.arg];
-  let sawValue = false;
-
-  for (const candidate of candidates) {
-    if (candidate === undefined) {
-      continue;
-    }
-    sawValue = true;
-    const parsed = parseBooleanLike(candidate);
-    if (parsed !== undefined) {
-      return parsed;
-    }
-  }
-
-  if (sawValue) {
-    throw new Error("extended_context expects true/false or on/off.");
-  }
-
-  return undefined;
 }
 
 function formatTokenCount(value: number | undefined) {
@@ -3194,7 +2878,6 @@ export class RoutineToolRegistry {
   private readonly health: HealthTrackingService;
   private readonly media: MediaService | null;
   private readonly toolResults: ToolResultStore;
-  private readonly toolSearch = new ToolSearchService();
   private readonly openbrowser = new OpenBrowserService();
   private readonly secrets = new SecretStoreService();
   private readonly webFetch = new WebFetchService();
@@ -3730,27 +3413,6 @@ export class RoutineToolRegistry {
           description:
             "Place an outbound Vonage phone call through the Gemini Live native-audio backend. The runtime writes a live transcript log to disk while the call is running.",
           schema: makePhoneCallSchema,
-        },
-      ),
-      tool(
-        async (input) =>
-          traceSpan(
-            "tool.call_create",
-            async () => this.vonage.formatCall(await this.vonage.createCall({
-              to: input.to,
-              from: input.from,
-              answerText: input.answerText,
-              answerUrl: input.answerUrl,
-              eventUrl: input.eventUrl,
-              fallbackUrl: input.fallbackUrl,
-            })),
-            { attributes: input },
-          ),
-        {
-          name: "call_create",
-          description:
-            "Create an outbound Vonage phone call. By default the runtime uses the configured webhook URLs and reads the private key from the encrypted secret store.",
-          schema: callCreateSchema,
         },
       ),
       tool(
@@ -4529,18 +4191,31 @@ export class RoutineToolRegistry {
             "tool.model",
             async () => {
               const active = this.models.getActiveModel();
-              const requestedModelId = resolveFirstArg(input);
+              const action = input.action
+                ?? (input.modelId ? "select" : input.thinkingLevel ? "set_thinking" : input.enabled !== undefined ? "set_extended_context" : "status");
 
-              if (!requestedModelId) {
-                const models = await this.models.listProviderModels(active.providerId);
+              if (action === "status") {
+                return [
+                  `Active model: ${active.providerId}/${active.modelId}`,
+                  `Thinking: ${active.thinkingLevel}`,
+                  ...renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()),
+                  "Actions: status, list, select, set_thinking, set_extended_context",
+                ].join("\n");
+              }
+
+              if (action === "list") {
+                const provider = (input.provider ?? active.providerId) as ModelProviderId;
+                const models = await this.models.listProviderModels(provider);
                 if (models.length === 0) {
-                  return `No models were returned for provider ${active.providerId}.`;
+                  return `No models were returned for provider ${provider}.`;
                 }
 
                 return [
-                  `Provider: ${this.models.getProviderLabel(active.providerId)}`,
-                  `Thinking: ${active.thinkingLevel}`,
-                  ...renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()),
+                  `Provider: ${this.models.getProviderLabel(provider)}`,
+                  provider === active.providerId ? `Thinking: ${active.thinkingLevel}` : "",
+                  provider === active.providerId
+                    ? renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()).join("\n")
+                    : "",
                   ...models.map((model) =>
                     [
                       `- ${model.modelId}`,
@@ -4553,74 +4228,42 @@ export class RoutineToolRegistry {
                       .filter(Boolean)
                       .join(" "),
                   ),
-                ].join("\n");
+                ].filter(Boolean).join("\n");
               }
 
-              const selected = await this.models.selectActiveModel(active.providerId, requestedModelId);
-              const nextActive = this.models.getActiveModel();
-              return [
-                `Active model set to ${selected.providerId}/${selected.modelId}.`,
-                `Thinking: ${nextActive.thinkingLevel}.`,
-                ...renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()),
-                selected.contextWindow ? `Context window: ${selected.contextWindow} tokens.` : "",
-                selected.maxOutputTokens ? `Max output: ${selected.maxOutputTokens} tokens.` : "",
-              ]
-                .filter(Boolean)
-                .join("\n");
-            },
-            { attributes: input },
-          ),
-        {
-          name: "model",
-          description:
-            "List models from the current provider when called without args, or set the active model on that provider when given a model id.",
-          schema: modelToolSchema,
-        },
-      ),
-      tool(
-        async (input) =>
-          traceSpan(
-            "tool.think",
-            async () => {
-              const requestedLevel = resolveThinkingLevelArg(input);
-
-              if (!requestedLevel) {
-                const active = this.models.getActiveModel();
+              if (action === "select") {
+                if (!input.modelId?.trim()) {
+                  throw new Error("modelId is required for action=select.");
+                }
+                const provider = (input.provider ?? active.providerId) as ModelProviderId;
+                const selected = await this.models.selectActiveModel(provider, input.modelId.trim());
                 return [
-                  `Thinking level: ${active.thinkingLevel}`,
-                  `Active model: ${active.providerId}/${active.modelId}`,
+                  `Active model set to ${selected.providerId}/${selected.modelId}.`,
+                  `Thinking: ${this.models.getActiveModel().thinkingLevel}.`,
                   ...renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()),
-                  "Available levels: minimal, low, medium, high, xhigh",
+                  selected.contextWindow ? `Context window: ${selected.contextWindow} tokens.` : "",
+                  selected.maxOutputTokens ? `Max output: ${selected.maxOutputTokens} tokens.` : "",
+                ]
+                  .filter(Boolean)
+                  .join("\n");
+              }
+
+              if (action === "set_thinking") {
+                if (!input.thinkingLevel) {
+                  throw new Error("thinkingLevel is required for action=set_thinking.");
+                }
+                const updated = this.models.setThinkingLevel(input.thinkingLevel);
+                return [
+                  `Thinking level set to ${updated.thinkingLevel}.`,
+                  `Active model: ${updated.providerId}/${updated.modelId}`,
+                  ...renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()),
                 ].join("\n");
               }
 
-              const updated = this.models.setThinkingLevel(requestedLevel);
-              return [
-                `Thinking level set to ${updated.thinkingLevel}.`,
-                `Active model: ${updated.providerId}/${updated.modelId}`,
-                ...renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()),
-              ].join("\n");
-            },
-            { attributes: input },
-          ),
-        {
-          name: "think",
-          description:
-            "Show the current thinking level when called without args, or set the active model's thinking level when given one.",
-          schema: thinkToolSchema,
-        },
-      ),
-      tool(
-        async (input) =>
-          traceSpan(
-            "tool.extended_context",
-            async () => {
-              const requestedValue = resolveExtendedContextArg(input);
-              if (requestedValue === undefined) {
-                return renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()).join("\n");
+              if (input.enabled === undefined) {
+                throw new Error("enabled is required for action=set_extended_context.");
               }
-
-              const updated = this.models.setExtendedContextEnabled(requestedValue);
+              const updated = this.models.setExtendedContextEnabled(input.enabled);
               return [
                 `Extended context ${updated.extendedContextEnabled ? "enabled" : "disabled"}.`,
                 ...renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()),
@@ -4629,79 +4272,10 @@ export class RoutineToolRegistry {
             { attributes: input },
           ),
         {
-          name: "extended_context",
+          name: "model",
           description:
-            "Show whether extended context is enabled for the active model, or toggle it on/off.",
-          schema: extendedContextToolSchema,
-        },
-      ),
-      tool(
-        async (input) =>
-          traceSpan(
-            "tool.model_list_provider_models",
-            async () => {
-              const models = await this.models.listProviderModels(input.provider as ModelProviderId);
-              if (models.length === 0) {
-                return `No models were returned for provider ${input.provider}.`;
-              }
-
-              return [
-                `Provider: ${this.models.getProviderLabel(input.provider as ModelProviderId)}`,
-                input.provider === this.models.getActiveModel().providerId
-                  ? `Thinking: ${this.models.getActiveModel().thinkingLevel}`
-                  : "",
-                input.provider === this.models.getActiveModel().providerId
-                  ? renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()).join("\n")
-                  : "",
-                ...models.map((model) =>
-                  [
-                    `- ${model.modelId}`,
-                    model.name !== model.modelId ? `(${model.name})` : "",
-                    model.active ? "[active]" : "",
-                    model.supported ? "" : "[unsupported by runtime]",
-                    model.contextWindow ? `context=${model.contextWindow}` : "",
-                    model.maxOutputTokens ? `max_output=${model.maxOutputTokens}` : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" "),
-                ),
-              ].filter(Boolean).join("\n");
-            },
-            { attributes: input },
-          ),
-        {
-          name: "model_list_provider_models",
-          description:
-            "List live models from one provider endpoint and show which one is active and supported by this runtime.",
-          schema: listProviderModelsSchema,
-        },
-      ),
-      tool(
-        async (input) =>
-          traceSpan(
-            "tool.model_select_active",
-            async () => {
-              const selected = await this.models.selectActiveModel(
-                input.provider as ModelProviderId,
-                input.modelId,
-              );
-              return [
-                `Active model set to ${selected.providerId}/${selected.modelId}.`,
-                `Thinking: ${this.models.getActiveModel().thinkingLevel}.`,
-                ...renderExtendedContextStatus(this.models.getActiveExtendedContextStatus()),
-                selected.contextWindow ? `Context window: ${selected.contextWindow} tokens.` : "",
-                selected.maxOutputTokens ? `Max output: ${selected.maxOutputTokens} tokens.` : "",
-              ]
-                .filter(Boolean)
-                .join("\n");
-            },
-            { attributes: input },
-          ),
-        {
-          name: "model_select_active",
-          description:
-            "Set the provider/model pair that the chat runtime should use as the active model.",
-          schema: selectActiveModelSchema,
+            "Inspect or change model settings. Use action=status, list, select, set_thinking, or set_extended_context.",
+          schema: modelToolSchema,
         },
       ),
       tool(
@@ -5385,124 +4959,6 @@ export class RoutineToolRegistry {
       tool(
         async (input) =>
           traceSpan(
-            "tool.git_status",
-            async () => renderShellExecResult(await this.shell.exec({
-              command: buildGitCommand(["status", "--short", "--branch"]),
-              cwd: input.cwd,
-              timeoutMs: input.timeoutMs,
-            })),
-            { attributes: input },
-          ),
-        {
-          name: "git_status",
-          description:
-            "Show the current git branch and concise working-tree status for the repo at cwd.",
-          schema: gitStatusSchema,
-        },
-      ),
-      tool(
-        async (input) =>
-          traceSpan(
-            "tool.git_diff",
-            async () => {
-              const args = ["diff"];
-              if (input.staged) {
-                args.push("--cached");
-              }
-              if (input.nameOnly) {
-                args.push("--name-only");
-              }
-              if (input.baseRef?.trim()) {
-                args.push(input.baseRef.trim());
-              }
-              return renderShellExecResult(await this.shell.exec({
-                command: buildGitCommand(args, input.paths),
-                cwd: input.cwd,
-                timeoutMs: input.timeoutMs,
-              }));
-            },
-            { attributes: input },
-          ),
-        {
-          name: "git_diff",
-          description:
-            "Show a git diff for the repo at cwd, optionally limited to staged changes, a base ref, or specific paths.",
-          schema: gitDiffSchema,
-        },
-      ),
-      tool(
-        async (input) =>
-          traceSpan(
-            "tool.git_stage",
-            async () => {
-              const command = input.all
-                ? buildGitCommand(["add", "-A"])
-                : buildGitCommand(["add"], input.paths);
-              return renderShellExecResult(await this.shell.exec({
-                command,
-                cwd: input.cwd,
-                timeoutMs: input.timeoutMs,
-              }));
-            },
-            { attributes: input },
-          ),
-        {
-          name: "git_stage",
-          description:
-            "Stage explicit paths or all repo changes in the git working tree at cwd.",
-          schema: gitStageSchema,
-        },
-      ),
-      tool(
-        async (input) =>
-          traceSpan(
-            "tool.git_commit",
-            async () => renderShellExecResult(await this.shell.exec({
-              command: buildGitCommand(["commit", "-m", input.message]),
-              cwd: input.cwd,
-              timeoutMs: input.timeoutMs,
-            })),
-            { attributes: { cwd: input.cwd, timeoutMs: input.timeoutMs, messageLength: input.message.length } },
-          ),
-        {
-          name: "git_commit",
-          description:
-            "Commit the currently staged git changes at cwd with a provided commit message.",
-          schema: gitCommitSchema,
-        },
-      ),
-      tool(
-        async (input) =>
-          traceSpan(
-            "tool.git_revert",
-            async () => {
-              const staged = input.staged ?? true;
-              const worktree = input.worktree ?? true;
-              const args = ["restore"];
-              if (staged) {
-                args.push("--staged");
-              }
-              if (worktree) {
-                args.push("--worktree");
-              }
-              return renderShellExecResult(await this.shell.exec({
-                command: buildGitCommand(args, input.paths),
-                cwd: input.cwd,
-                timeoutMs: input.timeoutMs,
-              }));
-            },
-            { attributes: input },
-          ),
-        {
-          name: "git_revert",
-          description:
-            "Restore uncommitted git changes for explicit paths at cwd, for the index, worktree, or both.",
-          schema: gitRevertSchema,
-        },
-      ),
-      tool(
-        async (input) =>
-          traceSpan(
             "tool.exec_status",
             async () => {
               if (!input.id) {
@@ -5697,12 +5153,6 @@ export class RoutineToolRegistry {
           "Replace text in a file using an exact oldString -> newString edit. Errors if the match is missing or ambiguous.",
         schema: editFileSchema,
       }),
-      tool(async (input) => this.filesystem.multiEdit(input), {
-        name: "multi_edit",
-        description:
-          "Apply multiple exact string replacements to a file in sequence.",
-        schema: multiEditSchema,
-      }),
       tool(async (input) => this.filesystem.applyPatch(input), {
         name: "apply_patch",
         description:
@@ -5755,14 +5205,13 @@ export class RoutineToolRegistry {
     this.tools = [...canonicalTools, ...filesystemTools];
     assertToolAuthorizationCoverage([
       ...this.tools.map((entry) => entry.name),
-      "tool_search",
+      "load_tool_library",
       "run_tool_program",
       "context",
       "model_context_usage",
       "compact",
       "reload",
-      "new",
-      "fnew",
+      "new_chat",
       "launch_coding_agent",
       "resume_coding_agent",
       "steer_coding_agent",
@@ -5801,8 +5250,25 @@ export class RoutineToolRegistry {
       ));
   }
 
-  getToolCatalog(context?: ToolContext) {
+  getToolCatalog(context?: ToolContext): ToolCatalogCard[] {
     return this.getRawTools(context).map((entry) => buildToolCatalogCard(entry));
+  }
+
+  getToolLibraries(context?: ToolContext, scope?: AgentToolScope): ToolLibraryDefinition[] {
+    const availableToolNames = new Set(
+      this.getToolCatalog(context)
+        .filter((card) => !card.aliasOf)
+        .filter((card) => !scope || card.agentScopes.includes(scope))
+        .map((card) => card.canonicalName),
+    );
+
+    return getToolLibraryDefinitions()
+      .map((library) => ({
+        ...library,
+        toolNames: library.toolNames.filter((name) => availableToolNames.has(name)),
+      }))
+      .filter((library) => library.toolNames.length > 0)
+      .filter((library) => !scope || !library.scopes || library.scopes.includes(scope));
   }
 
   private resolvePhoneCallBackend(requestedBackend?: string): PhoneCallBackend {
@@ -5817,7 +5283,7 @@ export class RoutineToolRegistry {
     names: string[],
     context?: ToolContext,
     options?: { defaultCwd?: string },
-  ) {
+  ): StructuredToolInterface[] {
     const selectedNames = new Set(names);
     const rawTools = this.getRawTools(context).filter((entry) => selectedNames.has(entry.name));
     const wrapped = (!context?.onToolUse
@@ -5844,38 +5310,6 @@ export class RoutineToolRegistry {
             },
           )));
     return wrapped.map((entry) => this.wrapToolWithDefaultCwd(entry, options?.defaultCwd));
-  }
-
-  getCodingAgentTools(options?: ToolContext & { defaultCwd?: string }) {
-    const selectedNames = new Set([
-      "project_list",
-      "project_get",
-      "read_file",
-      "write_file",
-      "edit_file",
-      "multi_edit",
-      "list_dir",
-      "glob",
-      "grep",
-      "stat_path",
-      "mkdir",
-      "move_path",
-      "copy_path",
-      "delete_path",
-      "exec_command",
-      "exec_status",
-      "exec_output",
-      "memory_search",
-      "telemetry_query",
-      "web_search",
-      "web_fetch",
-      "todo_read",
-      "todo_write",
-    ]);
-
-    return this.getToolsByNames([...selectedNames], options, {
-      defaultCwd: options?.defaultCwd,
-    });
   }
 
   getToolNames() {
@@ -5999,31 +5433,29 @@ export class RoutineToolRegistry {
         ? this.createReflectTool(context)
       : name === "reload"
         ? this.createReloadTool(context)
-        : name === "new"
-          ? this.createNewTool(context)
-          : name === "fnew"
-            ? this.createFnewTool(context)
+        : name === "new_chat"
+          ? this.createNewChatTool(context)
             : name === "launch_coding_agent"
               ? this.createLaunchCodingAgentTool(context)
               : name === "resume_coding_agent"
                 ? this.createResumeCodingAgentTool(context)
                 : name === "steer_coding_agent"
-                  ? this.createSteerCodingAgentTool(context)
+                ? this.createSteerCodingAgentTool(context)
                   : name === "cancel_coding_agent"
                     ? this.createCancelCodingAgentTool(context)
                 : name === "workflow_status"
                   ? this.createWorkflowStatusTool(context)
-                  : name === "tool_search"
-                  ? this.createToolSearchTool(context)
+                  : name === "load_tool_library"
+                  ? this.createLoadToolLibraryTool(context)
                   : name === "tool_result_read"
                     ? this.createToolResultReadTool(context)
                   : this.toolsByName.get(name);
   }
 
-  private getRawTools(context?: ToolContext) {
+  private getRawTools(context?: ToolContext): StructuredToolInterface[] {
     return [
       ...this.tools,
-      this.createToolSearchTool(context),
+      this.createLoadToolLibraryTool(context),
       this.createToolResultReadTool(context),
       this.createRunToolProgramTool(context),
       this.createReflectTool(context),
@@ -6031,8 +5463,7 @@ export class RoutineToolRegistry {
       this.createUsageSummaryTool(context),
       this.createCompactTool(context),
       this.createReloadTool(context),
-      this.createNewTool(context),
-      this.createFnewTool(context),
+      this.createNewChatTool(context),
       this.createLaunchCodingAgentTool(context),
       this.createResumeCodingAgentTool(context),
       this.createSteerCodingAgentTool(context),
@@ -6566,141 +5997,107 @@ export class RoutineToolRegistry {
     );
   }
 
-  private createToolSearchTool(context?: ToolContext) {
+  private createLoadToolLibraryTool(context?: ToolContext): StructuredToolInterface {
     return tool(
       async (input) =>
         traceSpan(
-          "tool.tool_search",
+          "tool.load_tool_library",
           async () => {
-            const query = input.query.trim();
-            if (!query) {
-              throw new Error("tool_search requires a non-empty query.");
-            }
-
             const scope = (input.scope as AgentToolScope | undefined) ?? "chat";
-            const ranked = await this.toolSearch.search({
-              cards: this.getToolCatalog(context).filter((card) => card.name !== "tool_search"),
-              query,
-              limit: input.limit ?? 8,
-              agentScope: scope,
-            });
+            const libraries = this.getToolLibraries(context, scope);
             const visibleBefore = uniqueStrings([
               ...this.getAgentDefaultVisibleToolNames(scope),
               ...(context?.getActiveToolNames?.() ?? []),
             ]);
+            const requestedLibraryId = input.library?.trim();
 
-            if (ranked.length === 0) {
+            if (!requestedLibraryId) {
+              const renderedLibraries = libraries.map((library) => {
+                const alreadyVisible = library.toolNames.filter((name) => visibleBefore.includes(name));
+                return {
+                  id: library.id,
+                  description: library.description,
+                  toolNames: [...library.toolNames],
+                  alreadyVisible,
+                  hiddenToolCount: library.toolNames.length - alreadyVisible.length,
+                };
+              });
               if (input.format === "json") {
                 return {
-                  query,
                   scope,
-                  activate: input.activate !== false,
-                  results: [],
-                  newlyActivated: [],
-                  alreadyVisible: [],
-                  visibleAfter: visibleBefore,
-                  message: `No tools matched "${query}" for scope ${scope}.`,
+                  libraries: renderedLibraries,
+                  visibleBefore,
                 };
               }
-              return `No tools matched "${query}" for scope ${scope}.`;
+              return [
+                `Scope: ${scope}`,
+                `Visible tool count: ${visibleBefore.length}`,
+                "",
+                ...renderedLibraries.map((library) => [
+                  `Library: ${library.id}`,
+                  `Description: ${library.description}`,
+                  `Tools: ${library.toolNames.join(", ")}`,
+                  library.alreadyVisible.length > 0
+                    ? `Already visible: ${library.alreadyVisible.join(", ")}`
+                    : "Already visible: (none)",
+                  `Hidden tools: ${library.hiddenToolCount}`,
+                ].join("\n")),
+              ].join("\n");
             }
 
-            const shouldActivate = input.activate !== false;
-            const loadCount = input.loadCount ?? 5;
+            const library = libraries.find((entry) => entry.id === requestedLibraryId);
+            if (!library) {
+              const availableIds = libraries.map((entry) => entry.id);
+              if (input.format === "json") {
+                return {
+                  scope,
+                  library: requestedLibraryId,
+                  availableLibraries: availableIds,
+                  message: `Unknown tool library "${requestedLibraryId}" for scope ${scope}.`,
+                };
+              }
+              return `Unknown tool library "${requestedLibraryId}" for scope ${scope}. Available libraries: ${availableIds.join(", ") || "(none)"}.`;
+            }
+
             const visibleBeforeSet = new Set(visibleBefore);
-            const discoveredToolNames = uniqueStrings(
-              ranked
-                .slice(0, loadCount)
-                .map((result) => result.card.canonicalName),
-            );
-            const newlyActivated = shouldActivate
-              ? discoveredToolNames.filter((name) => !visibleBeforeSet.has(name))
-              : [];
-            const alreadyVisible = shouldActivate
-              ? discoveredToolNames.filter((name) => visibleBeforeSet.has(name))
-              : [];
+            const newlyActivated = library.toolNames.filter((name) => !visibleBeforeSet.has(name));
+            const alreadyVisible = library.toolNames.filter((name) => visibleBeforeSet.has(name));
 
-            if (shouldActivate && newlyActivated.length > 0) {
-              context?.activateDiscoveredTools?.(newlyActivated);
+            if (newlyActivated.length > 0) {
+              context?.activateToolNames?.(newlyActivated);
             }
 
-            const visibleAfter = shouldActivate
-              ? uniqueStrings([...visibleBefore, ...newlyActivated])
-              : [...visibleBefore];
-
-            const renderedResults = ranked.map(({ card, score, vectorScore, lexicalScore }) => ({
-              name: card.canonicalName,
-              description: card.description,
-              examples: card.examples,
-              domains: card.domains,
-              tags: card.tags.slice(0, 8),
-              defaultVisibleScopes: card.defaultVisibleScopes,
-              defaultVisibleToMainAgent: card.defaultVisibleToMainAgent,
-              defaultVisibleToSubagent: card.defaultVisibleToSubagent,
-              scores: {
-                hybrid: Number(score.toFixed(4)),
-                vector: Number(vectorScore.toFixed(4)),
-                lexical: Number(lexicalScore.toFixed(4)),
-              },
-              visibleNow: shouldActivate && discoveredToolNames.includes(card.canonicalName),
-              activationState: !shouldActivate || !discoveredToolNames.includes(card.canonicalName)
-                ? "unchanged"
-                : newlyActivated.includes(card.canonicalName)
-                  ? "newly-activated"
-                  : "already-visible",
-            }));
+            const visibleAfter = uniqueStrings([...visibleBefore, ...newlyActivated]);
 
             if (input.format === "json") {
               return {
-                query,
                 scope,
-                activate: shouldActivate,
-                loadCount,
+                library: library.id,
+                description: library.description,
+                toolNames: [...library.toolNames],
                 newlyActivated,
                 alreadyVisible,
                 visibleAfter,
-                results: renderedResults,
               };
             }
 
             return [
-              `Query: ${query}`,
               `Scope: ${scope}`,
-              `Results: ${ranked.length}`,
-              shouldActivate
-                ? `Newly activated: ${newlyActivated.length > 0 ? newlyActivated.join(", ") : "(none)"}`
-                : "Activation: skipped",
-              shouldActivate
-                ? `Already visible: ${alreadyVisible.length > 0 ? alreadyVisible.join(", ") : "(none)"}`
-                : "",
-              shouldActivate ? `Visible tool count after search: ${visibleAfter.length}` : "",
-              "",
-              ranked.map(({ card, score, vectorScore, lexicalScore }) =>
-              [
-                `Tool: ${card.canonicalName}`,
-                `Description: ${card.description}`,
-                card.examples.length > 0 ? `Examples: ${card.examples.join(" | ")}` : "",
-                `Domains: ${card.domains.join(", ")}`,
-                `Tags: ${card.tags.slice(0, 8).join(", ")}`,
-                `Default visibility: main=${card.defaultVisibleToMainAgent ? "yes" : "no"} subagent=${card.defaultVisibleToSubagent ? "yes" : "no"}${card.defaultVisibleScopes.length > 0 ? ` [${card.defaultVisibleScopes.join(", ")}]` : ""}`,
-                `Scores: hybrid=${score.toFixed(4)} vector=${vectorScore.toFixed(4)} lexical=${lexicalScore.toFixed(4)}`,
-                shouldActivate && discoveredToolNames.includes(card.canonicalName)
-                  ? newlyActivated.includes(card.canonicalName)
-                    ? "Visible now: yes (newly activated)"
-                    : "Visible now: yes (already visible)"
-                  : "",
-              ].join("\n")).join("\n\n"),
-            ]
-              .filter(Boolean)
-              .join("\n");
+              `Library: ${library.id}`,
+              `Description: ${library.description}`,
+              `Tools: ${library.toolNames.join(", ")}`,
+              `Newly activated: ${newlyActivated.length > 0 ? newlyActivated.join(", ") : "(none)"}`,
+              `Already visible: ${alreadyVisible.length > 0 ? alreadyVisible.join(", ") : "(none)"}`,
+              `Visible tool count after load: ${visibleAfter.length}`,
+            ].join("\n");
           },
           { attributes: input },
         ),
       {
-        name: "tool_search",
+        name: "load_tool_library",
         description:
-          "Search the available backend tools by capability and use case, and activate the best matches into the current run. Use this when the right tool is not already visible instead of guessing tool names. Supports format=json for structured output.",
-        schema: toolSearchSchema,
+          "List available tool libraries for a scope or load one named library into the current run. Use this when the needed tool family is not already visible. Supports format=json for structured output.",
+        schema: loadToolLibrarySchema,
       },
     );
   }
@@ -7057,39 +6454,21 @@ export class RoutineToolRegistry {
     );
   }
 
-  private createNewTool(context?: ToolContext) {
+  private createNewChatTool(context?: ToolContext) {
     return this.createFreshConversationTool(
       {
-        name: "new",
-        spanName: "tool.new",
-        errorLabel: "new",
+        name: "new_chat",
+        spanName: "tool.new_chat",
+        errorLabel: "new_chat",
         description:
-          "Flush durable memory from the active conversation and start a fresh conversation with no prior messages. The current thread keeps its existing system-prompt snapshot; use reload explicitly if you want a new prompt snapshot.",
+          "Start a fresh conversation. By default this flushes durable memory from the active thread first; set force=true to skip the durable-memory flush and reset immediately. The current thread keeps its existing system-prompt snapshot; use reload explicitly if you want a new prompt snapshot.",
         preparingProgress: "Preparing a fresh conversation for {conversationKey}.",
         successProgressWithMemory:
           "Fresh conversation is ready. Memory flushed to {memoryFilePath}.",
         successProgressWithoutMemory:
           "Fresh conversation is ready. No durable memory needed to be saved.",
-        flushMemory: true,
-      },
-      context,
-    );
-  }
-
-  private createFnewTool(context?: ToolContext) {
-    return this.createFreshConversationTool(
-      {
-        name: "fnew",
-        spanName: "tool.fnew",
-        errorLabel: "fnew",
-        description:
-          "Start a brand new conversation immediately without compacting the prior thread or writing anything to durable memory. The current thread keeps its existing system-prompt snapshot; use reload explicitly if you want a new prompt snapshot.",
-        preparingProgress: "Preparing a clean fresh conversation for {conversationKey}.",
-        successProgressWithMemory:
+        forceSuccessProgress:
           "Fresh conversation is ready. Durable memory flush was intentionally skipped.",
-        successProgressWithoutMemory:
-          "Fresh conversation is ready. Durable memory flush was intentionally skipped.",
-        flushMemory: false,
       },
       context,
     );
@@ -7097,14 +6476,14 @@ export class RoutineToolRegistry {
 
   private createFreshConversationTool(
     config: {
-      name: "new" | "fnew";
-      spanName: "tool.new" | "tool.fnew";
-      errorLabel: "new" | "fnew";
+      name: "new_chat";
+      spanName: "tool.new_chat";
+      errorLabel: "new_chat";
       description: string;
       preparingProgress: string;
       successProgressWithMemory: string;
       successProgressWithoutMemory: string;
-      flushMemory: boolean;
+      forceSuccessProgress: string;
     },
     context?: ToolContext,
   ) {
@@ -7126,9 +6505,10 @@ export class RoutineToolRegistry {
               input,
             );
 
+            const flushMemory = input.force !== true;
             const freshConversation = await this.transitions.startFreshConversation({
               conversationKey,
-              flushMemory: config.flushMemory,
+              flushMemory,
               onProgress: async (message) => this.reportProgress(context, message, input),
             });
             this.sessionTodos.clear(conversationKey);
@@ -7137,7 +6517,7 @@ export class RoutineToolRegistry {
               `Started a new conversation for ${conversationKey}.`,
               `Assistant: ${freshConversation.openingLine}`,
               `System prompt version: ${freshConversation.systemPrompt.version}.`,
-              freshConversation.memoryFlushSkipped
+              input.force === true || freshConversation.memoryFlushSkipped
                 ? "Durable memory flush was intentionally skipped."
                 : freshConversation.memoryFilePath
                 ? `Memory flushed to ${freshConversation.memoryFilePath}.`
@@ -7150,7 +6530,9 @@ export class RoutineToolRegistry {
 
             await this.reportProgress(
               context,
-              freshConversation.memoryFilePath
+              input.force === true
+                ? config.forceSuccessProgress
+                : freshConversation.memoryFilePath
                 ? config.successProgressWithMemory.replace(
                     "{memoryFilePath}",
                     freshConversation.memoryFilePath,

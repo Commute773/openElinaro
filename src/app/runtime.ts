@@ -53,7 +53,7 @@ type ShellRuntime = Pick<
 >;
 type FilesystemRuntime = Pick<
   FilesystemService,
-  "applyPatch" | "copyPath" | "deletePath" | "edit" | "glob" | "grep" | "listDir" | "mkdir" | "movePath" | "multiEdit" | "read" | "statPath" | "write"
+  "applyPatch" | "copyPath" | "deletePath" | "edit" | "glob" | "grep" | "listDir" | "mkdir" | "movePath" | "read" | "statPath" | "write"
 >;
 
 type RuntimeScope = {
@@ -85,7 +85,7 @@ function buildBackgroundAgentAssistantContext(
     projects.buildAssistantContext(),
     "Background coding subagents do not get automatic per-turn memory recall.",
     "When the assigned workspace is a local git repo, the runtime forks this run into an isolated linked worktree before planner or worker execution starts.",
-    "Tool visibility is limited to the coding planner/worker scope for this run. If a needed tool is not visible, call tool_search before guessing; if it still is not available, continue within the visible toolset.",
+    "Tool visibility is limited to the coding planner/worker scope for this run. If a needed tool family is not visible, call load_tool_library before guessing; if it still is not available, continue within the visible toolset.",
   ]
     .filter(Boolean)
     .join("\n\n");

@@ -1,5 +1,5 @@
 import type { StructuredToolInterface } from "@langchain/core/tools";
-import type { AgentToolScope, ResolvedToolBundle } from "../domain/tool-catalog";
+import type { AgentToolScope, ResolvedToolBundle, ToolCatalogCard } from "../domain/tool-catalog";
 import type { ToolContext } from "../tools/routine-tool-registry";
 import { RoutineToolRegistry } from "../tools/routine-tool-registry";
 
@@ -25,11 +25,11 @@ export class ToolResolutionService {
     return {
       entries: tools,
       tools: tools.map((entry) => entry.name),
-      selectedBySearch: [...(params.activatedToolNames ?? [])],
+      activatedTools: [...(params.activatedToolNames ?? [])],
     };
   }
 
-  getScopeCatalog(agentScope: AgentToolScope, context?: ToolContext) {
+  getScopeCatalog(agentScope: AgentToolScope, context?: ToolContext): ToolCatalogCard[] {
     return this.tools.getToolCatalog(context)
       .filter((card) => !card.aliasOf)
       .filter((card) => card.agentScopes.includes(agentScope));
@@ -38,7 +38,7 @@ export class ToolResolutionService {
   resolveAllForScope(
     agentScope: AgentToolScope,
     params?: Omit<ResolveParams, "agentScope" | "activatedToolNames">,
-  ) {
+  ): ResolvedToolBundle & { entries: StructuredToolInterface[] } {
     const catalog = this.getScopeCatalog(agentScope, params?.context);
     const tools = this.tools.getToolsByNames(
       catalog.map((card) => card.canonicalName),
@@ -48,7 +48,7 @@ export class ToolResolutionService {
     return {
       entries: tools,
       tools: tools.map((entry) => entry.name),
-      selectedBySearch: [] as string[],
+      activatedTools: [] as string[],
     };
   }
 

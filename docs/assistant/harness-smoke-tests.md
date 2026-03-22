@@ -2,15 +2,14 @@
 
 Use these examples to verify the assistant harness after tool or backend changes. They are intentionally small, deterministic, and safe to run in a normal repo checkout.
 
-## `tool_search`
+## `load_tool_library`
 
 Known-good text output:
 
 ```json
 {
-  "query": "search repository files and inspect matching code",
-  "scope": "chat",
-  "limit": 5
+  "library": "filesystem_read",
+  "scope": "chat"
 }
 ```
 
@@ -18,18 +17,17 @@ Known-good structured output:
 
 ```json
 {
-  "query": "search repository files and inspect matching code",
+  "library": "filesystem_read",
   "scope": "chat",
-  "limit": 5,
   "format": "json"
 }
 ```
 
 Expected:
 
-- Returns ranked results.
-- Text mode reports `Newly activated`, `Already visible`, and `Visible tool count after search`.
-- JSON mode returns `results`, `newlyActivated`, `alreadyVisible`, and `visibleAfter`.
+- Returns the selected library description and tool list.
+- Text mode reports `Newly activated`, `Already visible`, and `Visible tool count after load`.
+- JSON mode returns `toolNames`, `newlyActivated`, `alreadyVisible`, and `visibleAfter`.
 
 ## `list_dir`
 

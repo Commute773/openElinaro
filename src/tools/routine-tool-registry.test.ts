@@ -454,7 +454,6 @@ describe("RoutineToolRegistry tool catalog", () => {
       "read package.json",
       "open src/index.ts",
     ]);
-    expect(canonical?.searchText).toContain("read package.json");
   });
 
   test("suppresses tool-use echo when silent is true", async () => {
@@ -695,9 +694,9 @@ describe("RoutineToolRegistry tool catalog", () => {
     expect(capturedOutput).toContain("ANSWER_VALUE=kiwi");
   });
 
-  test("fnew starts a brand new chat without flushing durable memory", async () => {
+  test("new_chat force=true starts a brand new chat without flushing durable memory", async () => {
     const harness = createHarness();
-    const conversationKey = "fnew-test-thread";
+    const conversationKey = "force-reset-test-thread";
     harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
     harness.conversations.rollbackAndAppend(
       conversationKey,
@@ -705,7 +704,7 @@ describe("RoutineToolRegistry tool catalog", () => {
       [new HumanMessage("hello before reset")],
     );
 
-    const result = await harness.registry.invoke("fnew", { conversationKey });
+    const result = await harness.registry.invoke("new_chat", { conversationKey, force: true });
     const storedConversation = harness.conversations.get(conversationKey);
 
     expect(result).toContain(`Started a new conversation for ${conversationKey}.`);
@@ -1402,7 +1401,7 @@ describe("RoutineToolRegistry tool catalog", () => {
     }
   });
 
-  test("builds native git commands through the shell backend", async () => {
+  test("routes git work through exec_command instead of dedicated git tools", async () => {
     const calls: Array<{ command: string; cwd?: string; timeoutMs?: number }> = [];
     const shellStub = {
       exec: async (params: { command: string; cwd?: string; timeoutMs?: number }) => {
@@ -1429,38 +1428,16 @@ describe("RoutineToolRegistry tool catalog", () => {
     };
     const harness = createHarnessWithOptions({ shell: shellStub });
 
-    await harness.registry.invoke("git_status", { cwd: "/repo" });
-    await harness.registry.invoke("git_diff", {
+    await harness.registry.invoke("exec_command", {
       cwd: "/repo",
-      staged: true,
-      baseRef: "HEAD~1",
-      paths: ["src/index.ts"],
-    });
-    await harness.registry.invoke("git_stage", { cwd: "/repo", paths: ["src/index.ts"] });
-    await harness.registry.invoke("git_commit", { cwd: "/repo", message: "test commit" });
-    await harness.registry.invoke("git_revert", {
-      cwd: "/repo",
-      paths: ["src/index.ts"],
-      staged: false,
-      worktree: true,
+      command: "git status --short --branch",
     });
 
     expect(calls[0]).toMatchObject({
       cwd: "/repo",
-      command: "'git' 'status' '--short' '--branch'",
+      command: "git status --short --branch",
     });
-    expect(calls[1]).toMatchObject({
-      command: "'git' 'diff' '--cached' 'HEAD~1' '--' 'src/index.ts'",
-    });
-    expect(calls[2]).toMatchObject({
-      command: "'git' 'add' '--' 'src/index.ts'",
-    });
-    expect(calls[3]).toMatchObject({
-      command: "'git' 'commit' '-m' 'test commit'",
-    });
-    expect(calls[4]).toMatchObject({
-      command: "'git' 'restore' '--worktree' '--' 'src/index.ts'",
-    });
+    expect(calls).toHaveLength(1);
   });
 
   test("round-trips coding session todos by conversation key", async () => {
@@ -1509,8 +1486,7 @@ describe("RoutineToolRegistry tool catalog", () => {
       defaultCwd: process.cwd(),
     }).tools;
 
-    expect(chatTools).toContain("web_search");
-    expect(chatTools).toContain("web_fetch");
+    expect(chatTools).toContain("load_tool_library");
     expect(chatTools).toContain("exec_command");
     expect(chatTools).toContain("exec_status");
     expect(chatTools).toContain("exec_output");
@@ -1522,7 +1498,7 @@ describe("RoutineToolRegistry tool catalog", () => {
     expect(codingTools).toContain("edit_file");
     expect(codingTools).toContain("apply_patch");
     expect(codingTools).toContain("exec_command");
-    expect(codingTools).not.toContain("run_tool_program");
+    expect(codingTools).toContain("run_tool_program");
     expect(codingTools).not.toContain("web_search");
     expect(codingTools).not.toContain("service_version");
   });
@@ -1535,12 +1511,10 @@ describe("RoutineToolRegistry tool catalog", () => {
       defaultCwd: process.cwd(),
     }).tools;
 
-    expect(planningTools).toContain("tool_search");
+    expect(planningTools).toContain("load_tool_library");
     expect(planningTools).toContain("read_file");
     expect(planningTools).toContain("grep");
-    expect(planningTools).toContain("git_status");
-    expect(planningTools).toContain("git_diff");
-    expect(planningTools).not.toContain("run_tool_program");
+    expect(planningTools).toContain("run_tool_program");
     expect(planningTools).not.toContain("apply_patch");
     expect(planningTools).not.toContain("write_file");
     expect(planningTools).not.toContain("exec_command");
@@ -1548,15 +1522,15 @@ describe("RoutineToolRegistry tool catalog", () => {
     expect(planningTools).not.toContain("todo_write");
   });
 
-  test("keeps native git write tools visible for coding workers", () => {
+  test("keeps coding-worker defaults focused on file edits plus exec", () => {
     const visible = getRuntimeAgentDefaultVisibleToolNames("coding-worker");
 
-    expect(visible).toContain("git_status");
-    expect(visible).toContain("git_diff");
-    expect(visible).toContain("git_stage");
-    expect(visible).toContain("git_commit");
-    expect(visible).not.toContain("git_revert");
+    expect(visible).toContain("exec_command");
+    expect(visible).toContain("exec_status");
+    expect(visible).toContain("exec_output");
     expect(visible).toContain("apply_patch");
+    expect(visible).not.toContain("git_status");
+    expect(visible).not.toContain("git_diff");
   });
 
   test("apply_patch supports add, update, move, and delete operations", async () => {
@@ -1612,8 +1586,8 @@ describe("RoutineToolRegistry tool catalog", () => {
     const defaultChatTools = harness.registry.getAgentDefaultVisibleToolNames("chat");
 
     expect(userFacingTools).toContain("routine_add");
-    expect(userFacingTools).not.toContain("tool_search");
-    expect(defaultChatTools).toContain("tool_search");
+    expect(userFacingTools).not.toContain("load_tool_library");
+    expect(defaultChatTools).toContain("load_tool_library");
     expect(defaultChatTools).toContain("run_tool_program");
     expect(defaultChatTools).not.toContain("routine_add");
   });
@@ -2199,57 +2173,55 @@ describe("RoutineToolRegistry tool catalog", () => {
     ]);
   });
 
-  test("treats default-visible tools as already visible during tool_search", async () => {
+  test("treats default-visible tools as already visible during load_tool_library", async () => {
     const harness = createHarness();
     const activated: string[] = [];
 
-    const result = await harness.registry.invokeRaw("tool_search", {
-      query: "web_search",
+    const result = await harness.registry.invokeRaw("load_tool_library", {
+      library: "shell",
       scope: "chat",
-      limit: 1,
-      loadCount: 1,
       format: "json",
     }, {
       conversationKey: "chat-1",
       getActiveToolNames: () => [],
-      activateDiscoveredTools: (toolNames) => {
+      activateToolNames: (toolNames) => {
         activated.push(...toolNames);
       },
     }) as {
       alreadyVisible: string[];
       newlyActivated: string[];
       visibleAfter: string[];
-      results: Array<{ name: string }>;
+      toolNames: string[];
     };
 
-    expect(result.results[0]?.name).toBe("web_search");
-    expect(result.alreadyVisible).toContain("web_search");
+    expect(result.toolNames).toContain("exec_command");
+    expect(result.alreadyVisible).toContain("exec_command");
     expect(result.newlyActivated).toEqual([]);
-    expect(result.visibleAfter).toContain("web_search");
+    expect(result.visibleAfter).toContain("exec_command");
     expect(activated).toEqual([]);
   });
 
-  test("prioritizes exact tool-name queries for web_fetch during tool_search", async () => {
+  test("loads the web research library into chat scope", async () => {
     const harness = createHarness();
 
-    const result = await harness.registry.invokeRaw("tool_search", {
-      query: "web_fetch URL content",
+    const result = await harness.registry.invokeRaw("load_tool_library", {
+      library: "web_research",
       scope: "chat",
-      limit: 3,
-      loadCount: 3,
       format: "json",
     }, {
       conversationKey: "chat-web-fetch-search",
       getActiveToolNames: () => [],
-      activateDiscoveredTools: () => {},
+      activateToolNames: () => {},
     }) as {
       alreadyVisible: string[];
-      results: Array<{ name: string }>;
+      newlyActivated: string[];
+      toolNames: string[];
       visibleAfter: string[];
     };
 
-    expect(result.results[0]?.name).toBe("web_fetch");
-    expect(result.alreadyVisible).toContain("web_fetch");
+    expect(result.toolNames).toContain("web_fetch");
+    expect(result.toolNames).toContain("web_search");
+    expect(result.newlyActivated).toContain("web_fetch");
     expect(result.visibleAfter).toContain("web_fetch");
   });
 
@@ -2260,7 +2232,7 @@ describe("RoutineToolRegistry tool catalog", () => {
     const writeFile = cards.find((card) => card.canonicalName === "write_file");
     const todoWrite = cards.find((card) => card.canonicalName === "todo_write");
 
-    expect(webSearch?.defaultVisibleToMainAgent).toBe(true);
+    expect(webSearch?.defaultVisibleToMainAgent).toBe(false);
     expect(webSearch?.defaultVisibleToSubagent).toBe(false);
     expect(writeFile?.defaultVisibleToSubagent).toBe(true);
     expect(writeFile?.defaultVisibleToMainAgent).toBe(false);

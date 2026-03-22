@@ -12,6 +12,7 @@ import {
   type Attachment,
   type ChatInputCommandInteraction,
   type Message,
+  type SlashCommandOptionsOnlyBuilder,
 } from "discord.js";
 import { OpenElinaroApp } from "../../app/runtime";
 import { getAuthStatus, getAuthStatusLines, hasAnyProviderAuth, hasProviderAuth } from "../../auth/store";
@@ -86,7 +87,7 @@ const MAX_TEXT_ATTACHMENT_CHARS = 32_000;
 const DEFAULT_PROFILE_THINKING_LEVEL = "low";
 const DISCORD_CONTINUED_SUFFIX = "/continued";
 const discordTelemetry = telemetry.child({ component: "discord" });
-const USER_FACING_TOOL_NAMES_WITH_CUSTOM_COMMANDS = new Set<string>([
+const TOOL_COMMAND_EXCLUSIONS = new Set<string>([
   "routine_check",
   "routine_list",
   "routine_add",
@@ -96,17 +97,71 @@ const USER_FACING_TOOL_NAMES_WITH_CUSTOM_COMMANDS = new Set<string>([
   "routine_skip",
   "routine_pause",
   "routine_resume",
-  "compact",
-  "reflect",
-  "reload",
-  "new",
-  "fnew",
   "profile_set_defaults",
-  "context",
   "update",
 ]);
-const ADVANCED_DIRECT_COMMAND_BUILDERS: SlashCommandBuilder[] = [];
 type ProfileCommandAction = "list" | "show" | "set" | "auth";
+type DerivedToolCommandBuilder = (toolName: string) => SlashCommandBuilder | SlashCommandOptionsOnlyBuilder;
+type DerivedToolInputBuilder = (interaction: ChatInputCommandInteraction) => unknown;
+
+const TOOL_DERIVED_COMMAND_BUILDERS: Partial<Record<string, DerivedToolCommandBuilder>> = {
+  new_chat: (toolName) =>
+    new SlashCommandBuilder()
+      .setName(toolName)
+      .setDescription("Start a fresh conversation for your Discord chat session")
+      .addBooleanOption((option) =>
+        option
+          .setName("force")
+          .setDescription("Skip the durable-memory flush and reset immediately")
+          .setRequired(false),
+      ),
+  compact: (toolName) =>
+    new SlashCommandBuilder()
+      .setName(toolName)
+      .setDescription("Compact the current Discord conversation into a shorter continuation state"),
+  reflect: (toolName) =>
+    new SlashCommandBuilder()
+      .setName(toolName)
+      .setDescription("Write a private reflection entry to the active profile journal")
+      .addStringOption((option) =>
+        option
+          .setName("focus")
+          .setDescription("Optional focus for this reflection entry")
+          .setRequired(false),
+      ),
+  reload: (toolName) =>
+    new SlashCommandBuilder()
+      .setName(toolName)
+      .setDescription("Reload the current conversation's system prompt snapshot"),
+  context: (toolName) =>
+    new SlashCommandBuilder()
+      .setName(toolName)
+      .setDescription("Show the current context-window token usage")
+      .addStringOption((option) =>
+        option
+          .setName("mode")
+          .setDescription("Optional output mode")
+          .setRequired(false)
+          .addChoices(
+            { name: "v", value: "v" },
+            { name: "full", value: "full" },
+          ),
+      ),
+};
+
+const TOOL_DERIVED_INPUT_BUILDERS: Partial<Record<string, DerivedToolInputBuilder>> = {
+  new_chat: (interaction) => ({
+    ...(interaction.options.getBoolean("force") === true ? { force: true } : {}),
+  }),
+  compact: () => ({}),
+  reflect: (interaction) => ({
+    focus: interaction.options.getString("focus") ?? undefined,
+  }),
+  reload: () => ({}),
+  context: (interaction) => ({
+    ...(interaction.options.getString("mode") ? { mode: interaction.options.getString("mode") } : {}),
+  }),
+};
 
 function traceSpan<T>(
   operation: string,
@@ -118,7 +173,7 @@ function traceSpan<T>(
 
 function getAutoRegisteredToolCommandNames() {
   return getRuntimeUserFacingToolNames().filter((name) =>
-    !USER_FACING_TOOL_NAMES_WITH_CUSTOM_COMMANDS.has(name)
+    !TOOL_COMMAND_EXCLUSIONS.has(name)
   );
 }
 
@@ -889,39 +944,6 @@ async function handleSlashCommand(params: {
     return;
   }
 
-  if (interaction.commandName === "new") {
-    await invokeDiscordToolAndReply(interaction, app, "new", {});
-    return;
-  }
-
-  if (interaction.commandName === "fnew") {
-    await invokeDiscordToolAndReply(interaction, app, "fnew", {});
-    return;
-  }
-
-  if (interaction.commandName === "compact") {
-    await invokeDiscordToolAndReply(interaction, app, "compact", {});
-    return;
-  }
-
-  if (interaction.commandName === "reflect") {
-    await invokeDiscordToolAndReply(interaction, app, "reflect", {
-      focus: interaction.options.getString("focus") ?? undefined,
-    });
-    return;
-  }
-
-  if (interaction.commandName === "reload") {
-    await invokeDiscordToolAndReply(interaction, app, "reload", {});
-    return;
-  }
-
-  if (interaction.commandName === "context") {
-    const mode = interaction.options.getString("mode") ?? undefined;
-    await invokeDiscordToolAndReply(interaction, app, "context", mode ? { mode } : {});
-    return;
-  }
-
   if (interaction.commandName === "update") {
     const confirm = interaction.options.getBoolean("confirm") ?? false;
     if (!confirm) {
@@ -953,7 +975,7 @@ async function handleSlashCommand(params: {
   }
 
   if (getAutoRegisteredToolCommandNameSet().has(interaction.commandName)) {
-    await invokeToolFromJsonInput(interaction, app, interaction.commandName);
+    await invokeDerivedToolCommand(interaction, app, interaction.commandName);
     return;
   }
 
@@ -1111,40 +1133,6 @@ function buildSlashCommands() {
           .setRequired(false),
       ),
     new SlashCommandBuilder()
-      .setName("new")
-      .setDescription("Start a fresh conversation for your Discord chat session"),
-    new SlashCommandBuilder()
-      .setName("fnew")
-      .setDescription("Start a brand new conversation immediately without writing durable memory"),
-    new SlashCommandBuilder()
-      .setName("compact")
-      .setDescription("Compact the current Discord conversation into a shorter continuation state"),
-    new SlashCommandBuilder()
-      .setName("reflect")
-      .setDescription("Write a private reflection entry to the active profile journal")
-      .addStringOption((option) =>
-        option
-          .setName("focus")
-          .setDescription("Optional focus for this reflection entry")
-          .setRequired(false),
-      ),
-    new SlashCommandBuilder()
-      .setName("reload")
-      .setDescription("Reload the current conversation's system prompt snapshot"),
-    new SlashCommandBuilder()
-      .setName("context")
-      .setDescription("Show the current context-window token usage")
-      .addStringOption((option) =>
-        option
-          .setName("mode")
-          .setDescription("Optional output mode")
-          .setRequired(false)
-          .addChoices(
-            { name: "v", value: "v" },
-            { name: "full", value: "full" },
-          ),
-      ),
-    new SlashCommandBuilder()
       .setName("update")
       .setDescription("Preview or apply the latest fast-forward git changes into the source workspace")
       .addBooleanOption((option) =>
@@ -1157,15 +1145,7 @@ function buildSlashCommands() {
       .setName("stop")
       .setDescription("Immediately halt the current Discord conversation agent"),
     ...getAutoRegisteredToolCommandNames().map((toolName) =>
-      new SlashCommandBuilder()
-        .setName(toolName)
-        .setDescription(buildAutoRegisteredToolDescription(toolName))
-        .addStringOption((option) =>
-          option
-            .setName("input")
-            .setDescription("Optional JSON object input")
-            .setRequired(false),
-        )),
+      buildDerivedToolSlashCommand(toolName)),
     new SlashCommandBuilder()
       .setName("routine")
       .setDescription("Manage routines, meds, deadlines, and recurring work")
@@ -1329,23 +1309,40 @@ function buildSlashCommands() {
       .addStringOption((option) =>
         option.setName("text").setDescription("Message text").setRequired(true),
       ),
-    ...ADVANCED_DIRECT_COMMAND_BUILDERS,
   ].map((command) => command.toJSON());
 }
 
 function buildAutoRegisteredToolDescription(toolName: string) {
   switch (toolName) {
-    case "think":
-      return "Show or change the active model thinking level";
-    case "extended_context":
-      return "Show or toggle the active model extended-context window";
     case "workflow_status":
       return "Inspect recent background workflow runs";
     case "launch_coding_agent":
       return "Launch a background coding run with JSON input";
+    case "new_chat":
+      return "Start a fresh conversation for your Discord chat session";
+    case "context":
+      return "Show the current context-window token usage";
+    case "reflect":
+      return "Write a private reflection entry";
     default:
       return `Invoke ${toolName} with optional JSON input.`;
   }
+}
+
+function buildDerivedToolSlashCommand(toolName: string) {
+  const builder = TOOL_DERIVED_COMMAND_BUILDERS[toolName];
+  if (builder) {
+    return builder(toolName);
+  }
+  return new SlashCommandBuilder()
+    .setName(toolName)
+    .setDescription(buildAutoRegisteredToolDescription(toolName))
+    .addStringOption((option) =>
+      option
+        .setName("input")
+        .setDescription("Optional JSON object input")
+        .setRequired(false),
+    );
 }
 
 async function syncSlashCommands(client: Client<true>) {
@@ -1438,13 +1435,18 @@ async function handleRoutineCommand(
   await invokeDiscordToolAndReply(interaction, app, "routine_resume", { id });
 }
 
-async function invokeToolFromJsonInput(
+async function invokeDerivedToolCommand(
   interaction: ChatInputCommandInteraction,
   app: DiscordAppRuntime,
   toolName: string,
 ) {
-  const rawInput = interaction.options.getString("input");
-  const input = rawInput ? parseJsonObject(rawInput) : {};
+  const derivedInputBuilder = TOOL_DERIVED_INPUT_BUILDERS[toolName];
+  const input = derivedInputBuilder
+    ? derivedInputBuilder(interaction)
+    : (() => {
+        const rawInput = interaction.options.getString("input");
+        return rawInput ? parseJsonObject(rawInput) : {};
+      })();
   await invokeDiscordToolAndReply(interaction, app, toolName, input);
 }
 
