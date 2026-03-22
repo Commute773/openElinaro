@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.9
+- Released at: 2026-03-22T00:39:04Z
+- Release id: 20260322T003905Z-4246d6a
+- Previous version: 2026.03.22.8
+- Trigger: managed service update
+
+Preserve the managed service identity across self-updates by exporting the service user, group, and unit metadata from the installed service definition.
+This fixes detached /update confirm:true runs on hosts like krysalstis where the service intentionally runs as root instead of the default openelinaro user.
+
 ## 2026.03.22.8
 - Released at: 2026-03-22T00:26:29Z
 - Release id: 20260322T002629Z-1d6240d
