@@ -27,6 +27,15 @@ function writeTestProfileRegistry() {
       version: 1,
       profiles: [
         {
+          id: "root",
+          name: "Root",
+          roles: ["root"],
+          memoryNamespace: "root",
+          preferredProvider: "claude",
+          defaultModelId: "claude-opus-4-6",
+          maxSubagentDepth: 1,
+        },
+        {
           id: "restricted",
           name: "Restricted",
           roles: ["restricted"],

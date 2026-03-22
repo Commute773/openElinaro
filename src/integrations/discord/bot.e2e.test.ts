@@ -1044,7 +1044,7 @@ if (RUN_CHILD_SUITE) {
     expect(invoked).toEqual(["update_preview"]);
     const replyText = interaction.replies.map((reply) => reply.content).join("\n");
     expect(replyText).toContain("## 2026.03.21.38");
-    expect(replyText).toContain("This only previews the fast-forward and pending deployment notes.");
+    expect(replyText).toContain("This previews the latest tagged version available on the remote.");
   });
 
   test("still runs the update tool when confirm is passed", async () => {

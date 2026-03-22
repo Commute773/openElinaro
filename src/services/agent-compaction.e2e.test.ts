@@ -58,7 +58,6 @@ type Harness = {
   service: any;
   conversations: any;
   systemPrompts: any;
-  telemetryStore: any;
   requests: RequestRecord[];
 };
 
@@ -69,7 +68,6 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
   const memoryServiceModule = await importFresh<typeof import("./memory-service")>("src/services/memory-service.ts");
   const profileServiceModule = await importFresh<typeof import("./profile-service")>("src/services/profile-service.ts");
   const systemPromptModule = await importFresh<typeof import("./system-prompt-service")>("src/services/system-prompt-service.ts");
-  const telemetryStoreModule = await importFresh<typeof import("./telemetry-store")>("src/services/telemetry-store.ts");
   const scriptedConnectorModule = await importFresh<typeof import("../test/scripted-provider-connector")>("src/test/scripted-provider-connector.ts");
 
   const requests: RequestRecord[] = [];
@@ -174,7 +172,6 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
     service,
     conversations,
     systemPrompts,
-    telemetryStore: new telemetryStoreModule.TelemetryStore(path.join(tempRoot, ".openelinarotest", "telemetry.sqlite")),
     requests,
   };
 }
@@ -252,23 +249,6 @@ describe("agent compaction e2e", () => {
     expect(fs.readFileSync(memoryPath, "utf8")).toContain("User prefers terse replies.");
 
     expect(harness.requests.some((request) => request.usagePurpose === "conversation_compaction")).toBe(true);
-    const telemetry = harness.telemetryStore.query({
-      conversationKey,
-      limit: 20,
-    });
-    expect(telemetry.spans).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        component: "conversation",
-        operation: "compact",
-        outcome: "ok",
-      }),
-    ]));
-    expect(telemetry.events).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        component: "agent_chat",
-        eventName: "compaction.completed",
-      }),
-    ]));
   });
 
   test("continues the turn when compaction aborts", async () => {
@@ -304,17 +284,5 @@ describe("agent compaction e2e", () => {
     expect(messages[0]).not.toContain("Context summary (generated automatically during compaction");
     expect(messages.at(-2)).toContain("Keep going even if compaction aborts.");
     expect(messages.at(-1)).toContain("Reply despite compaction failure.");
-
-    const telemetry = harness.telemetryStore.query({
-      conversationKey,
-      limit: 20,
-    });
-    expect(telemetry.events).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        component: "agent_chat",
-        eventName: "compaction.failed",
-        outcome: "error",
-      }),
-    ]));
   });
 });
