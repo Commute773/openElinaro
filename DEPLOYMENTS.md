@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.2
+- Released at: 2026-03-22T17:44:05Z
+- Release id: 20260322T174405Z-2875677
+- Previous version: 2026.03.22
+- Trigger: ci/release workflow
+
+- test: add unit tests for ShellService and FilesystemService
+- test: add unit tests for heartbeat state, alarm notification, reflection prompt, and reflection state services
+
 ## 2026.03.22
 - Released at: 2026-03-22T17:31:55Z
 - Release id: 20260322T173155Z-28f0923
