@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.17
+- Released at: 2026-03-22T02:00:00Z
+- Release id: 20260322T020000Z-069d54f
+- Previous version: 2026.03.22.16
+- Trigger: managed service update
+
+Minor README wording cleanup for the /update deployment description.
+This is a fresh prepared version for exercising the real Discord slash-command handler on krysalstis with simulated /update and /update confirm:true interactions.
+
 ## 2026.03.22.16
 - Released at: 2026-03-22T01:14:11Z
 - Release id: 20260322T011411Z-aae6721
