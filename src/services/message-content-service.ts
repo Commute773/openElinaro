@@ -7,6 +7,7 @@ import type {
 } from "../domain/assistant";
 
 const APPROXIMATE_IMAGE_TOKENS = 1_024;
+const REMOTE_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -21,8 +22,18 @@ function isImageBlock(value: unknown): value is ChatImageContentBlock {
     isRecord(value) &&
     value.type === "image" &&
     typeof value.data === "string" &&
-    typeof value.mimeType === "string"
+    typeof value.mimeType === "string" &&
+    (value.sourceUrl === undefined || typeof value.sourceUrl === "string")
   );
+}
+
+function normalizeSourceUrl(sourceUrl: unknown) {
+  if (typeof sourceUrl !== "string") {
+    return undefined;
+  }
+
+  const trimmed = sourceUrl.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 export function normalizeChatPromptContent(content: unknown): ChatPromptContentBlock[] {
@@ -45,15 +56,34 @@ export function normalizeChatPromptContent(content: unknown): ChatPromptContentB
     }
 
     if (isImageBlock(block)) {
+      const sourceUrl = normalizeSourceUrl(block.sourceUrl);
       normalized.push({
         type: "image",
         data: block.data,
         mimeType: block.mimeType,
+        ...(sourceUrl ? { sourceUrl } : {}),
       });
     }
   }
 
   return normalized;
+}
+
+export function resolveRemoteImageUrl(sourceUrl: unknown) {
+  const normalized = normalizeSourceUrl(sourceUrl);
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    const url = new URL(normalized);
+    if (!REMOTE_IMAGE_PROTOCOLS.has(url.protocol)) {
+      return null;
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 export function buildChatPromptContent(params: {

@@ -15,6 +15,7 @@ export interface ChatImageContentBlock {
   type: "image";
   data: string;
   mimeType: string;
+  sourceUrl?: string;
   [key: string]: unknown;
 }
 
