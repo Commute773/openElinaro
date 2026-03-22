@@ -190,7 +190,13 @@ function redactAttributes(attributes?: TelemetryAttributes) {
 
 export class TelemetryService {
   private readonly storage = new AsyncLocalStorage<TelemetryScope>();
-  private readonly version = new DeploymentVersionService().load().version;
+  private readonly version = (() => {
+    try {
+      return new DeploymentVersionService().load().version;
+    } catch {
+      return "unknown";
+    }
+  })();
 
   constructor(
     private readonly store = new TelemetryStore(),
@@ -548,4 +554,10 @@ export class TelemetryService {
   }
 }
 
-export const telemetry = new TelemetryService();
+export const telemetry = (() => {
+  try {
+    return new TelemetryService();
+  } catch {
+    return new TelemetryService(new TelemetryStore(":memory:"));
+  }
+})();
