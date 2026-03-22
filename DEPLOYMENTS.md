@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.22.9
+- Released at: 2026-03-22T23:24:19Z
+- Release id: 20260322T232419Z-7788e1d
+- Previous version: 2026.03.22.8
+- Trigger: ci/release workflow
+
+- feat: replace in-process subagents with tmux + hooks architecture (#32)
+
 ## 2026.03.22.8
 - Released at: 2026-03-22T21:13:22Z
 - Release id: 20260322T211322Z-6de3a59
