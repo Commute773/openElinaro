@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.19
+- Released at: 2026-03-22T15:09:35Z
+- Release id: 20260322T150935Z-dab1124
+- Previous version: 2026.03.22.18
+- Trigger: managed service update
+
+Add a built-in runtime/config preamble ahead of file-based system prompts.
+Document enabled and disabled feature flags in the prompt and point feature enablement at feature_manage, config.yaml, secret-store.json, and setup:python.
+
 ## 2026.03.22.18
 - Released at: 2026-03-22T02:09:03Z
 - Release id: 20260322T020903Z-619e5f7

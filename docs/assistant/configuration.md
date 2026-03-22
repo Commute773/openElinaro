@@ -44,6 +44,8 @@ Optional feature tools only appear when the feature is both:
 - enabled in `~/.openelinaro/config.yaml`
 - sufficiently configured for that feature
 
+The base system prompt now starts with a short runtime/config preamble before the file-based `system_prompt/*.md` content. That preamble reports core app toggles plus which optional features are enabled or disabled in config, and points the agent at `feature_manage`, `~/.openelinaro/config.yaml`, `~/.openelinaro/secret-store.json`, and `bun run setup:python` for feature enablement.
+
 Examples:
 
 - `email` stays hidden until the feature is enabled and its secret refs resolve

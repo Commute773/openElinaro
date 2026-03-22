@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { getRuntimeConfig } from "../config/runtime-config";
 import { buildAssistantIdentityPromptContext, getAssistantDisplayName } from "../config/runtime-identity";
+import { FEATURE_IDS } from "./feature-config-service";
 import {
   formatUserDataRelativePath,
   getRepoSystemPromptRoot,
@@ -87,10 +89,37 @@ function sha256(value: string) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
+function formatPromptList(values: string[]) {
+  return values.length > 0 ? values.join(", ") : "none";
+}
+
+function buildRuntimeOverviewPrompt() {
+  const config = getRuntimeConfig();
+  const enabledFeatures = FEATURE_IDS.filter((featureId) => config[featureId].enabled);
+  const disabledFeatures = FEATURE_IDS.filter((featureId) => !config[featureId].enabled);
+  const configPath = formatUserDataRelativePath("config.yaml");
+  const secretStorePath = formatUserDataRelativePath("secret-store.json");
+  const coreToggles = [
+    `automatic conversation memory ${config.core.app.automaticConversationMemoryEnabled ? "on" : "off"}`,
+    `docs indexer ${config.core.app.docsIndexerEnabled ? "on" : "off"}`,
+  ].join("; ");
+
+  return [
+    "## Runtime",
+    "Runtime: OpenElinaro local-first agent runtime.",
+    `Core toggles: ${coreToggles}.`,
+    `Optional features enabled in config: ${formatPromptList(enabledFeatures)}.`,
+    `Optional features disabled in config: ${formatPromptList(disabledFeatures)}.`,
+    "Optional feature tools stay hidden until the feature is enabled and fully configured.",
+    `To inspect or enable features, use \`feature_manage\` (\`action=status\` then \`action=apply\`) or update ${configPath} and ${secretStorePath}. Run \`bun run setup:python\` for Python-backed features.`,
+  ].join("\n");
+}
+
 function compileFiles(files: SystemPromptSource[]) {
+  const runtimeOverview = buildRuntimeOverviewPrompt();
   const identityContext = buildAssistantIdentityPromptContext();
   if (files.length === 0) {
-    return `${buildFallbackSystemPrompt()}\n\n${identityContext}`;
+    return `${runtimeOverview}\n\n${buildFallbackSystemPrompt()}\n\n${identityContext}`;
   }
 
   const compiled = files
@@ -99,7 +128,7 @@ function compileFiles(files: SystemPromptSource[]) {
       return `<!-- ${file.displayPath} -->\n${content}`;
     })
     .join("\n\n");
-  return `${compiled}\n\n${identityContext}`;
+  return `${runtimeOverview}\n\n${compiled}\n\n${identityContext}`;
 }
 
 function capSystemPrompt(text: string): ComposedSystemPrompt {
