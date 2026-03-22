@@ -1,10 +1,11 @@
 /**
  * Bun test preload script.
  *
- * Sets OPENELINARO_ROOT_DIR to a per-run temp directory so that no test ever
- * accidentally reads or writes to ~/.openelinarotest.  Individual tests that
- * need an isolated root still create their own temp dirs and override this
- * value — this preload simply acts as a safety net.
+ * Sets OPENELINARO_ROOT_DIR and OPENELINARO_USER_DATA_DIR to per-run temp
+ * directories so that no test ever accidentally reads or writes to
+ * ~/.openelinarotest.  Individual tests that need an isolated root still
+ * create their own temp dirs and override these values -- this preload
+ * simply acts as a safety net.
  */
 import fs from "node:fs";
 import os from "node:os";
@@ -22,4 +23,14 @@ if (!process.env.OPENELINARO_ROOT_DIR) {
       // Best effort; ignore errors during cleanup.
     }
   });
+}
+
+if (!process.env.OPENELINARO_USER_DATA_DIR) {
+  const userDataDir = path.join(process.env.OPENELINARO_ROOT_DIR, ".openelinarotest");
+  fs.mkdirSync(userDataDir, { recursive: true });
+  process.env.OPENELINARO_USER_DATA_DIR = userDataDir;
+}
+
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = "test";
 }
