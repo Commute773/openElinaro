@@ -1,26 +1,53 @@
-import { test, expect, describe, mock, beforeEach } from "bun:test";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { test, expect, describe, mock, beforeEach, afterEach } from "bun:test";
 import type { ProfileRecord } from "../domain/profiles";
+
+// ---------------------------------------------------------------------------
+// Environment-based path isolation (no mock.module for runtime-root)
+// ---------------------------------------------------------------------------
+
+let tempRoot = "";
+let previousRootDir: string | undefined;
+let previousUserDataDir: string | undefined;
+let mockRuntimeRootDir = "";
+let mockUserDataPath = "";
+let mockMemoryDocumentRoot = "";
+
+beforeEach(() => {
+  previousRootDir = process.env.OPENELINARO_ROOT_DIR;
+  previousUserDataDir = process.env.OPENELINARO_USER_DATA_DIR;
+  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-acl-test-"));
+  mockRuntimeRootDir = tempRoot;
+  mockUserDataPath = path.join(tempRoot, ".openelinarotest");
+  mockMemoryDocumentRoot = path.join(mockUserDataPath, "memory", "documents");
+  fs.mkdirSync(mockMemoryDocumentRoot, { recursive: true });
+  process.env.OPENELINARO_ROOT_DIR = mockRuntimeRootDir;
+  process.env.OPENELINARO_USER_DATA_DIR = mockUserDataPath;
+});
+
+afterEach(() => {
+  if (previousRootDir === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDir;
+  }
+  if (previousUserDataDir === undefined) {
+    delete process.env.OPENELINARO_USER_DATA_DIR;
+  } else {
+    process.env.OPENELINARO_USER_DATA_DIR = previousUserDataDir;
+  }
+  if (tempRoot) {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
-
-const mockRuntimeRootDir = "/repo-root";
-const mockUserDataPath = "/user-data";
-// resolveRuntimePath is mocked to resolve under mockUserDataPath so that
-// getMemoryDocumentRoot() returns a path within the data root, matching
-// the real layout where both resolve to ~/.openelinaro.
-const mockMemoryDocumentRoot = "/user-data/memory/documents";
-
-mock.module("./runtime-root", () => ({
-  getRuntimeRootDir: () => mockRuntimeRootDir,
-  resolveRuntimePath: (...segments: string[]) =>
-    [mockUserDataPath, ...segments].join("/"),
-  resolveUserDataPath: (...segments: string[]) =>
-    segments.length ? [mockUserDataPath, ...segments].join("/") : mockUserDataPath,
-  resolveServicePath: (...segments: string[]) =>
-    [mockRuntimeRootDir, ...segments].join("/"),
-}));
+// runtime-root is NOT mocked via mock.module because Bun's module mocks
+// persist across test files and would cause EROFS errors in later tests.
 
 const mockGetToolAuthorizationDeclaration = mock(
   () => ({ access: "anyone" as const, behavior: "uniform" as const }),
@@ -47,7 +74,7 @@ function makeProfileService(overrides: Record<string, Function> = {}) {
 function makeProjectsService(overrides: Record<string, Function> = {}) {
   return {
     listAllProjects: mock(() => []),
-    resolveDocPath: mock(() => "/user-data/projects/default/README.md"),
+    resolveDocPath: mock(() => path.join(mockUserDataPath, "projects/default/README.md")),
     resolveWorkspacePath: mock(() => "/workspace/default"),
     canAccessProject: mock(() => true),
     ...overrides,
@@ -262,7 +289,7 @@ describe("AccessControlService", () => {
       const project = { id: "proj1", workspacePath: "/workspace/proj1" };
       projectsSvc.listAllProjects.mockReturnValue([project]);
       projectsSvc.resolveWorkspacePath.mockReturnValue("/workspace/proj1");
-      projectsSvc.resolveDocPath.mockReturnValue("/user-data/projects/proj1/README.md");
+      projectsSvc.resolveDocPath.mockReturnValue(path.join(mockUserDataPath, "projects/proj1/README.md"));
       projectsSvc.canAccessProject.mockReturnValue(true);
 
       const svc = createService(userProfile());
@@ -274,7 +301,7 @@ describe("AccessControlService", () => {
       const project = { id: "proj1", workspacePath: "/workspace/proj1" };
       projectsSvc.listAllProjects.mockReturnValue([project]);
       projectsSvc.resolveWorkspacePath.mockReturnValue("/workspace/proj1");
-      projectsSvc.resolveDocPath.mockReturnValue("/user-data/projects/proj1/README.md");
+      projectsSvc.resolveDocPath.mockReturnValue(path.join(mockUserDataPath, "projects/proj1/README.md"));
       projectsSvc.canAccessProject.mockReturnValue(false);
 
       const svc = createService(userProfile());
