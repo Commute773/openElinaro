@@ -88,6 +88,7 @@ case "$(openelinaro_service_manager)" in
     HELPER_PLIST="${JOB_DIR}/launchd-helper.plist"
     HELPER_ARGS=(
       /usr/bin/env
+      "HOME=${HOME:-}"
       "OPENELINARO_ROOT_DIR=${ROOT_DIR}"
       "OPENELINARO_USER_DATA_DIR=${OPENELINARO_USER_DATA_ROOT}"
       "OPENELINARO_HEALTHCHECK_TIMEOUT_MS=${OPENELINARO_HEALTHCHECK_TIMEOUT_MS}"
@@ -121,7 +122,9 @@ case "$(openelinaro_service_manager)" in
       --property="WorkingDirectory=${ROOT_DIR}" \
       --property="StandardOutput=append:${STDOUT_LOG}" \
       --property="StandardError=append:${STDERR_LOG}" \
+      --setenv="HOME=${HOME:-}" \
       --setenv="OPENELINARO_ROOT_DIR=${ROOT_DIR}" \
+      --setenv="OPENELINARO_USER_DATA_DIR=${OPENELINARO_USER_DATA_ROOT}" \
       --setenv="OPENELINARO_HEALTHCHECK_TIMEOUT_MS=${OPENELINARO_HEALTHCHECK_TIMEOUT_MS}" \
       --setenv="OPENELINARO_DETACHED_HELPER_DELAY_MS=${OPENELINARO_DETACHED_HELPER_DELAY_MS:-5000}" \
       --setenv="OPENELINARO_NOTIFY_DISCORD_USER_ID=${OPENELINARO_NOTIFY_DISCORD_USER_ID:-}" \

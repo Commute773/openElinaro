@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.5
+- Released at: 2026-03-22T00:17:05Z
+- Release id: 20260322T001705Z-ce19b74
+- Previous version: 2026.03.22.4
+- Trigger: managed service update
+
+Fix detached managed-service transition helpers to propagate HOME and OPENELINARO_USER_DATA_DIR.
+This repairs update/rollback helper runs on systemd hosts like krysalstis, where the helper previously failed before switching releases.
+
 ## 2026.03.22.4
 - Released at: 2026-03-22T00:13:54Z
 - Release id: 20260322T001354Z-24dadce
