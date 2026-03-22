@@ -9,6 +9,7 @@ import {
 } from "@langchain/core/messages";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 import { telemetry as rootTelemetry, type TelemetryService } from "./telemetry";
+import { timestamp } from "../utils/timestamp";
 
 export type WorkflowSessionScope = "planner" | "worker";
 
@@ -60,10 +61,6 @@ type WorkflowSessionArchiveStoreShape = {
   version: 1;
   entries: WorkflowSessionArchiveEntry[];
 };
-
-function timestamp() {
-  return new Date().toISOString();
-}
 
 function uniqueStrings(values: string[]) {
   const seen = new Set<string>();

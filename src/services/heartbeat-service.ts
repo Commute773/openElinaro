@@ -3,6 +3,7 @@ import path from "node:path";
 import type { HeartbeatReminderSnapshot } from "../domain/routines";
 import { formatLocalTime } from "./local-time-service";
 import { getAssistantContextRoot } from "./runtime-user-content";
+import { timestamp } from "../utils/timestamp";
 
 const HEARTBEAT_FILE_NAME = "heartbeat.md";
 const HEARTBEAT_NOOP_RESPONSE = "HEARTBEAT_OK";
@@ -17,10 +18,6 @@ const FALLBACK_HEARTBEAT = [
   "- Use `silent: true` on heartbeat housekeeping tool calls so intermediate tool echoes stay out of Discord.",
   "- If nothing needs user attention, reply with exactly `HEARTBEAT_OK`.",
 ].join("\n");
-
-function timestamp() {
-  return new Date().toISOString();
-}
 
 function getHeartbeatFilePath() {
   return path.join(getAssistantContextRoot(), HEARTBEAT_FILE_NAME);

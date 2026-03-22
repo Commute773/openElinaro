@@ -10,6 +10,7 @@ import {
   getRepoSystemPromptRoot,
   getUserSystemPromptRoot,
 } from "./runtime-user-content";
+import { timestamp } from "../utils/timestamp";
 
 const SYSTEM_PROMPT_EXTENSION = ".md";
 export const MAX_SYSTEM_PROMPT_CHARS = 100_000;
@@ -36,10 +37,6 @@ export interface ComposedSystemPrompt {
   charCount: number;
   capped: boolean;
   originalCharCount: number;
-}
-
-function timestamp() {
-  return new Date().toISOString();
 }
 
 type SystemPromptSource = {

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";
 import { telemetry as rootTelemetry, type TelemetryService } from "./telemetry";
+import { timestamp } from "../utils/timestamp";
 
 const WORKSPACE_STORE_VERSION = 1;
 const WORKTREE_ROOT_DIRNAME = ".openelinaro-worktrees";
@@ -33,10 +34,6 @@ function getWorkspaceStorePath() {
 
 function ensureStoreDir() {
   fs.mkdirSync(path.dirname(getWorkspaceStorePath()), { recursive: true });
-}
-
-function timestamp() {
-  return new Date().toISOString();
 }
 
 function sanitizeSegment(value: string, fallback: string) {

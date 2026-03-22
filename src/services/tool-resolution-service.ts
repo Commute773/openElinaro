@@ -1,7 +1,7 @@
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { AgentToolScope, ResolvedToolBundle, ToolCatalogCard } from "../domain/tool-catalog";
-import type { ToolContext } from "../tools/routine-tool-registry";
-import { RoutineToolRegistry } from "../tools/routine-tool-registry";
+import type { ToolContext } from "../tools/tool-registry";
+import { ToolRegistry } from "../tools/tool-registry";
 
 type ResolveParams = {
   agentScope: AgentToolScope;
@@ -10,8 +10,19 @@ type ResolveParams = {
   activatedToolNames?: string[];
 };
 
+type ScopedResolveParams = Omit<ResolveParams, "agentScope">;
+type ScopedResolveAllParams = Omit<ResolveParams, "agentScope" | "activatedToolNames">;
+
+/** Create a pair of scope-bound resolve helpers. */
+function buildScopeResolver(service: ToolResolutionService, scope: AgentToolScope) {
+  return {
+    resolve: (params: ScopedResolveParams) => service.resolve({ ...params, agentScope: scope }),
+    resolveAll: (params?: ScopedResolveAllParams) => service.resolveAllForScope(scope, params),
+  };
+}
+
 export class ToolResolutionService {
-  constructor(private readonly tools: RoutineToolRegistry) {}
+  constructor(private readonly tools: ToolRegistry) {}
 
   resolve(params: ResolveParams): ResolvedToolBundle & { entries: StructuredToolInterface[] } {
     const selectedNames = new Set(this.tools.getAgentDefaultVisibleToolNames(params.agentScope));
@@ -37,7 +48,7 @@ export class ToolResolutionService {
 
   resolveAllForScope(
     agentScope: AgentToolScope,
-    params?: Omit<ResolveParams, "agentScope" | "activatedToolNames">,
+    params?: ScopedResolveAllParams,
   ): ResolvedToolBundle & { entries: StructuredToolInterface[] } {
     const catalog = this.getScopeCatalog(agentScope, params?.context);
     const tools = this.tools.getToolsByNames(
@@ -52,40 +63,34 @@ export class ToolResolutionService {
     };
   }
 
-  resolveForChat(params: Omit<ResolveParams, "agentScope">) {
-    return this.resolve({
-      ...params,
-      agentScope: "chat",
-    });
+  /** Get a scope-bound resolver pair for any AgentToolScope. */
+  forScope(scope: AgentToolScope) {
+    return buildScopeResolver(this, scope);
   }
 
-  resolveAllForChat(params?: Omit<ResolveParams, "agentScope" | "activatedToolNames">) {
-    return this.resolveAllForScope("chat", params);
+  // -- Convenience aliases (delegate to forScope) -------------------------
+
+  resolveForChat(params: ScopedResolveParams) {
+    return this.forScope("chat").resolve(params);
   }
 
-  resolveForCodingPlanner(params: Omit<ResolveParams, "agentScope">) {
-    return this.resolve({
-      ...params,
-      agentScope: "coding-planner",
-    });
+  resolveAllForChat(params?: ScopedResolveAllParams) {
+    return this.forScope("chat").resolveAll(params);
   }
 
-  resolveAllForCodingPlanner(
-    params?: Omit<ResolveParams, "agentScope" | "activatedToolNames">,
-  ) {
-    return this.resolveAllForScope("coding-planner", params);
+  resolveForCodingPlanner(params: ScopedResolveParams) {
+    return this.forScope("coding-planner").resolve(params);
   }
 
-  resolveForCodingWorker(params: Omit<ResolveParams, "agentScope">) {
-    return this.resolve({
-      ...params,
-      agentScope: "coding-worker",
-    });
+  resolveAllForCodingPlanner(params?: ScopedResolveAllParams) {
+    return this.forScope("coding-planner").resolveAll(params);
   }
 
-  resolveAllForCodingWorker(
-    params?: Omit<ResolveParams, "agentScope" | "activatedToolNames">,
-  ) {
-    return this.resolveAllForScope("coding-worker", params);
+  resolveForCodingWorker(params: ScopedResolveParams) {
+    return this.forScope("coding-worker").resolve(params);
+  }
+
+  resolveAllForCodingWorker(params?: ScopedResolveAllParams) {
+    return this.forScope("coding-worker").resolveAll(params);
   }
 }

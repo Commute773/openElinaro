@@ -5,6 +5,7 @@ import { getDefaultProfileId } from "../services/profile-service";
 import { resolveRuntimePath } from "../services/runtime-root";
 import { type ProviderAuthSecret, SecretStoreService } from "../services/secret-store-service";
 import { telemetry } from "../services/telemetry";
+import { timestamp } from "../utils/timestamp";
 
 export type ProviderId = "openai-codex" | "claude";
 
@@ -36,10 +37,6 @@ type LegacyAuthStoreShape = {
 };
 
 const secrets = new SecretStoreService();
-
-function timestamp() {
-  return new Date().toISOString();
-}
 
 function getLegacyAuthStorePath() {
   return resolveRuntimePath("auth-store.json");

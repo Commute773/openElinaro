@@ -8,6 +8,7 @@ import { ProfileService } from "./profile-service";
 import { resolveRuntimePath } from "./runtime-root";
 import { buildOpenElinaroCommandEnvironment } from "./shell-environment";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 import type {
   ShellBackgroundJob,
   ShellBackgroundJobStatus,
@@ -16,12 +17,15 @@ import type {
   ShellExecParams,
   ShellExecResult,
 } from "./shell-service";
+import { timestamp } from "../utils/timestamp";
+import {
+  SHELL_DEFAULT_TIMEOUT_MS as DEFAULT_TIMEOUT_MS,
+  SHELL_COMMAND_PREVIEW_LIMIT as COMMAND_PREVIEW_LIMIT,
+  SHELL_DEFAULT_NOTIFICATION_TAIL_LINES as DEFAULT_NOTIFICATION_TAIL_LINES,
+} from "../config/service-constants";
 
 const execFileAsync = promisify(execFile);
-const DEFAULT_TIMEOUT_MS = 120_000;
-const COMMAND_PREVIEW_LIMIT = 512;
 const SHELL_TASK_ROOT = resolveRuntimePath("shell-tasks");
-const DEFAULT_NOTIFICATION_TAIL_LINES = 20;
 const sshShellTelemetry = telemetry.child({ component: "ssh_shell" });
 
 type ShellBackgroundRuntime = {
@@ -37,10 +41,6 @@ type ShellBackgroundRuntime = {
 
 function ensureTaskRoot() {
   fs.mkdirSync(SHELL_TASK_ROOT, { recursive: true });
-}
-
-function timestamp() {
-  return new Date().toISOString();
 }
 
 function splitOutputLines(text: string) {
@@ -90,13 +90,7 @@ function resolveRemoteCwd(profileService: ProfileService, profile: ProfileRecord
     : path.posix.resolve(fallback ?? "/", requested);
 }
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return sshShellTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(sshShellTelemetry);
 
 export class SshShellService {
   private readonly backgroundJobs = new Map<string, ShellBackgroundJob>();

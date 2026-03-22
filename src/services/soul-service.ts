@@ -5,29 +5,14 @@ import { ReflectionPromptService } from "./reflection-prompt-service";
 import { ReflectionStateService } from "./reflection-state-service";
 import type { RoutinesService } from "./routines-service";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
+import { nowInTimezone, localDateKey } from "../utils/time-helpers";
 
 const SOUL_REWRITE_INTERVAL_DAYS = 7;
 const MAX_RECENT_JOURNAL_CHARS = 12_000;
 const soulTelemetry = telemetry.child({ component: "soul" });
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return soulTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
-
-function nowInTimezone(timezone: string, reference: Date = new Date()) {
-  return new Date(reference.toLocaleString("en-US", { timeZone: timezone }));
-}
-
-function localDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+const traceSpan = createTraceSpan(soulTelemetry);
 
 function compactTail(text: string, maxChars: number) {
   const normalized = text.trim();

@@ -23,7 +23,7 @@ let projectsServiceModule: typeof import("./projects-service");
 let routinesServiceModule: typeof import("./routines-service");
 let systemPromptModule: typeof import("./system-prompt-service");
 let toolResolutionModule: typeof import("./tool-resolution-service");
-let toolRegistryModule: typeof import("../tools/routine-tool-registry");
+let toolRegistryModule: typeof import("../tools/tool-registry");
 
 function copyDirectory(relativePath: string) {
   const source = path.join(repoRoot, relativePath);
@@ -268,7 +268,7 @@ function createHarness(expectedArtifactDir: string) {
     models,
     systemPrompts,
   );
-  const toolRegistry = new toolRegistryModule.RoutineToolRegistry(
+  const toolRegistry = new toolRegistryModule.ToolRegistry(
     routines,
     projects,
     models,
@@ -327,7 +327,7 @@ describe("OpenBrowser agent e2e", () => {
     routinesServiceModule = await importFresh("src/services/routines-service.ts");
     systemPromptModule = await importFresh("src/services/system-prompt-service.ts");
     toolResolutionModule = await importFresh("src/services/tool-resolution-service.ts");
-    toolRegistryModule = await importFresh("src/tools/routine-tool-registry.ts");
+    toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
   });
 
   afterAll(() => {

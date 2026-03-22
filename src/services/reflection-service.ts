@@ -4,8 +4,10 @@ import { ConversationStore } from "./conversation-store";
 import { MemoryService } from "./memory-service";
 import { ModelService } from "./model-service";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 import { ReflectionPromptService } from "./reflection-prompt-service";
 import { ReflectionStateService } from "./reflection-state-service";
+import { nowInTimezone, localDateKey, startOfDay as startOfLocalDay } from "../utils/time-helpers";
 
 export type ReflectionTrigger = "daily" | "compaction" | "explicit";
 
@@ -28,30 +30,7 @@ const MAX_RECENT_HISTORY_ENTRIES = 18;
 const MAX_BOOTSTRAP_ENTRIES = 3;
 const reflectionTelemetry = telemetry.child({ component: "reflection" });
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return reflectionTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
-
-function nowInTimezone(timezone: string, reference: Date = new Date()) {
-  return new Date(reference.toLocaleString("en-US", { timeZone: timezone }));
-}
-
-function localDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function startOfLocalDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
+const traceSpan = createTraceSpan(reflectionTelemetry);
 
 function stripCodeFence(text: string) {
   return text

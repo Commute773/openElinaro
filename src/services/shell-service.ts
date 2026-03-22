@@ -6,13 +6,17 @@ import { AccessControlService } from "./access-control-service";
 import { resolveRuntimePath } from "./runtime-root";
 import { buildOpenElinaroCommandEnvironment } from "./shell-environment";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
+import { timestamp } from "../utils/timestamp";
+import {
+  SHELL_DEFAULT_TIMEOUT_MS as DEFAULT_TIMEOUT_MS,
+  SHELL_COMMAND_PREVIEW_LIMIT as COMMAND_PREVIEW_LIMIT,
+  SHELL_DEFAULT_NOTIFICATION_TAIL_LINES as DEFAULT_NOTIFICATION_TAIL_LINES,
+} from "../config/service-constants";
 
 const execFileAsync = promisify(execFile);
-const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_CWD = process.cwd();
-const COMMAND_PREVIEW_LIMIT = 512;
 const SHELL_TASK_ROOT = resolveRuntimePath("shell-tasks");
-const DEFAULT_NOTIFICATION_TAIL_LINES = 20;
 const DEFAULT_SHELL_BIN = "bash";
 const shellTelemetry = telemetry.child({ component: "shell" });
 const SHELL_USER_ENV_BLOCKLIST = new Set([
@@ -43,10 +47,6 @@ function ensureTaskRoot() {
   fs.mkdirSync(SHELL_TASK_ROOT, { recursive: true });
 }
 
-function timestamp() {
-  return new Date().toISOString();
-}
-
 function splitOutputLines(text: string) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   if (lines.at(-1) === "") {
@@ -72,13 +72,7 @@ function nextJobId() {
   return `shell-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return shellTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(shellTelemetry);
 
 export interface ShellExecParams {
   command: string;

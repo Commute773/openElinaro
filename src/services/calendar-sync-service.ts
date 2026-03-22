@@ -2,7 +2,9 @@ import type { CalendarHintEvent } from "../domain/routines";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { RoutinesService } from "./routines-service";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 import { CalendarSyncStateService } from "./calendar-sync-state-service";
+import { toIso, addDaysUtc as addDays, addMonthsUtc as addMonths, startOfUtcDay } from "../utils/time-helpers";
 
 const DEFAULT_SYNC_INTERVAL_MS = 15 * 60_000;
 const DEFAULT_LOOKAHEAD_DAYS = 45;
@@ -50,33 +52,7 @@ type RecurrenceRule = {
   byMonthDay?: number[];
 };
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return calendarTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
-
-function toIso(date: Date) {
-  return date.toISOString();
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
-function addMonths(date: Date, months: number) {
-  const next = new Date(date);
-  next.setUTCMonth(next.getUTCMonth() + months);
-  return next;
-}
-
-function startOfUtcDay(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
+const traceSpan = createTraceSpan(calendarTelemetry);
 
 function weekdayToken(date: Date) {
   return ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][date.getUTCDay()]!;

@@ -4,6 +4,8 @@ import path from "node:path";
 import { getLocalEnv } from "../config/local-env";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
+import { DEFAULT_PROFILE_ID as DEFAULT_SECRET_STORE_PROFILE_ID } from "../config/service-constants";
+import { timestamp as nowIso } from "../utils/timestamp";
 
 export const SECRET_STORE_KINDS = ["generic", "payment_card", "password"] as const;
 export type SecretStoreKind = (typeof SECRET_STORE_KINDS)[number];
@@ -76,7 +78,6 @@ const MAX_SECRET_FIELDS = 64;
 const MAX_SECRET_VALUE_LENGTH = 4_096;
 const SECRET_STORE_SALT = "openelinaro-secret-store-v1";
 const DEFAULT_PASSWORD_LENGTH = 24;
-const DEFAULT_SECRET_STORE_PROFILE_ID = "root";
 const PASSWORD_CHARSETS = {
   lowercase: "abcdefghijkmnopqrstuvwxyz",
   uppercase: "ABCDEFGHJKLMNPQRSTUVWXYZ",
@@ -97,9 +98,6 @@ export class MissingLegacySecretStoreKeyError extends Error {
 
 export class MissingSecretStoreKeyError extends MissingLegacySecretStoreKeyError {}
 
-function nowIso() {
-  return new Date().toISOString();
-}
 
 function getSecretStorePath() {
   return resolveRuntimePath("secret-store.json");

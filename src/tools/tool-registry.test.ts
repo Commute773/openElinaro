@@ -28,8 +28,8 @@ import { getRuntimeConfig } from "../config/runtime-config";
 import {
   getRuntimeAgentDefaultVisibleToolNames,
   getRuntimeUserFacingToolNames,
-  RoutineToolRegistry,
-} from "./routine-tool-registry";
+  ToolRegistry,
+} from "./tool-registry";
 
 const repoRoot = process.cwd();
 let runtimeRoot = "";
@@ -302,7 +302,7 @@ function createHarnessWithOptions(options?: {
   >;
   toolResults?: ToolResultStore;
 }) {
-  const tempDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "routine-tool-registry-"));
+  const tempDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "tool-registry-"));
   const profiles = new ProfileService("root");
   const profile = profiles.getActiveProfile();
   const projects = new ProjectsService(profile, profiles);
@@ -342,7 +342,7 @@ function createHarnessWithOptions(options?: {
     createTicket: async () => createStubTicket(),
     updateTicket: async () => createStubTicket(),
   };
-  const registry = new RoutineToolRegistry(
+  const registry = new ToolRegistry(
     routines,
     projects,
     models,
@@ -379,7 +379,7 @@ function createRegistry() {
 
 beforeEach(() => {
   previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-routine-tool-registry-"));
+  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-tool-registry-"));
   process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
   writeTestProfileRegistry(runtimeRoot);
   writeTestProjectRegistry(runtimeRoot);
@@ -433,7 +433,7 @@ afterEach(() => {
   runtimeRoot = "";
 });
 
-describe("RoutineToolRegistry tool catalog", () => {
+describe("ToolRegistry tool catalog", () => {
   test("hides finance tools when the finance feature is disabled", () => {
     updateTestRuntimeConfig((config) => {
       config.finance.enabled = false;

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getAssistantContextRoot } from "./runtime-user-content";
+import { timestamp } from "../utils/timestamp";
 
 const REFLECTION_FILE_NAME = "reflection.md";
 const REFLECTION_MOOD_NOTES_FILE_NAME = "reflection-mood-notes.md";
@@ -30,10 +31,6 @@ export interface ReflectionPromptSnapshot {
 
 export interface SoulPromptSnapshot {
   soulRewrite: ReflectionPromptDocumentSnapshot;
-}
-
-function timestamp() {
-  return new Date().toISOString();
 }
 
 function loadOptionalDocument(fileName: string) {

@@ -13,6 +13,7 @@ import { ConversationHistoryService } from "./conversation-history-service";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 import type { SystemPromptSnapshot } from "./system-prompt-service";
 import { telemetry } from "./telemetry";
+import { timestamp } from "../utils/timestamp";
 
 export interface ConversationState {
   key: string;
@@ -74,10 +75,6 @@ function getStorePath() {
 
 function ensureStoreDir() {
   fs.mkdirSync(path.dirname(getStorePath()), { recursive: true });
-}
-
-function timestamp() {
-  return new Date().toISOString();
 }
 
 function readStore(): ConversationStoreShape {

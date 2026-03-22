@@ -3,6 +3,7 @@ import path from "node:path";
 import type { ScheduledAlarm } from "./alarm-service";
 import { formatLocalTime } from "./local-time-service";
 import { getAssistantContextRoot } from "./runtime-user-content";
+import { timestamp } from "../utils/timestamp";
 
 const ALARM_FILE_NAME = "alarm.md";
 const EMPTY_ASSISTANT_RESPONSE = "The assistant responded without text output.";
@@ -14,10 +15,6 @@ const FALLBACK_ALARM_CONTEXT = [
   "- Write one concise user-facing message for the triggered alarm or timer.",
   "- Do not dump the raw internal payload unless a field is materially useful to the user.",
 ].join("\n");
-
-function timestamp() {
-  return new Date().toISOString();
-}
 
 function getAlarmFilePath() {
   return path.join(getAssistantContextRoot(), ALARM_FILE_NAME);

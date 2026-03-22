@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { resolveUserDataPath } from "./runtime-root";
+import { timestamp } from "../utils/timestamp";
 
 export const DEFAULT_SERVICE_RESTART_CONTINUATION_MESSAGE =
   "System restarted. Continue what you were doing. This system restart may be unrelated to your actions.";
@@ -12,10 +13,6 @@ export interface PendingServiceRestartNotice {
 }
 
 type StoredServiceRestartNotice = PendingServiceRestartNotice;
-
-function timestamp() {
-  return new Date().toISOString();
-}
 
 export class ServiceRestartNoticeService {
   constructor(

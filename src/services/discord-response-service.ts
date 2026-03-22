@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import type { AppResponse, AppResponseAttachment } from "../domain/assistant";
+import { DISCORD_MAX_ATTACHMENT_BYTES as MAX_DISCORD_ATTACHMENT_BYTES } from "../config/service-constants";
 
 const DISCORD_FILE_DIRECTIVE_PATTERN = /<discord-file\b([^>]*)\/?>/gi;
 const DISCORD_FILE_ATTRIBUTE_PATTERN = /(\w+)=(?:"([^"]*)"|'([^']*)')/g;
-const MAX_DISCORD_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 const UNTRUSTED_CONTENT_WARNING_LINE = "UNTRUSTED CONTENT WARNING";
 const UNTRUSTED_DATA_BEGIN_LINE = "BEGIN_UNTRUSTED_DATA";
 const UNTRUSTED_DATA_END_LINE = "END_UNTRUSTED_DATA";

@@ -2,6 +2,7 @@ import type { ProjectRecord, WorkPriority } from "../domain/projects";
 import type { RoutineItem, RoutineSchedule } from "../domain/routines";
 import { ProjectsService } from "./projects-service";
 import { RoutinesService } from "./routines-service";
+import { nowInTimezone, parseTime, startOfDay } from "../utils/time-helpers";
 
 type WorkMode = "work" | "sleep" | "personal";
 type DueBucket = "overdue" | "today" | "soon" | "later" | "backlog";
@@ -26,10 +27,6 @@ export type WorkPlanSnapshot = {
   hasExplicitInProgress: boolean;
 };
 
-function nowInTimezone(timezone: string, reference: Date = new Date()) {
-  return new Date(reference.toLocaleString("en-US", { timeZone: timezone }));
-}
-
 function toTimezoneDate(date: Date, timezone: string) {
   return new Date(date.toLocaleString("en-US", { timeZone: timezone }));
 }
@@ -40,16 +37,6 @@ function parseIso(value?: string) {
   }
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-}
-
-function parseTime(time: string) {
-  const [hoursRaw, minutesRaw] = time.split(":");
-  const hours = Number(hoursRaw);
-  const minutes = Number(minutesRaw);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
-    throw new Error(`Invalid time value: ${time}`);
-  }
-  return { hours, minutes };
 }
 
 function minutesSinceMidnight(date: Date) {
@@ -80,12 +67,6 @@ function isWithinTimeBlock(
   }
 
   return currentMinutes >= startMinutes || currentMinutes < endMinutes;
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
 }
 
 function priorityScore(priority?: WorkPriority) {

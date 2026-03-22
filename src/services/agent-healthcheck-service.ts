@@ -3,6 +3,7 @@ import path from "node:path";
 import type { AppResponse } from "../domain/assistant";
 import { resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
+import { timestamp as nowIso } from "../utils/timestamp";
 
 export const AGENT_HEALTHCHECK_PROMPT =
   "this is a healthcheck, reply with HEALTHCHECK_OK to confirm you are up and active";
@@ -46,9 +47,6 @@ export interface AgentHealthcheckRunner {
   }): Promise<AppResponse>;
 }
 
-function nowIso() {
-  return new Date().toISOString();
-}
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));

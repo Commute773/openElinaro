@@ -4,13 +4,10 @@ import type { TaskPlan } from "../domain/task-plan";
 import type { WorkflowRun } from "../domain/workflow-run";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 import { telemetry as rootTelemetry, type TelemetryService } from "./telemetry";
+import { timestamp } from "../utils/timestamp";
 
 function getStorePath() {
   return resolveRuntimePath("workflows.json");
-}
-
-function timestamp() {
-  return new Date().toISOString();
 }
 
 function ensureStoreDir() {

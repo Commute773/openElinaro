@@ -269,7 +269,7 @@ describe("workflow anthropic tool result ordering e2e", () => {
     const profileModule = await importFresh<typeof import("../services/profile-service")>("src/services/profile-service.ts");
     const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
     const connectorModule = await importFresh<typeof import("../connectors/active-model-connector")>("src/connectors/active-model-connector.ts");
-    const toolRegistryModule = await importFresh<typeof import("../tools/routine-tool-registry")>("src/tools/routine-tool-registry.ts");
+    const toolRegistryModule = await importFresh<typeof import("../tools/tool-registry")>("src/tools/tool-registry.ts");
     const toolResolverModule = await importFresh<typeof import("../services/tool-resolution-service")>("src/services/tool-resolution-service.ts");
     const projectsModule = await importFresh<typeof import("../services/projects-service")>("src/services/projects-service.ts");
     const accessModule = await importFresh<typeof import("../services/access-control-service")>("src/services/access-control-service.ts");
@@ -306,7 +306,7 @@ describe("workflow anthropic tool result ordering e2e", () => {
       systemPrompts,
     );
     const connector = new connectorModule.ActiveModelConnector(models);
-    const toolRegistry = new toolRegistryModule.RoutineToolRegistry(
+    const toolRegistry = new toolRegistryModule.ToolRegistry(
       routines,
       projects,
       models,

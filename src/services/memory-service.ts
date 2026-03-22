@@ -5,6 +5,7 @@ import type { ProfileRecord } from "../domain/profiles";
 import { ProfileService } from "./profile-service";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 import {
   buildDocumentFrequencies,
   countTerms,
@@ -33,13 +34,7 @@ function getMemoryDocumentRoot() {
   return path.join(getMemoryStoreRoot(), "documents");
 }
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return memoryTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(memoryTelemetry);
 
 type MemoryDocumentRecord = {
   id: string;

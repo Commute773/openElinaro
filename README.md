@@ -8,15 +8,15 @@ The current repo state is intentionally minimal:
 - `src/index.ts` starts the Discord surface plus the local HTTP webhook listener.
 - `src/demo.ts` demonstrates the app runtime without Discord.
 - `src/app/runtime.ts` owns the fast foreground lane and background workflow lane.
-- `src/orchestration/app-graph.ts` routes user requests into immediate chat/todo/medication handling or async workflow handoff.
-- `src/orchestration/workflow-graph.ts` runs queued task plans through LangGraph.
+- `src/app/runtime-scope.ts`, `src/app/runtime-workflow.ts`, and `src/app/runtime-automation.ts` are extracted modules covering runtime scope setup, workflow dispatch, and automation logic respectively.
+- `src/orchestration/workflow-graph.ts` runs queued task plans through LangGraph, supported by decomposed modules: `workflow-executor.ts`, `workflow-planner.ts`, `workflow-agent-runner.ts`, `workflow-state.ts`, `workflow-timeout.ts`, and `workflow-types.ts`.
 - `src/services/workflow-registry.ts` keeps in-memory workflow status.
 - `src/integrations/discord/bot.ts` exposes the app over Discord.
 - `src/integrations/http/server.ts` exposes local machine-to-machine webhook ingress for Vonage voice/messages.
 - `src/services/routines-service.ts` is the native routines engine for todos, meds, deadlines, reminders, and completion state.
 - `src/services/projects-service.ts` loads the live project registry from `~/.openelinaro/projects/` and seeds it from the committed starter registry under `projects/` on first run.
 - `profiles/registry.json` is the committed starter profile registry; the live runtime copy is `~/.openelinaro/profiles/registry.json`.
-- `src/tools/routine-tool-registry.ts` defines the shared backend tool catalog plus the separate user-facing and agent-default-visible tool subsets used by the runtime.
+- `src/tools/tool-registry.ts` defines the shared backend tool catalog plus the separate user-facing and agent-default-visible tool subsets used by the runtime; domain-specific tool builders live in `src/tools/groups/` (routine, finance, health, communication, project, filesystem, shell, memory, and system tool groups).
 - `src/connectors/active-model-connector.ts` routes chat requests through whichever model is currently active.
 - `src/services/model-service.ts` discovers provider models from live provider endpoints, persists the active model, and inspects context-window usage.
 - `src/services/system-prompt-service.ts` compiles shared `system_prompt/*.md` plus user-managed `~/.openelinaro/system_prompt/*.md` into the per-thread system-prompt snapshot.

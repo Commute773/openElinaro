@@ -5,6 +5,7 @@ import PostalMime, { type Address as PostalAddress, type Email as ParsedEmail } 
 import { getRuntimeConfig } from "../config/runtime-config";
 import { SecretStoreService } from "./secret-store-service";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 
 const DEFAULT_EMAIL_PROVIDER = "IMAP/SMTP";
 const DEFAULT_EMAIL_USERNAME = "";
@@ -164,13 +165,7 @@ interface EmailBackend {
   sendMessage(params: EmailSendParams): Promise<EmailSendResult>;
 }
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return emailTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(emailTelemetry);
 
 function parsePositiveInt(value: string | undefined, fallback: number) {
   if (!value?.trim()) {

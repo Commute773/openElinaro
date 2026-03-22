@@ -16,6 +16,7 @@ import {
 import { getDefaultProfileId } from "./profile-service";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 import {
   EMBEDDING_MODEL_ID,
   embedTexts,
@@ -32,13 +33,7 @@ function getConversationHistoryRoot() {
   return resolveRuntimePath("conversation-history");
 }
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return conversationHistoryTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(conversationHistoryTelemetry);
 
 type ConversationHistoryMessageEntry = {
   version: number;

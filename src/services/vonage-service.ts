@@ -11,6 +11,9 @@ import { getRuntimeConfig } from "../config/runtime-config";
 import { CommunicationsStore } from "./communications-store";
 import { SecretStoreService } from "./secret-store-service";
 import { telemetry } from "./telemetry";
+import { normalizeString } from "../utils/text-utils";
+import { DEFAULT_PROFILE_ID as DEFAULT_SECRET_PROFILE_ID } from "../config/service-constants";
+import { timestamp as nowIso } from "../utils/timestamp";
 
 const DEFAULT_HTTP_HOST = "0.0.0.0";
 const DEFAULT_HTTP_PORT = 3000;
@@ -19,7 +22,6 @@ const DEFAULT_MESSAGES_API_BASE_URL = "https://api.nexmo.com";
 const DEFAULT_WEBHOOK_BASE_PATH = "/webhooks/vonage";
 const DEFAULT_PRIVATE_KEY_SECRET_REF = "vonage.private_key";
 const DEFAULT_SIGNATURE_SECRET_REF = "vonage.signature_secret";
-const DEFAULT_SECRET_PROFILE_ID = "root";
 const DEFAULT_VOICE_ANSWER_TEXT =
   "The assistant is online, but live inbound calling is not configured yet. Please send a text message instead.";
 const DEFAULT_MESSAGE_CHANNEL: MessageChannel = "sms";
@@ -75,9 +77,6 @@ type MessageSendInput = {
   clientRef?: string;
 };
 
-function nowIso() {
-  return new Date().toISOString();
-}
 
 function normalizeBaseUrl(value: string | undefined | null) {
   const normalized = value?.trim();
@@ -92,10 +91,6 @@ function parsePort(value: string | undefined) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_HTTP_PORT;
 }
 
-function normalizeString(value: unknown) {
-  const normalized = typeof value === "string" ? value.trim() : "";
-  return normalized || null;
-}
 
 function normalizeNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {

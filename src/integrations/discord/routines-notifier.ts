@@ -5,6 +5,7 @@ import { DocsIndexStateService } from "../../services/docs-index-state-service";
 import { HeartbeatStateService } from "../../services/heartbeat-state-service";
 import { getLocalTimezone } from "../../services/local-time-service";
 import { telemetry } from "../../services/telemetry";
+import { createTraceSpan } from "../../utils/telemetry-helpers";
 
 const HEARTBEAT_INTERVAL_MS = 55 * 60 * 1000;
 const ALERT_POLL_MIN_MS = 5_000;
@@ -23,13 +24,7 @@ const DOCS_INDEX_FAILURE_BACKOFF_MS = [
 ];
 const discordNotifierTelemetry = telemetry.child({ component: "discord" });
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return discordNotifierTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(discordNotifierTelemetry);
 
 export class DiscordRoutinesNotifier {
   private timer: ReturnType<typeof setTimeout> | null = null;

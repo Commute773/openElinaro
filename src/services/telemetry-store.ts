@@ -1,7 +1,6 @@
-import fs from "node:fs";
-import path from "node:path";
-import { Database } from "bun:sqlite";
+import type { Database } from "bun:sqlite";
 import { resolveRuntimePath } from "./runtime-root";
+import { openDatabase } from "../utils/sqlite-helpers";
 
 export type TelemetrySeverity = "debug" | "info" | "warn" | "error";
 export type TelemetryOutcome = "ok" | "error" | "cancelled" | "timeout" | "rejected";
@@ -75,9 +74,6 @@ function getStorePath() {
   return resolveRuntimePath("telemetry.sqlite");
 }
 
-function isInMemoryDbPath(value: string) {
-  return value === ":memory:";
-}
 
 function normalizeLikePattern(value: string) {
   return `%${value.trim().toLowerCase()}%`;
@@ -87,10 +83,7 @@ export class TelemetryStore {
   private readonly db: Database;
 
   constructor(private readonly dbPath = getStorePath()) {
-    if (!isInMemoryDbPath(this.dbPath)) {
-      fs.mkdirSync(path.dirname(this.dbPath), { recursive: true });
-    }
-    this.db = new Database(this.dbPath, { create: true });
+    this.db = openDatabase(this.dbPath);
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS migrations (
         key TEXT PRIMARY KEY,

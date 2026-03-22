@@ -11,6 +11,7 @@ import { toModelMessages } from "./ai-sdk-message-service";
 import { MemoryService } from "./memory-service";
 import { ModelService } from "./model-service";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 
 const COMPACTION_TAIL_MESSAGES = 4;
 const TOOL_RESULT_PREVIEW_CHARS = 800;
@@ -30,13 +31,7 @@ function truncate(text: string, limit: number) {
   return `${text.slice(0, limit)}...`;
 }
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return compactionTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(compactionTelemetry);
 
 function formatTranscript(messages: BaseMessage[]) {
   return messages

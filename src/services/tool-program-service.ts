@@ -9,9 +9,10 @@ import type {
   ToolProgramWorkerRequest,
   ToolProgramWorkerResponse,
 } from "../domain/tool-program";
-import type { ToolContext } from "../tools/routine-tool-registry";
+import type { ToolContext } from "../tools/tool-registry";
 import { stringifyToolErrorEnvelope } from "./tool-error-service";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 
 const DEFAULT_TIMEOUT_MS = 45_000;
 const MAX_TIMEOUT_MS = 180_000;
@@ -49,13 +50,7 @@ function serializeMessage(message: ToolProgramWorkerRequest) {
   return `${JSON.stringify(message)}\n`;
 }
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return toolProgramTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(toolProgramTelemetry);
 
 function toWorkerToolCards(cards: ToolCatalogCard[], allowedTools: Set<string>): ToolProgramAvailableTool[] {
   return cards

@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.22.25
+- Released at: 2026-03-22T17:18:14Z
+- Release id: 20260322T171814Z-4b766ed
+- Previous version: 2026.03.22.24
+- Trigger: managed service update
+
+docs: update all documentation to match current codebase — fix stale file references (app-graph.ts, routine-tool-registry.ts), add missing directory entries (tools/groups, utils, config, services/finance, services/gemini-live), update doc indexes, and reflect orchestration/runtime decomposition across README, WORKSPACE_SUMMARY, repo-layout, architecture-decisions, communications, runtime-domain-model, observability, and research docs
+
 ## 2026.03.22.24
 - Released at: 2026-03-22T15:44:13Z
 - Release id: 20260322T154413Z-e2034ad

@@ -13,6 +13,7 @@ import type {
   LanguageModelV3StreamResult,
 } from "@ai-sdk/provider";
 import type { ModelMessage } from "@ai-sdk/provider-utils";
+import { approximateTextTokens } from "../utils/text-utils";
 import {
   mapStopReasonToFinishReason,
   stringifyToolResultOutput,
@@ -23,6 +24,7 @@ import { InferencePromptDriftMonitor } from "../services/inference-prompt-drift-
 import { buildCurrentLocalTimePrefix } from "../services/local-time-service";
 import { ModelService } from "../services/model-service";
 import { telemetry } from "../services/telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 import type {
   UsagePromptBreakdown,
   UsagePromptContributor,
@@ -35,13 +37,7 @@ const connectorTelemetry = telemetry.child({ component: "connector" });
 const MAX_PROMPT_DIAGNOSTIC_CONTRIBUTORS = 12;
 const PROMPT_DIAGNOSTIC_PREVIEW_CHARS = 160;
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return connectorTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(connectorTelemetry);
 
 function toUsageMetadata(usage: Usage) {
   const inputTokens = usage.input + usage.cacheRead + usage.cacheWrite;
@@ -57,9 +53,6 @@ function toUsageMetadata(usage: Usage) {
   };
 }
 
-function approximateTextTokens(text: string) {
-  return Math.ceil(text.length / 4);
-}
 
 function compactPreview(text: string) {
   const normalized = text.replace(/\s+/g, " ").trim();

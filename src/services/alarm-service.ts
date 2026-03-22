@@ -1,7 +1,6 @@
-import fs from "node:fs";
-import path from "node:path";
-import { Database } from "bun:sqlite";
+import type { Database } from "bun:sqlite";
 import { getLocalTimezone } from "./local-time-service";
+import { openDatabase } from "../utils/sqlite-helpers";
 import { resolveRuntimePath } from "./runtime-root";
 import { telemetry as rootTelemetry, type TelemetryService } from "./telemetry";
 
@@ -185,8 +184,7 @@ export class AlarmService {
     telemetry: TelemetryService = rootTelemetry.child({ component: "alarm" }),
   ) {
     this.telemetry = telemetry;
-    fs.mkdirSync(path.dirname(this.dbPath), { recursive: true });
-    this.db = new Database(this.dbPath, { create: true });
+    this.db = openDatabase(this.dbPath);
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS alarms (
         id TEXT PRIMARY KEY,

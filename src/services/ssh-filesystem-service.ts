@@ -9,14 +9,17 @@ import {
   parseStructuredPatch,
 } from "./structured-patch";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 
-const DEFAULT_READ_LIMIT = 200;
-const DEFAULT_LIST_LIMIT = 200;
-const DEFAULT_GLOB_LIMIT = 200;
-const DEFAULT_GREP_LIMIT = 100;
-const MAX_LINE_LENGTH = 2_000;
-const MAX_READ_BYTES = 50 * 1024;
-const MAX_READ_BYTES_LABEL = `${MAX_READ_BYTES / 1024} KB`;
+import {
+  FS_DEFAULT_READ_LIMIT as DEFAULT_READ_LIMIT,
+  FS_DEFAULT_LIST_LIMIT as DEFAULT_LIST_LIMIT,
+  FS_DEFAULT_GLOB_LIMIT as DEFAULT_GLOB_LIMIT,
+  FS_DEFAULT_GREP_LIMIT as DEFAULT_GREP_LIMIT,
+  FS_MAX_LINE_LENGTH as MAX_LINE_LENGTH,
+  FS_MAX_READ_BYTES as MAX_READ_BYTES,
+  FS_MAX_READ_BYTES_LABEL as MAX_READ_BYTES_LABEL,
+} from "../config/service-constants";
 const sshFilesystemTelemetry = telemetry.child({ component: "ssh_filesystem" });
 
 type ResolvedPathInput = {
@@ -471,13 +474,7 @@ function formatTimestamp(value: number) {
   return new Date(value * 1000).toISOString();
 }
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return sshFilesystemTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(sshFilesystemTelemetry);
 
 export class SshFilesystemService {
   private readonly profiles: ProfileService;

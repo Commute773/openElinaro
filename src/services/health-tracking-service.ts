@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";
+import { timestamp as nowIso } from "../utils/timestamp";
 
 export interface HealthCheckinInput {
   observedAt?: string;
@@ -34,9 +35,6 @@ interface HealthStoreData {
 
 const STORE_VERSION = 1;
 
-function nowIso() {
-  return new Date().toISOString();
-}
 
 function parseScore(value: string | undefined) {
   if (!value) {

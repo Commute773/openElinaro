@@ -12,9 +12,11 @@ import {
   extractTextFromContent,
   extractTextFromMessage,
 } from "./message-content-service";
+import { approximateTextTokens } from "../utils/text-utils";
 import { ModelService } from "./model-service";
 import { ProfileService } from "./profile-service";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 
 const MEMORY_RECALL_LIMIT = 3;
 const MEMORY_RECALL_MIN_SCORE = 0.05;
@@ -81,13 +83,7 @@ const INTERNAL_AUTOMATION_PATTERNS = [
   /^context summary \(generated automatically during compaction;/i,
 ];
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return conversationMemoryTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(conversationMemoryTelemetry);
 
 function uniqueRecallMatches(matches: MemorySearchMatch[]) {
   const selected = new Map<string, MemorySearchMatch>();
@@ -153,9 +149,6 @@ function countTokenOverlap(queryTokens: string[], text: string) {
   return overlap;
 }
 
-function approximateTextTokens(text: string) {
-  return Math.ceil(text.length / 4);
-}
 
 function hasExplicitRecallIntent(text: string) {
   return EXPLICIT_RECALL_PATTERNS.some((pattern) => pattern.test(text));

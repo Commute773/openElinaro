@@ -13,8 +13,9 @@ import {
   formatSystemPromptWarning,
   SystemPromptService,
 } from "./system-prompt-service";
-import { RoutineToolRegistry } from "../tools/routine-tool-registry";
+import { ToolRegistry } from "../tools/tool-registry";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
 import { ToolResultStore } from "./tool-result-store";
 import { ToolResolutionService } from "./tool-resolution-service";
 import { ConversationMemoryService } from "./conversation-memory-service";
@@ -28,13 +29,7 @@ const QUEUED_STOPPED_MESSAGE = "Queued request cancelled because the conversatio
 const CHAT_MAX_STEPS = 24;
 const agentChatTelemetry = telemetry.child({ component: "agent_chat" });
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return agentChatTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(agentChatTelemetry);
 
 type ChatReplyResult = {
   mode: "immediate" | "accepted";
@@ -163,7 +158,7 @@ export class AgentChatService {
 
   constructor(
     private readonly connector: ProviderConnector,
-    private readonly routineTools: RoutineToolRegistry,
+    private readonly routineTools: ToolRegistry,
     private readonly toolResolver: ToolResolutionService,
     private readonly transitions: ConversationStateTransitionService,
     private readonly conversations: ConversationStore,

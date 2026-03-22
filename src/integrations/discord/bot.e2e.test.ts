@@ -28,7 +28,7 @@ let systemPromptModule: typeof import("../../services/system-prompt-service");
 let memoryServiceModule: typeof import("../../services/memory-service");
 let modelServiceModule: typeof import("../../services/model-service");
 let transitionServiceModule: typeof import("../../services/conversation-state-transition-service");
-let toolRegistryModule: typeof import("../../tools/routine-tool-registry");
+let toolRegistryModule: typeof import("../../tools/tool-registry");
 let toolResolutionModule: typeof import("../../services/tool-resolution-service");
 let agentChatModule: typeof import("../../services/agent-chat-service");
 
@@ -346,7 +346,7 @@ function createDiscordAppHarness(options?: {
     models,
     systemPrompts,
   );
-  const toolRegistry = new toolRegistryModule.RoutineToolRegistry(
+  const toolRegistry = new toolRegistryModule.ToolRegistry(
     routines,
     projects,
     models,
@@ -674,7 +674,7 @@ if (RUN_CHILD_SUITE) {
     memoryServiceModule = await importFresh("src/services/memory-service.ts");
     modelServiceModule = await importFresh("src/services/model-service.ts");
     transitionServiceModule = await importFresh("src/services/conversation-state-transition-service.ts");
-    toolRegistryModule = await importFresh("src/tools/routine-tool-registry.ts");
+    toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
     toolResolutionModule = await importFresh("src/services/tool-resolution-service.ts");
     agentChatModule = await importFresh("src/services/agent-chat-service.ts");
   });

@@ -7,6 +7,7 @@ import {
   type AgentHealthcheckRequest,
   type AgentHealthcheckResponse,
 } from "../services/agent-healthcheck-service";
+import { timestamp as nowIso } from "../utils/timestamp";
 
 function parseTimeoutMs(argv: string[]) {
   const timeoutArg = argv.find((entry) => entry.startsWith("--timeout-ms="));
@@ -20,9 +21,6 @@ function parseTimeoutMs(argv: string[]) {
   return parsed;
 }
 
-function nowIso() {
-  return new Date().toISOString();
-}
 
 function nextRequestId() {
   return `healthcheck-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

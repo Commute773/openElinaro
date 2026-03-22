@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
+import { timestamp } from "../utils/timestamp";
+import { countLines } from "../utils/text-utils";
 
 export interface StoredToolResultRecord {
   ref: string;
@@ -14,10 +16,6 @@ export interface StoredToolResultRecord {
   createdAt: string;
 }
 
-function timestamp() {
-  return new Date().toISOString();
-}
-
 function sanitizeSegment(value: string) {
   const normalized = value
     .trim()
@@ -27,12 +25,6 @@ function sanitizeSegment(value: string) {
   return normalized || "default";
 }
 
-function countLines(content: string) {
-  if (!content) {
-    return 0;
-  }
-  return content.split(/\r?\n/).length;
-}
 
 function nextRef(namespace: string, toolCallId: string) {
   return [

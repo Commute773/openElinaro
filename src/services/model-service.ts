@@ -14,6 +14,7 @@ import {
   type Usage,
 } from "@mariozechner/pi-ai";
 import { getOAuthApiKey, type OAuthCredentials } from "@mariozechner/pi-ai/oauth";
+import { approximateTextTokens } from "../utils/text-utils";
 import { z } from "zod";
 import { assertSuccessfulProviderResponse } from "../connectors/provider-response";
 import {
@@ -32,17 +33,13 @@ import { getClaudeSetupToken, getCodexCredentials, saveCodexCredentials } from "
 import type { ProfileRecord } from "../domain/profiles";
 import { resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
+import { createTraceSpan } from "../utils/telemetry-helpers";
+import { timestamp } from "../utils/timestamp";
 
 export type ModelProviderId = "openai-codex" | "claude";
 const modelTelemetry = telemetry.child({ component: "model" });
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return modelTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(modelTelemetry);
 
 export interface ListedProviderModel {
   providerId: ModelProviderId;
@@ -264,10 +261,6 @@ const STANDARD_CONTEXT_WINDOW_OVERRIDES: Record<string, number> = {
 const EXTENDED_CONTEXT_WINDOW_OVERRIDES: Record<string, number> = {
   "openai-codex/gpt-5.4": 1_050_000,
 };
-
-function timestamp() {
-  return new Date().toISOString();
-}
 
 function ensureStoreDir() {
   fs.mkdirSync(path.dirname(getStorePath()), { recursive: true });
@@ -681,9 +674,6 @@ export function resolveListedModelIdentifier(
   throw new Error(`Model not found in the live catalog: ${requested}`);
 }
 
-function approximateTextTokens(text: string) {
-  return Math.ceil(text.length / 4);
-}
 
 function hrtimeMs(startedAt: bigint, endedAt: bigint) {
   return Number(endedAt - startedAt) / 1_000_000;

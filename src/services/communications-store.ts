@@ -10,13 +10,12 @@ import type {
   CallChannel,
 } from "../domain/communications";
 import { resolveRuntimePath } from "./runtime-root";
+import { normalizeString } from "../utils/text-utils";
+import { timestamp as nowIso } from "../utils/timestamp";
 
 const STORE_VERSION = 1;
 const MAX_EVENTS_PER_RECORD = 50;
 
-function nowIso() {
-  return new Date().toISOString();
-}
 
 function emptyStore(): CommunicationsStoreShape {
   return {
@@ -51,10 +50,6 @@ function normalizeMessageChannel(value: unknown): MessageChannel {
   return "unknown";
 }
 
-function normalizeString(value: unknown) {
-  const normalized = typeof value === "string" ? value.trim() : "";
-  return normalized || null;
-}
 
 function normalizeNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {

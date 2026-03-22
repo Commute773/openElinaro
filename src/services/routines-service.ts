@@ -20,77 +20,7 @@ import { ProjectsService } from "./projects-service";
 import { RoutinesStore } from "./routines-store";
 import { formatLocalTime } from "./local-time-service";
 import { telemetry } from "./telemetry";
-
-const WEEKDAYS: Weekday[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-
-function nowInTimezone(timezone: string, reference: Date = new Date()) {
-  return new Date(reference.toLocaleString("en-US", { timeZone: timezone }));
-}
-
-function parseIso(value?: string) {
-  return value ? new Date(value) : null;
-}
-
-function toIso(date: Date) {
-  return date.toISOString();
-}
-
-function localDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function parseTime(time: string) {
-  const [hoursRaw, minutesRaw] = time.split(":");
-  const hours = Number(hoursRaw);
-  const minutes = Number(minutesRaw);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
-    throw new Error(`Invalid time value: ${time}`);
-  }
-  return { hours, minutes };
-}
-
-function setTime(date: Date, time: string) {
-  const next = new Date(date);
-  const { hours, minutes } = parseTime(time);
-  next.setHours(hours, minutes, 0, 0);
-  return next;
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function addMonths(date: Date, months: number) {
-  const next = new Date(date);
-  next.setMonth(next.getMonth() + months);
-  return next;
-}
-
-function setDayOfMonth(date: Date, dayOfMonth: number) {
-  const next = new Date(date);
-  const maxDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
-  next.setDate(Math.min(dayOfMonth, maxDay));
-  return next;
-}
-
-function weekdayKey(date: Date): Weekday {
-  return WEEKDAYS[date.getDay()] as Weekday;
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function isSameLocalDay(a: Date, b: Date) {
-  return localDateKey(a) === localDateKey(b);
-}
+import { nowInTimezone, parseIso, toIso, localDateKey, parseTime, setTime, addDaysLocal as addDays, addMonthsLocal as addMonths, setDayOfMonth, weekdayKey, startOfDay, isSameLocalDay } from "../utils/time-helpers";
 
 function trimHistory(values: string[], limit: number) {
   return values.slice(Math.max(0, values.length - limit));

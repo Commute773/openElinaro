@@ -4,8 +4,7 @@ import type { RoutineItem, RoutineStoreData } from "../domain/routines";
 import { getLocalTimezone } from "./local-time-service";
 import { ProfileService } from "./profile-service";
 import { resolveRuntimePath } from "./runtime-root";
-
-const DEFAULT_ROUTINE_PROFILE_ID = "root";
+import { DEFAULT_PROFILE_ID as DEFAULT_ROUTINE_PROFILE_ID } from "../config/service-constants";
 
 function getStorePath() {
   return resolveRuntimePath("routines.json");

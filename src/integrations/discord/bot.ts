@@ -28,11 +28,13 @@ import type { RoutineItemKind, RoutinePriority, Weekday } from "../../domain/rou
 import type { ModelProviderId } from "../../services/model-service";
 import { buildChatPromptContent } from "../../services/message-content-service";
 import { AgentHealthcheckService } from "../../services/agent-healthcheck-service";
+import { DISCORD_MAX_ATTACHMENT_BYTES as MAX_IMAGE_ATTACHMENT_BYTES, DISCORD_MAX_TEXT_ATTACHMENT_BYTES as MAX_TEXT_ATTACHMENT_BYTES } from "../../config/service-constants";
 import { sanitizeDiscordText } from "../../services/discord-response-service";
 import { ProfileService } from "../../services/profile-service";
 import { SecretStoreService } from "../../services/secret-store-service";
 import { telemetry } from "../../services/telemetry";
-import { getRuntimeUserFacingToolNames } from "../../tools/routine-tool-registry";
+import { createTraceSpan } from "../../utils/telemetry-helpers";
+import { getRuntimeUserFacingToolNames } from "../../tools/tool-registry";
 import { DiscordAuthSessionManager } from "./auth-session-manager";
 import { DiscordRoutinesNotifier } from "./routines-notifier";
 
@@ -81,8 +83,6 @@ const THINKING_LEVEL_CHOICES = [
 const DISCORD_MESSAGE_LIMIT = 1_900;
 const DISCORD_TYPING_REFRESH_MS = 8_000;
 const DISCORD_DM_BATCH_TIMEOUT_MS = 5 * 60 * 1000;
-const MAX_IMAGE_ATTACHMENT_BYTES = 8 * 1024 * 1024;
-const MAX_TEXT_ATTACHMENT_BYTES = 256 * 1024;
 const MAX_TEXT_ATTACHMENT_CHARS = 32_000;
 const DEFAULT_PROFILE_THINKING_LEVEL = "low";
 const DISCORD_CONTINUED_SUFFIX = "/continued";
@@ -163,13 +163,7 @@ const TOOL_DERIVED_INPUT_BUILDERS: Partial<Record<string, DerivedToolInputBuilde
   }),
 };
 
-function traceSpan<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  options?: { attributes?: Record<string, unknown> },
-) {
-  return discordTelemetry.span(operation, options?.attributes ?? {}, fn);
-}
+const traceSpan = createTraceSpan(discordTelemetry);
 
 function getAutoRegisteredToolCommandNames() {
   return getRuntimeUserFacingToolNames().filter((name) =>

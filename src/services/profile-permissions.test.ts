@@ -24,7 +24,7 @@ let systemPromptsModule: typeof import("../services/system-prompt-service");
 let memoryModule: typeof import("../services/memory-service");
 let modelsModule: typeof import("../services/model-service");
 let transitionsModule: typeof import("../services/conversation-state-transition-service");
-let toolRegistryModule: typeof import("../tools/routine-tool-registry");
+let toolRegistryModule: typeof import("../tools/tool-registry");
 let toolAuthModule: typeof import("../services/tool-authorization-service");
 
 function writeTestProfileRegistry() {
@@ -171,7 +171,7 @@ beforeAll(async () => {
   memoryModule = await importFresh("src/services/memory-service.ts");
   modelsModule = await importFresh("src/services/model-service.ts");
   transitionsModule = await importFresh("src/services/conversation-state-transition-service.ts");
-  toolRegistryModule = await importFresh("src/tools/routine-tool-registry.ts");
+  toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
   toolAuthModule = await importFresh("src/services/tool-authorization-service.ts");
 });
 
@@ -429,7 +429,7 @@ describe("profile-scoped auth and permissions", () => {
       models,
       systemPrompts,
     );
-    const registry = new toolRegistryModule.RoutineToolRegistry(
+    const registry = new toolRegistryModule.ToolRegistry(
       routines,
       projects,
       models,
@@ -518,7 +518,7 @@ describe("profile-scoped auth and permissions", () => {
       models,
       systemPrompts,
     );
-    const registry = new toolRegistryModule.RoutineToolRegistry(
+    const registry = new toolRegistryModule.ToolRegistry(
       routines,
       projects,
       models,
@@ -611,7 +611,7 @@ describe("profile-scoped auth and permissions", () => {
       models,
       systemPrompts,
     );
-    const registry = new toolRegistryModule.RoutineToolRegistry(
+    const registry = new toolRegistryModule.ToolRegistry(
       routines,
       projects,
       models,
@@ -702,7 +702,7 @@ describe("profile-scoped auth and permissions", () => {
       models,
       systemPrompts,
     );
-    const registry = new toolRegistryModule.RoutineToolRegistry(
+    const registry = new toolRegistryModule.ToolRegistry(
       routines,
       projects,
       models,
@@ -859,7 +859,7 @@ describe("profile-scoped auth and permissions", () => {
       models,
       systemPrompts,
     );
-    const registry = new toolRegistryModule.RoutineToolRegistry(
+    const registry = new toolRegistryModule.ToolRegistry(
       routines,
       projects,
       models,
