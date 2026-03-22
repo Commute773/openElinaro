@@ -7,7 +7,7 @@ The runtime uses two local files for operator state:
 
 Bundled repo files such as `profiles/registry.json` and `projects/registry.json` are starter templates only. The live copies the runtime reads and mutates are under `~/.openelinaro/`.
 
-In test mode, the runtime defaults to `~/.openelinarotest/` when invoked from the repo checkout. Tests that point `OPENELINARO_ROOT_DIR` or `OPENELINARO_USER_DATA_DIR` at an isolated temp root still keep their mutable state there.
+In test mode, each test creates an isolated temp directory and sets `OPENELINARO_ROOT_DIR` to it. The Bun test preload (`src/test/preload.ts`) provides a fallback temp directory so tests never touch the user's home directory. Shared fixture data lives in `src/test/fixtures/`.
 
 ## Shape
 

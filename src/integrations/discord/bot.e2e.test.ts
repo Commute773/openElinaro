@@ -7,10 +7,11 @@ import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ChannelType, MessageFlags, type ChatInputCommandInteraction, type Message } from "discord.js";
 import type { AppProgressEvent, ChatPromptContentBlock } from "../../domain/assistant";
+import { getTestFixturesDir } from "../../test/fixtures";
 import { ScriptedProviderConnector, type ScriptedConnectorRequest } from "../../test/scripted-provider-connector";
 
 const repoRoot = process.cwd();
-const machineTestRoot = path.join(os.homedir(), ".openelinarotest");
+const machineTestRoot = getTestFixturesDir();
 
 let previousCwd = "";
 let tempRoot = "";
