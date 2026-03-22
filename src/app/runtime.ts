@@ -127,6 +127,7 @@ export class OpenElinaroApp {
       typingEligible?: boolean;
       chatOptions?: {
         contextConversationKey?: string;
+        background?: boolean;
         persistConversation?: boolean;
         enableMemoryIngestion?: boolean;
         enableThreadStartContext?: boolean;
@@ -171,6 +172,7 @@ export class OpenElinaroApp {
               : undefined,
             onToolUse: options?.onToolUse,
             persistConversation: options?.chatOptions?.persistConversation,
+            background: options?.chatOptions?.background,
             enableMemoryIngestion: options?.chatOptions?.enableMemoryIngestion,
             enableCompaction: options?.chatOptions?.enableCompaction,
             includeBackgroundExecNotifications: options?.chatOptions?.includeBackgroundExecNotifications,
@@ -616,6 +618,58 @@ export class OpenElinaroApp {
       ...response,
       message: finalMessage,
       completed,
+    };
+  }
+
+  getNextAutonomousTimeAt(reference?: Date) {
+    const nextRunAt = this.getScope().autonomousTime.getNextRunAt(reference);
+    return nextRunAt?.toISOString();
+  }
+
+  async runAutonomousTimeSession(options?: { reference?: Date }) {
+    const scope = this.getScope();
+    const reference = options?.reference ?? new Date();
+    if (!scope.autonomousTime.isEligible(reference)) {
+      return {
+        requestId: `autonomous-time-${Date.now()}`,
+        mode: "immediate" as const,
+        message: "",
+        warnings: [],
+        triggered: false,
+      };
+    }
+
+    const requestId = `autonomous-time-${Date.now()}`;
+    const { text } = scope.autonomousTime.buildInjectedMessage(reference);
+    const localDate = scope.autonomousTime.getTriggerLocalDate(reference);
+    const conversationKey = buildAutomationSessionKey(`autonomous-time-${localDate}`, scope.profile.id);
+    const response = await this.handleRequest(
+      {
+        id: requestId,
+        kind: "chat",
+        text,
+        conversationKey,
+      },
+      {
+        onToolUse: async () => {},
+        typingEligible: false,
+        chatOptions: {
+          background: true,
+          persistConversation: true,
+          enableMemoryIngestion: true,
+          enableThreadStartContext: false,
+          enableCompaction: true,
+          includeBackgroundExecNotifications: true,
+          providerSessionId: conversationKey,
+          usagePurpose: "automation_autonomous_time",
+        },
+      },
+    );
+    scope.autonomousTime.markTriggered(reference);
+
+    return {
+      ...response,
+      triggered: true,
     };
   }
 

@@ -33,6 +33,7 @@ export class DiscordRoutinesNotifier {
   private readonly docsIndexState: DocsIndexStateService;
   private readonly docsIndexer: DocsIndexService;
   private nextHeartbeatAt = this.computeInitialNextHeartbeatAt();
+  private nextAutonomousTimeAt = this.computeInitialNextAutonomousTimeAt();
   private nextDocsIndexAt: number;
   private running = false;
 
@@ -83,10 +84,13 @@ export class DiscordRoutinesNotifier {
     const routineDelayMs = nextRoutineAttentionAt
       ? Math.max(ALERT_POLL_MIN_MS, new Date(nextRoutineAttentionAt).getTime() - Date.now())
       : Number.POSITIVE_INFINITY;
+    const autonomousTimeDelayMs = this.nextAutonomousTimeAt
+      ? Math.max(ALERT_POLL_MIN_MS, this.nextAutonomousTimeAt - Date.now())
+      : Number.POSITIVE_INFINITY;
     const docsIndexDelayMs = this.docsIndexer.isEnabled()
       ? Math.max(ALERT_POLL_MIN_MS, this.nextDocsIndexAt - Date.now())
       : Number.POSITIVE_INFINITY;
-    const delayMs = Math.min(heartbeatDelayMs, alarmDelayMs, routineDelayMs, docsIndexDelayMs);
+    const delayMs = Math.min(heartbeatDelayMs, alarmDelayMs, routineDelayMs, autonomousTimeDelayMs, docsIndexDelayMs);
 
     this.timer = setTimeout(() => {
       void this.runTick();
@@ -155,6 +159,11 @@ export class DiscordRoutinesNotifier {
       return Math.min(scheduledAt, retryAt);
     }
     return scheduledAt;
+  }
+
+  private computeInitialNextAutonomousTimeAt(reference = new Date()) {
+    const nextRunAt = this.app.getNextAutonomousTimeAt?.(reference);
+    return nextRunAt ? new Date(nextRunAt).getTime() : Number.POSITIVE_INFINITY;
   }
 
   private markDocsIndexCompleted(reference = new Date()) {
@@ -255,6 +264,33 @@ export class DiscordRoutinesNotifier {
               } else {
                 this.markHeartbeatFailed(new Date());
               }
+            }
+          }
+
+          if (Date.now() >= this.nextAutonomousTimeAt) {
+            try {
+              const response = await this.app.runAutonomousTimeSession({
+                reference: new Date(),
+              });
+              this.nextAutonomousTimeAt = this.computeInitialNextAutonomousTimeAt(new Date());
+              discordNotifierTelemetry.event(
+                response.triggered
+                  ? "discord.autonomous_time.triggered"
+                  : "discord.autonomous_time.skipped",
+                { mode: response.mode },
+                response.triggered ? undefined : { level: "debug" },
+              );
+            } catch (error) {
+              this.nextAutonomousTimeAt = this.computeInitialNextAutonomousTimeAt(new Date());
+              discordNotifierTelemetry.event(
+                "discord.autonomous_time.error",
+                {
+                  error: error instanceof Error
+                    ? { name: error.name, message: error.message, stack: error.stack }
+                    : String(error),
+                },
+                { level: "error", outcome: "error" },
+              );
             }
           }
         },

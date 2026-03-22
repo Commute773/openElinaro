@@ -3,6 +3,7 @@ import type { ProfileRecord } from "../domain/profiles";
 import { AccessControlService } from "../services/access-control-service";
 import { ActiveModelConnector } from "../connectors/active-model-connector";
 import { AgentChatService } from "../services/agent-chat-service";
+import { AutonomousTimeService } from "../services/autonomous-time-service";
 import { ConversationMemoryService } from "../services/conversation-memory-service";
 import { ConversationStateTransitionService } from "../services/conversation-state-transition-service";
 import type { ConversationStore } from "../services/conversation-store";
@@ -47,6 +48,7 @@ export type RuntimeScope = {
   memory: MemoryService;
   conversationMemory: ConversationMemoryService;
   reflection: ReflectionService;
+  autonomousTime: AutonomousTimeService;
   connector: ActiveModelConnector;
   shell: ShellRuntime;
   transitions: ConversationStateTransitionService;
@@ -145,6 +147,7 @@ export function createRuntimeScope(ctx: {
     models,
     soul,
   );
+  const autonomousTime = new AutonomousTimeService(profile, routines);
   const automaticConversationMemoryDisabled = isAutomaticConversationMemoryDisabled();
   const connector = new ActiveModelConnector(models);
   const shell: ShellRuntime = profiles.isSshExecutionProfile(profile)
@@ -216,6 +219,7 @@ export function createRuntimeScope(ctx: {
     memory,
     conversationMemory,
     reflection,
+    autonomousTime,
     connector,
     shell,
     transitions,

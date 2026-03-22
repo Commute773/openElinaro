@@ -76,6 +76,8 @@ describe("RuntimeConfigSchema", () => {
     expect(config.localVoice.enabled).toBe(false);
     expect(config.media.enabled).toBe(false);
     expect(config.media.roots).toEqual([]);
+    expect(config.autonomousTime.enabled).toBe(false);
+    expect(config.autonomousTime.promptPath).toBe("assistant_context/autonomous-time.md");
   });
 
   test("preserves explicit overrides alongside defaults", () => {
@@ -88,6 +90,7 @@ describe("RuntimeConfigSchema", () => {
     expect(config.calendar.enabled).toBe(true);
     expect(config.calendar.icsUrl).toBe("https://example.com/cal.ics");
     expect(config.email.enabled).toBe(false);
+    expect(config.autonomousTime.enabled).toBe(false);
   });
 
   test("rejects invalid values", () => {
@@ -238,12 +241,14 @@ describe("hasRuntimeConfigPath", () => {
     expect(hasRuntimeConfigPath("calendar")).toBe(true);
     expect(hasRuntimeConfigPath("email")).toBe(true);
     expect(hasRuntimeConfigPath("media")).toBe(true);
+    expect(hasRuntimeConfigPath("autonomousTime")).toBe(true);
   });
 
   test("returns true for nested paths", () => {
     expect(hasRuntimeConfigPath("core.http.port")).toBe(true);
     expect(hasRuntimeConfigPath("core.profile.activeProfileId")).toBe(true);
     expect(hasRuntimeConfigPath("calendar.enabled")).toBe(true);
+    expect(hasRuntimeConfigPath("autonomousTime.promptPath")).toBe(true);
   });
 
   test("returns false for nonexistent paths", () => {

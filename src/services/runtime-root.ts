@@ -14,6 +14,7 @@ const USER_DATA_TOP_LEVEL = new Set([
   "agent-healthchecks",
   "alarms.sqlite",
   "auth-store.json",
+  "autonomous-time-state.json",
   "benchmarks",
   "calendar-sync-state.json",
   "communications",

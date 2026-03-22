@@ -24,6 +24,7 @@ import type { ReflectionService } from "./reflection-service";
 const COMPACTION_THRESHOLD_PERCENT = 80;
 const QUEUED_WHILE_COMPACTING_MESSAGE = "message queued as we are currently compacting";
 const STEERING_ACCEPTED_MESSAGE = "message accepted and will steer the current agent at the next turn";
+const BACKGROUND_ACCEPTED_MESSAGE = "message accepted into the background queue";
 const STOPPED_MESSAGE = "Current agent halted.";
 const QUEUED_STOPPED_MESSAGE = "Queued request cancelled because the conversation was stopped.";
 const CHAT_MAX_STEPS = 24;
@@ -187,6 +188,7 @@ export class AgentChatService {
     onBackgroundResponse?: (result: ChatReplyResult) => Promise<void>;
     onToolUse?: (event: AppProgressEvent) => Promise<void>;
     typingEligible?: boolean;
+    background?: boolean;
     persistConversation?: boolean;
     enableMemoryIngestion?: boolean;
     enableCompaction?: boolean;
@@ -205,6 +207,24 @@ export class AgentChatService {
       providerSessionId: params.providerSessionId,
       usagePurpose: params.usagePurpose ?? "chat_turn",
     };
+    if (params.background) {
+      this.enqueueBackgroundChatJob(session, {
+        conversationKey: params.conversationKey,
+        contextConversationKey: params.contextConversationKey,
+        content: params.content,
+        systemContext: params.systemContext,
+        typingEligible,
+        onBackgroundResponse: params.onBackgroundResponse,
+        onToolUse: params.onToolUse,
+        execution,
+      });
+      this.refreshConversationActivity(params.conversationKey, session);
+      this.kickSession(params.conversationKey);
+      return {
+        mode: "accepted",
+        message: BACKGROUND_ACCEPTED_MESSAGE,
+      };
+    }
     if (session.compacting) {
       this.enqueueBackgroundChatJob(session, {
         conversationKey: params.conversationKey,
@@ -679,7 +699,7 @@ export class AgentChatService {
                   sessionId: job.execution.providerSessionId ?? job.conversationKey,
                   conversationKey: job.execution.providerSessionId ?? job.conversationKey,
                   usagePurpose: job.execution.usagePurpose,
-                  prependLocalTimeToUserAndToolMessages: this.superagentMode,
+                  prependLocalTimeToUserAndToolMessages: true,
                 },
               },
             })
