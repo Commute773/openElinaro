@@ -7,14 +7,14 @@ OPENELINARO_REPO_ROOT="${ROOT_DIR}"
 source "${ROOT_DIR}/scripts/service-common.sh"
 
 LABEL="$(openelinaro_service_name)"
-SERVICE_ROOT_DIR="${OPENELINARO_SERVICE_ROOT_DIR:-${ROOT_DIR}}"
-APP_ENTRYPOINT="${SERVICE_ROOT_DIR}/src/index.ts"
-NODE_WRAPPER_PATH="${SERVICE_ROOT_DIR}/scripts/run-managed-service-node.mjs"
 USER_DOMAIN="gui/$(id -u)"
 BUN_BIN="$(openelinaro_ensure_bun_bin)"
 NODE_BIN="$(openelinaro_ensure_node_bin)"
 
-openelinaro_ensure_deployment_dirs
+SERVICE_ROOT_DIR="$(openelinaro_resolve_service_root_dir)"
+APP_ENTRYPOINT="${SERVICE_ROOT_DIR}/src/index.ts"
+NODE_WRAPPER_PATH="${SERVICE_ROOT_DIR}/scripts/run-managed-service-node.mjs"
+
 mkdir -p "${OPENELINARO_USER_DATA_ROOT}/logs"
 
 launchctl bootout "${USER_DOMAIN}/${LABEL}" >/dev/null 2>&1 || true

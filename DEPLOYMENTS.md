@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.2
+- Released at: 2026-03-22T00:07:41Z
+- Release id: 20260322T000741Z-7b5e388
+- Previous version: 2026.03.22
+- Trigger: managed service update
+
+Fix managed-service installs to bootstrap an initial release snapshot instead of binding the live service directly to the mutable source checkout.
+This preserves the distinction between running version and prepared source version, which /update relies on for changelog previews and deploy checks.
+
 ## 2026.03.22
 - Released at: 2026-03-22T00:03:47Z
 - Release id: 20260322T000347Z-80f078e

@@ -192,6 +192,7 @@ bun run setup:python
 ## Deployment
 
 - `bun run service:install` installs or updates the current platform backend: a submitted `launchd` job in the active macOS user session or a system `systemd` service on Linux.
+- When no managed release pointer exists yet, `bun run service:install` now bootstraps a first release snapshot under `~/.openelinaro/deployments/releases/` instead of binding the live service directly to the mutable source checkout.
 - `bun run service:healthcheck` sends a simulated local message to the live main agent that says `this is a healthcheck, reply with HEALTHCHECK_OK to confirm you are up and active` and waits up to 60 seconds for `HEALTHCHECK_OK`.
 - `bun run service:prepare-update` runs `bun run check`, requires a non-empty human-written change block via `--changes`, `--changes-file`, `OPENELINARO_DEPLOY_CHANGES`, or piped stdin, requires the current branch to track an upstream, then computes the next deploy version in `yyyy.mm.dd` or `yyyy.mm.dd.n` form, writes `VERSION.json` plus `DEPLOYMENTS.md` into the source workspace, commits the current code plus metadata as `update: <version>`, and pushes that branch upstream.
 - Managed-service rollback is still an agent-only path. Use the root-only `service_rollback` tool instead of invoking transition scripts manually.

@@ -17,8 +17,6 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 UNIT_NAME="$(openelinaro_service_name)"
-SERVICE_ROOT_DIR="${OPENELINARO_SERVICE_ROOT_DIR:-${ROOT_DIR}}"
-RUNNER_PATH="${SERVICE_ROOT_DIR}/scripts/run-managed-service.sh"
 UNIT_PATH="${OPENELINARO_SYSTEMD_UNIT_PATH:-/etc/systemd/system/${UNIT_NAME}}"
 
 if ! id "${SERVICE_USER}" >/dev/null 2>&1; then
@@ -26,7 +24,9 @@ if ! id "${SERVICE_USER}" >/dev/null 2>&1; then
   exit 1
 fi
 
-openelinaro_ensure_deployment_dirs
+SERVICE_ROOT_DIR="$(openelinaro_resolve_service_root_dir)"
+RUNNER_PATH="${SERVICE_ROOT_DIR}/scripts/run-managed-service.sh"
+
 mkdir -p "${OPENELINARO_USER_DATA_ROOT}/logs"
 chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${OPENELINARO_USER_DATA_ROOT}"
 

@@ -226,6 +226,32 @@ openelinaro_current_release_version() {
   openelinaro_release_version_for_dir "$(openelinaro_current_release_dir)"
 }
 
+openelinaro_resolve_service_root_dir() {
+  if [[ -n "${OPENELINARO_SERVICE_ROOT_DIR:-}" ]]; then
+    printf '%s\n' "$(openelinaro_normalize_release_dir "${OPENELINARO_SERVICE_ROOT_DIR}")"
+    return 0
+  fi
+
+  openelinaro_ensure_deployment_dirs
+
+  local current_target
+  current_target="$(openelinaro_read_release_pointer_file "${OPENELINARO_CURRENT_RELEASE_FILE}")"
+  if [[ -n "${current_target}" ]]; then
+    printf '%s\n' "${current_target}"
+    return 0
+  fi
+
+  local release_version released_at release_id release_dir
+  release_version="$(openelinaro_current_deploy_version)"
+  released_at="$(openelinaro_read_json_string_field "$(openelinaro_version_file_path)" "releasedAt")"
+  release_id="bootstrap-$(openelinaro_next_release_id)"
+  release_dir="${OPENELINARO_RELEASES_DIR}/${release_id}"
+
+  openelinaro_create_release_snapshot "${release_dir}" "${release_id}" "${release_version}" "${released_at}" ""
+  openelinaro_update_release_state "${release_dir}" ""
+  printf '%s\n' "${release_dir}"
+}
+
 openelinaro_compare_versions() {
   local left="$1"
   local right="$2"
