@@ -8,6 +8,7 @@ import {
   extractTextFromMessage,
   approximateContentTokens,
   toPiUserContent,
+  resolveRemoteImageUrl,
 } from "./message-content-service";
 
 describe("normalizeChatPromptContent", () => {
@@ -36,6 +37,23 @@ describe("normalizeChatPromptContent", () => {
     const input = [{ type: "image", data: "base64data", mimeType: "image/png" }];
     expect(normalizeChatPromptContent(input)).toEqual([
       { type: "image", data: "base64data", mimeType: "image/png" },
+    ]);
+  });
+
+  test("preserves remote image source URLs", () => {
+    const input = [{
+      type: "image",
+      data: "base64data",
+      mimeType: "image/png",
+      sourceUrl: " https://cdn.discordapp.com/attachments/example.png ",
+    }];
+    expect(normalizeChatPromptContent(input)).toEqual([
+      {
+        type: "image",
+        data: "base64data",
+        mimeType: "image/png",
+        sourceUrl: "https://cdn.discordapp.com/attachments/example.png",
+      },
     ]);
   });
 
@@ -246,5 +264,20 @@ describe("toPiUserContent", () => {
 
   test("returns empty string for non-string, non-array input", () => {
     expect(toPiUserContent(42)).toBe("");
+  });
+});
+
+describe("resolveRemoteImageUrl", () => {
+  test("returns normalized http and https image URLs", () => {
+    expect(resolveRemoteImageUrl(" https://cdn.discordapp.com/attachments/example.png ")).toBe(
+      "https://cdn.discordapp.com/attachments/example.png",
+    );
+    expect(resolveRemoteImageUrl("http://example.com/image.jpg")).toBe("http://example.com/image.jpg");
+  });
+
+  test("rejects non-remote or invalid image URLs", () => {
+    expect(resolveRemoteImageUrl("data:image/png;base64,abc")).toBeNull();
+    expect(resolveRemoteImageUrl("file:///tmp/image.png")).toBeNull();
+    expect(resolveRemoteImageUrl("not a url")).toBeNull();
   });
 });

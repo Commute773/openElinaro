@@ -828,6 +828,12 @@ if (RUN_CHILD_SUITE) {
     const blocks = firstMessage?.content as ChatPromptContentBlock[];
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/png")).toBe(true);
     expect(
+      blocks.some((block) =>
+        block.type === "image"
+        && block.sourceUrl === `data:image/png;base64,${imageBase64}`
+      ),
+    ).toBe(true);
+    expect(
       blocks.some((block) => block.type === "text" && block.text.includes("Attached image: pixel.png")),
     ).toBe(true);
     expect(

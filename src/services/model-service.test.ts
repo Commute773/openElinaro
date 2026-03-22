@@ -681,4 +681,58 @@ describe("ModelService.countAnthropicTokens", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  test("prefers remote image URLs over inline base64 for Anthropic token counting", async () => {
+    const service = new ModelService(TEST_PROFILE);
+    const originalFetch = globalThis.fetch;
+    let requestBody: Record<string, unknown> | null = null;
+
+    globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      return new Response(JSON.stringify({ input_tokens: 9 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      await (service as any).countAnthropicTokens({
+        modelId: "claude-opus-4-6",
+        apiKey: "test-claude-token",
+        systemPrompt: "You are a test system prompt.",
+        messages: [
+          new HumanMessage([
+            { type: "text", text: "What is in this image?" },
+            {
+              type: "image",
+              data: "base64data",
+              mimeType: "image/png",
+              sourceUrl: "https://cdn.discordapp.com/attachments/example.png",
+            },
+          ]),
+        ],
+        tools: [],
+      });
+
+      expect(requestBody).toMatchObject({
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "What is in this image?" },
+              {
+                type: "image",
+                source: {
+                  type: "url",
+                  url: "https://cdn.discordapp.com/attachments/example.png",
+                },
+              },
+            ],
+          },
+        ],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

@@ -21,6 +21,7 @@ import {
   approximateContentTokens,
   extractTextFromMessage,
   normalizeChatPromptContent,
+  resolveRemoteImageUrl,
 } from "./message-content-service";
 import {
   UsageTrackingService,
@@ -767,18 +768,31 @@ function toAnthropicUserContent(content: unknown): string | Array<Record<string,
     return blocks[0].text;
   }
 
-  return blocks.map((block) =>
-    block.type === "text"
-      ? { type: "text", text: block.text }
-      : {
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: block.mimeType,
-            data: block.data,
-          },
-        }
-  );
+  return blocks.map((block) => {
+    if (block.type === "text") {
+      return { type: "text", text: block.text };
+    }
+
+    const remoteImageUrl = resolveRemoteImageUrl(block.sourceUrl);
+    if (remoteImageUrl) {
+      return {
+        type: "image",
+        source: {
+          type: "url",
+          url: remoteImageUrl,
+        },
+      };
+    }
+
+    return {
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: block.mimeType,
+        data: block.data,
+      },
+    };
+  });
 }
 
 function toAnthropicMessages(messages: BaseMessage[]) {

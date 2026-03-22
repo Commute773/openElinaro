@@ -3,7 +3,7 @@ import type { StructuredToolInterface } from "@langchain/core/tools";
 import { tool, type LanguageModelUsage, type ToolSet } from "ai";
 import type { LanguageModelV3FinishReason, LanguageModelV3Usage } from "@ai-sdk/provider";
 import type { ModelMessage, ToolResultOutput } from "@ai-sdk/provider-utils";
-import { extractTextFromMessage, normalizeChatPromptContent } from "./message-content-service";
+import { extractTextFromMessage, normalizeChatPromptContent, resolveRemoteImageUrl } from "./message-content-service";
 import { ToolResultStore } from "./tool-result-store";
 
 const TOOL_RESULT_INLINE_CHAR_THRESHOLD = 1_000;
@@ -168,11 +168,18 @@ function toModelMessage(message: BaseMessage): ModelMessage | null {
 
     return {
       role: "user",
-      content: blocks.map((block) =>
-        block.type === "text"
-          ? { type: "text" as const, text: block.text }
-          : { type: "image" as const, image: block.data, mediaType: block.mimeType }
-      ),
+      content: blocks.map((block) => {
+        if (block.type === "text") {
+          return { type: "text" as const, text: block.text };
+        }
+
+        const remoteImageUrl = resolveRemoteImageUrl(block.sourceUrl);
+        return {
+          type: "image" as const,
+          image: remoteImageUrl ? new URL(remoteImageUrl) : block.data,
+          mediaType: block.mimeType,
+        };
+      }),
     };
   }
 

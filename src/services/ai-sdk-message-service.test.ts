@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { ToolMessage } from "@langchain/core/messages";
+import { HumanMessage, ToolMessage } from "@langchain/core/messages";
 
 let tempRoot = "";
 let previousRootDirEnv: string | undefined;
@@ -225,5 +225,71 @@ describe("ai-sdk message service tool-result refs", () => {
     const toolMessage = appended[0] as ToolMessage;
     expect(String(toolMessage.content)).toContain("[tool_result_ref");
     expect(String(toolMessage.content)).toContain("tool=web_fetch");
+  });
+});
+
+describe("ai-sdk message service multimodal user messages", () => {
+  test("uses remote image URLs when available in chat content", async () => {
+    const messageModule = await import("./ai-sdk-message-service");
+
+    const messages = messageModule.toModelMessages([
+      new HumanMessage([
+        { type: "text", text: "Look at this" },
+        {
+          type: "image",
+          data: "base64data",
+          mimeType: "image/png",
+          sourceUrl: "https://cdn.discordapp.com/attachments/example.png",
+        },
+      ]),
+    ]);
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      role: "user",
+      content: [
+        { type: "text", text: "Look at this" },
+        { type: "image", mediaType: "image/png" },
+      ],
+    });
+    const userMessage = messages[0] as Extract<typeof messages[number], { role: "user" }>;
+    expect(Array.isArray(userMessage.content)).toBe(true);
+    if (!Array.isArray(userMessage.content)) {
+      throw new Error("expected multipart user content");
+    }
+    const imagePart = userMessage.content[1];
+    expect(imagePart?.type).toBe("image");
+    if (imagePart?.type !== "image") {
+      throw new Error("expected image part");
+    }
+    expect(imagePart.image).toBeInstanceOf(URL);
+    expect((imagePart.image as URL).toString()).toBe("https://cdn.discordapp.com/attachments/example.png");
+  });
+
+  test("keeps inline image data when the source URL is not remotely fetchable", async () => {
+    const messageModule = await import("./ai-sdk-message-service");
+
+    const messages = messageModule.toModelMessages([
+      new HumanMessage([
+        {
+          type: "image",
+          data: "base64data",
+          mimeType: "image/png",
+          sourceUrl: "data:image/png;base64,base64data",
+        },
+      ]),
+    ]);
+
+    const userMessage = messages[0] as Extract<typeof messages[number], { role: "user" }>;
+    expect(Array.isArray(userMessage.content)).toBe(true);
+    if (!Array.isArray(userMessage.content)) {
+      throw new Error("expected multipart user content");
+    }
+    const imagePart = userMessage.content[0];
+    expect(imagePart?.type).toBe("image");
+    if (imagePart?.type !== "image") {
+      throw new Error("expected image part");
+    }
+    expect(imagePart.image).toBe("base64data");
   });
 });

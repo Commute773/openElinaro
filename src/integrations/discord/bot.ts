@@ -1670,6 +1670,7 @@ async function buildAttachmentBlocks(
               type: "image" as const,
               data: Buffer.from(bytes).toString("base64"),
               mimeType,
+              sourceUrl: attachment.url,
             },
           ];
         }
