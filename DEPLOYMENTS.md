@@ -1,5 +1,32 @@
 # Deployments
 
+## 2026.03.22.4
+- Released at: 2026-03-22T19:24:28Z
+- Release id: 20260322T192428Z-71cdf31
+- Previous version: 2026.03.22.2
+- Trigger: ci/release workflow
+
+- fix: resolve TypeScript type errors in 13 test files to pass CI check
+- fix: resolve 9 e2e test failures across 5 test files
+- fix: resolve all 136 test failures from mock leaks and path mismatches
+- fix: eliminate EROFS test failures with preload and mock leak fix
+- test: move test fixtures out of ~/.openelinarotest into the repo
+- fix: make telemetry singleton resilient to initialization failures (#25)
+- fix: align deployment-version and tool-registry tests with tag-based update mechanism (#24)
+- ci: add concurrency group to debounce release workflow runs
+- test: add unit tests for workflow orchestration modules
+- test: add unit tests for finance forecasting, import, recurring, and ledger modules
+- test: add unit tests for runtime-config and feature-config-service
+- test: add unit tests for security and access control modules
+- test: add unit tests for finance database, budget, and helpers
+- test: add unit tests for hybrid-search and memory-service
+- test: add unit tests for profile-service, projects-service, and routines-store
+- test: add unit tests for conversation service modules
+- test: add unit tests for tool service modules
+- test: add unit tests for structured-patch and file-utils
+- test: add unit tests for text-utils, time-helpers, and timestamp utilities
+- test: add unit tests for domain model (task-plan, errors)
+
 ## 2026.03.22.2
 - Released at: 2026-03-22T17:44:05Z
 - Release id: 20260322T174405Z-2875677
