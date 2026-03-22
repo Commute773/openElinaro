@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.16
+- Released at: 2026-03-22T01:14:11Z
+- Release id: 20260322T011411Z-aae6721
+- Previous version: 2026.03.22.15
+- Trigger: managed service update
+
+Minor README wording cleanup for the /update deployment description.
+This is a fresh prepared version for manually validating the real .15 -> .16 update path on krysalstis after the sudo env fix.
+
 ## 2026.03.22.15
 - Released at: 2026-03-22T01:11:46Z
 - Release id: 20260322T011147Z-f1faa40
