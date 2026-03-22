@@ -80,6 +80,7 @@ import { telemetry } from "../services/telemetry";
 import { ToolResultStore } from "../services/tool-result-store";
 import { ToolSearchService } from "../services/tool-search-service";
 import { isRunningInsideManagedService, resolveRuntimePlatform, type RuntimePlatform } from "../services/runtime-platform";
+import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
 import { FeatureConfigService, parseFeatureValue, type FeatureId } from "../services/feature-config-service";
 import {
   guardUntrustedText,
@@ -3203,6 +3204,7 @@ export class RoutineToolRegistry {
   private readonly filesystem: FilesystemRuntime;
   private readonly telemetryQuery = new TelemetryQueryService();
   private readonly deploymentVersion = new DeploymentVersionService();
+  private readonly serviceRestartNotices = new ServiceRestartNoticeService();
   private readonly sessionTodos: SessionTodoStore;
   private readonly workPlanning: WorkPlanningService;
   private readonly pendingConversationResets = new Map<string, string>();
@@ -5218,16 +5220,7 @@ export class RoutineToolRegistry {
               lines.push("Validation: passed.");
 
               if (input.restart) {
-                if (!isRunningInsideManagedService()) {
-                  lines.push("Restart skipped: this runtime is not running inside the managed service.");
-                } else {
-                  await this.shell.exec({
-                    command: buildServiceRestartCommand(this.runtimePlatform),
-                    timeoutMs: 15_000,
-                    sudo: requiresPrivilegedServiceControl(this.runtimePlatform, "restart"),
-                  });
-                  lines.push("Service restart requested. Reconnect after the bot comes back.");
-                }
+                lines.push(await this.requestManagedServiceRestart("config_edit"));
               }
 
               return lines.join("\n");
@@ -5277,6 +5270,7 @@ export class RoutineToolRegistry {
                 });
               }
               const status = this.featureConfig.getStatus(input.featureId as FeatureId);
+              const shouldRestart = input.restart ?? true;
               const lines = [
                 `Saved ${input.featureId} feature config.`,
                 input.preparePython ? "Shared Python runtime setup completed." : "",
@@ -5284,17 +5278,8 @@ export class RoutineToolRegistry {
                 status.missing.length > 0 ? `Missing: ${status.missing.join(", ")}` : "Missing: none",
               ];
 
-              if (input.restart) {
-                if (!isRunningInsideManagedService()) {
-                  lines.push("Restart skipped: this runtime is not running inside the managed service.");
-                } else {
-                  await this.shell.exec({
-                    command: buildServiceRestartCommand(this.runtimePlatform),
-                    timeoutMs: 15_000,
-                    sudo: requiresPrivilegedServiceControl(this.runtimePlatform, "restart"),
-                  });
-                  lines.push("Service restart requested. Reconnect after the bot comes back.");
-                }
+              if (shouldRestart) {
+                lines.push(await this.requestManagedServiceRestart("feature_manage"));
               }
 
               return lines.join("\n");
@@ -5304,7 +5289,7 @@ export class RoutineToolRegistry {
         {
           name: "feature_manage",
           description:
-            "Inspect or update one optional feature block in ~/.openelinaro/config.yaml. Use action=status to see feature readiness, or action=apply to enable/disable a feature, write config values, optionally prepare the shared Python runtime, and optionally restart the managed service so new tools activate.",
+            "Inspect or update one optional feature block in ~/.openelinaro/config.yaml. Use action=status to see feature readiness, or action=apply to enable/disable a feature, write config values, optionally prepare the shared Python runtime, and restart the managed service by default so new tools activate immediately. Set restart=false only when you intentionally want to defer that restart.",
           schema: z.object({
             action: z.enum(["status", "apply"]),
             featureId: z.enum(["calendar", "email", "communications", "webSearch", "webFetch", "openbrowser", "finance", "tickets", "localVoice", "media"]).optional(),
@@ -6305,6 +6290,27 @@ export class RoutineToolRegistry {
         { level: "debug", outcome: "error" },
       );
     }
+  }
+
+  private async requestManagedServiceRestart(source: "config_edit" | "feature_manage") {
+    if (!isRunningInsideManagedService()) {
+      return "Restart skipped: this runtime is not running inside the managed service.";
+    }
+
+    const result = await this.shell.exec({
+      command: buildServiceRestartCommand(this.runtimePlatform),
+      timeoutMs: 15_000,
+      sudo: requiresPrivilegedServiceControl(this.runtimePlatform, "restart"),
+    });
+    if (result.exitCode !== 0) {
+      throw new Error([
+        "Managed-service restart request failed.",
+        "",
+        renderShellExecResult(result),
+      ].join("\n"));
+    }
+    this.serviceRestartNotices.recordPendingNotice({ source });
+    return "Service restart requested. Reconnect after the bot comes back. Running background agents will resume automatically after restart.";
   }
 
   private getConversationForTool(input: { conversationKey?: string }, context?: ToolContext) {

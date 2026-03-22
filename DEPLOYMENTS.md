@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.22.21
+- Released at: 2026-03-22T15:15:33Z
+- Release id: 20260322T151533Z-2160610
+- Previous version: 2026.03.22.20
+- Trigger: managed service update
+
+Add validated config_edit tool for runtime config updates and restart gating
+
 ## 2026.03.22.20
 - Released at: 2026-03-22T15:13:56Z
 - Release id: 20260322T151356Z-eb68564

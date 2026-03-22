@@ -22,6 +22,7 @@ import { HeartbeatService } from "../services/heartbeat-service";
 import type { CacheMissWarning } from "../services/cache-miss-monitor";
 import { RoutinesService } from "../services/routines-service";
 import { ShellService } from "../services/shell-service";
+import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
 import { SshFilesystemService } from "../services/ssh-filesystem-service";
 import { SshShellService } from "../services/ssh-shell-service";
 import { SystemPromptService } from "../services/system-prompt-service";
@@ -142,6 +143,9 @@ export class OpenElinaroApp {
   private readonly heartbeats = this.appTelemetry.instrumentMethods(new HeartbeatService(), {
     component: "heartbeat",
   });
+  private readonly serviceRestartNotices = this.appTelemetry.instrumentMethods(new ServiceRestartNoticeService(), {
+    component: "service_restart_notice",
+  });
   private readonly calendar = this.appTelemetry.instrumentMethods(new CalendarSyncService(this.routines), {
     component: "calendar",
   });
@@ -182,6 +186,7 @@ export class OpenElinaroApp {
       });
     });
 
+    this.injectPendingServiceRestartContinuations();
     this.kickBackgroundRunner();
   }
 
@@ -1399,6 +1404,48 @@ export class OpenElinaroApp {
       });
       this.kickBackgroundRunner();
     });
+  }
+
+  private injectPendingServiceRestartContinuations() {
+    const notice = this.serviceRestartNotices.consumePendingNotice();
+    if (!notice) {
+      return;
+    }
+
+    for (const run of this.registry.listRecoverableRuns()) {
+      if (run.kind !== "coding-agent") {
+        continue;
+      }
+
+      const existingInstructions = run.pendingParentInstructions ?? [];
+      let injectedIntoSession = false;
+      if (run.currentSessionId) {
+        injectedIntoSession = Boolean(
+          this.workflowSessions.appendHumanMessage(run.currentSessionId, notice.message),
+        );
+      }
+
+      const pendingParentInstructions = injectedIntoSession || existingInstructions.includes(notice.message)
+        ? existingInstructions
+        : existingInstructions.concat(notice.message);
+      const logEntry = [
+        "Managed service restart detected.",
+        `Source: ${notice.source ?? "unknown"}.`,
+        `Requested at: ${notice.requestedAt}.`,
+        injectedIntoSession
+          ? "Injected continuation note into the persisted workflow session."
+          : "Queued continuation note for the next planner turn because no persisted session was available.",
+      ].join(" ");
+      const executionLog = run.executionLog.includes(logEntry)
+        ? run.executionLog
+        : run.executionLog.concat(logEntry);
+      this.registry.save({
+        ...run,
+        pendingParentInstructions,
+        executionLog,
+        updatedAt: timestamp(),
+      });
+    }
   }
 
   private kickBackgroundRunner(): void {

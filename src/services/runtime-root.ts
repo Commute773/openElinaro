@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const USER_DATA_ROOT_DIRNAME = ".openelinaro";
 const TEST_USER_DATA_ROOT_DIRNAME = ".openelinarotest";
+const DEFAULT_SERVICE_ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const USER_DATA_TOP_LEVEL = new Set([
   "config.yaml",
   "profiles",
@@ -57,14 +59,10 @@ export function getRuntimeRootDir() {
 
 export function getServiceRootDir() {
   const configuredRoot = process.env.OPENELINARO_SERVICE_ROOT_DIR?.trim();
-  const fallbackRoot = process.env.OPENELINARO_ROOT_DIR?.trim();
   if (configuredRoot) {
     return path.resolve(configuredRoot);
   }
-  if (fallbackRoot) {
-    return path.resolve(fallbackRoot);
-  }
-  return process.cwd();
+  return DEFAULT_SERVICE_ROOT_DIR;
 }
 
 export function getUserDataRootDir() {

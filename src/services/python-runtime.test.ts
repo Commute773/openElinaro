@@ -2,7 +2,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { ensureRuntimeConfigFile, getRuntimeConfig, reloadRuntimeConfig, saveRuntimeConfig, type RuntimeConfig } from "../config/runtime-config";
+import {
+  ensureRuntimeConfigFile,
+  formatRuntimeConfigValidationError,
+  getRuntimeConfig,
+  hasRuntimeConfigPath,
+  reloadRuntimeConfig,
+  saveRuntimeConfig,
+  type RuntimeConfig,
+  validateRuntimeConfigFile,
+  validateRuntimeConfigText,
+} from "../config/runtime-config";
 import { assertSharedPythonRuntimeReady, getSharedPythonRuntimeStatus } from "./python-runtime";
 
 let runtimeRoot = "";
@@ -63,5 +73,28 @@ describe("python-runtime", () => {
 
   test("throws a setup hint when the shared runtime has not been prepared", () => {
     expect(() => assertSharedPythonRuntimeReady()).toThrow(/bun run setup:python/);
+  });
+
+  test("validates the current config file and known schema paths", () => {
+    const config = validateRuntimeConfigFile();
+
+    expect(config.core.assistant.displayName).toBe("OpenElinaro");
+    expect(hasRuntimeConfigPath("email.enabled")).toBe(true);
+    expect(hasRuntimeConfigPath("communications.vonage.applicationId")).toBe(true);
+    expect(hasRuntimeConfigPath("email.notARealField")).toBe(false);
+    expect(hasRuntimeConfigPath("")).toBe(false);
+  });
+
+  test("formats schema validation failures with config paths", () => {
+    let message = "";
+
+    try {
+      validateRuntimeConfigText("email:\n  imapPort: 0\n");
+    } catch (error) {
+      message = formatRuntimeConfigValidationError(error);
+    }
+
+    expect(message).toContain("email.imapPort");
+    expect(message).toContain("Too small");
   });
 });
