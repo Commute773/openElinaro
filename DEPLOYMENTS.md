@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.10
+- Released at: 2026-03-22T00:41:22Z
+- Release id: 20260322T004122Z-4234728
+- Previous version: 2026.03.22.9
+- Trigger: managed service update
+
+Minor README wording cleanup for the /update deployment note.
+This is a fresh prepared version for validating the real detached update flow after the service identity propagation fix.
+
 ## 2026.03.22.9
 - Released at: 2026-03-22T00:39:04Z
 - Release id: 20260322T003905Z-4246d6a
