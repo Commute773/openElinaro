@@ -394,11 +394,6 @@ function buildServiceCommand(
   ].join(" ");
 }
 
-function buildGitFetchTagsCommand() {
-  const rootDir = process.env.OPENELINARO_ROOT_DIR?.trim() || process.cwd();
-  return ["git", "-C", rootDir, "fetch", "--tags", "origin"].map((arg) => shellQuote(arg)).join(" ");
-}
-
 function buildGitLatestTagCommand() {
   const rootDir = process.env.OPENELINARO_ROOT_DIR?.trim() || process.cwd();
   return `${["git", "-C", rootDir, "tag", "-l", "v*", "--sort=-version:refname"].map((arg) => shellQuote(arg)).join(" ")} | head -n1 | sed 's/^v//'`;
@@ -1138,12 +1133,12 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
       operation,
       async () => {
         const timeoutMs = input.timeoutMs ?? 60_000;
-        const fetchResult = await ctx.shell.exec({
-          command: buildGitFetchTagsCommand(),
-          timeoutMs,
+        const pullResult = await ctx.shell.exec({
+          command: buildGitPullCommand(),
+          timeoutMs: timeoutMs + 30_000,
         });
-        if (fetchResult.exitCode !== 0) {
-          return renderShellExecResult(fetchResult);
+        if (pullResult.exitCode !== 0) {
+          return `Failed to sync latest version:\n${renderShellExecResult(pullResult)}`;
         }
         const tagResult = await ctx.shell.exec({
           command: buildGitLatestTagCommand(),
@@ -1175,6 +1170,14 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         });
         if (pullResult.exitCode !== 0) {
           return `Failed to pull latest version:\n${renderShellExecResult(pullResult)}`;
+        }
+        const tagResult = await ctx.shell.exec({
+          command: buildGitLatestTagCommand(),
+          timeoutMs: 10_000,
+        });
+        const latestTagVersion = tagResult.exitCode === 0 ? tagResult.stdout?.trim() ?? "" : "";
+        if (!ctx.deploymentVersion.hasPreparedUpdate()) {
+          return ctx.deploymentVersion.formatPreparedUpdate(latestTagVersion);
         }
         const result = await ctx.shell.exec({
           command: buildServiceCommand("update", timeoutMs, {

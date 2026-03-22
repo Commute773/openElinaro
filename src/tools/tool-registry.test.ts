@@ -944,6 +944,11 @@ describe("ToolRegistry tool catalog", () => {
     const shellStub = {
       exec: async (params: { command: string; timeoutMs?: number }) => {
         commands.push(params.command);
+        const stdout = params.command.includes("'tag' '-l'")
+          ? "2026.03.21.35\n"
+          : params.command.includes("scripts/service-update-detached.sh")
+            ? "scheduled\n"
+            : "Already up to date.\n";
         return {
           command: params.command,
           cwd: process.cwd(),
@@ -951,7 +956,7 @@ describe("ToolRegistry tool catalog", () => {
           timeoutMs: params.timeoutMs ?? 0,
           sudo: false,
           exitCode: 0,
-          stdout: "scheduled\n",
+          stdout,
           stderr: "",
         };
       },
@@ -1025,28 +1030,33 @@ describe("ToolRegistry tool catalog", () => {
       const updateResult = await harness.registry.invoke("update", { conversationKey: "123456789012345678" });
       const rollbackResult = await harness.registry.invoke("service_rollback", {});
 
-      // update_preview: fetch tags then read latest tag (2 calls)
+      // update_preview: fetch tags + pull, then read latest tag
       expect(commands[0]).toContain("'git' '-C'");
       expect(commands[0]).toContain("'fetch' '--tags' 'origin'");
+      expect(commands[0]).toContain("'pull' '--ff-only'");
       expect(commands[1]).toContain("'git' '-C'");
       expect(commands[1]).toContain("'tag' '-l'");
 
-      // update: git fetch --tags && git pull --ff-only, then service-update script
+      // update: git fetch --tags && git pull --ff-only, latest tag check, then service-update script
       expect(commands[2]).toContain("'fetch' '--tags' 'origin'");
       expect(commands[2]).toContain("'pull' '--ff-only'");
-      expect(commands[3]).toContain("OPENELINARO_AGENT_SERVICE_CONTROL='1'");
-      expect(commands[3]).toContain(`OPENELINARO_ROOT_DIR='${runtimeRoot}'`);
-      expect(commands[3]).toContain(`OPENELINARO_SERVICE_ROOT_DIR='${serviceRoot}'`);
-      expect(commands[3]).toContain(`OPENELINARO_USER_DATA_DIR='${path.join(runtimeRoot, ".openelinaro")}'`);
-      expect(commands[3]).toContain("OPENELINARO_SERVICE_USER='root'");
-      expect(commands[3]).toContain("OPENELINARO_SERVICE_GROUP='root'");
-      expect(commands[3]).toContain("OPENELINARO_SERVICE_LABEL='openelinaro.service'");
-      expect(commands[3]).toContain("OPENELINARO_SYSTEMD_UNIT_PATH='/etc/systemd/system/openelinaro.service'");
-      expect(commands[3]).toContain("OPENELINARO_NOTIFY_DISCORD_USER_ID='123456789012345678'");
-      expect(commands[3]).toContain("scripts/service-update-detached.sh");
-      expect(commands[4]).toContain("scripts/service-rollback-detached.sh");
-      // update_preview shows tag-based available update info
-      expect(updatePreviewResult).toContain("2026.03.21.34");
+      expect(commands[3]).toContain("'git' '-C'");
+      expect(commands[3]).toContain("'tag' '-l'");
+      expect(commands[4]).toContain("OPENELINARO_AGENT_SERVICE_CONTROL='1'");
+      expect(commands[4]).toContain(`OPENELINARO_ROOT_DIR='${runtimeRoot}'`);
+      expect(commands[4]).toContain(`OPENELINARO_SERVICE_ROOT_DIR='${serviceRoot}'`);
+      expect(commands[4]).toContain(`OPENELINARO_USER_DATA_DIR='${path.join(runtimeRoot, ".openelinaro")}'`);
+      expect(commands[4]).toContain("OPENELINARO_SERVICE_USER='root'");
+      expect(commands[4]).toContain("OPENELINARO_SERVICE_GROUP='root'");
+      expect(commands[4]).toContain("OPENELINARO_SERVICE_LABEL='openelinaro.service'");
+      expect(commands[4]).toContain("OPENELINARO_SYSTEMD_UNIT_PATH='/etc/systemd/system/openelinaro.service'");
+      expect(commands[4]).toContain("OPENELINARO_NOTIFY_DISCORD_USER_ID='123456789012345678'");
+      expect(commands[4]).toContain("scripts/service-update-detached.sh");
+      expect(commands[5]).toContain("scripts/service-rollback-detached.sh");
+      expect(updatePreviewResult).toContain("Deployed version: 2026.03.21.34.");
+      expect(updatePreviewResult).toContain("Pulled source version: 2026.03.21.35.");
+      expect(updatePreviewResult).toContain("Latest remote tag version: 2026.03.21.35.");
+      expect(updatePreviewResult).toContain("Deployment available: 2026.03.21.34 -> 2026.03.21.35.");
       expect(updateResult).toContain("scripts/service-update-detached.sh");
       expect(updateResult).toContain("detached helper");
       expect(rollbackResult).toContain("detached helper");
@@ -1125,7 +1135,7 @@ describe("ToolRegistry tool catalog", () => {
     const updateResult = await harness.registry.invoke("update", {});
     const rollbackResult = await harness.registry.invoke("service_rollback", {});
 
-    // update_preview now uses fetch --tags, so errors come from that
+    // update_preview now syncs with pull, so fetch/pull failures surface there
     expect(updatePreviewResult).toContain("Could not read from remote repository");
     expect(updatePreviewResult).not.toContain("UNTRUSTED CONTENT WARNING");
     // update also fetches first, so it fails on pull
@@ -1133,6 +1143,83 @@ describe("ToolRegistry tool catalog", () => {
     expect(updateResult).not.toContain("UNTRUSTED CONTENT WARNING");
     expect(rollbackResult).toContain("Managed-service update and rollback scripts are internal.");
     expect(rollbackResult).not.toContain("UNTRUSTED CONTENT WARNING");
+  });
+
+  test("update skips the deploy script when the pulled source version already matches the deployed version", async () => {
+    const commands: string[] = [];
+    const shellStub = {
+      exec: async (params: { command: string; timeoutMs?: number }) => {
+        commands.push(params.command);
+        const stdout = params.command.includes("'tag' '-l'")
+          ? "2026.03.21.35\n"
+          : "Already up to date.\n";
+        return {
+          command: params.command,
+          cwd: process.cwd(),
+          effectiveUser: "elinaro",
+          timeoutMs: params.timeoutMs ?? 0,
+          sudo: false,
+          exitCode: 0,
+          stdout,
+          stderr: "",
+        };
+      },
+      launchBackground: () => {
+        throw new Error("not used");
+      },
+      listBackgroundJobs: () => [],
+      readBackgroundOutput: () => {
+        throw new Error("not used");
+      },
+      consumeConversationNotifications: () => [],
+    };
+    const previous = process.env.OPENELINARO_SERVICE_ROOT_DIR;
+    const serviceRoot = path.join(runtimeRoot, "service-release-same-version");
+    fs.mkdirSync(serviceRoot, { recursive: true });
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = serviceRoot;
+    fs.writeFileSync(
+      path.join(serviceRoot, "release.json"),
+      `${JSON.stringify({
+        id: "20260321T235500Z-live",
+        createdAt: "2026-03-21T23:55:00Z",
+        sourceRoot: runtimeRoot,
+        version: "2026.03.21.35",
+        releasedAt: "2026-03-21T23:55:00Z",
+        previousVersion: "2026.03.21.34",
+        changelogPath: "DEPLOYMENTS.md",
+      }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(runtimeRoot, "VERSION.json"),
+      `${JSON.stringify({
+        version: "2026.03.21.35",
+        releasedAt: "2026-03-21T23:55:00Z",
+        previousVersion: "2026.03.21.34",
+        changelogPath: "DEPLOYMENTS.md",
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    try {
+      const harness = createHarnessWithOptions({ shell: shellStub });
+      const updateResult = await harness.registry.invoke("update", {});
+
+      expect(commands).toHaveLength(2);
+      expect(commands[0]).toContain("'fetch' '--tags' 'origin'");
+      expect(commands[0]).toContain("'pull' '--ff-only'");
+      expect(commands[1]).toContain("'tag' '-l'");
+      expect(updateResult).toContain("Deployed version: 2026.03.21.35.");
+      expect(updateResult).toContain("Pulled source version: 2026.03.21.35.");
+      expect(updateResult).toContain("Nothing to deploy.");
+      expect(commands.some((command) => command.includes("service-update-detached.sh"))).toBe(false);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.OPENELINARO_SERVICE_ROOT_DIR;
+      } else {
+        process.env.OPENELINARO_SERVICE_ROOT_DIR = previous;
+      }
+    }
   });
 
   test("uses git fetch --tags without sudo on Linux for update_preview", async () => {
@@ -1168,10 +1255,11 @@ describe("ToolRegistry tool catalog", () => {
 
     await harness.registry.invoke("update_preview", {});
 
-    // update_preview now makes 2 calls: fetch tags + read latest tag
+    // update_preview now makes 2 calls: fetch tags + pull, then read latest tag
     expect(calls).toHaveLength(2);
     expect(calls[0]?.command).toContain("'git' '-C'");
     expect(calls[0]?.command).toContain("'fetch' '--tags' 'origin'");
+    expect(calls[0]?.command).toContain("'pull' '--ff-only'");
     expect(calls[0]?.sudo).not.toBe(true);
     expect(calls[1]?.command).toContain("'git' '-C'");
     expect(calls[1]?.command).toContain("'tag' '-l'");

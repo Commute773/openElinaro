@@ -37,6 +37,14 @@ export type DeploymentChangelogEntry = {
   lines: string[];
 };
 
+type SourceVersionInfo = {
+  version: string | null;
+  releasedAt: string | null;
+  previousVersion: string | null;
+  changelogPath: string | null;
+  sourceRoot: string;
+};
+
 const DEFAULT_DEPLOYMENT_VERSION = "unversioned";
 const RELEASE_FILE_NAME = "release.json";
 const VERSION_FILE_NAME = "VERSION.json";
@@ -91,6 +99,16 @@ function parseDeploymentChangelog(markdown: string): DeploymentChangelogEntry[] 
   return entries;
 }
 
+function renderDeploymentChangelogEntry(entry: DeploymentChangelogEntry) {
+  return [
+    `## ${entry.version}`,
+    ...entry.lines.filter((line, index, all) => {
+      const previousLine = index > 0 ? all[index - 1] : undefined;
+      return line.trim().length > 0 || (previousLine?.trim().length ?? 0) > 0;
+    }),
+  ];
+}
+
 function parseVersionSegments(version: string): number[] {
   const segments = version.match(/\d+/g)?.map((value) => Number.parseInt(value, 10)) ?? [];
   if (segments.length === 0) {
@@ -135,6 +153,46 @@ function resolveSourceRoot(info: DeploymentVersionInfo) {
 }
 
 export class DeploymentVersionService {
+  private loadSourceVersionInfo(runtime = this.load()): SourceVersionInfo {
+    const sourceRoot = resolveSourceRoot(runtime);
+    const sourceVersion = readJsonFile<VersionFilePayload>(path.join(sourceRoot, VERSION_FILE_NAME));
+
+    return {
+      version: sourceVersion?.version?.trim() || null,
+      releasedAt: sourceVersion?.releasedAt ?? null,
+      previousVersion: sourceVersion?.previousVersion ?? null,
+      changelogPath: resolveOptionalPath(
+        sourceRoot,
+        sourceVersion?.changelogPath ?? CHANGELOG_FILE_NAME,
+      ),
+      sourceRoot,
+    };
+  }
+
+  private getChangelogEntriesBetween(
+    changelogPath: string | null,
+    sinceSegments: number[] | null,
+    throughSegments?: number[] | null,
+  ) {
+    if (!changelogPath || !fs.existsSync(changelogPath)) {
+      return [];
+    }
+
+    return parseDeploymentChangelog(fs.readFileSync(changelogPath, "utf8")).filter((entry) => {
+      const entrySegments = tryParseVersionSegments(entry.version);
+      if (!entrySegments) {
+        return false;
+      }
+      if (sinceSegments && compareVersionSegments(entrySegments, sinceSegments) <= 0) {
+        return false;
+      }
+      if (throughSegments && compareVersionSegments(entrySegments, throughSegments) > 0) {
+        return false;
+      }
+      return true;
+    });
+  }
+
   load(): DeploymentVersionInfo {
     const serviceRoot = getServiceRootDir();
     const release = readJsonFile<ReleaseFilePayload>(path.join(serviceRoot, RELEASE_FILE_NAME));
@@ -212,16 +270,15 @@ export class DeploymentVersionService {
     ].join("\n");
   }
 
-  formatPreparedUpdate() {
+  formatPreparedUpdate(latestTagVersion = "") {
     const runtime = this.load();
-    const sourceRoot = resolveSourceRoot(runtime);
-    const sourceVersion = readJsonFile<VersionFilePayload>(path.join(sourceRoot, VERSION_FILE_NAME));
-    const preparedVersion = sourceVersion?.version?.trim();
+    const source = this.loadSourceVersionInfo(runtime);
+    const preparedVersion = source.version;
     if (!preparedVersion) {
       return [
-        `Current version: ${runtime.version}.`,
-        `No prepared update metadata was found in ${sourceRoot}.`,
-        "Run bun run service:prepare-update first.",
+        `Deployed version: ${runtime.version}.`,
+        `Source root: ${source.sourceRoot}`,
+        `No pulled source version metadata was found in ${source.sourceRoot}.`,
       ].join("\n");
     }
 
@@ -229,113 +286,154 @@ export class DeploymentVersionService {
     const runtimeSegments = tryParseVersionSegments(runtime.version);
     if (!preparedSegments) {
       return [
-        `Current version: ${runtime.version}.`,
-        `Prepared source version ${preparedVersion} has an unsupported format.`,
-        `Source root: ${sourceRoot}`,
+        `Deployed version: ${runtime.version}.`,
+        `Pulled source version: ${preparedVersion}.`,
+        `Source root: ${source.sourceRoot}`,
+        `Pulled source version ${preparedVersion} has an unsupported format.`,
       ].join("\n");
     }
 
     if (runtimeSegments && compareVersionSegments(preparedSegments, runtimeSegments) <= 0) {
       return [
-        `Current version: ${runtime.version}.`,
-        `Prepared source version: ${preparedVersion}.`,
-        "No prepared update is newer than the running service.",
+        `Deployed version: ${runtime.version}.`,
+        `Pulled source version: ${preparedVersion}.`,
+        `Source root: ${source.sourceRoot}`,
+        "The pulled source version is not newer than the deployed service.",
+        ...(latestTagVersion ? [`Latest remote tag version: ${latestTagVersion}.`] : []),
+        "Nothing to deploy.",
       ].join("\n");
     }
 
-    const changelogPath = resolveOptionalPath(
-      sourceRoot,
-      sourceVersion?.changelogPath ?? CHANGELOG_FILE_NAME,
+    const changelogEntries = this.getChangelogEntriesBetween(
+      source.changelogPath,
+      runtimeSegments,
+      preparedSegments,
     );
-    const changelogEntries = changelogPath && fs.existsSync(changelogPath)
-      ? parseDeploymentChangelog(fs.readFileSync(changelogPath, "utf8")).filter((entry) => {
-        const entrySegments = tryParseVersionSegments(entry.version);
-        if (!entrySegments) {
-          return false;
-        }
-        return runtimeSegments
-          ? compareVersionSegments(entrySegments, runtimeSegments) > 0
-          : compareVersionSegments(entrySegments, preparedSegments) <= 0;
-      })
-      : [];
 
     return [
-      `Prepared update available: ${runtime.version} -> ${preparedVersion}.`,
-      `Prepared at: ${sourceVersion?.releasedAt ?? "unknown"}`,
-      `Source root: ${sourceRoot}`,
+      `Deployed version: ${runtime.version}.`,
+      `Pulled source version: ${preparedVersion}.`,
+      `Deployment available: ${runtime.version} -> ${preparedVersion}.`,
+      `Prepared at: ${source.releasedAt ?? "unknown"}`,
+      `Source root: ${source.sourceRoot}`,
       ...(
         changelogEntries.length > 0
           ? [
-              `Pending deployment entries since ${runtime.version}: ${changelogEntries.length}.`,
-              ...changelogEntries.flatMap((entry) => [
-                `## ${entry.version}`,
-                ...entry.lines.filter((line, index, all) => {
-                  const previousLine = index > 0 ? all[index - 1] : undefined;
-                  return line.trim().length > 0 || (previousLine?.trim().length ?? 0) > 0;
-                }),
-              ]),
-            ]
-          : [`No deployment changelog entries newer than ${runtime.version} were found in ${path.basename(changelogPath ?? CHANGELOG_FILE_NAME)}.`]
+            `Pending deployment entries since ${runtime.version}: ${changelogEntries.length}.`,
+            ...changelogEntries.flatMap((entry) => renderDeploymentChangelogEntry(entry)),
+          ]
+          : [`No deployment changelog entries newer than ${runtime.version} were found in ${path.basename(source.changelogPath ?? CHANGELOG_FILE_NAME)}.`]
       ),
     ].join("\n");
   }
 
   formatAvailableUpdate(latestTagVersion: string) {
     const runtime = this.load();
+    const source = this.loadSourceVersionInfo(runtime);
     const currentVersion = runtime.version;
+    const sourceVersion = source.version;
+    const currentSegments = tryParseVersionSegments(currentVersion);
+    const sourceSegments = tryParseVersionSegments(sourceVersion);
+
+    const lines = [
+      `Deployed version: ${currentVersion}.`,
+      `Pulled source version: ${sourceVersion ?? "unknown"}.`,
+      `Source root: ${source.sourceRoot}`,
+    ];
 
     if (!latestTagVersion) {
-      return [
-        `Current version: ${currentVersion}.`,
-        "No tagged versions were found on the remote.",
-      ].join("\n");
+      lines.push("No tagged versions were found on the remote.");
+      if (sourceSegments && (!currentSegments || compareVersionSegments(sourceSegments, currentSegments) > 0)) {
+        const changelogEntries = this.getChangelogEntriesBetween(
+          source.changelogPath,
+          currentSegments,
+          sourceSegments,
+        );
+        lines.push(
+          `Deployment available: ${currentVersion} -> ${sourceVersion}.`,
+          "Run `/update confirm:true` to deploy the already pulled version.",
+        );
+        if (changelogEntries.length > 0) {
+          lines.push(
+            `Pending deployment entries since ${currentVersion}: ${changelogEntries.length}.`,
+            ...changelogEntries.flatMap((entry) => renderDeploymentChangelogEntry(entry)),
+          );
+        }
+      }
+      return lines.join("\n");
     }
 
     const latestSegments = tryParseVersionSegments(latestTagVersion);
-    const currentSegments = tryParseVersionSegments(currentVersion);
 
     if (!latestSegments) {
       return [
-        `Current version: ${currentVersion}.`,
+        ...lines,
+        `Latest remote tag version: ${latestTagVersion}.`,
         `Latest remote tag version ${latestTagVersion} has an unsupported format.`,
       ].join("\n");
     }
 
-    if (currentSegments && compareVersionSegments(latestSegments, currentSegments) <= 0) {
-      return [
-        `Current version: ${currentVersion}.`,
-        `Latest remote tag version: ${latestTagVersion}.`,
-        "Already up to date. No newer tagged version is available.",
-      ].join("\n");
+    lines.push(`Latest remote tag version: ${latestTagVersion}.`);
+
+    if (!sourceVersion) {
+      lines.push(`No pulled source version metadata was found in ${source.sourceRoot}.`);
+      return lines.join("\n");
     }
 
-    const lines = [
-      `Update available: ${currentVersion} -> ${latestTagVersion}.`,
-      "Run `/update confirm:true` to pull and deploy this version.",
-    ];
+    if (!sourceSegments) {
+      lines.push(`Pulled source version ${sourceVersion} has an unsupported format.`);
+      return lines.join("\n");
+    }
 
-    // Show changelog entries between current and latest if available
-    if (runtime.changelogPath && fs.existsSync(runtime.changelogPath) && currentSegments) {
-      const entries = parseDeploymentChangelog(fs.readFileSync(runtime.changelogPath, "utf8"))
-        .filter((entry) => {
-          const entrySegments = tryParseVersionSegments(entry.version);
-          return entrySegments && compareVersionSegments(entrySegments, currentSegments) > 0;
-        });
+    if (compareVersionSegments(sourceSegments, latestSegments) >= 0) {
+      lines.push("Source checkout is up to date with the latest remote tag.");
+    } else {
+      lines.push(`Source checkout is behind the latest remote tag: ${sourceVersion} -> ${latestTagVersion}.`);
+    }
 
-      if (entries.length > 0) {
+    if (!currentSegments || compareVersionSegments(sourceSegments, currentSegments) > 0) {
+      const changelogEntries = this.getChangelogEntriesBetween(
+        source.changelogPath,
+        currentSegments,
+        sourceSegments,
+      );
+      lines.push(
+        `Deployment available: ${currentVersion} -> ${sourceVersion}.`,
+        "Run `/update confirm:true` to deploy the already pulled version.",
+      );
+      if (changelogEntries.length > 0) {
         lines.push(
-          `Pending changelog entries: ${entries.length}.`,
-          ...entries.flatMap((entry) => [
-            `## ${entry.version}`,
-            ...entry.lines.filter((line, index, all) => {
-              const previousLine = index > 0 ? all[index - 1] : undefined;
-              return line.trim().length > 0 || (previousLine?.trim().length ?? 0) > 0;
-            }),
-          ]),
+          `Pending deployment entries since ${currentVersion}: ${changelogEntries.length}.`,
+          ...changelogEntries.flatMap((entry) => renderDeploymentChangelogEntry(entry)),
         );
       }
+      return lines.join("\n");
     }
 
+    if (currentSegments && compareVersionSegments(sourceSegments, currentSegments) === 0) {
+      lines.push("Deployed service is already at the pulled source version. No deploy needed.");
+      return lines.join("\n");
+    }
+
+    lines.push("Pulled source version is older than the deployed service. Deployment was skipped.");
     return lines.join("\n");
+  }
+
+  hasPreparedUpdate() {
+    const runtime = this.load();
+    const source = this.loadSourceVersionInfo(runtime);
+    if (!source.version) {
+      return false;
+    }
+
+    const sourceSegments = tryParseVersionSegments(source.version);
+    const runtimeSegments = tryParseVersionSegments(runtime.version);
+    if (!sourceSegments) {
+      return false;
+    }
+    if (!runtimeSegments) {
+      return true;
+    }
+    return compareVersionSegments(sourceSegments, runtimeSegments) > 0;
   }
 }

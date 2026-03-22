@@ -1050,7 +1050,7 @@ if (RUN_CHILD_SUITE) {
     expect(invoked).toEqual(["update_preview"]);
     const replyText = interaction.replies.map((reply) => reply.content).join("\n");
     expect(replyText).toContain("## 2026.03.21.38");
-    expect(replyText).toContain("This previews the latest tagged version available on the remote.");
+    expect(replyText).toContain("This syncs the source checkout, shows the latest remote tag, and tells you whether deployment is still pending.");
   });
 
   test("still runs the update tool when confirm is passed", async () => {

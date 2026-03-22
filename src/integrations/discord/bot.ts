@@ -947,7 +947,7 @@ async function handleSlashCommand(params: {
         [
           preview,
           "",
-          "This previews the latest tagged version available on the remote. Run `/update confirm:true` to pull and deploy it.",
+          "This syncs the source checkout, shows the latest remote tag, and tells you whether deployment is still pending. Run `/update confirm:true` to deploy if needed.",
         ].join("\n"),
       );
       return;
