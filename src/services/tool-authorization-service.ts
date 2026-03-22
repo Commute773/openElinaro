@@ -97,6 +97,7 @@ export const TOOL_AUTH_DECLARATIONS: Record<string, ToolAuthorizationDeclaration
   secret_import_file: { access: "root", behavior: "uniform", note: "Imports a flat JSON secret payload from a local file into the local secret store." },
   secret_generate_password: { access: "root", behavior: "uniform", note: "Generates a strong password server-side and stores it in the local secret store without returning the raw password." },
   secret_delete: { access: "root", behavior: "uniform", note: "Deletes one stored secret from the local secret store." },
+  config_edit: { access: "root", behavior: "uniform", note: "Reads and edits ~/.openelinaro/config.yaml, validates the result against the runtime schema, and may restart the managed service." },
   feature_manage: { access: "root", behavior: "uniform", note: "Reads and writes optional feature config blocks and may restart the managed service." },
   memory_reindex: { access: "anyone", behavior: "role-sensitive", note: "Reindexing only sees memory visible to the active profile." },
   reflect: { access: "anyone", behavior: "role-sensitive", note: "Reflection entries are written under the active profile memory namespace." },

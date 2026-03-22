@@ -1204,6 +1204,121 @@ describe("RoutineToolRegistry tool catalog", () => {
     expect(result).toContain("Shared Python runtime setup completed.");
   });
 
+  test("config_edit validates a change before restarting the managed service", async () => {
+    const calls: Array<{ command: string; sudo?: boolean }> = [];
+    const shellStub = {
+      exec: async (params: { command: string; timeoutMs?: number; sudo?: boolean }) => {
+        calls.push({ command: params.command, sudo: params.sudo });
+        return {
+          command: params.command,
+          cwd: process.cwd(),
+          effectiveUser: "elinaro",
+          timeoutMs: params.timeoutMs ?? 0,
+          sudo: params.sudo === true,
+          exitCode: 0,
+          stdout: "scheduled\n",
+          stderr: "",
+        };
+      },
+      launchBackground: () => {
+        throw new Error("not used");
+      },
+      listBackgroundJobs: () => [],
+      readBackgroundOutput: () => {
+        throw new Error("not used");
+      },
+      consumeConversationNotifications: () => [],
+    };
+    const previousServiceRoot = process.env.OPENELINARO_SERVICE_ROOT_DIR;
+    try {
+      process.env.OPENELINARO_SERVICE_ROOT_DIR = path.join(runtimeRoot, "service-release");
+      fs.mkdirSync(process.env.OPENELINARO_SERVICE_ROOT_DIR, { recursive: true });
+      const harness = createHarnessWithOptions({
+        shell: shellStub,
+        runtimePlatform: resolveRuntimePlatform("linux"),
+      });
+
+      const result = await harness.registry.invoke("config_edit", {
+        action: "set",
+        path: "email.enabled",
+        value: "false",
+        restart: true,
+      });
+
+      expect(result).toContain("Saved email.enabled.");
+      expect(result).toContain("Validation: passed.");
+      expect(result).toContain("Service restart requested.");
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.command).toContain("systemctl restart openelinaro.service");
+      expect(calls[0]?.sudo).toBe(true);
+
+      const readback = await harness.registry.invoke("config_edit", {
+        action: "get",
+        path: "email.enabled",
+      });
+      expect(String(readback).trim()).toBe("false");
+    } finally {
+      if (previousServiceRoot === undefined) {
+        delete process.env.OPENELINARO_SERVICE_ROOT_DIR;
+      } else {
+        process.env.OPENELINARO_SERVICE_ROOT_DIR = previousServiceRoot;
+      }
+    }
+  });
+
+  test("config_edit does not restart when validation fails", async () => {
+    const calls: Array<{ command: string; sudo?: boolean }> = [];
+    const shellStub = {
+      exec: async (params: { command: string; timeoutMs?: number; sudo?: boolean }) => {
+        calls.push({ command: params.command, sudo: params.sudo });
+        return {
+          command: params.command,
+          cwd: process.cwd(),
+          effectiveUser: "elinaro",
+          timeoutMs: params.timeoutMs ?? 0,
+          sudo: params.sudo === true,
+          exitCode: 0,
+          stdout: "scheduled\n",
+          stderr: "",
+        };
+      },
+      launchBackground: () => {
+        throw new Error("not used");
+      },
+      listBackgroundJobs: () => [],
+      readBackgroundOutput: () => {
+        throw new Error("not used");
+      },
+      consumeConversationNotifications: () => [],
+    };
+    const previousServiceRoot = process.env.OPENELINARO_SERVICE_ROOT_DIR;
+    try {
+      process.env.OPENELINARO_SERVICE_ROOT_DIR = path.join(runtimeRoot, "service-release");
+      fs.mkdirSync(process.env.OPENELINARO_SERVICE_ROOT_DIR, { recursive: true });
+      const harness = createHarnessWithOptions({
+        shell: shellStub,
+        runtimePlatform: resolveRuntimePlatform("linux"),
+      });
+
+      const result = await harness.registry.invoke("config_edit", {
+        action: "set",
+        path: "email.imapPort",
+        value: "0",
+        restart: true,
+      });
+
+      expect(result).toContain("\"tool\": \"config_edit\"");
+      expect(result).toContain("email.imapPort");
+      expect(calls).toHaveLength(0);
+    } finally {
+      if (previousServiceRoot === undefined) {
+        delete process.env.OPENELINARO_SERVICE_ROOT_DIR;
+      } else {
+        process.env.OPENELINARO_SERVICE_ROOT_DIR = previousServiceRoot;
+      }
+    }
+  });
+
   test("builds native git commands through the shell backend", async () => {
     const calls: Array<{ command: string; cwd?: string; timeoutMs?: number }> = [];
     const shellStub = {

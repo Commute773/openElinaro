@@ -273,6 +273,9 @@ export class FeatureConfigService {
 }
 
 export function parseFeatureValue(raw: string) {
+  if (raw === "") {
+    return "";
+  }
   try {
     return parse(raw);
   } catch {

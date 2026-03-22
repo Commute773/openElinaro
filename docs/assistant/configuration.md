@@ -88,6 +88,14 @@ After the bot is online, the agent can manage optional features through the `fea
 - prepare the shared Python venv from the agent
 - request a managed-service restart so the new tool surface activates
 
+For direct runtime-config edits, use `config_edit` instead of shell edits:
+
+- `action=get` reads the whole file or one config path
+- `action=set` and `action=unset` change a specific path such as `email.enabled`
+- `action=replace` validates a whole replacement config before saving it
+- `action=validate` checks either the current file or a proposed YAML payload
+- restarts are only requested after schema validation succeeds
+
 Provider auth still lives in Discord DM flows and is also stored in `~/.openelinaro/secret-store.json`.
 
 ## Secrets

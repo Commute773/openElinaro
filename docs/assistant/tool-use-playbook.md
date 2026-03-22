@@ -12,6 +12,7 @@ Default rule:
 - Ask for the capability you want, not the tool name you hope exists.
 - `tool_search` matches against tool names, descriptions, tags, domains, and short example intents.
 - Let `tool_search` activate a few likely tools, then use those tools directly.
+- For runtime settings under `~/.openelinaro/config.yaml`, prefer `config_edit` or `feature_manage` over shell-editing the file by hand.
 - Discord `/update` now fast-forwards the source checkout and replies with the pending deployment changelog entries newer than the running version. `confirm:true` is the actual deploy step. The root-only `update_preview` tool is the non-deploying source-sync-plus-summary step, while `update` is the managed-service deploy step.
 - Managed-service installs now export their configured service identity into the runtime environment so detached `/update confirm:true` helpers can reinstall the service with the same user, group, and unit metadata.
 - Detached `/update confirm:true` helpers also inherit the live release root from the running service so rollback and release-state updates stay aligned even if `current-release.txt` was stale.

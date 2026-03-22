@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { stringify as stringifyYaml } from "yaml";
 import { z } from "zod";
 import { hasProviderAuth } from "../auth/store";
 import type { AppProgressEvent, AppProgressUpdate } from "../domain/assistant";
@@ -89,7 +90,18 @@ import {
   composeSystemPrompt,
   SystemPromptService,
 } from "../services/system-prompt-service";
-import { getRuntimeConfig } from "../config/runtime-config";
+import {
+  formatRuntimeConfigValidationError,
+  getRuntimeConfig,
+  getRuntimeConfigPath,
+  getRuntimeConfigValue,
+  hasRuntimeConfigPath,
+  saveRuntimeConfig,
+  setRuntimeConfigValue,
+  unsetRuntimeConfigValue,
+  validateRuntimeConfigFile,
+  validateRuntimeConfigText,
+} from "../config/runtime-config";
 import type { ThinkingLevel } from "@mariozechner/pi-ai";
 import { getAuthStatus } from "../auth/store";
 import type { WorkflowRun } from "../domain/workflow-run";
@@ -638,6 +650,46 @@ const generateSecretPasswordSchema = z.object({
   includeDigits: z.boolean().optional(),
   includeSymbols: z.boolean().optional(),
   symbols: z.string().max(64).optional(),
+});
+
+const configEditSchema = z.object({
+  action: z.enum(["get", "set", "unset", "validate", "replace"]),
+  path: z.string().optional(),
+  value: z.string().optional(),
+  yaml: z.string().optional(),
+  restart: z.boolean().optional(),
+}).superRefine((value, ctx) => {
+  if ((value.action === "set" || value.action === "unset") && !value.path?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "path is required for set and unset actions.",
+      path: ["path"],
+    });
+  }
+
+  if (value.action === "set" && value.value === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "value is required for the set action.",
+      path: ["value"],
+    });
+  }
+
+  if (value.action === "replace" && value.yaml === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "yaml is required for the replace action.",
+      path: ["yaml"],
+    });
+  }
+
+  if (value.restart && !["set", "unset", "replace"].includes(value.action)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "restart is only supported for set, unset, and replace actions.",
+      path: ["restart"],
+    });
+  }
 });
 
 const readFileSchema = pathSchema.extend({
@@ -1228,6 +1280,7 @@ export const ROUTINE_TOOL_NAMES = [
   "secret_import_file",
   "secret_generate_password",
   "secret_delete",
+  "config_edit",
   "feature_manage",
   "memory_reindex",
   "reflect",
@@ -1746,6 +1799,11 @@ const UNTRUSTED_TOOL_DESCRIPTOR_MAP: Record<string, Omit<UntrustedContentDescrip
     sourceName: "local encrypted secret metadata",
     notes: "Deletes one stored secret without returning secret values.",
   },
+  config_edit: {
+    sourceType: "other",
+    sourceName: "local runtime config",
+    notes: "Reads and writes ~/.openelinaro/config.yaml, validates the result against the runtime schema, and may request a managed-service restart.",
+  },
   feature_manage: {
     sourceType: "other",
     sourceName: "local feature config",
@@ -1855,6 +1913,7 @@ const TOOL_SCOPE_DEFAULTS: Record<string, AgentToolScope[]> = {
   secret_import_file: ["chat", "direct"],
   secret_generate_password: ["chat", "direct"],
   secret_delete: ["chat", "direct"],
+  config_edit: ["chat", "direct"],
   feature_manage: ["chat", "direct"],
   apply_patch: ["chat", "coding-planner", "coding-worker", "direct"],
 };
@@ -2733,6 +2792,21 @@ function stringifyToolResult(result: unknown) {
   } catch {
     return String(result);
   }
+}
+
+function formatConfigValue(value: unknown) {
+  return stringifyYaml(value).trimEnd();
+}
+
+function assertKnownRuntimeConfigPath(pathExpression: string) {
+  const normalized = pathExpression.trim();
+  if (!normalized) {
+    throw new Error("Config path cannot be empty.");
+  }
+  if (!hasRuntimeConfigPath(normalized)) {
+    throw new Error(`Unknown config path: ${normalized}`);
+  }
+  return normalized;
 }
 
 function truncateToolOutput(text: string, limit = TOOL_OUTPUT_CHAR_LIMIT) {
@@ -5083,6 +5157,88 @@ export class RoutineToolRegistry {
           name: "secret_delete",
           description: "Delete one stored secret from the encrypted local secret store.",
           schema: namedSecretSchema,
+        },
+      ),
+      tool(
+        async (input) =>
+          traceSpan(
+            "tool.config_edit",
+            async () => {
+              if (input.action === "get") {
+                if (!input.path?.trim()) {
+                  return fs.readFileSync(getRuntimeConfigPath(), "utf8").trimEnd();
+                }
+                const pathExpression = assertKnownRuntimeConfigPath(input.path);
+                return formatConfigValue(getRuntimeConfigValue(pathExpression));
+              }
+
+              if (input.action === "validate") {
+                try {
+                  if (input.yaml !== undefined) {
+                    validateRuntimeConfigText(input.yaml);
+                    return "Provided config YAML is valid.";
+                  }
+                  validateRuntimeConfigFile();
+                  return "Current config.yaml is valid.";
+                } catch (error) {
+                  throw new Error(formatRuntimeConfigValidationError(error));
+                }
+              }
+
+              const lines: string[] = [];
+
+              if (input.action === "replace") {
+                try {
+                  const validated = validateRuntimeConfigText(input.yaml ?? "");
+                  saveRuntimeConfig(validated);
+                } catch (error) {
+                  throw new Error(formatRuntimeConfigValidationError(error));
+                }
+                lines.push(`Saved ${getRuntimeConfigPath()}.`);
+              } else if (input.action === "set") {
+                const pathExpression = assertKnownRuntimeConfigPath(input.path ?? "");
+                try {
+                  setRuntimeConfigValue(pathExpression, parseFeatureValue(input.value ?? ""));
+                } catch (error) {
+                  throw new Error(formatRuntimeConfigValidationError(error));
+                }
+                lines.push(`Saved ${pathExpression}.`);
+                lines.push(`Value:\n${formatConfigValue(getRuntimeConfigValue(pathExpression))}`);
+              } else if (input.action === "unset") {
+                const pathExpression = assertKnownRuntimeConfigPath(input.path ?? "");
+                try {
+                  unsetRuntimeConfigValue(pathExpression);
+                } catch (error) {
+                  throw new Error(formatRuntimeConfigValidationError(error));
+                }
+                lines.push(`Unset ${pathExpression}.`);
+                lines.push(`Effective value:\n${formatConfigValue(getRuntimeConfigValue(pathExpression))}`);
+              }
+
+              lines.push("Validation: passed.");
+
+              if (input.restart) {
+                if (!isRunningInsideManagedService()) {
+                  lines.push("Restart skipped: this runtime is not running inside the managed service.");
+                } else {
+                  await this.shell.exec({
+                    command: buildServiceRestartCommand(this.runtimePlatform),
+                    timeoutMs: 15_000,
+                    sudo: requiresPrivilegedServiceControl(this.runtimePlatform, "restart"),
+                  });
+                  lines.push("Service restart requested. Reconnect after the bot comes back.");
+                }
+              }
+
+              return lines.join("\n");
+            },
+            { attributes: input },
+          ),
+        {
+          name: "config_edit",
+          description:
+            "Read, validate, or edit ~/.openelinaro/config.yaml. Supports whole-file reads, path-based set/unset operations, whole-file replacement, schema validation, and optional managed-service restart only after validation succeeds.",
+          schema: configEditSchema,
         },
       ),
       tool(

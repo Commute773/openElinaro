@@ -95,7 +95,7 @@ const DEFAULT_KOKORO = { baseUrl: "http://127.0.0.1:8801/v1", model: "kokoro", v
 const DEFAULT_LOCAL_VOICE = { enabled: false, localLlm: DEFAULT_LOCAL_LLM, kokoro: DEFAULT_KOKORO };
 const DEFAULT_MEDIA = { enabled: false, roots: [] as string[] };
 
-const RuntimeConfigSchema = z.object({
+export const RuntimeConfigSchema = z.object({
   core: z.object({
     profile: z.object({
       activeProfileId: z.string().min(1).default("root"),
@@ -237,6 +237,35 @@ function buildDefaultConfig() {
   return RuntimeConfigSchema.parse({});
 }
 
+export function validateRuntimeConfig(input: unknown) {
+  return RuntimeConfigSchema.parse(input);
+}
+
+export function validateRuntimeConfigText(text: string) {
+  const parsed = text.trim() ? parse(text) : {};
+  return validateRuntimeConfig(parsed);
+}
+
+export function validateRuntimeConfigFile(configPath = ensureRuntimeConfigFile()) {
+  const text = fs.readFileSync(configPath, "utf8");
+  return validateRuntimeConfigText(text);
+}
+
+export function formatRuntimeConfigValidationError(error: unknown) {
+  if (error instanceof z.ZodError) {
+    return error.issues
+      .map((issue) => {
+        const pathLabel = issue.path.length > 0 ? issue.path.join(".") : "(root)";
+        return `${pathLabel}: ${issue.message}`;
+      })
+      .join("\n");
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
 export function ensureRuntimeConfigFile() {
   const configPath = getRuntimeConfigPath();
   if (fs.existsSync(configPath)) {
@@ -249,9 +278,7 @@ export function ensureRuntimeConfigFile() {
 }
 
 function loadFromDisk(configPath = ensureRuntimeConfigFile()) {
-  const text = fs.readFileSync(configPath, "utf8");
-  const parsed = text.trim() ? parse(text) : {};
-  const validated = RuntimeConfigSchema.parse(parsed);
+  const validated = validateRuntimeConfigFile(configPath);
   cachedConfigPath = configPath;
   return validated;
 }
@@ -271,7 +298,7 @@ export function reloadRuntimeConfig() {
 
 export function saveRuntimeConfig(config: RuntimeConfig) {
   const configPath = ensureRuntimeConfigFile();
-  const validated = RuntimeConfigSchema.parse(config);
+  const validated = validateRuntimeConfig(config);
   fs.writeFileSync(configPath, stringify(validated), { mode: 0o600 });
   cachedConfig = validated;
   cachedConfigPath = configPath;
@@ -283,6 +310,22 @@ function splitPathSegments(pathExpression: string) {
     .split(".")
     .map((segment) => segment.trim())
     .filter(Boolean);
+}
+
+export function hasRuntimeConfigPath(pathExpression: string) {
+  const segments = splitPathSegments(pathExpression);
+  if (segments.length === 0) {
+    return false;
+  }
+
+  let current: unknown = buildDefaultConfig();
+  for (const segment of segments) {
+    if (!current || typeof current !== "object" || Array.isArray(current) || !(segment in current)) {
+      return false;
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return true;
 }
 
 export function getRuntimeConfigValue(pathExpression: string): unknown {
@@ -313,7 +356,7 @@ export function setRuntimeConfigValue(pathExpression: string, value: unknown) {
     cursor = cursor[segment] as Record<string, unknown>;
   }
   cursor[segments.at(-1)!] = value;
-  return saveRuntimeConfig(RuntimeConfigSchema.parse(next));
+  return saveRuntimeConfig(validateRuntimeConfig(next));
 }
 
 export function unsetRuntimeConfigValue(pathExpression: string) {
@@ -332,5 +375,5 @@ export function unsetRuntimeConfigValue(pathExpression: string) {
     cursor = existing as Record<string, unknown>;
   }
   delete cursor[segments.at(-1)!];
-  return saveRuntimeConfig(RuntimeConfigSchema.parse(next));
+  return saveRuntimeConfig(validateRuntimeConfig(next));
 }
