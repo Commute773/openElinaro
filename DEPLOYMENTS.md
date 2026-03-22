@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.12
+- Released at: 2026-03-22T00:56:23Z
+- Release id: 20260322T005623Z-cfb12f6
+- Previous version: 2026.03.22.11
+- Trigger: managed service update
+
+Pass the live managed-service root through detached update helpers and prefer it over stale release-pointer files when determining the current deployment.
+This fixes bot-triggered /update failures after overlapping helper jobs leave current-release.txt behind the actual running release.
+
 ## 2026.03.22.11
 - Released at: 2026-03-22T00:44:45Z
 - Release id: 20260322T004445Z-868b95f

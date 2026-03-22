@@ -163,6 +163,13 @@ openelinaro_migrate_release_pointer_files() {
 }
 
 openelinaro_current_release_dir() {
+  local service_root="${OPENELINARO_SERVICE_ROOT_DIR:-}"
+  service_root="$(openelinaro_normalize_release_dir "${service_root}")"
+  if [[ -n "${service_root}" ]]; then
+    printf '%s\n' "${service_root}"
+    return 0
+  fi
+
   local current_target
   current_target="$(openelinaro_read_release_pointer_file "${OPENELINARO_CURRENT_RELEASE_FILE}")"
   if [[ -n "${current_target}" ]]; then

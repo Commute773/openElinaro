@@ -90,6 +90,7 @@ case "$(openelinaro_service_manager)" in
       /usr/bin/env
       "HOME=${HOME:-}"
       "OPENELINARO_ROOT_DIR=${ROOT_DIR}"
+      "OPENELINARO_SERVICE_ROOT_DIR=${OPENELINARO_SERVICE_ROOT_DIR:-}"
       "OPENELINARO_USER_DATA_DIR=${OPENELINARO_USER_DATA_ROOT}"
       "OPENELINARO_SERVICE_USER=${OPENELINARO_SERVICE_USER:-}"
       "OPENELINARO_SERVICE_GROUP=${OPENELINARO_SERVICE_GROUP:-}"
@@ -128,6 +129,7 @@ case "$(openelinaro_service_manager)" in
       --property="StandardError=append:${STDERR_LOG}" \
       --setenv="HOME=${HOME:-}" \
       --setenv="OPENELINARO_ROOT_DIR=${ROOT_DIR}" \
+      --setenv="OPENELINARO_SERVICE_ROOT_DIR=${OPENELINARO_SERVICE_ROOT_DIR:-}" \
       --setenv="OPENELINARO_USER_DATA_DIR=${OPENELINARO_USER_DATA_ROOT}" \
       --setenv="OPENELINARO_SERVICE_USER=${OPENELINARO_SERVICE_USER:-}" \
       --setenv="OPENELINARO_SERVICE_GROUP=${OPENELINARO_SERVICE_GROUP:-}" \

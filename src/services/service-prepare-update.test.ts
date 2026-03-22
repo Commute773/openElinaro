@@ -155,6 +155,41 @@ describe("service-prepare-update.sh", () => {
     expect(fs.existsSync(path.join(deploymentsDir, "previous"))).toBe(false);
   });
 
+  test("prefers the live managed-service root over a stale current-release pointer", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-service-live-root-"));
+    tempRoots.push(tempRoot);
+    fs.mkdirSync(path.join(tempRoot, "scripts"), { recursive: true });
+    fs.copyFileSync(serviceCommonPath, path.join(tempRoot, "scripts/service-common.sh"));
+
+    const deploymentsDir = path.join(tempRoot, ".openelinaro", "deployments");
+    const releasesDir = path.join(deploymentsDir, "releases");
+    const staleReleaseDir = path.join(releasesDir, "20260322T004221Z-stale");
+    const liveReleaseDir = path.join(releasesDir, "20260322T004241Z-live");
+    fs.mkdirSync(staleReleaseDir, { recursive: true });
+    fs.mkdirSync(liveReleaseDir, { recursive: true });
+    const normalizedStaleReleaseDir = fs.realpathSync(staleReleaseDir);
+    const normalizedLiveReleaseDir = fs.realpathSync(liveReleaseDir);
+    fs.mkdirSync(deploymentsDir, { recursive: true });
+    fs.writeFileSync(path.join(deploymentsDir, "current-release.txt"), `${normalizedStaleReleaseDir}\n`, "utf8");
+
+    const output = execFileSync(
+      "bash",
+      [
+        "-lc",
+        [
+          `export OPENELINARO_REPO_ROOT='${tempRoot}'`,
+          `export OPENELINARO_USER_DATA_DIR='${path.join(tempRoot, ".openelinaro")}'`,
+          `export OPENELINARO_SERVICE_ROOT_DIR='${normalizedLiveReleaseDir}'`,
+          `source '${path.join(tempRoot, "scripts/service-common.sh")}'`,
+          "printf 'current=%s\\n' \"$(openelinaro_current_release_dir)\"",
+        ].join("; "),
+      ],
+      { encoding: "utf8" },
+    );
+
+    expect(output).toContain(`current=${normalizedLiveReleaseDir}`);
+  });
+
   test("release snapshots include the python requirements bundle needed for shared-runtime features", () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-release-snapshot-"));
     tempRoots.push(tempRoot);
