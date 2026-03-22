@@ -307,7 +307,9 @@ describe("deployment version service", () => {
 
     const result = new DeploymentVersionService().formatPreparedUpdate();
 
-    expect(result).toContain("Prepared update available: 2026.03.16 -> 2026.03.16.2.");
+    expect(result).toContain("Deployed version: 2026.03.16.");
+    expect(result).toContain("Pulled source version: 2026.03.16.2.");
+    expect(result).toContain("Deployment available: 2026.03.16 -> 2026.03.16.2.");
     expect(result).toContain(`Source root: ${sourceRoot}`);
     expect(result).toContain("Pending deployment entries since 2026.03.16: 2.");
     expect(result).toContain("## 2026.03.16.2");
@@ -346,8 +348,140 @@ describe("deployment version service", () => {
 
     const result = new DeploymentVersionService().formatPreparedUpdate();
 
-    expect(result).toContain("Current version: 2026.03.16.2.");
-    expect(result).toContain("Prepared source version: 2026.03.16.2.");
-    expect(result).toContain("No prepared update is newer than the running service.");
+    expect(result).toContain("Deployed version: 2026.03.16.2.");
+    expect(result).toContain("Pulled source version: 2026.03.16.2.");
+    expect(result).toContain("The pulled source version is not newer than the deployed service.");
+    expect(result).toContain("Nothing to deploy.");
+  });
+
+  test("formats update preview with separate remote, source, and deployed versions", () => {
+    const sourceRoot = path.join(tempRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
+    fs.writeFileSync(
+      path.join(tempRoot, "release.json"),
+      `${JSON.stringify({
+        id: "20260316T100000Z-live",
+        createdAt: "2026-03-16T10:00:00Z",
+        sourceRoot,
+        version: "2026.03.16",
+        releasedAt: "2026-03-16T10:00:00Z",
+        previousVersion: "2026.03.15.9",
+        changelogPath: "DEPLOYMENTS.md",
+      }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(sourceRoot, "VERSION.json"),
+      `${JSON.stringify({
+        version: "2026.03.16.2",
+        releasedAt: "2026-03-16T12:00:00Z",
+        previousVersion: "2026.03.16.1",
+        changelogPath: "DEPLOYMENTS.md",
+      }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(sourceRoot, "DEPLOYMENTS.md"),
+      [
+        "# Deployments",
+        "",
+        "## 2026.03.16.2",
+        "- Released at: 2026-03-16T12:00:00Z",
+        "- Previous version: 2026.03.16.1",
+        "- Add deploy preview changelog details",
+        "",
+        "## 2026.03.16.1",
+        "- Released at: 2026-03-16T11:00:00Z",
+        "- Previous version: 2026.03.16",
+        "- Tighten deploy metadata handling",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = new DeploymentVersionService().formatAvailableUpdate("2026.03.16.2");
+
+    expect(result).toContain("Deployed version: 2026.03.16.");
+    expect(result).toContain("Pulled source version: 2026.03.16.2.");
+    expect(result).toContain("Latest remote tag version: 2026.03.16.2.");
+    expect(result).toContain("Source checkout is up to date with the latest remote tag.");
+    expect(result).toContain("Deployment available: 2026.03.16 -> 2026.03.16.2.");
+    expect(result).toContain("Run `/update confirm:true` to deploy the already pulled version.");
+    expect(result).toContain("## 2026.03.16.2");
+    expect(result).toContain("## 2026.03.16.1");
+  });
+
+  test("reports when the deployed service already matches the pulled source version", () => {
+    const sourceRoot = path.join(tempRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
+    fs.writeFileSync(
+      path.join(tempRoot, "release.json"),
+      `${JSON.stringify({
+        id: "20260316T100000Z-live",
+        createdAt: "2026-03-16T10:00:00Z",
+        sourceRoot,
+        version: "2026.03.16.2",
+        releasedAt: "2026-03-16T10:00:00Z",
+        previousVersion: "2026.03.16.1",
+        changelogPath: "DEPLOYMENTS.md",
+      }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(sourceRoot, "VERSION.json"),
+      `${JSON.stringify({
+        version: "2026.03.16.2",
+        releasedAt: "2026-03-16T12:00:00Z",
+        previousVersion: "2026.03.16.1",
+        changelogPath: "DEPLOYMENTS.md",
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const result = new DeploymentVersionService().formatAvailableUpdate("2026.03.16.2");
+
+    expect(result).toContain("Deployed version: 2026.03.16.2.");
+    expect(result).toContain("Pulled source version: 2026.03.16.2.");
+    expect(result).toContain("Latest remote tag version: 2026.03.16.2.");
+    expect(result).toContain("Source checkout is up to date with the latest remote tag.");
+    expect(result).toContain("Deployed service is already at the pulled source version. No deploy needed.");
+    expect(new DeploymentVersionService().hasPreparedUpdate()).toBe(false);
+  });
+
+  test("treats an unversioned deployed service as behind a valid pulled source version", () => {
+    const sourceRoot = path.join(tempRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
+    fs.writeFileSync(
+      path.join(tempRoot, "release.json"),
+      `${JSON.stringify({
+        id: "20260316T100000Z-live",
+        createdAt: "2026-03-16T10:00:00Z",
+        sourceRoot,
+        version: "unversioned",
+        releasedAt: "2026-03-16T10:00:00Z",
+        changelogPath: "DEPLOYMENTS.md",
+      }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(sourceRoot, "VERSION.json"),
+      `${JSON.stringify({
+        version: "2026.03.16.2",
+        releasedAt: "2026-03-16T12:00:00Z",
+        previousVersion: "2026.03.16.1",
+        changelogPath: "DEPLOYMENTS.md",
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const result = new DeploymentVersionService().formatAvailableUpdate("2026.03.16.2");
+
+    expect(result).toContain("Deployed version: unversioned.");
+    expect(result).toContain("Pulled source version: 2026.03.16.2.");
+    expect(result).toContain("Deployment available: unversioned -> 2026.03.16.2.");
+    expect(new DeploymentVersionService().hasPreparedUpdate()).toBe(true);
   });
 });

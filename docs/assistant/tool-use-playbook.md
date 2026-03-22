@@ -13,7 +13,7 @@ Default rule:
 - `load_tool_library` lists the available libraries and activates one exact library id at a time.
 - Load the smallest relevant library, then use those tools directly.
 - For runtime settings under `~/.openelinaro/config.yaml`, prefer `config_edit` or `feature_manage` over shell-editing the file by hand.
-- Discord `/update` now fast-forwards the source checkout and replies with the pending deployment changelog entries newer than the running version. `confirm:true` is the actual deploy step. The root-only `update_preview` tool is the non-deploying source-sync-plus-summary step, while `update` is the managed-service deploy step.
+- Discord `/update` fast-forwards the source checkout, reports the deployed version, pulled source version, and latest remote tag separately, and includes pending deployment notes when the service is behind. `confirm:true` is the actual deploy step, and it now short-circuits with a clear "nothing to deploy" message when the pulled source already matches the deployed service.
 - Managed-service installs now export their configured service identity into the runtime environment so detached `/update confirm:true` helpers can reinstall the service with the same user, group, and unit metadata.
 - Detached `/update confirm:true` helpers also inherit the live release root from the running service so rollback and release-state updates stay aligned even if `current-release.txt` was stale.
 
@@ -172,7 +172,7 @@ Example:
 - Use `service_changelog_since_version` when you need the deployment entries whose version is numerically greater than a requested version instead of reading all of `DEPLOYMENTS.md`.
 - Deployment versions are `YYYY.MM.DD` or `YYYY.MM.DD.N`; the `.N` sequence resets each UTC day, so compare the full version rather than only the numeric suffix.
 - Deploys are explicit. Do not assume code changes should redeploy the service automatically, even when the change affects runtime or managed-service behavior.
-- Use `update_preview` when you want to fast-forward the source checkout without deploying, then inspect the prepared source-root update and the changelog entries newer than the running service version.
+- Use `update_preview` when you want to fast-forward the source checkout without deploying, then inspect whether the source is current with the latest remote tag and whether the deployed service is still behind that pulled source version.
 - `bun run service:prepare-update` now requires a non-empty change block so `DEPLOYMENTS.md` captures actual release notes instead of metadata only.
 - `bun run service:prepare-update` now also refuses detached `HEAD` so the prepared-update commit cannot be left orphaned outside a branch tip.
 - `bun run service:prepare-update` now also requires the current branch to track an upstream and pushes the prepared update commit immediately after writing it.
