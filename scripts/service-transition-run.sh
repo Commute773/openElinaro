@@ -71,9 +71,9 @@ completedAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
   notify_transition_status completed
   exit 0
+else
+  exit_code=$?
 fi
-
-exit_code=$?
 cat > "${STATUS_PATH}" <<EOF
 status=failed
 action=${ACTION}

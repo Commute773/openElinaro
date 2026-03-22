@@ -1,5 +1,15 @@
 # Deployments
 
+## 2026.03.22.7
+- Released at: 2026-03-22T00:23:51Z
+- Release id: 20260322T002351Z-c83915c
+- Previous version: 2026.03.22.6
+- Trigger: managed service update
+
+Fix detached update helpers to preserve service user/group overrides and related service-install env.
+Also fix detached helper status files to record the real nonzero exit code on update failures.
+This repairs /update confirm:true on krysalstis, where installs must keep using the root service identity.
+
 ## 2026.03.22.6
 - Released at: 2026-03-22T00:18:23Z
 - Release id: 20260322T001823Z-9100f70
