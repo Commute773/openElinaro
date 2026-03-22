@@ -1,5 +1,15 @@
 # Deployments
 
+## 2026.03.22.3
+- Released at: 2026-03-22T17:48:56Z
+- Release id: 20260322T174856Z-deede5f
+- Previous version: 2026.03.22.2
+- Trigger: ci/release workflow
+
+- update: 2026.03.22.2 [skip ci]
+- test: add unit tests for ShellService and FilesystemService
+- test: overhaul test infrastructure with separate unit/e2e/paid commands
+
 ## 2026.03.22.2
 - Released at: 2026-03-22T17:44:05Z
 - Release id: 20260322T174405Z-2875677
