@@ -86,7 +86,9 @@ After the bot is online, the agent can manage optional features through the `fea
 - apply config values
 - enable or disable a feature
 - prepare the shared Python venv from the agent
-- request a managed-service restart so the new tool surface activates
+- restart the managed service by default so the new tool surface activates immediately
+
+If that restart interrupts in-flight background coding agents, the runtime now requeues them on startup and injects a short continuation note telling the agent that the system restarted and it should continue its prior work.
 
 For direct runtime-config edits, use `config_edit` instead of shell edits:
 

@@ -24,6 +24,7 @@ import { ToolResolutionService } from "../services/tool-resolution-service";
 import { resolveRuntimePlatform, type RuntimePlatform } from "../services/runtime-platform";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
+import { getRuntimeConfig } from "../config/runtime-config";
 import {
   getRuntimeAgentDefaultVisibleToolNames,
   getRuntimeUserFacingToolNames,
@@ -939,7 +940,7 @@ describe("RoutineToolRegistry tool catalog", () => {
     }
   });
 
-  test("update_preview pulls source changes and update deploys the prepared version when running inside the managed service", async () => {
+  test("update_preview dry-runs source changes and update deploys the prepared version when running inside the managed service", async () => {
     const commands: string[] = [];
     const shellStub = {
       exec: async (params: { command: string; timeoutMs?: number }) => {
@@ -1027,6 +1028,7 @@ describe("RoutineToolRegistry tool catalog", () => {
 
       expect(commands[0]).toContain("'git' '-C'");
       expect(commands[0]).toContain("'pull' '--ff-only'");
+      expect(commands[0]).toContain("'--dry-run'");
       expect(commands[1]).toContain("OPENELINARO_AGENT_SERVICE_CONTROL='1'");
       expect(commands[1]).toContain(`OPENELINARO_ROOT_DIR='${runtimeRoot}'`);
       expect(commands[1]).toContain(`OPENELINARO_SERVICE_ROOT_DIR='${serviceRoot}'`);
@@ -1161,6 +1163,7 @@ describe("RoutineToolRegistry tool catalog", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toContain("'git' '-C'");
     expect(calls[0]?.command).toContain("'pull' '--ff-only'");
+    expect(calls[0]?.command).toContain("'--dry-run'");
     expect(calls[0]?.sudo).not.toBe(true);
   });
 
@@ -1202,6 +1205,86 @@ describe("RoutineToolRegistry tool catalog", () => {
     expect(calls[0]?.command).toContain("src/cli/setup-python.ts");
     expect(calls[0]?.timeoutMs).toBe(20 * 60_000);
     expect(result).toContain("Shared Python runtime setup completed.");
+  });
+
+  test("feature_manage reports feature readiness", async () => {
+    const harness = createHarnessWithOptions();
+
+    const result = await harness.registry.invoke("feature_manage", {
+      action: "status",
+      featureId: "webSearch",
+    });
+
+    expect(result).toContain("webSearch: active");
+    expect(result).toContain("missing: none");
+    expect(result).toContain("Brave Search API integration.");
+  });
+
+  test("feature_manage applies changes and requests a managed-service restart by default", async () => {
+    const calls: Array<{ command: string; timeoutMs?: number; sudo?: boolean }> = [];
+    const shellStub = {
+      exec: async (params: { command: string; timeoutMs?: number; sudo?: boolean }) => {
+        calls.push(params);
+        return {
+          command: params.command,
+          cwd: process.cwd(),
+          effectiveUser: "elinaro",
+          timeoutMs: params.timeoutMs ?? 0,
+          sudo: params.sudo === true,
+          exitCode: 0,
+          stdout: "scheduled\n",
+          stderr: "",
+        };
+      },
+      launchBackground: () => {
+        throw new Error("not used");
+      },
+      listBackgroundJobs: () => [],
+      readBackgroundOutput: () => {
+        throw new Error("not used");
+      },
+      consumeConversationNotifications: () => [],
+    };
+    const previousServiceRoot = process.env.OPENELINARO_SERVICE_ROOT_DIR;
+
+    try {
+      process.env.OPENELINARO_SERVICE_ROOT_DIR = path.join(runtimeRoot, "service-release");
+      fs.mkdirSync(process.env.OPENELINARO_SERVICE_ROOT_DIR, { recursive: true });
+      const harness = createHarnessWithOptions({
+        shell: shellStub,
+        runtimePlatform: resolveRuntimePlatform("linux"),
+      });
+
+      const result = await harness.registry.invoke("feature_manage", {
+        action: "apply",
+        featureId: "media",
+        enabled: true,
+        values: {
+          roots: JSON.stringify(["/tmp/media"]),
+        },
+      });
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.command).toContain("systemctl restart openelinaro.service");
+      expect(calls[0]?.timeoutMs).toBe(15_000);
+      expect(result).toContain("Saved media feature config.");
+      expect(result).toContain("Status: active");
+      expect(result).toContain("Service restart requested.");
+      expect(getRuntimeConfig().media.enabled).toBe(true);
+      expect(getRuntimeConfig().media.roots).toEqual(["/tmp/media"]);
+
+      const noticePath = path.join(runtimeRoot, ".openelinarotest", "service-restart-notice.json");
+      expect(fs.existsSync(noticePath)).toBe(true);
+      const notice = JSON.parse(fs.readFileSync(noticePath, "utf8")) as { source?: string; message?: string };
+      expect(notice.source).toBe("feature_manage");
+      expect(notice.message).toContain("System restarted. Continue what you were doing.");
+    } finally {
+      if (previousServiceRoot === undefined) {
+        delete process.env.OPENELINARO_SERVICE_ROOT_DIR;
+      } else {
+        process.env.OPENELINARO_SERVICE_ROOT_DIR = previousServiceRoot;
+      }
+    }
   });
 
   test("config_edit validates a change before restarting the managed service", async () => {

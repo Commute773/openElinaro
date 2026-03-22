@@ -202,6 +202,7 @@ Background coding-agent runs persist task-level reports in `~/.openelinaro/workf
 - Large outputs from designated high-volume tools are persisted under `~/.openelinaro/tool-results/` and injected back into planner/worker and chat transcripts as compact refs. Raw payloads are reopened on demand with `tool_result_read` instead of being replayed automatically on every turn.
 - `launch_coding_agent` now saves the run directly as `running`; there is no queued pickup delay before the planner starts.
 - In-flight `running` coding runs are reloaded as `interrupted` on startup, then resumed from the persisted workflow-session state instead of being downgraded to a terminal interruption.
+- When the managed service restarts intentionally for config/feature changes, startup injects a short human continuation note into each recoverable persisted coding session so the agent knows the system restarted and should keep going.
 - Transient harness/provider disconnects and 429 rate limits keep the run in `running` with `runningState=backoff`, `retryCount`, and `nextAttemptAt` instead of converting the current task into a normal execution failure.
 - Task failures and blockers are recorded on the run instead of immediately aborting the whole subagent.
 - Coding runs now track `taskIssueCount`, `taskErrorCount`, and `consecutiveTaskErrorCount`.

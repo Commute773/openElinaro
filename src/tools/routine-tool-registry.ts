@@ -3258,7 +3258,7 @@ export class RoutineToolRegistry {
         async () => {
           const timeoutMs = input.timeoutMs ?? 60_000;
           const result = await this.shell.exec({
-            command: buildGitPullCommand(false),
+            command: buildGitPullCommand(true),
             timeoutMs,
           });
           if (result.exitCode !== 0) {
@@ -3269,7 +3269,7 @@ export class RoutineToolRegistry {
           } catch (error) {
             const detail = error instanceof Error ? error.message : String(error);
             return [
-              "Pull completed, but could not load the prepared update summary.",
+              "Preview completed, but could not load the prepared update summary.",
               `Reason: ${detail}`,
               "",
               renderShellExecResult(result),
@@ -5640,7 +5640,7 @@ export class RoutineToolRegistry {
         {
           name: "update_preview",
           description:
-            "Fast-forward the source workspace to the latest prepared code without deploying, then summarize deployment entries newer than the current running version.",
+            "Preview whether the source workspace can fast-forward to the latest prepared code without deploying, then summarize deployment entries newer than the current running version.",
           schema: serviceActionSchema,
         },
       ),

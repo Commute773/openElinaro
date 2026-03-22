@@ -1,5 +1,15 @@
 # Deployments
 
+## 2026.03.22.22
+- Released at: 2026-03-22T15:17:12Z
+- Release id: 20260322T151712Z-e946662
+- Previous version: 2026.03.22.21
+- Trigger: managed service update
+
+## Cleanup
+- decouple bundled service asset resolution from OPENELINARO_ROOT_DIR so isolated test roots still load packaged profiles and projects
+- make update_preview a true dry-run preview and align user-facing Discord/tool copy with the non-mutating behavior
+
 ## 2026.03.22.21
 - Released at: 2026-03-22T15:15:33Z
 - Release id: 20260322T151533Z-2160610

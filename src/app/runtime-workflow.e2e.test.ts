@@ -31,6 +31,8 @@ let originalShellExecVerification: typeof shellServiceModule.ShellService.protot
 const DEFAULT_MAX_CONSECUTIVE_TASK_ERRORS = 3;
 const DEFAULT_RESUME_RETRY_DELAY_MS = 5_000;
 const DEFAULT_STUCK_AFTER_MS = 15 * 60_000;
+const DEFAULT_SERVICE_RESTART_CONTINUATION_MESSAGE =
+  "System restarted. Continue what you were doing. This system restart may be unrelated to your actions.";
 
 let scriptedHandler: ((request: ScriptedConnectorRequest) => AIMessage) | null = null;
 let transientHarnessOfflineOnce = false;
@@ -692,6 +694,61 @@ function buildPersistedWorkerResumeResponse(request: ScriptedConnectorRequest) {
               summary: "Resumed the persisted worker session and finished the note.",
               filesTouched: ["RESUMED_NOTE.md"],
               commandsRun: ["write_file RESUMED_NOTE.md"],
+              verificationCommands: [],
+              blockers: [],
+            },
+            type: "tool_call",
+          },
+        ],
+      });
+    }
+  }
+
+  return new AIMessage(`Unhandled scripted request for ${sessionId}.`);
+}
+
+function buildPersistedWorkerResumeWithRestartNoticeResponse(request: ScriptedConnectorRequest) {
+  const sessionId = request.sessionId ?? "";
+  const tool = latestTool(request);
+  const latestHuman = latestHumanText(request);
+
+  if (sessionId.endsWith(":resume-task")) {
+    if (!tool) {
+      throw new Error("worker session restarted from scratch instead of resuming persisted state");
+    }
+    if (!latestHuman.includes(DEFAULT_SERVICE_RESTART_CONTINUATION_MESSAGE)) {
+      throw new Error("restart continuation note was not injected into the resumed worker session");
+    }
+
+    if (tool.name === "tool_search") {
+      return new AIMessage({
+        content: "",
+        tool_calls: [
+          {
+            id: "resume-write-file-restart-note",
+            name: "write_file",
+            args: {
+              path: "RESUMED_NOTE_AFTER_SERVICE_RESTART.md",
+              content: "# Resumed Note\n\ncontinued after managed service restart\n",
+            },
+            type: "tool_call",
+          },
+        ],
+      });
+    }
+
+    if (tool.name === "write_file") {
+      return new AIMessage({
+        content: "",
+        tool_calls: [
+          {
+            id: "resume-complete-restart-note",
+            name: "complete_coding_task",
+            args: {
+              status: "completed",
+              summary: "Resumed the persisted worker session after a managed service restart.",
+              filesTouched: ["RESUMED_NOTE_AFTER_SERVICE_RESTART.md"],
+              commandsRun: ["write_file RESUMED_NOTE_AFTER_SERVICE_RESTART.md"],
               verificationCommands: [],
               blockers: [],
             },
@@ -1407,6 +1464,108 @@ describe("OpenElinaro runtime workflow e2e", () => {
       "continued after harness restart",
     );
     expect(workflowSessions.get(`${runId}:${taskId}`)).toBeUndefined();
+  });
+
+  test("resumes interrupted coding agents after a managed-service restart with a continuation note", async () => {
+    scriptedHandler = buildPersistedWorkerResumeWithRestartNoticeResponse;
+    const workflowSessionStoreModule = await importFresh<typeof import("../services/workflow-session-store")>("src/services/workflow-session-store.ts");
+    const serviceRestartNoticeModule = await importFresh<typeof import("../services/service-restart-notice-service")>("src/services/service-restart-notice-service.ts");
+
+    const runId = "run-resume-after-service-restart-e2e";
+    const taskId = "resume-task";
+    const userPrompt = [
+      "Overall goal: Resume an interrupted worker session after managed-service restart.",
+      `Workspace cwd: ${tempRoot}`,
+      `Assigned task id: ${taskId}`,
+      "Assigned task title: Resume after managed-service restart",
+      "Acceptance criteria:\n- Finish the note from the persisted worker session after restart.",
+      "Suggested verification commands: determine and run the smallest relevant checks yourself.",
+      "Inspect, implement, verify, then submit the structured result.",
+    ].join("\n\n");
+
+    fs.writeFileSync(
+      path.join(tempRoot, ".openelinarotest", "workflows.json"),
+      `${JSON.stringify({
+        runs: [
+          {
+            id: runId,
+            kind: "coding-agent",
+            goal: "Resume an interrupted worker session after managed-service restart.",
+            profileId: "root",
+            status: "running",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            executionStartedAt: new Date(Date.now() - 2_000).toISOString(),
+            currentSessionId: `${runId}:${taskId}`,
+            currentTaskId: taskId,
+            workspaceCwd: tempRoot,
+            timeoutMs: 30_000,
+            executionLog: ["Worker session interrupted before managed-service restart."],
+            plan: createTaskPlan("Resume an interrupted worker session after managed-service restart.", [
+              {
+                id: taskId,
+                title: "Resume after managed-service restart",
+                status: "ready",
+                executionMode: "serial",
+                dependsOn: [],
+                acceptanceCriteria: ["Finish the note from the persisted worker session after restart."],
+                verificationCommands: [],
+              },
+            ]),
+            taskReports: [],
+          },
+        ],
+      }, null, 2)}\n`,
+    );
+
+    const workflowSessions = new workflowSessionStoreModule.WorkflowSessionStore();
+    workflowSessions.save({
+      key: `${runId}:${taskId}`,
+      runId,
+      scope: "worker",
+      taskId,
+      messages: [
+        new HumanMessage(userPrompt),
+        new AIMessage({
+          content: "",
+          tool_calls: [
+            {
+              id: "resume-search-restart-note",
+              name: "tool_search",
+              args: { query: "write and edit files in the workspace", scope: "coding-worker" },
+              type: "tool_call",
+            },
+          ],
+        }),
+        new ToolMessage({
+          content: "Newly activated: write_file\nVisible tool count after search: 2",
+          tool_call_id: "resume-search-restart-note",
+          name: "tool_search",
+          status: "success",
+        }),
+      ],
+      activeToolNames: ["tool_search", "write_file"],
+      progressLog: ["[resume-task] tool: `tool_search`"],
+      turns: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    new serviceRestartNoticeModule.ServiceRestartNoticeService().recordPendingNotice({ source: "feature_manage" });
+
+    const app = new appRuntimeModule.OpenElinaroApp({ profileId: "root" });
+
+    await waitFor(() => app.getWorkflowRun(runId)?.status === "completed", 10_000);
+
+    const run = app.getWorkflowRun(runId);
+    expect(run?.status).toBe("completed");
+    expect(run?.taskReports?.[0]?.summary).toContain("managed service restart");
+    expect(run?.executionLog.some((entry) => entry.includes("Managed service restart detected."))).toBe(true);
+    expect(fs.readFileSync(path.join(tempRoot, "RESUMED_NOTE_AFTER_SERVICE_RESTART.md"), "utf8")).toContain(
+      "continued after managed service restart",
+    );
+    expect(workflowSessions.get(`${runId}:${taskId}`)).toBeUndefined();
+    expect(fs.existsSync(path.join(tempRoot, ".openelinarotest", "service-restart-notice.json"))).toBe(false);
   });
 
   test("requeues and retries a coding-agent run after a transient harness outage", async () => {
