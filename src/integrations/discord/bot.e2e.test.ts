@@ -1067,7 +1067,7 @@ if (RUN_CHILD_SUITE) {
 
     expect(invoked).toEqual(["update"]);
     expect(interaction.replies.map((reply) => reply.content).join("\n"))
-      .toContain("Updated openelinaro service");
+      .toContain("updating... don't send messages. you'll get `update complete` when it's done.");
   });
 
   test("emulates an ablative Discord thread with compact and new inside the temp clone only", async () => {

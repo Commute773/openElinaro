@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.4
+- Released at: 2026-03-22T00:13:54Z
+- Release id: 20260322T001354Z-24dadce
+- Previous version: 2026.03.22.3
+- Trigger: managed service update
+
+Make /update confirm:true reply with a short updating notice instead of the raw detached-helper transcript.
+The detached completion DM still delivers the final `update complete` message when the deploy finishes.
+
 ## 2026.03.22.3
 - Released at: 2026-03-22T00:08:18Z
 - Release id: 20260322T000818Z-77f2952

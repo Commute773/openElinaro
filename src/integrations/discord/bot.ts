@@ -936,7 +936,14 @@ async function handleSlashCommand(params: {
       );
       return;
     }
-    await invokeDiscordToolAndReply(interaction, app, "update", {});
+    await deferInteractionReply(interaction);
+    await app.invokeRoutineTool("update", {}, {
+      conversationKey: getDiscordConversationKey(interaction),
+    });
+    await replyWithChunks(
+      interaction,
+      "updating... don't send messages. you'll get `update complete` when it's done.",
+    );
     return;
   }
 
