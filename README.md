@@ -1,7 +1,7 @@
 # openelinaro
 
 Bun + TypeScript runtime scaffold for an OpenClaw-style multi-agent app.
-This README stays as a quick operator-focused overview of the current runtime.
+This README stays as a quick operator-facing overview of the current runtime.
 
 The current repo state is intentionally minimal:
 

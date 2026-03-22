@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22
+- Released at: 2026-03-22T00:03:47Z
+- Release id: 20260322T000347Z-80f078e
+- Previous version: 2026.03.21.40
+- Trigger: managed service update
+
+Trivial README wording cleanup.
+No runtime behavior changes in this release; this is just a fresh prepared update after confirming krysalstis is already deployed on 2026.03.21.40.
+
 ## 2026.03.21.40
 - Released at: 2026-03-21T23:51:19Z
 - Release id: 20260321T235119Z-ba4cff0
