@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.13
+- Released at: 2026-03-22T00:58:43Z
+- Release id: 20260322T005843Z-b55d9b2
+- Previous version: 2026.03.22.12
+- Trigger: managed service update
+
+Minor README wording cleanup for the /update deployment description.
+This is a fresh prepared version for re-testing the real bot-triggered update flow after the stale live-release pointer fix.
+
 ## 2026.03.22.12
 - Released at: 2026-03-22T00:56:23Z
 - Release id: 20260322T005623Z-cfb12f6
