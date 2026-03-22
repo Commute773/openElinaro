@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "bun:test";
+import { getTestFixturesDir } from "../test/fixtures";
 
 const repoRoot = process.cwd();
-const machineTestRoot = path.join(os.homedir(), ".openelinarotest");
+const machineTestRoot = getTestFixturesDir();
 
 function hasRootProviderAuthInRepo() {
   const authStorePath = path.join(machineTestRoot, "auth-store.json");

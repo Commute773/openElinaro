@@ -5,9 +5,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { ToolMessage } from "@langchain/core/messages";
 
+import { getTestFixturesDir } from "../test/fixtures";
+
 const repoRoot = process.cwd();
 const TEST_ROOT_NAME = ".openelinarotest";
-const MACHINE_TEST_ROOT = path.join(os.homedir(), TEST_ROOT_NAME);
+const MACHINE_TEST_ROOT = getTestFixturesDir();
 
 let previousRootDirEnv: string | undefined;
 let tempRoot = "";

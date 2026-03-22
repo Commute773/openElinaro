@@ -8,16 +8,18 @@ import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import type { LanguageModelV3CallOptions, LanguageModelV3GenerateResult } from "@ai-sdk/provider";
 import { buildScriptedConnectorRequest, toGenerateResultFromAIMessage } from "../test/scripted-provider-connector";
 
+import { getTestFixturesDir } from "../test/fixtures";
+
 const repoRoot = process.cwd();
 const TEST_ROOT_NAME = ".openelinarotest";
-const MACHINE_TEST_ROOT = path.join(os.homedir(), TEST_ROOT_NAME);
+const MACHINE_TEST_ROOT = getTestFixturesDir();
 const TURN_LIMIT = Number.parseInt(process.env.OPENELINARO_SWEBENCH_TURN_LIMIT ?? "5", 10);
 const RUN_TIMEOUT_MS = Number.parseInt(process.env.OPENELINARO_SWEBENCH_TIMEOUT_MS ?? "180000", 10);
 const WAIT_TIMEOUT_MS = Number.parseInt(
   process.env.OPENELINARO_SWEBENCH_WAIT_TIMEOUT_MS ?? String(Math.max(RUN_TIMEOUT_MS + 60_000, 240_000)),
   10,
 );
-const ARTIFACT_ROOT = path.join(MACHINE_TEST_ROOT, "benchmarks", "swebench", "sphinx-9229-smoke");
+const ARTIFACT_ROOT = path.join(os.tmpdir(), "openelinaro-benchmarks", "swebench", "sphinx-9229-smoke");
 const STREAM_OUTPUT = process.env.OPENELINARO_SWEBENCH_STREAM !== "0";
 
 let previousRootDirEnv: string | undefined;

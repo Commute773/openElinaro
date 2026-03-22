@@ -75,7 +75,10 @@ export function getUserDataRootDir() {
     if (configuredRuntimeRoot) {
       return path.join(path.resolve(configuredRuntimeRoot), TEST_USER_DATA_ROOT_DIRNAME);
     }
-    return path.join(os.homedir(), TEST_USER_DATA_ROOT_DIRNAME);
+    // Fall back to a temp-dir-based path rather than touching the user's home
+    // directory.  The test preload (src/test/preload.ts) should have set
+    // OPENELINARO_ROOT_DIR already; this branch is a last-resort safety net.
+    return path.join(os.tmpdir(), TEST_USER_DATA_ROOT_DIRNAME);
   }
   return path.join(os.homedir(), USER_DATA_ROOT_DIRNAME);
 }
@@ -112,7 +115,7 @@ export function assertTestRuntimeRootIsIsolated(feature: string) {
   const runtimeRoot = getRuntimeRootDir();
   if (fs.existsSync(path.join(runtimeRoot, ".git"))) {
     throw new Error(
-      `${feature} writes are blocked during tests unless OPENELINARO_ROOT_DIR or cwd points to an isolated test root, or OPENELINARO_USER_DATA_DIR points to an isolated .openelinarotest directory.`,
+      `${feature} writes are blocked during tests unless OPENELINARO_ROOT_DIR or cwd points to an isolated test root, or OPENELINARO_USER_DATA_DIR points to an isolated directory. The Bun test preload (src/test/preload.ts) should set OPENELINARO_ROOT_DIR automatically.`,
     );
   }
 }

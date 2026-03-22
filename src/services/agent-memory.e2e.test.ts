@@ -5,10 +5,11 @@ import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 import { AIMessage, HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { getTestFixturesDir } from "../test/fixtures";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 
 const repoRoot = process.cwd();
-const MACHINE_TEST_ROOT = path.join(os.homedir(), ".openelinarotest");
+const MACHINE_TEST_ROOT = getTestFixturesDir();
 const NO_HIT_PROMPT = "[E2E TEST] zxqv norb flensor kraylith velmora quentis halvane.";
 const HIT_PROMPT = "[E2E TEST] Remind me about Montreal pricing and what I said about it.";
 const HEALTHCHECK_PROMPT =
