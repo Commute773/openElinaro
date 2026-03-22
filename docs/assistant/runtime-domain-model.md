@@ -194,6 +194,8 @@ The generic recent-thread digest intentionally excludes `identity/` documents so
 
 Background coding-agent runs persist task-level reports in `~/.openelinaro/workflows.json`, and their in-flight planner/worker session transcripts live in `~/.openelinaro/workflow-sessions.json`.
 
+The workflow execution pipeline is decomposed across dedicated orchestration modules: `workflow-executor.ts` (batch task execution and verification), `workflow-planner.ts` (plan generation and replanning), `workflow-agent-runner.ts` (structured tool-agent loop shared by planners and workers), `workflow-state.ts` (session history helpers, pruning, and resume-context builders), `workflow-types.ts` (shared type definitions, schemas, and error classes), and `workflow-timeout.ts` (time-awareness blocks and hard-timeout guards).
+
 - Planning and coding workers are bounded by `timeoutMs`; they do not have a fixed model-step cap.
 - `launch_coding_agent` defaults to a one-hour timeout when `timeoutMs` is omitted, and `resume_coding_agent` keeps the stored timeout or falls back to one hour.
 - Planner and worker subagents inherit the compiled `system_prompt/*.md` base prompt, then add explicit background-run runtime context including profile/project context, workspace identity, launch depth, and their planner/worker role.
@@ -206,7 +208,7 @@ Background coding-agent runs persist task-level reports in `~/.openelinaro/workf
 - Transient harness/provider disconnects and 429 rate limits keep the run in `running` with `runningState=backoff`, `retryCount`, and `nextAttemptAt` instead of converting the current task into a normal execution failure.
 - Task failures and blockers are recorded on the run instead of immediately aborting the whole subagent.
 - Coding runs now track `taskIssueCount`, `taskErrorCount`, and `consecutiveTaskErrorCount`.
-- Default tool visibility now differs between the main agent and coding subagents. Coding planners start with a narrow repo-inspection bundle; coding workers start with repo-inspection plus edit primitives (`write_file`, `edit_file`, `apply_patch`) and shell execution. Other tool families are loaded on demand through `load_tool_library` and are not part of the default subagent bundle.
+- Default tool visibility now differs between the main agent and coding subagents. Coding planners start with a narrow repo-inspection bundle; coding workers start with repo-inspection plus edit primitives (`write_file`, `edit_file`, `apply_patch`) and shell execution. Other tool families are loaded on demand through `load_tool_library` and are not part of the default subagent bundle. The narrow default bundles are assembled from per-family group builders in `src/tools/groups/` (e.g. `buildFilesystemTools`, `buildShellTools`, `buildProjectTools`).
 - Parent agents can now steer a live coding run with `steer_coding_agent` while it is still running. Steering messages are appended to the active planner or worker session and are consumed on the next model step instead of waiting for the run to finish.
 - Parent agents can now stop a pending or running coding run with `cancel_coding_agent`.
 - Coding-agent runs are no longer driven by a central queue runner; each run owns its own async lifecycle, and the only shared timer is for delayed retry/recovery wakeups.

@@ -16,7 +16,7 @@ The runtime telemetry entrypoint is [`src/services/telemetry.ts`](../../src/serv
 
 - `instrumentMethods(...)` returns a proxy that wraps public prototype methods in spans.
 - Internal method-to-method calls inside the same instance are not intercepted; explicit `traceSpan(...)` is still the right choice for long-running internal phases and important sub-steps.
-- The runtime applies this at its composition root in [`src/app/runtime.ts`](../../src/app/runtime.ts) for services that previously had weak or inconsistent span coverage.
+- The runtime applies this at its composition root — now spread across [`src/app/runtime.ts`](../../src/app/runtime.ts), [`src/app/runtime-scope.ts`](../../src/app/runtime-scope.ts), [`src/app/runtime-workflow.ts`](../../src/app/runtime-workflow.ts), and [`src/app/runtime-automation.ts`](../../src/app/runtime-automation.ts) — for services that previously had weak or inconsistent span coverage.
 
 ## Coverage rule
 
