@@ -2656,6 +2656,21 @@ function buildServiceCommand(
     `OPENELINARO_HEALTHCHECK_TIMEOUT_MS=${shellQuote(String(timeoutMs))}`,
     `OPENELINARO_AGENT_SERVICE_CONTROL=${shellQuote("1")}`,
   ];
+  const passthroughEnv = [
+    "OPENELINARO_ROOT_DIR",
+    "OPENELINARO_SERVICE_ROOT_DIR",
+    "OPENELINARO_USER_DATA_DIR",
+    "OPENELINARO_SERVICE_USER",
+    "OPENELINARO_SERVICE_GROUP",
+    "OPENELINARO_SERVICE_LABEL",
+    "OPENELINARO_SYSTEMD_UNIT_PATH",
+  ] as const;
+  for (const envName of passthroughEnv) {
+    const envValue = process.env[envName]?.trim();
+    if (envValue) {
+      envParts.push(`${envName}=${shellQuote(envValue)}`);
+    }
+  }
   if (options?.conversationKey?.trim()) {
     envParts.push(
       `OPENELINARO_NOTIFY_DISCORD_USER_ID=${shellQuote(options.conversationKey.trim())}`,

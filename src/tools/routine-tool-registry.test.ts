@@ -1006,9 +1006,20 @@ describe("RoutineToolRegistry tool catalog", () => {
       ].join("\n"),
       "utf8",
     );
-
+    const previousRootDir = process.env.OPENELINARO_ROOT_DIR;
+    const previousUserDataDir = process.env.OPENELINARO_USER_DATA_DIR;
+    const previousServiceUser = process.env.OPENELINARO_SERVICE_USER;
+    const previousServiceGroup = process.env.OPENELINARO_SERVICE_GROUP;
+    const previousServiceLabel = process.env.OPENELINARO_SERVICE_LABEL;
+    const previousSystemdUnitPath = process.env.OPENELINARO_SYSTEMD_UNIT_PATH;
     try {
       const harness = createHarnessWithOptions({ shell: shellStub });
+      process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
+      process.env.OPENELINARO_USER_DATA_DIR = path.join(runtimeRoot, ".openelinaro");
+      process.env.OPENELINARO_SERVICE_USER = "root";
+      process.env.OPENELINARO_SERVICE_GROUP = "root";
+      process.env.OPENELINARO_SERVICE_LABEL = "openelinaro.service";
+      process.env.OPENELINARO_SYSTEMD_UNIT_PATH = "/etc/systemd/system/openelinaro.service";
 
       const updatePreviewResult = await harness.registry.invoke("update_preview", {});
       const updateResult = await harness.registry.invoke("update", { conversationKey: "123456789012345678" });
@@ -1017,6 +1028,13 @@ describe("RoutineToolRegistry tool catalog", () => {
       expect(commands[0]).toContain("'git' '-C'");
       expect(commands[0]).toContain("'pull' '--ff-only'");
       expect(commands[1]).toContain("OPENELINARO_AGENT_SERVICE_CONTROL='1'");
+      expect(commands[1]).toContain(`OPENELINARO_ROOT_DIR='${runtimeRoot}'`);
+      expect(commands[1]).toContain(`OPENELINARO_SERVICE_ROOT_DIR='${serviceRoot}'`);
+      expect(commands[1]).toContain(`OPENELINARO_USER_DATA_DIR='${path.join(runtimeRoot, ".openelinaro")}'`);
+      expect(commands[1]).toContain("OPENELINARO_SERVICE_USER='root'");
+      expect(commands[1]).toContain("OPENELINARO_SERVICE_GROUP='root'");
+      expect(commands[1]).toContain("OPENELINARO_SERVICE_LABEL='openelinaro.service'");
+      expect(commands[1]).toContain("OPENELINARO_SYSTEMD_UNIT_PATH='/etc/systemd/system/openelinaro.service'");
       expect(commands[1]).toContain("OPENELINARO_NOTIFY_DISCORD_USER_ID='123456789012345678'");
       expect(commands[1]).toContain("scripts/service-update-detached.sh");
       expect(commands[2]).toContain("scripts/service-rollback-detached.sh");
@@ -1031,6 +1049,36 @@ describe("RoutineToolRegistry tool catalog", () => {
         delete process.env.OPENELINARO_SERVICE_ROOT_DIR;
       } else {
         process.env.OPENELINARO_SERVICE_ROOT_DIR = previous;
+      }
+      if (previousRootDir === undefined) {
+        delete process.env.OPENELINARO_ROOT_DIR;
+      } else {
+        process.env.OPENELINARO_ROOT_DIR = previousRootDir;
+      }
+      if (previousUserDataDir === undefined) {
+        delete process.env.OPENELINARO_USER_DATA_DIR;
+      } else {
+        process.env.OPENELINARO_USER_DATA_DIR = previousUserDataDir;
+      }
+      if (previousServiceUser === undefined) {
+        delete process.env.OPENELINARO_SERVICE_USER;
+      } else {
+        process.env.OPENELINARO_SERVICE_USER = previousServiceUser;
+      }
+      if (previousServiceGroup === undefined) {
+        delete process.env.OPENELINARO_SERVICE_GROUP;
+      } else {
+        process.env.OPENELINARO_SERVICE_GROUP = previousServiceGroup;
+      }
+      if (previousServiceLabel === undefined) {
+        delete process.env.OPENELINARO_SERVICE_LABEL;
+      } else {
+        process.env.OPENELINARO_SERVICE_LABEL = previousServiceLabel;
+      }
+      if (previousSystemdUnitPath === undefined) {
+        delete process.env.OPENELINARO_SYSTEMD_UNIT_PATH;
+      } else {
+        process.env.OPENELINARO_SYSTEMD_UNIT_PATH = previousSystemdUnitPath;
       }
     }
   });

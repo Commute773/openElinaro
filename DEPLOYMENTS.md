@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.22.15
+- Released at: 2026-03-22T01:11:46Z
+- Release id: 20260322T011147Z-f1faa40
+- Previous version: 2026.03.22.14
+- Trigger: managed service update
+
+Inline the managed-service metadata in the /update deploy command so sudo does not strip the live release root, service user, or unit path.
+This fixes bot-triggered /update confirm:true on krysalstis, where the helper must inherit the live service environment explicitly.
+
 ## 2026.03.22.14
 - Released at: 2026-03-22T01:01:19Z
 - Release id: 20260322T010119Z-e731885
