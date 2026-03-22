@@ -37,7 +37,7 @@ The current platform is close, but it does not yet have a first-class workspace-
 - [`src/domain/projects.ts`](../../src/domain/projects.ts) defines a project with one `workspacePath`
 - [`src/domain/workflow-run.ts`](../../src/domain/workflow-run.ts) stores only `workspaceCwd?: string`
 - [`src/services/access-control-service.ts`](../../src/services/access-control-service.ts) authorizes project paths against `project.workspacePath`, which will not automatically include linked worktrees outside that path
-- [`src/tools/routine-tool-registry.ts`](../../src/tools/routine-tool-registry.ts) launches coding agents with raw `cwd`
+- [`src/tools/tool-registry.ts`](../../src/tools/tool-registry.ts) launches coding agents with raw `cwd`
 
 So the main gap is architectural, not Git capability.
 
@@ -215,6 +215,8 @@ For this codebase, I would make three changes first:
 1. Add a `ProjectWorkspaceService` that discovers Git worktrees and overlays local metadata.
 2. Extend the domain from `project.workspacePath` plus `workflow.workspaceCwd` to `projectId + workspaceId + rootPath`.
 3. Make background coding agents allocate linked worktrees by default when the task can write.
+
+**Update (2026-03-22):** Step 1 has been partially implemented — `ProjectWorkspaceService` now exists at [`src/services/project-workspace-service.ts`](../../src/services/project-workspace-service.ts).
 
 That gets the core value of worktrees into the platform without redesigning the whole project system.
 
