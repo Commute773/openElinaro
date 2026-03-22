@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.22.8
+- Released at: 2026-03-22T21:13:22Z
+- Release id: 20260322T211322Z-6de3a59
+- Previous version: 2026.03.22.7
+- Trigger: ci/release workflow
+
+- Add autonomous time scheduling tests
+
 ## 2026.03.22.7
 - Released at: 2026-03-22T21:09:31Z
 - Release id: 20260322T210931Z-ea65eb2
