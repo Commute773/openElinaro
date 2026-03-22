@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.22.7
+- Released at: 2026-03-22T21:09:31Z
+- Release id: 20260322T210931Z-ea65eb2
+- Previous version: 2026.03.22.6
+- Trigger: ci/release workflow
+
+- feat: prepend local time to all user messages and enforce commit-after-feature workflow
+
 ## 2026.03.22.6
 - Released at: 2026-03-22T20:13:47Z
 - Release id: 20260322T201347Z-54377ed
