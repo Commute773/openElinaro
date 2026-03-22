@@ -394,13 +394,22 @@ function buildServiceCommand(
   ].join(" ");
 }
 
-function buildGitPullCommand(preview = false) {
+function buildGitFetchTagsCommand() {
   const rootDir = process.env.OPENELINARO_ROOT_DIR?.trim() || process.cwd();
-  const args = ["git", "-C", rootDir, "pull", "--ff-only"];
-  if (preview) {
-    args.push("--dry-run");
-  }
-  return args.map((arg) => shellQuote(arg)).join(" ");
+  return ["git", "-C", rootDir, "fetch", "--tags", "origin"].map((arg) => shellQuote(arg)).join(" ");
+}
+
+function buildGitLatestTagCommand() {
+  const rootDir = process.env.OPENELINARO_ROOT_DIR?.trim() || process.cwd();
+  return `${["git", "-C", rootDir, "tag", "-l", "v*", "--sort=-version:refname"].map((arg) => shellQuote(arg)).join(" ")} | head -n1 | sed 's/^v//'`;
+}
+
+function buildGitPullCommand() {
+  const rootDir = process.env.OPENELINARO_ROOT_DIR?.trim() || process.cwd();
+  return [
+    ["git", "-C", rootDir, "fetch", "--tags", "origin"].map((arg) => shellQuote(arg)).join(" "),
+    ["git", "-C", rootDir, "pull", "--ff-only"].map((arg) => shellQuote(arg)).join(" "),
+  ].join(" && ");
 }
 
 function buildPythonSetupCommand() {
@@ -1129,22 +1138,25 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
       operation,
       async () => {
         const timeoutMs = input.timeoutMs ?? 60_000;
-        const result = await ctx.shell.exec({
-          command: buildGitPullCommand(true),
+        const fetchResult = await ctx.shell.exec({
+          command: buildGitFetchTagsCommand(),
           timeoutMs,
         });
-        if (result.exitCode !== 0) {
-          return renderShellExecResult(result);
+        if (fetchResult.exitCode !== 0) {
+          return renderShellExecResult(fetchResult);
         }
+        const tagResult = await ctx.shell.exec({
+          command: buildGitLatestTagCommand(),
+          timeoutMs: 10_000,
+        });
+        const latestTagVersion = tagResult.stdout?.trim() ?? "";
         try {
-          return ctx.deploymentVersion.formatPreparedUpdate();
+          return ctx.deploymentVersion.formatAvailableUpdate(latestTagVersion);
         } catch (error) {
           const detail = error instanceof Error ? error.message : String(error);
           return [
-            "Preview completed, but could not load the prepared update summary.",
+            "Fetched tags, but could not determine available update.",
             `Reason: ${detail}`,
-            "",
-            renderShellExecResult(result),
           ].join("\n");
         }
       },
@@ -1156,6 +1168,14 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
       operation,
       async () => {
         const timeoutMs = input.timeoutMs ?? 60_000;
+        // Pull latest tagged version into the source checkout first
+        const pullResult = await ctx.shell.exec({
+          command: buildGitPullCommand(),
+          timeoutMs: timeoutMs + 30_000,
+        });
+        if (pullResult.exitCode !== 0) {
+          return `Failed to pull latest version:\n${renderShellExecResult(pullResult)}`;
+        }
         const result = await ctx.shell.exec({
           command: buildServiceCommand("update", timeoutMs, {
             conversationKey: input.conversationKey,

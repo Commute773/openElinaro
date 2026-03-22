@@ -1,0 +1,139 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run check
+
+      - name: Compute next version
+        id: version
+        run: |
+          TODAY="$(date -u +%Y.%m.%d)"
+
+          # Find the highest sequence tag for today
+          LATEST_TODAY_TAG="$(git tag -l "v${TODAY}.*" --sort=-version:refname | head -n1)"
+          BARE_TODAY_TAG="$(git tag -l "v${TODAY}" | head -n1)"
+
+          if [[ -n "${LATEST_TODAY_TAG}" ]]; then
+            # Extract sequence from vYYYY.MM.DD.N
+            CURRENT_SEQ="${LATEST_TODAY_TAG##v${TODAY}.}"
+            NEXT_VERSION="${TODAY}.$((CURRENT_SEQ + 1))"
+          elif [[ -n "${BARE_TODAY_TAG}" ]]; then
+            # There is a bare vYYYY.MM.DD tag, so next is .2
+            NEXT_VERSION="${TODAY}.2"
+          else
+            NEXT_VERSION="${TODAY}"
+          fi
+
+          SEQUENCE="1"
+          if [[ "${NEXT_VERSION}" =~ \.[0-9]+$ ]]; then
+            SEQUENCE="${NEXT_VERSION##*.}"
+          fi
+
+          echo "version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sequence=${SEQUENCE}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog from commits
+        id: changelog
+        run: |
+          PREV_TAG="$(git tag -l 'v*' --sort=-version:refname | head -n1)"
+          if [[ -n "${PREV_TAG}" ]]; then
+            CHANGES="$(git log --oneline "${PREV_TAG}..HEAD" --no-merges --pretty=format:'- %s' | head -30)"
+          else
+            CHANGES="- Initial release"
+          fi
+
+          # Write to a temp file to preserve newlines
+          echo "${CHANGES}" > /tmp/changes.txt
+
+      - name: Update VERSION.json and DEPLOYMENTS.md
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SEQUENCE="${{ steps.version.outputs.sequence }}"
+          RELEASED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          RELEASE_ID="$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short HEAD)"
+          PREV_VERSION="$(jq -r '.version // empty' VERSION.json 2>/dev/null || echo "")"
+          CHANGES="$(cat /tmp/changes.txt)"
+
+          # Write VERSION.json
+          PREV_VERSION_JSON="null"
+          if [[ -n "${PREV_VERSION}" ]]; then
+            PREV_VERSION_JSON="\"${PREV_VERSION}\""
+          fi
+
+          cat > VERSION.json <<EOF
+          {
+            "version": "${VERSION}",
+            "releasedAt": "${RELEASED_AT}",
+            "sequence": ${SEQUENCE},
+            "previousVersion": ${PREV_VERSION_JSON},
+            "releaseId": "${RELEASE_ID}",
+            "changelogPath": "DEPLOYMENTS.md"
+          }
+          EOF
+
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' VERSION.json
+
+          # Prepend new entry to DEPLOYMENTS.md
+          PREV_LABEL="${PREV_VERSION:-none}"
+          NEW_ENTRY="## ${VERSION}
+          - Released at: ${RELEASED_AT}
+          - Release id: ${RELEASE_ID}
+          - Previous version: ${PREV_LABEL}
+          - Trigger: ci/release workflow
+
+          ${CHANGES}"
+
+          # Remove leading whitespace
+          NEW_ENTRY="$(echo "${NEW_ENTRY}" | sed 's/^          //')"
+
+          if [[ -f DEPLOYMENTS.md ]]; then
+            # Strip the "# Deployments" header and leading blank line, prepend new entry
+            EXISTING_BODY="$(tail -n +3 DEPLOYMENTS.md)"
+            {
+              echo "# Deployments"
+              echo ""
+              echo "${NEW_ENTRY}"
+              echo ""
+              echo "${EXISTING_BODY}"
+            } > DEPLOYMENTS.md
+          else
+            {
+              echo "# Deployments"
+              echo ""
+              echo "${NEW_ENTRY}"
+            } > DEPLOYMENTS.md
+          fi
+
+      - name: Commit metadata and tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION.json DEPLOYMENTS.md
+          git commit -m "update: ${VERSION} [skip ci]"
+          git tag "${TAG}"
+          git push origin main --tags

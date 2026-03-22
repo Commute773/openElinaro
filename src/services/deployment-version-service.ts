@@ -279,4 +279,63 @@ export class DeploymentVersionService {
       ),
     ].join("\n");
   }
+
+  formatAvailableUpdate(latestTagVersion: string) {
+    const runtime = this.load();
+    const currentVersion = runtime.version;
+
+    if (!latestTagVersion) {
+      return [
+        `Current version: ${currentVersion}.`,
+        "No tagged versions were found on the remote.",
+      ].join("\n");
+    }
+
+    const latestSegments = tryParseVersionSegments(latestTagVersion);
+    const currentSegments = tryParseVersionSegments(currentVersion);
+
+    if (!latestSegments) {
+      return [
+        `Current version: ${currentVersion}.`,
+        `Latest remote tag version ${latestTagVersion} has an unsupported format.`,
+      ].join("\n");
+    }
+
+    if (currentSegments && compareVersionSegments(latestSegments, currentSegments) <= 0) {
+      return [
+        `Current version: ${currentVersion}.`,
+        `Latest remote tag version: ${latestTagVersion}.`,
+        "Already up to date. No newer tagged version is available.",
+      ].join("\n");
+    }
+
+    const lines = [
+      `Update available: ${currentVersion} -> ${latestTagVersion}.`,
+      "Run `/update confirm:true` to pull and deploy this version.",
+    ];
+
+    // Show changelog entries between current and latest if available
+    if (runtime.changelogPath && fs.existsSync(runtime.changelogPath) && currentSegments) {
+      const entries = parseDeploymentChangelog(fs.readFileSync(runtime.changelogPath, "utf8"))
+        .filter((entry) => {
+          const entrySegments = tryParseVersionSegments(entry.version);
+          return entrySegments && compareVersionSegments(entrySegments, currentSegments) > 0;
+        });
+
+      if (entries.length > 0) {
+        lines.push(
+          `Pending changelog entries: ${entries.length}.`,
+          ...entries.flatMap((entry) => [
+            `## ${entry.version}`,
+            ...entry.lines.filter((line, index, all) => {
+              const previousLine = index > 0 ? all[index - 1] : undefined;
+              return line.trim().length > 0 || (previousLine?.trim().length ?? 0) > 0;
+            }),
+          ]),
+        );
+      }
+    }
+
+    return lines.join("\n");
+  }
 }

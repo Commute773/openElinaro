@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "WARNING: service-prepare-update.sh is deprecated. Versions are now created automatically by CI on merge to main." >&2
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${OPENELINARO_ROOT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 OPENELINARO_REPO_ROOT="${ROOT_DIR}"

@@ -947,7 +947,7 @@ async function handleSlashCommand(params: {
         [
           preview,
           "",
-          "This only previews the fast-forward and pending deployment notes. Run `/update confirm:true` to deploy the prepared version into the local installation.",
+          "This previews the latest tagged version available on the remote. Run `/update confirm:true` to pull and deploy it.",
         ].join("\n"),
       );
       return;
