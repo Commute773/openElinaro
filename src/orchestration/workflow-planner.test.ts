@@ -31,7 +31,7 @@ describe("planCodingRun", () => {
           throw new Error("Planner tool resolution failed");
         },
       } as any,
-      shell: { execVerification: mock(() => Promise.resolve({ exitCode: 0, stdout: "", stderr: "" })) },
+      shell: { execVerification: mock(() => Promise.resolve({ command: "", cwd: "", timeoutMs: 0, sudo: false, effectiveUser: "", exitCode: 0, stdout: "", stderr: "" })) },
       workflowSessions: {
         ensure: mock(() => {}),
         get: mock(() => ({ progressLog: [], activeToolNames: [] })),
@@ -57,7 +57,7 @@ describe("planCodingRun", () => {
           throw new Error("Stop after session setup");
         },
       } as any,
-      shell: { execVerification: mock(() => Promise.resolve({ exitCode: 0, stdout: "", stderr: "" })) },
+      shell: { execVerification: mock(() => Promise.resolve({ command: "", cwd: "", timeoutMs: 0, sudo: false, effectiveUser: "", exitCode: 0, stdout: "", stderr: "" })) },
       workflowSessions: {
         ensure: mock((params: { key: string }) => {
           capturedKey = params.key;
@@ -89,7 +89,7 @@ describe("planCodingRun", () => {
           throw new Error("Stop early");
         },
       } as any,
-      shell: { execVerification: mock(() => Promise.resolve({ exitCode: 0, stdout: "", stderr: "" })) },
+      shell: { execVerification: mock(() => Promise.resolve({ command: "", cwd: "", timeoutMs: 0, sudo: false, effectiveUser: "", exitCode: 0, stdout: "", stderr: "" })) },
       workflowSessions: {
         ensure: mock((args: any) => { capturedEnsureArgs = args; }),
         get: mock(() => ({ progressLog: [], activeToolNames: [] })),
@@ -124,7 +124,7 @@ describe("planCodingRun", () => {
           throw new Error("Stop early");
         },
       } as any,
-      shell: { execVerification: mock(() => Promise.resolve({ exitCode: 0, stdout: "", stderr: "" })) },
+      shell: { execVerification: mock(() => Promise.resolve({ command: "", cwd: "", timeoutMs: 0, sudo: false, effectiveUser: "", exitCode: 0, stdout: "", stderr: "" })) },
       workflowSessions: {
         ensure: mock((args: any) => { capturedMessages = args.messages; }),
         get: mock(() => ({ progressLog: [], activeToolNames: [] })),

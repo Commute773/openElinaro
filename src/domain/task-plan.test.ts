@@ -110,7 +110,7 @@ describe("getExecutionBatch", () => {
     const batch = getExecutionBatch(plan);
     expect(batch.mode).toBe("serial");
     expect(batch.tasks).toHaveLength(1);
-    expect(batch.tasks[0].id).toBe("a");
+    expect(batch.tasks[0]!.id).toBe("a");
   });
 
   test("returns parallel batch with all parallel tasks when no serial tasks", () => {
@@ -131,7 +131,7 @@ describe("getExecutionBatch", () => {
     ]);
     const batch = getExecutionBatch(plan);
     expect(batch.mode).toBe("serial");
-    expect(batch.tasks[0].id).toBe("b");
+    expect(batch.tasks[0]!.id).toBe("b");
   });
 });
 
@@ -142,20 +142,20 @@ describe("updateTaskStatuses", () => {
       makeTask({ id: "b", status: "pending" }),
     ]);
     const updated = updateTaskStatuses(plan, [{ id: "a", status: "running" }]);
-    expect(updated.tasks[0].status).toBe("running");
-    expect(updated.tasks[1].status).toBe("pending");
+    expect(updated.tasks[0]!.status).toBe("running");
+    expect(updated.tasks[1]!.status).toBe("pending");
   });
 
   test("preserves existing notes when update has no notes", () => {
     const plan = makePlan([makeTask({ id: "a", notes: "original" })]);
     const updated = updateTaskStatuses(plan, [{ id: "a", status: "completed" }]);
-    expect(updated.tasks[0].notes).toBe("original");
+    expect(updated.tasks[0]!.notes).toBe("original");
   });
 
   test("overwrites notes when update provides notes", () => {
     const plan = makePlan([makeTask({ id: "a", notes: "original" })]);
     const updated = updateTaskStatuses(plan, [{ id: "a", status: "completed", notes: "done" }]);
-    expect(updated.tasks[0].notes).toBe("done");
+    expect(updated.tasks[0]!.notes).toBe("done");
   });
 
   test("sets assignedAgent when provided", () => {
@@ -163,14 +163,14 @@ describe("updateTaskStatuses", () => {
     const updated = updateTaskStatuses(plan, [
       { id: "a", status: "running", assignedAgent: "agent-1" },
     ]);
-    expect(updated.tasks[0].assignedAgent).toBe("agent-1");
+    expect(updated.tasks[0]!.assignedAgent).toBe("agent-1");
   });
 
   test("does not mutate the original plan", () => {
     const plan = makePlan([makeTask({ id: "a", status: "pending" })]);
     const updated = updateTaskStatuses(plan, [{ id: "a", status: "completed" }]);
-    expect(plan.tasks[0].status).toBe("pending");
-    expect(updated.tasks[0].status).toBe("completed");
+    expect(plan.tasks[0]!.status).toBe("pending");
+    expect(updated.tasks[0]!.status).toBe("completed");
   });
 
   test("handles multiple updates at once", () => {
@@ -182,9 +182,9 @@ describe("updateTaskStatuses", () => {
       { id: "a", status: "completed" },
       { id: "b", status: "failed", notes: "timeout" },
     ]);
-    expect(updated.tasks[0].status).toBe("completed");
-    expect(updated.tasks[1].status).toBe("failed");
-    expect(updated.tasks[1].notes).toBe("timeout");
+    expect(updated.tasks[0]!.status).toBe("completed");
+    expect(updated.tasks[1]!.status).toBe("failed");
+    expect(updated.tasks[1]!.notes).toBe("timeout");
   });
 });
 

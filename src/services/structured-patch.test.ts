@@ -72,13 +72,14 @@ describe("parseStructuredPatch", () => {
 
     const ops = parseStructuredPatch(patch);
     expect(ops).toHaveLength(1);
-    expect(ops[0].type).toBe("update");
-    if (ops[0].type === "update") {
-      expect(ops[0].path).toBe("src/app.ts");
-      expect(ops[0].moveTo).toBeUndefined();
-      expect(ops[0].chunks).toHaveLength(1);
-      expect(ops[0].chunks[0].oldLines).toEqual(["keep", "old line"]);
-      expect(ops[0].chunks[0].newLines).toEqual(["keep", "new line"]);
+    expect(ops[0]!.type).toBe("update");
+    const op0update = ops[0]! as { type: "update"; path: string; moveTo?: string; chunks: StructuredPatchChunk[] };
+    if (op0update.type === "update") {
+      expect(op0update.path).toBe("src/app.ts");
+      expect(op0update.moveTo).toBeUndefined();
+      expect(op0update.chunks).toHaveLength(1);
+      expect(op0update.chunks[0]!.oldLines).toEqual(["keep", "old line"]);
+      expect(op0update.chunks[0]!.newLines).toEqual(["keep", "new line"]);
     }
   });
 
@@ -92,9 +93,10 @@ describe("parseStructuredPatch", () => {
 
     const ops = parseStructuredPatch(patch);
     expect(ops).toHaveLength(1);
-    if (ops[0].type === "update") {
-      expect(ops[0].moveTo).toBe("b.ts");
-      expect(ops[0].chunks).toHaveLength(0);
+    const op0moveTo = ops[0]! as { type: "update"; path: string; moveTo?: string; chunks: StructuredPatchChunk[] };
+    if (op0moveTo.type === "update") {
+      expect(op0moveTo.moveTo).toBe("b.ts");
+      expect(op0moveTo.chunks).toHaveLength(0);
     }
   });
 
@@ -121,8 +123,8 @@ describe("parseStructuredPatch", () => {
 
     const ops = parseStructuredPatch(patch);
     expect(ops).toHaveLength(2);
-    expect(ops[0].type).toBe("add");
-    expect(ops[1].type).toBe("delete");
+    expect(ops[0]!.type).toBe("add");
+    expect(ops[1]!.type).toBe("delete");
   });
 
   test("throws on unexpected patch header line", () => {
@@ -153,7 +155,7 @@ describe("parseStructuredPatch", () => {
       "*** Begin Patch\r\n*** Delete File: a.ts\r\n*** End Patch\r\n";
     const ops = parseStructuredPatch(patch);
     expect(ops).toHaveLength(1);
-    expect(ops[0].type).toBe("delete");
+    expect(ops[0]!.type).toBe("delete");
   });
 
   test("handles multiple @@ chunks in an update", () => {
@@ -170,8 +172,9 @@ describe("parseStructuredPatch", () => {
     ].join("\n");
 
     const ops = parseStructuredPatch(patch);
-    if (ops[0].type === "update") {
-      expect(ops[0].chunks).toHaveLength(2);
+    const op0chunks = ops[0]! as { type: "update"; path: string; moveTo?: string; chunks: StructuredPatchChunk[] };
+    if (op0chunks.type === "update") {
+      expect(op0chunks.chunks).toHaveLength(2);
     }
   });
 
@@ -188,10 +191,11 @@ describe("parseStructuredPatch", () => {
 
     const ops = parseStructuredPatch(patch);
     expect(ops).toHaveLength(1);
-    if (ops[0].type === "update") {
-      expect(ops[0].path).toBe("old.ts");
-      expect(ops[0].moveTo).toBe("new.ts");
-      expect(ops[0].chunks).toHaveLength(1);
+    const op0moveChunks = ops[0]! as { type: "update"; path: string; moveTo?: string; chunks: StructuredPatchChunk[] };
+    if (op0moveChunks.type === "update") {
+      expect(op0moveChunks.path).toBe("old.ts");
+      expect(op0moveChunks.moveTo).toBe("new.ts");
+      expect(op0moveChunks.chunks).toHaveLength(1);
     }
   });
 });

@@ -95,7 +95,7 @@ describe("ToolResolutionService", () => {
 
       const result = service.resolve({ agentScope: "chat" });
       expect(result.entries).toHaveLength(1);
-      expect(result.entries[0].name).toBe("t1");
+      expect(result.entries[0]!.name).toBe("t1");
     });
   });
 
@@ -111,7 +111,7 @@ describe("ToolResolutionService", () => {
 
       const result = service.getScopeCatalog("chat");
       expect(result).toHaveLength(1);
-      expect(result[0].canonicalName).toBe("tool_a");
+      expect(result[0]!.canonicalName).toBe("tool_a");
     });
 
     test("returns empty when no tools match scope", () => {

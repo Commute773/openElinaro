@@ -55,14 +55,14 @@ describe("ConversationHistoryService", () => {
       const lines = fs.readFileSync(getJournalPath(), "utf8").trim().split("\n");
       expect(lines).toHaveLength(2);
 
-      const entry1 = JSON.parse(lines[0]);
+      const entry1 = JSON.parse(lines[0]!);
       expect(entry1.kind).toBe("message");
       expect(entry1.conversationKey).toBe("conv-1");
       expect(entry1.role).toBe("user");
       expect(entry1.text).toBe("hello");
       expect(entry1.messageIndex).toBe(1);
 
-      const entry2 = JSON.parse(lines[1]);
+      const entry2 = JSON.parse(lines[1]!);
       expect(entry2.role).toBe("assistant");
       expect(entry2.text).toBe("hi there");
       expect(entry2.messageIndex).toBe(2);
@@ -95,9 +95,9 @@ describe("ConversationHistoryService", () => {
 
       const lines = fs.readFileSync(getJournalPath(), "utf8").trim().split("\n");
 
-      expect(JSON.parse(lines[0]).role).toBe("user");
-      expect(JSON.parse(lines[1]).role).toBe("assistant");
-      expect(JSON.parse(lines[2]).role).toBe("system");
+      expect(JSON.parse(lines[0]!).role).toBe("user");
+      expect(JSON.parse(lines[1]!).role).toBe("assistant");
+      expect(JSON.parse(lines[2]!).role).toBe("system");
     });
 
     test("uses startingIndex offset for messageIndex", () => {
@@ -224,8 +224,8 @@ describe("ConversationHistoryService", () => {
 
       const result = await service.listRecentMessages();
       expect(result.length).toBe(2);
-      expect(result[0].conversationKey).toBe("conv-2");
-      expect(result[1].conversationKey).toBe("conv-1");
+      expect(result[0]!.conversationKey).toBe("conv-2");
+      expect(result[1]!.conversationKey).toBe("conv-1");
     });
 
     test("filters by conversationKey", async () => {
@@ -245,7 +245,7 @@ describe("ConversationHistoryService", () => {
 
       const result = await service.listRecentMessages({ conversationKey: "conv-1" });
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("in conv 1");
+      expect(result[0]!.text).toBe("in conv 1");
     });
 
     test("filters by since timestamp", async () => {
@@ -265,7 +265,7 @@ describe("ConversationHistoryService", () => {
 
       const result = await service.listRecentMessages({ since: "2025-03-01T00:00:00Z" });
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("new message");
+      expect(result[0]!.text).toBe("new message");
     });
 
     test("respects limit parameter", async () => {
@@ -300,7 +300,7 @@ describe("ConversationHistoryService", () => {
 
       const result = await service.listRecentMessages();
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("visible");
+      expect(result[0]!.text).toBe("visible");
     });
   });
 
@@ -324,11 +324,11 @@ describe("ConversationHistoryService", () => {
 
       const resultA = await serviceA.listRecentMessages();
       expect(resultA).toHaveLength(1);
-      expect(resultA[0].text).toBe("from profile A");
+      expect(resultA[0]!.text).toBe("from profile A");
 
       const resultB = await serviceB.listRecentMessages();
       expect(resultB).toHaveLength(1);
-      expect(resultB[0].text).toBe("from profile B");
+      expect(resultB[0]!.text).toBe("from profile B");
     });
   });
 });

@@ -145,9 +145,9 @@ describe("buildTaskPlan", () => {
 
     expect(plan.goal).toBe("Do stuff");
     expect(plan.tasks).toHaveLength(2);
-    expect(plan.tasks[0].status).toBe("ready");
-    expect(plan.tasks[1].status).toBe("pending");
-    expect(plan.tasks[1].dependsOn).toEqual(["task-1"]);
+    expect(plan.tasks[0]!.status).toBe("ready");
+    expect(plan.tasks[1]!.status).toBe("pending");
+    expect(plan.tasks[1]!.dependsOn).toEqual(["task-1"]);
   });
 
   test("deduplicates task ids by appending suffix", () => {
@@ -172,7 +172,7 @@ describe("buildTaskPlan", () => {
       ],
     });
 
-    expect(plan.tasks[0].dependsOn).toEqual([]);
+    expect(plan.tasks[0]!.dependsOn).toEqual([]);
   });
 
   test("filters out dependencies referencing non-existent tasks", () => {
@@ -183,7 +183,7 @@ describe("buildTaskPlan", () => {
       ],
     });
 
-    expect(plan.tasks[0].dependsOn).toEqual([]);
+    expect(plan.tasks[0]!.dependsOn).toEqual([]);
   });
 });
 
@@ -303,14 +303,14 @@ describe("mergeTaskReport", () => {
     const run = makeRun();
     const result = mergeTaskReport(run, makeTask("t1"));
     expect(result.taskReports).toHaveLength(1);
-    expect(result.taskReports![0].taskId).toBe("t1");
+    expect(result.taskReports![0]!.taskId).toBe("t1");
   });
 
   test("replaces an existing report for the same task id", () => {
     const run = makeRun({ taskReports: [makeTask("t1", "failed")] });
     const result = mergeTaskReport(run, makeTask("t1", "completed"));
     expect(result.taskReports).toHaveLength(1);
-    expect(result.taskReports![0].status).toBe("completed");
+    expect(result.taskReports![0]!.status).toBe("completed");
   });
 });
 
@@ -521,7 +521,7 @@ describe("executeTaskPlanBatch", () => {
     ]);
     const run = makeRun({ plan });
     const result = executeTaskPlanBatch(run);
-    expect(result.plan!.tasks[0].status).toBe("completed");
+    expect(result.plan!.tasks[0]!.status).toBe("completed");
   });
 });
 
@@ -642,9 +642,12 @@ describe("formatWorkflowTurnProgress", () => {
   test("formats a turn record", () => {
     const turn = {
       index: 3,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      completedAt: "2024-01-01T00:00:01.000Z",
       modelId: "claude-test",
       finishReason: "stop" as const,
       responseToolNames: ["read_file"],
+      activeToolNames: [],
       inputTokens: 100,
       outputTokens: 50,
     };
@@ -660,9 +663,12 @@ describe("formatWorkflowTurnProgress", () => {
   test("shows (none) when no tools used", () => {
     const turn = {
       index: 1,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      completedAt: "2024-01-01T00:00:01.000Z",
       modelId: undefined,
       finishReason: "stop" as const,
       responseToolNames: [],
+      activeToolNames: [],
       inputTokens: 0,
       outputTokens: 0,
     };

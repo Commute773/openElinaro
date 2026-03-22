@@ -173,7 +173,7 @@ describe("getSettingOrDefault", () => {
   });
 
   test("falls back to DEFAULT_FINANCE_SETTINGS", () => {
-    expect(getSettingOrDefault(db, "fx.usdcad", {})).toBe(DEFAULT_FINANCE_SETTINGS["fx.usdcad"]);
+    expect(getSettingOrDefault(db, "fx.usdcad", {})).toBe(DEFAULT_FINANCE_SETTINGS["fx.usdcad"]!);
   });
 
   test("returns empty string as last resort", () => {

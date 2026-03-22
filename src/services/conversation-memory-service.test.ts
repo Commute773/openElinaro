@@ -66,6 +66,7 @@ function makeMatch(overrides: Partial<MemorySearchMatch> = {}): MemorySearchMatc
     text: "Some remembered content about preferences",
     score: 0.15,
     vectorScore: 0.12,
+    bm25Score: 0.1,
     ...overrides,
   };
 }

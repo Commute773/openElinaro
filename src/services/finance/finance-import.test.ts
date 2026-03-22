@@ -96,7 +96,7 @@ describe("fetchText", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response("Not Found", { status: 404, statusText: "Not Found" })),
-    );
+    ) as unknown as typeof fetch;
     try {
       await expect(fetchText("https://example.com/bad")).rejects.toThrow("Failed to fetch");
     } finally {
@@ -108,7 +108,7 @@ describe("fetchText", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response("hello world", { status: 200 })),
-    );
+    ) as unknown as typeof fetch;
     try {
       const result = await fetchText("https://example.com/good");
       expect(result).toBe("hello world");

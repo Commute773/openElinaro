@@ -359,7 +359,7 @@ describe("refreshRecurringRules", () => {
     const result = refreshRecurringRules(db, "2026-03-22", false, 0);
     expect(result.active.length + result.halted.length).toBeGreaterThanOrEqual(1);
     const spotify = [...result.active, ...result.halted].find(
-      (r) => String(r.name) === "Spotify",
+      (r) => String((r as Record<string, unknown>)["name"]) === "Spotify",
     );
     expect(spotify).toBeDefined();
     expect(spotify!.last_seen_date).toBe("2026-03-01");

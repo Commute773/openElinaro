@@ -403,13 +403,13 @@ describe("AccessControlService", () => {
   describe("listLaunchableProfiles", () => {
     test("delegates to profileService.listLaunchableProfiles", () => {
       profilesSvc.listLaunchableProfiles.mockReturnValue([
-        { id: "child", name: "Child" },
+        { id: "child", name: "Child", roles: ["user"], memoryNamespace: "child" },
       ]);
       const profile = rootProfile();
       const svc = createService(profile);
       const result = svc.listLaunchableProfiles(2);
       expect(profilesSvc.listLaunchableProfiles).toHaveBeenCalledWith(profile, 2);
-      expect(result).toEqual([{ id: "child", name: "Child" }]);
+      expect(result).toEqual([{ id: "child", name: "Child", roles: ["user"], memoryNamespace: "child" }]);
     });
 
     test("defaults currentDepth to 0", () => {

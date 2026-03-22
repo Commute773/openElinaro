@@ -151,8 +151,8 @@ describe("executeCodingBatch", () => {
 
     expect(result.kind).toBe("completed");
     expect(result.run.taskReports).toHaveLength(1);
-    expect(result.run.taskReports![0].taskId).toBe("t1");
-    expect(result.run.taskReports![0].status).toBe("failed");
+    expect(result.run.taskReports![0]!.taskId).toBe("t1");
+    expect(result.run.taskReports![0]!.status).toBe("failed");
     expect(result.run.executionLog.length).toBeGreaterThan(0);
     expect(result.run.executionLog.some((e) => e.includes("t1"))).toBe(true);
   });

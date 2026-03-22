@@ -21,7 +21,7 @@ mock.module("./text-embedding-service", () => ({
 const TEST_PROFILE = {
   id: "test-profile",
   name: "Test",
-  roles: ["root"],
+  roles: ["root"] as string[],
   memoryNamespace: "test-ns",
 } as const;
 
