@@ -2,6 +2,11 @@
 
 This repository is an agent platform built with Bun and TypeScript. Treat this file as the top-level map, not the full specification.
 
+## Build & Verify
+
+- **Test:** `bun test`
+- **After every code change:** `bun run service:prepare-update` (from repo root)
+- There is no `bun prepare` or `bun build` script. The correct command is `bun run service:prepare-update`.
 ## Start Here
 
 - Docs index: [docs/README.md](docs/README.md)
