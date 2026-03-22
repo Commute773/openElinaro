@@ -6,9 +6,10 @@ This runtime now treats phone calls and text messaging as first-class concepts t
 
 - `src/services/communications-store.ts` persists calls and messages under `~/.openelinaro/communications/store.json`
 - `src/services/vonage-service.ts` owns Vonage configuration, outbound API calls, webhook verification, and formatting
-- `src/services/gemini-live-phone-service.ts` owns Gemini 2.5 Flash Live outbound phone-call sessions, transcript logs, and the Vonage media bridge
+- `src/services/gemini-live-phone-service.ts` (re-exports from `src/services/gemini-live/`) owns Gemini 2.5 Flash Live outbound phone-call sessions, transcript logs, and the Vonage media bridge. Internal modules live in `src/services/gemini-live/` (`audio-stream.ts`, `latency-tracker.ts`, `phone-transcript.ts`)
 - `src/integrations/http/server.ts` exposes the local HTTP listener for Vonage webhooks
-- `src/tools/routine-tool-registry.ts` exposes root-only communications tools:
+- `src/tools/groups/communication-tools.ts` (registered via `src/tools/tool-registry.ts`) exposes root-only communications tools:
+  - `email`
   - `communications_status`
   - `make_phone_call`
   - `call_list`
