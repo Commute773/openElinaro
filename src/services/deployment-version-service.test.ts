@@ -27,7 +27,7 @@ describe("deployment version service", () => {
   });
 
   test("reads VERSION.json from the active service root", () => {
-    const resolvedRoot = fs.realpathSync(tempRoot);
+    const resolvedRoot = path.resolve(tempRoot);
     fs.writeFileSync(
       path.join(tempRoot, "VERSION.json"),
       `${JSON.stringify({
@@ -40,7 +40,7 @@ describe("deployment version service", () => {
       "utf8",
     );
 
-    process.chdir(tempRoot);
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
 
     expect(new DeploymentVersionService().load()).toEqual({
       version: "2026.03.15.2",
@@ -50,7 +50,7 @@ describe("deployment version service", () => {
       changelogPath: path.join(resolvedRoot, "DEPLOYMENTS.md"),
       sourceRoot: null,
       serviceRoot: resolvedRoot,
-      managedService: false,
+      managedService: true,
     });
   });
 
@@ -93,8 +93,8 @@ describe("deployment version service", () => {
   });
 
   test("returns an explicit unversioned fallback when metadata is missing", () => {
-    const resolvedRoot = fs.realpathSync(tempRoot);
-    process.chdir(tempRoot);
+    const resolvedRoot = path.resolve(tempRoot);
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
 
     expect(new DeploymentVersionService().load()).toEqual({
       version: "unversioned",
@@ -104,7 +104,7 @@ describe("deployment version service", () => {
       changelogPath: null,
       sourceRoot: null,
       serviceRoot: resolvedRoot,
-      managedService: false,
+      managedService: true,
     });
   });
 
