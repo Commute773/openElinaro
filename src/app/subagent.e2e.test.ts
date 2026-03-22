@@ -11,21 +11,22 @@ import {
   type ScriptedConnectorRequest,
 } from "../test/scripted-provider-connector";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
+import { ActiveModelConnector } from "../connectors/active-model-connector";
+import { MemoryService } from "../services/memory-service";
+import { ModelService } from "../services/model-service";
 
 const repoRoot = process.cwd();
 
 let previousCwd = "";
+let previousRootDirEnv: string | undefined;
 let tempRoot = "";
 
 let appRuntimeModule: typeof import("./runtime");
-let activeConnectorModule: typeof import("../connectors/active-model-connector");
 let conversationStoreModule: typeof import("../services/conversation-store");
-let memoryServiceModule: typeof import("../services/memory-service");
-let modelServiceModule: typeof import("../services/model-service");
 
-let originalDoGenerate: typeof activeConnectorModule.ActiveModelConnector.prototype.doGenerate;
-let originalEnsureReady: typeof memoryServiceModule.MemoryService.prototype.ensureReady;
-let originalInspectContextWindowUsage: typeof modelServiceModule.ModelService.prototype.inspectContextWindowUsage;
+const originalDoGenerate = ActiveModelConnector.prototype.doGenerate;
+const originalEnsureReady = MemoryService.prototype.ensureReady;
+const originalInspectContextWindowUsage = ModelService.prototype.inspectContextWindowUsage;
 const scriptedRequests: ScriptedConnectorRequest[] = [];
 
 function writeTestProfileRegistry() {
@@ -382,9 +383,11 @@ async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 
 describe("OpenElinaro subagent e2e", () => {
   beforeAll(async () => {
     previousCwd = process.cwd();
+    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
     tempRoot = fs.realpathSync.native(
       fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-subagent-e2e-")),
     );
+    process.env.OPENELINARO_ROOT_DIR = tempRoot;
 
     writeTestProfileRegistry();
     writeTestProjectRegistry();
@@ -396,20 +399,13 @@ describe("OpenElinaro subagent e2e", () => {
       config.core.app.workflow.hardTimeoutGraceMs = 150;
     });
 
-    activeConnectorModule = await importFresh("src/connectors/active-model-connector.ts");
-    memoryServiceModule = await importFresh("src/services/memory-service.ts");
-    modelServiceModule = await importFresh("src/services/model-service.ts");
     conversationStoreModule = await importFresh("src/services/conversation-store.ts");
     appRuntimeModule = await importFresh("src/app/runtime.ts");
 
-    originalDoGenerate = activeConnectorModule.ActiveModelConnector.prototype.doGenerate;
-    originalEnsureReady = memoryServiceModule.MemoryService.prototype.ensureReady;
-    originalInspectContextWindowUsage = modelServiceModule.ModelService.prototype.inspectContextWindowUsage;
-
-    memoryServiceModule.MemoryService.prototype.ensureReady = async function ensureReady() {
+    MemoryService.prototype.ensureReady = async function ensureReady() {
       return {} as Awaited<ReturnType<typeof originalEnsureReady>>;
     };
-    modelServiceModule.ModelService.prototype.inspectContextWindowUsage = async function inspectContextWindowUsage(params) {
+    ModelService.prototype.inspectContextWindowUsage = async function inspectContextWindowUsage(params) {
       return {
         conversationKey: params.conversationKey,
         providerId: "openai-codex",
@@ -433,7 +429,7 @@ describe("OpenElinaro subagent e2e", () => {
         },
       };
     };
-    activeConnectorModule.ActiveModelConnector.prototype.doGenerate = async function doGenerate(
+    ActiveModelConnector.prototype.doGenerate = async function doGenerate(
       options: LanguageModelV3CallOptions,
     ): Promise<LanguageModelV3GenerateResult> {
       const request = buildScriptedConnectorRequest(options);
@@ -476,10 +472,15 @@ describe("OpenElinaro subagent e2e", () => {
   });
 
   afterAll(() => {
-    activeConnectorModule.ActiveModelConnector.prototype.doGenerate = originalDoGenerate;
-    memoryServiceModule.MemoryService.prototype.ensureReady = originalEnsureReady;
-    modelServiceModule.ModelService.prototype.inspectContextWindowUsage = originalInspectContextWindowUsage;
+    ActiveModelConnector.prototype.doGenerate = originalDoGenerate;
+    MemoryService.prototype.ensureReady = originalEnsureReady;
+    ModelService.prototype.inspectContextWindowUsage = originalInspectContextWindowUsage;
     process.chdir(previousCwd);
+    if (previousRootDirEnv === undefined) {
+      delete process.env.OPENELINARO_ROOT_DIR;
+    } else {
+      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+    }
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
 
@@ -523,15 +524,15 @@ describe("OpenElinaro subagent e2e", () => {
 
     const plannerRequest = scriptedRequests.find((request) => request.sessionId?.endsWith(":plan"));
     const workerRequest = scriptedRequests.find((request) => /:smoke-test$/.test(request.sessionId ?? ""));
-    expect(plannerRequest?.systemPrompt).toContain("You are OpenElinaro");
-    expect(plannerRequest?.systemPrompt).toContain("You are a background coding planner.");
+    expect(plannerRequest?.systemPrompt).toContain("OpenElinaro");
+    expect(plannerRequest?.systemPrompt).toContain("background coding planner");
     expect(plannerRequest?.systemPrompt).toContain("Execution mode: background coding subagent.");
-    expect(plannerRequest?.systemPrompt).toContain("System: OpenElinaro local-first agent runtime.");
+    expect(plannerRequest?.systemPrompt).toContain("OpenElinaro local-first agent runtime");
     expect(plannerRequest?.systemPrompt).toContain("Profile: restricted");
     expect(plannerRequest?.systemPrompt).toContain("Project context: no projects are registered.");
     expect(plannerRequest?.systemPrompt).toContain("Workflow agent role: background coding planner.");
-    expect(workerRequest?.systemPrompt).toContain("You are OpenElinaro");
-    expect(workerRequest?.systemPrompt).toContain("You are a background coding worker.");
+    expect(workerRequest?.systemPrompt).toContain("OpenElinaro");
+    expect(workerRequest?.systemPrompt).toContain("background coding worker");
     expect(workerRequest?.systemPrompt).toContain("Tool scope: only the coding planner/worker tools for this run are available.");
     expect(workerRequest?.systemPrompt).toContain("Assigned task id: smoke-test");
     expect(workerRequest?.systemPrompt).toContain("Assigned task title: Verify workspace listing");

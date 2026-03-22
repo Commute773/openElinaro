@@ -771,6 +771,7 @@ export class OpenElinaroApp {
   }
 
   private buildWorkflowController(sourceProfileId: string) {
+    const getNotifier = () => this.onBackgroundConversationResponse;
     return createWorkflowController({
       sourceProfileId,
       profiles: this.profiles,
@@ -784,11 +785,12 @@ export class OpenElinaroApp {
       backgroundRetryTimer: this.backgroundRetryTimerRef,
       getScope: (profileId, options) => this.getScope(profileId, options),
       handleRequest: (request: AppRequest, options?: any) => this.handleRequest(request, options),
-      onBackgroundConversationResponse: this.onBackgroundConversationResponse,
+      get onBackgroundConversationResponse() { return getNotifier(); },
     });
   }
 
   private doKickBackgroundRunner(): void {
+    const getNotifier = () => this.onBackgroundConversationResponse;
     kickBackgroundRunner({
       registry: this.registry,
       activeWorkflowControllers: this.activeWorkflowControllers,
@@ -800,7 +802,7 @@ export class OpenElinaroApp {
       activeProfile: this.activeProfile,
       getScope: (profileId, options) => this.getScope(profileId, options),
       handleRequest: (request: AppRequest, options?: any) => this.handleRequest(request, options),
-      onBackgroundConversationResponse: this.onBackgroundConversationResponse,
+      get onBackgroundConversationResponse() { return getNotifier(); },
     });
   }
 }

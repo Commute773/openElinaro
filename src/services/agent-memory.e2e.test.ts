@@ -10,6 +10,7 @@ import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 
 const repoRoot = process.cwd();
 const MACHINE_TEST_ROOT = getTestFixturesDir();
+const HAS_MEMORY_FIXTURES = fs.existsSync(path.join(MACHINE_TEST_ROOT, "memory/index.root.json"));
 const NO_HIT_PROMPT = "[E2E TEST] zxqv norb flensor kraylith velmora quentis halvane.";
 const HIT_PROMPT = "[E2E TEST] Remind me about Montreal pricing and what I said about it.";
 const HEALTHCHECK_PROMPT =
@@ -291,6 +292,8 @@ afterAll(() => {
 });
 
 describe("real-corpus memory recall", () => {
+  const fixtureTest = HAS_MEMORY_FIXTURES ? test : test.skip;
+
   test("injects nothing when recall has no relevant match", async () => {
     const harness = createHarness();
 
@@ -315,7 +318,7 @@ describe("real-corpus memory recall", () => {
     expect(extractHumanText(savedHumanMessage as HumanMessage)).toBe(NO_HIT_PROMPT);
   });
 
-  test("prepends recalled memory to the top of the same user message", async () => {
+  fixtureTest("prepends recalled memory to the top of the same user message", async () => {
     const harness = createHarness();
 
     const directRecall = await harness.recall.buildRecallContext({
@@ -367,7 +370,7 @@ describe("real-corpus memory recall", () => {
     expect(directRecall).toBe("");
   });
 
-  test("benchmarks recall and pre-provider injection latency", async () => {
+  fixtureTest("benchmarks recall and pre-provider injection latency", async () => {
     const realHarness = createHarness();
     const baselineHarness = createHarness({
       async recallOverride() {
