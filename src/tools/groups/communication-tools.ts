@@ -15,15 +15,22 @@ const emailActionSchema = z.enum(["status", "count", "list_unread", "list_recent
 const emailMailboxSchema = z.enum(["unread", "recent"]);
 const callControlActionSchema = z.enum(["talk", "stop_talk", "stream", "stop_stream", "transfer"]);
 
+/** Coerce a bare string into a single-element array so the model can pass either form. */
+const coerceStringArray = (maxItems: number) =>
+  z.preprocess(
+    (val) => (typeof val === "string" ? [val] : val),
+    z.array(z.string().min(1)).min(1).max(maxItems),
+  );
+
 const emailSchema = z.object({
   action: emailActionSchema,
   mailbox: emailMailboxSchema.optional(),
   index: z.number().int().min(1).optional(),
   limit: z.number().int().min(1).max(50).optional(),
-  to: z.array(z.string().min(1)).min(1).max(50).optional(),
-  cc: z.array(z.string().min(1)).min(1).max(50).optional(),
-  bcc: z.array(z.string().min(1)).min(1).max(50).optional(),
-  replyTo: z.array(z.string().min(1)).min(1).max(10).optional(),
+  to: coerceStringArray(50).optional(),
+  cc: coerceStringArray(50).optional(),
+  bcc: coerceStringArray(50).optional(),
+  replyTo: coerceStringArray(10).optional(),
   subject: z.string().min(1).optional(),
   body: z.string().min(1).optional(),
   format: responseFormatSchema.optional(),
