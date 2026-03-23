@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.8
+- Released at: 2026-03-23T17:47:30Z
+- Release id: 20260323T174730Z-456829d
+- Previous version: 2026.03.23.7
+- Trigger: ci/release workflow
+
+- fix: read service user/group from config.yaml instead of hardcoding
+
 ## 2026.03.23.7
 - Released at: 2026-03-23T17:40:48Z
 - Release id: 20260323T174048Z-edd0eea
