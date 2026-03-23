@@ -101,14 +101,22 @@ function summarizeToolError(toolName: string, error: ToolErrorEnvelope["error"])
   return `\`${toolName}\` failed.`;
 }
 
+function formatAgentMessage(summary: string, raw: string) {
+  if (raw && raw !== "Command failed" && !summary.includes(raw)) {
+    return `${summary} ${raw}`;
+  }
+  return summary;
+}
+
 export function buildToolErrorEnvelope(toolName: string, error: unknown): ToolErrorEnvelope {
   const raw = normalizeErrorMessage(error) || `Tool ${toolName} failed.`;
   const classified = inferToolErrorType(raw);
   const details = extractErrorDetails(error);
+  const summary = summarizeToolError(toolName, classified);
   return {
     ok: false,
     tool: toolName,
-    message: summarizeToolError(toolName, classified),
+    message: formatAgentMessage(summary, raw),
     error: classified,
     debug: {
       raw,
