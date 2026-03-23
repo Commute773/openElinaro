@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.9
+- Released at: 2026-03-23T18:29:18Z
+- Release id: 20260323T182918Z-5c33165
+- Previous version: 2026.03.23.8
+- Trigger: ci/release workflow
+
+- fix: always use base64 image data instead of sourceUrl for LLM inference
+
 ## 2026.03.23.8
 - Released at: 2026-03-23T17:47:30Z
 - Release id: 20260323T174730Z-456829d
