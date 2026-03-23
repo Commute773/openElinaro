@@ -479,6 +479,317 @@ describe("MediaService", () => {
     }
   });
 
+  test("fires onPlaybackEnd callback when eof-reached becomes true", async () => {
+    const tempRoot = createTempRoot();
+    try {
+      const localMedia = path.join(tempRoot, "media");
+      const speakerConfigPath = path.join(tempRoot, "speakers.json");
+      const stateRoot = path.join(tempRoot, ".openelinarotest", "media");
+      const thunderPath = path.join(localMedia, "ambient", "thunder.mp3");
+      writeFile(thunderPath);
+      writeSpeakerConfig(speakerConfigPath);
+
+      let eofReached = false;
+      const events: Array<{ speakerId: string; title: string; reason: string }> = [];
+
+      const service = new MediaService({
+        mediaRoots: [localMedia],
+        catalogPath: path.join(tempRoot, "missing-catalog.json"),
+        speakerConfigPath,
+        stateRoot,
+        switchAudioSourceBin: "switchaudio",
+        blueutilBin: "blueutil",
+        mpvBin: "mpv",
+        ncBin: "nc",
+        osascriptBin: "osascript",
+        eofPollIntervalMs: 500,
+        runCommand: async ({ file, args, input }) => {
+          if (file === "switchaudio" && args?.join(" ") === "-a -t output") {
+            return { stdout: "B06HD\n", stderr: "", exitCode: 0 };
+          }
+          if (file === "switchaudio" && args?.join(" ") === "-c -t output") {
+            return { stdout: "B06HD\n", stderr: "", exitCode: 0 };
+          }
+          if (file === "nc") {
+            if (input?.includes('"get_property","pid"')) {
+              return { stdout: '{"data":444}\n', stderr: "", exitCode: 0 };
+            }
+            if (input?.includes('"get_property","eof-reached"')) {
+              return { stdout: `{"data":${eofReached}}\n`, stderr: "", exitCode: 0 };
+            }
+            if (input?.includes('"get_property","pause"')) {
+              return { stdout: '{"data":false}\n', stderr: "", exitCode: 0 };
+            }
+            if (input?.includes('"get_property","volume"')) {
+              return { stdout: '{"data":80}\n', stderr: "", exitCode: 0 };
+            }
+            if (input?.includes('"get_property","path"')) {
+              return { stdout: `{"data":"${thunderPath}"}\n`, stderr: "", exitCode: 0 };
+            }
+            return { stdout: "", stderr: "", exitCode: 0 };
+          }
+          return { stdout: "", stderr: "", exitCode: 0 };
+        },
+        spawnDetached: async ({ args }) => {
+          const socketArg = args?.find((arg) => arg.startsWith("--input-ipc-server="));
+          const socketPath = socketArg?.split("=", 2)[1] ?? "";
+          writeFile(socketPath);
+          return { pid: 444 };
+        },
+      });
+
+      service.onPlaybackEnd((event) => {
+        events.push(event);
+      });
+
+      await service.play({
+        query: "thunder",
+        speaker: "bedroom",
+        volume: 80,
+        loop: false,
+      });
+
+      // Simulate EOF by flipping the flag
+      eofReached = true;
+
+      // Wait for the poll to fire (poll interval is 500ms)
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      expect(events.length).toBe(1);
+      expect(events[0]?.speakerId).toBe("bedroom");
+      expect(events[0]?.title).toContain("Thunder");
+      expect(events[0]?.reason).toBe("eof");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("does not fire onPlaybackEnd for looped tracks", async () => {
+    const tempRoot = createTempRoot();
+    try {
+      const localMedia = path.join(tempRoot, "media");
+      const speakerConfigPath = path.join(tempRoot, "speakers.json");
+      const stateRoot = path.join(tempRoot, ".openelinarotest", "media");
+      const thunderPath = path.join(localMedia, "ambient", "thunder.mp3");
+      writeFile(thunderPath);
+      writeSpeakerConfig(speakerConfigPath);
+
+      const events: Array<{ speakerId: string; title: string; reason: string }> = [];
+
+      const service = new MediaService({
+        mediaRoots: [localMedia],
+        catalogPath: path.join(tempRoot, "missing-catalog.json"),
+        speakerConfigPath,
+        stateRoot,
+        switchAudioSourceBin: "switchaudio",
+        blueutilBin: "blueutil",
+        mpvBin: "mpv",
+        ncBin: "nc",
+        osascriptBin: "osascript",
+        eofPollIntervalMs: 500,
+        runCommand: async ({ file, args, input }) => {
+          if (file === "switchaudio" && args?.join(" ") === "-a -t output") {
+            return { stdout: "B06HD\n", stderr: "", exitCode: 0 };
+          }
+          if (file === "switchaudio" && args?.join(" ") === "-c -t output") {
+            return { stdout: "B06HD\n", stderr: "", exitCode: 0 };
+          }
+          if (file === "nc") {
+            if (input?.includes('"get_property","pid"')) {
+              return { stdout: '{"data":555}\n', stderr: "", exitCode: 0 };
+            }
+            if (input?.includes('"get_property","eof-reached"')) {
+              return { stdout: '{"data":true}\n', stderr: "", exitCode: 0 };
+            }
+            return { stdout: "", stderr: "", exitCode: 0 };
+          }
+          return { stdout: "", stderr: "", exitCode: 0 };
+        },
+        spawnDetached: async ({ args }) => {
+          const socketArg = args?.find((arg) => arg.startsWith("--input-ipc-server="));
+          const socketPath = socketArg?.split("=", 2)[1] ?? "";
+          writeFile(socketPath);
+          return { pid: 555 };
+        },
+      });
+
+      service.onPlaybackEnd((event) => {
+        events.push(event);
+      });
+
+      // Play with loop=true (ambience defaults to loop)
+      await service.play({
+        query: "thunder",
+        speaker: "bedroom",
+        volume: 80,
+        loop: true,
+      });
+
+      // Wait for potential poll cycles
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      expect(events.length).toBe(0);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("stopSpeaker clears the EOF watcher without firing callback", async () => {
+    const tempRoot = createTempRoot();
+    try {
+      const localMedia = path.join(tempRoot, "media");
+      const speakerConfigPath = path.join(tempRoot, "speakers.json");
+      const stateRoot = path.join(tempRoot, ".openelinarotest", "media");
+      const thunderPath = path.join(localMedia, "ambient", "thunder.mp3");
+      writeFile(thunderPath);
+      writeSpeakerConfig(speakerConfigPath);
+
+      const events: Array<{ speakerId: string; title: string; reason: string }> = [];
+
+      const service = new MediaService({
+        mediaRoots: [localMedia],
+        catalogPath: path.join(tempRoot, "missing-catalog.json"),
+        speakerConfigPath,
+        stateRoot,
+        switchAudioSourceBin: "switchaudio",
+        blueutilBin: "blueutil",
+        mpvBin: "mpv",
+        ncBin: "nc",
+        osascriptBin: "osascript",
+        eofPollIntervalMs: 500,
+        runCommand: async ({ file, args, input }) => {
+          if (file === "switchaudio" && args?.join(" ") === "-a -t output") {
+            return { stdout: "B06HD\n", stderr: "", exitCode: 0 };
+          }
+          if (file === "switchaudio" && args?.join(" ") === "-c -t output") {
+            return { stdout: "B06HD\n", stderr: "", exitCode: 0 };
+          }
+          if (file === "nc") {
+            if (input?.includes('"get_property","pid"')) {
+              return { stdout: '{"data":666}\n', stderr: "", exitCode: 0 };
+            }
+            if (input?.includes('"get_property","eof-reached"')) {
+              return { stdout: '{"data":false}\n', stderr: "", exitCode: 0 };
+            }
+            if (input?.includes('"get_property","pause"')) {
+              return { stdout: '{"data":false}\n', stderr: "", exitCode: 0 };
+            }
+            if (input?.includes('"get_property","volume"')) {
+              return { stdout: '{"data":80}\n', stderr: "", exitCode: 0 };
+            }
+            if (input?.includes('"get_property","path"')) {
+              return { stdout: `{"data":"${thunderPath}"}\n`, stderr: "", exitCode: 0 };
+            }
+            return { stdout: "", stderr: "", exitCode: 0 };
+          }
+          return { stdout: "", stderr: "", exitCode: 0 };
+        },
+        spawnDetached: async ({ args }) => {
+          const socketArg = args?.find((arg) => arg.startsWith("--input-ipc-server="));
+          const socketPath = socketArg?.split("=", 2)[1] ?? "";
+          writeFile(socketPath);
+          return { pid: 666 };
+        },
+      });
+
+      service.onPlaybackEnd((event) => {
+        events.push(event);
+      });
+
+      await service.play({
+        query: "thunder",
+        speaker: "bedroom",
+        volume: 80,
+        loop: false,
+      });
+
+      // Stop immediately — should clear the watcher
+      await service.stop("bedroom");
+
+      // Wait for potential poll cycles that should not fire
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      expect(events.length).toBe(0);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("unsubscribe from onPlaybackEnd removes the callback", async () => {
+    const tempRoot = createTempRoot();
+    try {
+      const localMedia = path.join(tempRoot, "media");
+      const speakerConfigPath = path.join(tempRoot, "speakers.json");
+      const stateRoot = path.join(tempRoot, ".openelinarotest", "media");
+      const thunderPath = path.join(localMedia, "ambient", "thunder.mp3");
+      writeFile(thunderPath);
+      writeSpeakerConfig(speakerConfigPath);
+
+      let eofReached = false;
+      const events: Array<{ speakerId: string; title: string; reason: string }> = [];
+
+      const service = new MediaService({
+        mediaRoots: [localMedia],
+        catalogPath: path.join(tempRoot, "missing-catalog.json"),
+        speakerConfigPath,
+        stateRoot,
+        switchAudioSourceBin: "switchaudio",
+        blueutilBin: "blueutil",
+        mpvBin: "mpv",
+        ncBin: "nc",
+        osascriptBin: "osascript",
+        eofPollIntervalMs: 500,
+        runCommand: async ({ file, args, input }) => {
+          if (file === "switchaudio" && args?.join(" ") === "-a -t output") {
+            return { stdout: "B06HD\n", stderr: "", exitCode: 0 };
+          }
+          if (file === "switchaudio" && args?.join(" ") === "-c -t output") {
+            return { stdout: "B06HD\n", stderr: "", exitCode: 0 };
+          }
+          if (file === "nc") {
+            if (input?.includes('"get_property","pid"')) {
+              return { stdout: '{"data":777}\n', stderr: "", exitCode: 0 };
+            }
+            if (input?.includes('"get_property","eof-reached"')) {
+              return { stdout: `{"data":${eofReached}}\n`, stderr: "", exitCode: 0 };
+            }
+            return { stdout: "", stderr: "", exitCode: 0 };
+          }
+          return { stdout: "", stderr: "", exitCode: 0 };
+        },
+        spawnDetached: async ({ args }) => {
+          const socketArg = args?.find((arg) => arg.startsWith("--input-ipc-server="));
+          const socketPath = socketArg?.split("=", 2)[1] ?? "";
+          writeFile(socketPath);
+          return { pid: 777 };
+        },
+      });
+
+      const unsubscribe = service.onPlaybackEnd((event) => {
+        events.push(event);
+      });
+
+      await service.play({
+        query: "thunder",
+        speaker: "bedroom",
+        volume: 80,
+        loop: false,
+      });
+
+      // Unsubscribe before EOF fires
+      unsubscribe();
+      eofReached = true;
+
+      // Wait for the poll to fire
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      // No events because we unsubscribed
+      expect(events.length).toBe(0);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test("round-trips playback control against a real local mpv process", async () => {
     if (process.platform !== "darwin" || !fs.existsSync("/opt/homebrew/bin/mpv")) {
       return;
