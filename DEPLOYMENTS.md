@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.6
+- Released at: 2026-03-23T17:31:11Z
+- Release id: 20260323T173111Z-79ff629
+- Previous version: 2026.03.23.5
+- Trigger: ci/release workflow
+
+- fix: show per-feature active/off status in system prompt and stop hard-coding web_search
+
 ## 2026.03.23.5
 - Released at: 2026-03-23T02:08:42Z
 - Release id: 20260323T020842Z-4c23169
