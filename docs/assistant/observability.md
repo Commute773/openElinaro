@@ -2,6 +2,36 @@
 
 The runtime telemetry entrypoint is [`src/services/telemetry.ts`](../../src/services/telemetry.ts). It is still the local structured telemetry layer, but it is now the single place to shape future OpenTelemetry-compatible behavior.
 
+## Log file layout
+
+All runtime state lives under `~/.openelinaro/`. The active log files are:
+
+| Path | Format | Contents |
+|------|--------|----------|
+| `telemetry.sqlite` | SQLite (tables: `spans`, `events`, `telemetry_fts`) | Primary structured telemetry — spans with duration/outcome, discrete events with severity |
+| `logs/errors.jsonl` | JSONL | Error and warning events only; auto-rotates to `errors.1.jsonl` at 10 MB |
+| `model-usage.jsonl` | JSONL | Per-request model API usage with token counts, costs, prompt diagnostics |
+| `deployments/helper-jobs/<id>/stdout.log` | Plain text | Per-update-job stdout (install, healthcheck, rollback output) |
+| `deployments/helper-jobs/<id>/stderr.log` | Plain text | Per-update-job stderr (failure reason and rollback details) |
+
+Legacy log files (`app.jsonl`, `launchd.*.log`, `service.*.log`) are no longer written and can be deleted.
+
+### Reading logs
+
+```sh
+# Tail recent errors
+bun src/cli/tail-errors.ts
+bun src/cli/tail-errors.ts -f                     # follow mode
+bun src/cli/tail-errors.ts --component=email       # filter by component
+
+# Raw JSONL
+tail -f ~/.openelinaro/logs/errors.jsonl | jq .
+
+# Check most recent update job
+ls -t ~/.openelinaro/deployments/helper-jobs/ | head -1
+cat ~/.openelinaro/deployments/helper-jobs/<id>/stderr.log
+```
+
 ## Current defaults
 
 - Use `telemetry.child({ component })` for component-scoped events and spans.
