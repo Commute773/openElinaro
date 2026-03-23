@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.19
+- Released at: 2026-03-23T22:01:53Z
+- Release id: 20260323T220153Z-f01e768
+- Previous version: 2026.03.23.18
+- Trigger: ci/release workflow
+
+- fix: use profile timezone for heartbeat time prefix, deduplicate time injection, fix URL parsing
+
 ## 2026.03.23.18
 - Released at: 2026-03-23T21:39:23Z
 - Release id: 20260323T213923Z-4cc1630
