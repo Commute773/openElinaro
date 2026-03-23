@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.23.20
+- Released at: 2026-03-23T23:08:12Z
+- Release id: 20260323T230812Z-b46fc4d
+- Previous version: 2026.03.23.19
+- Trigger: ci/release workflow
+
+- fix: make subagent failure errors verbose with exit codes, output, and pane capture
+- feat: add alarm flag to routines for exact-time firing
+
 ## 2026.03.23.19
 - Released at: 2026-03-23T22:01:53Z
 - Release id: 20260323T220153Z-f01e768

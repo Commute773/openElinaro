@@ -1,8 +1,8 @@
 {
-  "version": "2026.03.23.19",
-  "releasedAt": "2026-03-23T22:01:53Z",
-  "sequence": 19,
-  "previousVersion": "2026.03.23.18",
-  "releaseId": "20260323T220153Z-f01e768",
+  "version": "2026.03.23.20",
+  "releasedAt": "2026-03-23T23:08:12Z",
+  "sequence": 20,
+  "previousVersion": "2026.03.23.19",
+  "releaseId": "20260323T230812Z-b46fc4d",
   "changelogPath": "DEPLOYMENTS.md"
 }
