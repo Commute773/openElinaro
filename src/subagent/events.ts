@@ -50,15 +50,25 @@ export function normalizeClaudeHookEvent(raw: ClaudeHookPayload): SubagentEvent 
   }
 
   // Stop hook: terminal event
-  const succeeded = raw.exitCode === 0;
+  const exitCode = raw.exitCode ?? 1;
+  const succeeded = exitCode === 0;
+  const result = raw.result ?? "";
+
+  // Build a meaningful error: prefer the explicit error field, fall back to
+  // exit-code + result excerpt so failures are never opaque.
+  let error = raw.error ?? "";
+  if (!error && !succeeded) {
+    const parts = [`Process exited with code ${exitCode}.`];
+    if (result) {
+      parts.push(`Hook payload (last 2000 chars): ${result.slice(-2000)}`);
+    }
+    error = parts.join(" ");
+  }
+
   return {
     ...base,
     kind: succeeded ? "worker.completed" : "worker.failed",
-    payload: {
-      exitCode: raw.exitCode ?? 1,
-      result: raw.result ?? "",
-      error: raw.error ?? "",
-    },
+    payload: { exitCode, result, error },
   };
 }
 
@@ -74,16 +84,23 @@ export interface CodexNotifyPayload {
 export function normalizeCodexNotifyEvent(raw: CodexNotifyPayload): SubagentEvent {
   const timestamp = new Date().toISOString();
   const succeeded = raw.exitCode === 0;
+  const output = raw.output ?? "";
+
+  // Build a meaningful error when the explicit error field is empty.
+  let error = raw.error ?? "";
+  if (!error && !succeeded) {
+    const parts = [`Process exited with code ${raw.exitCode}.`];
+    if (output) {
+      parts.push(`Output (last 2000 chars): ${output.slice(-2000)}`);
+    }
+    error = parts.join(" ");
+  }
 
   return {
     runId: raw.runId,
     provider: "codex",
     timestamp,
     kind: succeeded ? "worker.completed" : "worker.failed",
-    payload: {
-      exitCode: raw.exitCode,
-      output: raw.output ?? "",
-      error: raw.error ?? "",
-    },
+    payload: { exitCode: raw.exitCode, output, error },
   };
 }

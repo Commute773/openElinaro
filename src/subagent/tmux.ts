@@ -15,17 +15,42 @@ export class TmuxManager {
   async ensureSession(): Promise<void> {
     const result = await $`tmux has-session -t ${this.sessionName} 2>/dev/null`.nothrow().quiet();
     if (result.exitCode !== 0) {
-      await $`tmux new-session -d -s ${this.sessionName} -x 200 -y 50`.quiet();
+      const create = await $`tmux new-session -d -s ${this.sessionName} -x 200 -y 50`.nothrow().quiet();
+      if (create.exitCode !== 0) {
+        const stderr = create.stderr.toString().trim();
+        throw new Error(
+          `Failed to create tmux session "${this.sessionName}" (exit ${create.exitCode}).${stderr ? ` stderr: ${stderr}` : ""} Is tmux installed and working?`,
+        );
+      }
     }
   }
 
   /**
    * Create a new tmux window and run a command inside it.
-   * The command's lifetime is the window's lifetime.
+   * Sets remain-on-exit so the window stays alive after process death,
+   * allowing pane capture for diagnostics.
    */
   async runInWindow(windowName: string, command: string, cwd: string): Promise<void> {
     await this.ensureSession();
-    await $`tmux new-window -t ${this.sessionName} -n ${windowName} -c ${cwd} ${command}`.quiet();
+    const result = await $`tmux new-window -t ${this.sessionName} -n ${windowName} -c ${cwd} ${command}`.nothrow().quiet();
+    if (result.exitCode !== 0) {
+      const stderr = result.stderr.toString().trim();
+      throw new Error(
+        `Failed to create tmux window "${windowName}" (exit ${result.exitCode}).${stderr ? ` stderr: ${stderr}` : ""} Command: ${command.slice(0, 200)}`,
+      );
+    }
+    // Keep window alive after process exits so we can capture output for diagnostics
+    await $`tmux set-window-option -t ${this.sessionName}:${windowName} remain-on-exit on`.nothrow().quiet();
+  }
+
+  /**
+   * Check if the process inside a tmux window is still running.
+   * Returns false if the window doesn't exist or the pane is dead.
+   */
+  async isWindowProcessAlive(windowName: string): Promise<boolean> {
+    const result = await $`tmux list-panes -t ${this.sessionName}:${windowName} -F "#{pane_dead}"`.nothrow().quiet();
+    if (result.exitCode !== 0) return false;
+    return result.text().trim() !== "1";
   }
 
   /**

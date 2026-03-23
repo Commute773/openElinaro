@@ -294,6 +294,49 @@ export function createSubagentController(ctx: {
       // Register timeout
       timeouts.register(runId, timeoutMs, onTimeout);
 
+      // Schedule early health check: if the process dies in the first few
+      // seconds without firing hooks, we capture the pane output and mark
+      // the run as failed so the error is never silently swallowed.
+      const EARLY_HEALTH_CHECK_MS = 5_000;
+      setTimeout(async () => {
+        try {
+          const currentRun = registry.get(runId);
+          if (!currentRun) return;
+          if (currentRun.status === "completed" || currentRun.status === "failed" || currentRun.status === "cancelled") return;
+
+          const alive = await tmux.isWindowProcessAlive(runId);
+          if (alive) return;
+
+          // Process died without firing hooks — capture pane for diagnostics
+          let paneOutput = "";
+          try {
+            paneOutput = await tmux.capturePane(runId, 100);
+          } catch {
+            // best effort
+          }
+          // Clean up remain-on-exit window
+          await tmux.killWindow(runId);
+
+          const errorParts = [`Agent process exited early without reporting completion (provider: ${provider}).`];
+          if (paneOutput) {
+            errorParts.push(`Terminal output:\n${paneOutput}`);
+          } else {
+            errorParts.push("No terminal output was captured. The process may have crashed on startup. Check that the binary path is correct and API keys are configured.");
+          }
+
+          timeouts.clear(runId);
+          const failedRun = registry.markFailed(runId, errorParts.join("\n"));
+          if (failedRun) {
+            void injectCompletion(failedRun);
+          }
+        } catch (error) {
+          telemetry.recordError(error, {
+            runId,
+            operation: "subagent.early_health_check",
+          });
+        }
+      }, EARLY_HEALTH_CHECK_MS);
+
       telemetry.event("subagent.launched", {
         runId,
         provider,
