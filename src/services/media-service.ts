@@ -37,7 +37,8 @@ function getDefaultCatalogPath() {
   return resolveRuntimePath("media", "catalog.json");
 }
 
-const DEFAULT_SPEAKER_CONFIG_PATH = path.join(
+const DEFAULT_SPEAKER_CONFIG_PATH = resolveRuntimePath("media", "speakers.json");
+const LEGACY_SPEAKER_CONFIG_PATH = path.join(
   os.homedir(),
   ".openclaw",
   "workspace",
@@ -236,6 +237,23 @@ function readJsonFile<T>(filePath: string): T | null {
   }
 }
 
+function resolveSpeakerConfigPath(): string {
+  if (fs.existsSync(DEFAULT_SPEAKER_CONFIG_PATH)) {
+    return DEFAULT_SPEAKER_CONFIG_PATH;
+  }
+  if (fs.existsSync(LEGACY_SPEAKER_CONFIG_PATH)) {
+    telemetry.event("media.legacy_speaker_config", {
+      legacyPath: LEGACY_SPEAKER_CONFIG_PATH,
+      expectedPath: DEFAULT_SPEAKER_CONFIG_PATH,
+    }, {
+      level: "warn",
+      outcome: "ok",
+    });
+    return LEGACY_SPEAKER_CONFIG_PATH;
+  }
+  return DEFAULT_SPEAKER_CONFIG_PATH;
+}
+
 async function defaultRunCommand(params: {
   file: string;
   args?: string[];
@@ -372,7 +390,7 @@ export class MediaService {
       path.resolve(entry)
     ));
     this.catalogPath = path.resolve(options?.catalogPath ?? getDefaultCatalogPath());
-    this.speakerConfigPath = path.resolve(options?.speakerConfigPath ?? DEFAULT_SPEAKER_CONFIG_PATH);
+    this.speakerConfigPath = path.resolve(options?.speakerConfigPath ?? resolveSpeakerConfigPath());
     this.stateRoot = path.resolve(options?.stateRoot ?? DEFAULT_STATE_ROOT);
     this.socketsRoot = path.resolve(options?.socketRoot ?? DEFAULT_SOCKET_ROOT);
     this.metadataRoot = path.join(this.stateRoot, "players");

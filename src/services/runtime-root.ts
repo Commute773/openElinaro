@@ -23,6 +23,7 @@ const USER_DATA_TOP_LEVEL = new Set([
   "deployments",
   "docs-index-state.json",
   "docs-index.json",
+  "extensions",
   "external-sessions.json",
   "finance",
   "finance.sqlite",

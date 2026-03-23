@@ -37,6 +37,7 @@ import {
   buildHeartbeatWorkFocus,
   buildAutomationSessionKey,
 } from "./runtime-automation";
+import { ATTACHMENT_FAILED_PREFIX } from "../services/discord-response-service";
 
 type BackgroundConversationResponseNotifier = (params: {
   conversationKey: string;
@@ -244,14 +245,16 @@ export class OpenElinaroApp {
             systemContext,
             typingEligible: options?.typingEligible,
             onBackgroundResponse: options?.onBackgroundResponse
-              ? async (result) => options.onBackgroundResponse?.(
-                  finalizeAppResponse(scope, {
+              ? async (result) => {
+                  const finalized = finalizeAppResponse(scope, {
                     requestId: request.id,
                     mode: result.mode,
                     message: result.message,
                     warnings: result.warnings,
-                  }),
-                )
+                  });
+                  await options.onBackgroundResponse?.(finalized);
+                  await this.injectAttachmentErrorFeedback(scope, conversationKey, finalized);
+                }
               : undefined,
             onToolUse: options?.onToolUse,
             persistConversation: options?.chatOptions?.persistConversation,
@@ -262,12 +265,14 @@ export class OpenElinaroApp {
             providerSessionId: options?.chatOptions?.providerSessionId,
             usagePurpose: options?.chatOptions?.usagePurpose,
           });
-          return finalizeAppResponse(scope, {
+          const response = finalizeAppResponse(scope, {
             requestId: request.id,
             mode: result.mode,
             message: result.message,
             warnings: result.warnings,
           });
+          await this.injectAttachmentErrorFeedback(scope, conversationKey, response);
+          return response;
         }
 
         if (request.kind === "todo") {
@@ -890,6 +895,34 @@ export class OpenElinaroApp {
         });
       });
     });
+  }
+
+  private async injectAttachmentErrorFeedback(
+    scope: RuntimeScope,
+    conversationKey: string,
+    response: AppResponse,
+  ): Promise<void> {
+    const errors = response.attachmentErrors;
+    if (!errors || errors.length === 0) {
+      return;
+    }
+    const feedbackLines = [
+      `${ATTACHMENT_FAILED_PREFIX} The following file attachments failed to send to the user:`,
+      ...errors.map((filePath) => `- ${filePath}`),
+      "You should inform the user or recreate the file and try again.",
+    ];
+    try {
+      await scope.chat.recordAssistantMessage({
+        conversationKey,
+        message: feedbackLines.join("\n"),
+      });
+    } catch (error) {
+      this.appTelemetry.recordError(error, {
+        conversationKey,
+        operation: "app.inject_attachment_error_feedback",
+        failedPaths: errors.join(", "),
+      });
+    }
   }
 
   private buildSubagentController(sourceProfileId: string) {

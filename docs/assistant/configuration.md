@@ -24,6 +24,7 @@ In test mode, each test creates an isolated temp directory and sets `OPENELINARO
 - `tickets`
 - `localVoice`
 - `media`
+- `extensions`
 - `autonomousTime`
 
 Each optional feature has:
