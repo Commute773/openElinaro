@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23
+- Released at: 2026-03-23T00:04:20Z
+- Release id: 20260323T000420Z-2dda8a0
+- Previous version: 2026.03.22.9
+- Trigger: ci/release workflow
+
+- feat: surface subagent provider descriptions for multi-provider profiles (#33)
+
 ## 2026.03.22.9
 - Released at: 2026-03-22T23:24:19Z
 - Release id: 20260322T232419Z-7788e1d
