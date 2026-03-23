@@ -1,5 +1,16 @@
 # Deployments
 
+## 2026.03.23.14
+- Released at: 2026-03-23T20:22:13Z
+- Release id: 20260323T202213Z-6fc2ec7
+- Previous version: 2026.03.23.13
+- Trigger: ci/release workflow
+
+- add: extension system scaffold (ET-057)
+- add withSqliteRetry helper for SQLITE_BUSY retry with exponential backoff
+- fix: surface discord-file attachment failures to assistant context
+- migrate media speaker config from ~/.openclaw to openElinaro-native path
+
 ## 2026.03.23.13
 - Released at: 2026-03-23T20:07:08Z
 - Release id: 20260323T200708Z-4c2a007
