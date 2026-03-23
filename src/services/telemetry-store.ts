@@ -1,4 +1,6 @@
 import type { Database } from "bun:sqlite";
+import fs from "node:fs";
+import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";
 import { openDatabase } from "../utils/sqlite-helpers";
 
@@ -79,8 +81,20 @@ function normalizeLikePattern(value: string) {
   return `%${value.trim().toLowerCase()}%`;
 }
 
+const ATTR_MAX_CHARS = 4000;
+
+function truncateAttributes(attrs: Record<string, unknown>): unknown {
+  const raw = JSON.stringify(attrs);
+  if (raw.length <= ATTR_MAX_CHARS) return attrs;
+  return raw.slice(0, ATTR_MAX_CHARS) + "...";
+}
+
 export class TelemetryStore {
   private readonly db: Database;
+  private readonly logPath: string;
+  private logDirReady = false;
+  private writeCount = 0;
+  private lastSizeCheckMs = 0;
 
   constructor(private readonly dbPath = getStorePath()) {
     this.db = openDatabase(this.dbPath);
@@ -161,6 +175,7 @@ export class TelemetryStore {
       CREATE INDEX IF NOT EXISTS idx_events_corr ON events(conversation_key, workflow_run_id, task_id, tool_name, profile_id);
       CREATE INDEX IF NOT EXISTS idx_events_entity ON events(entity_type, entity_id, job_id, provider);
     `);
+    this.logPath = resolveRuntimePath("logs", "errors.jsonl");
   }
 
   getPath() {
@@ -226,6 +241,9 @@ export class TelemetryStore {
       record.outcome,
       record.attributesJson ? JSON.stringify(record.attributesJson) : "",
     ].filter(Boolean).join(" "));
+    if (record.outcome === "error") {
+      this.appendErrorLog(this.formatSpanLogLine(record));
+    }
   }
 
   insertEvent(record: TelemetryEventRecord) {
@@ -270,6 +288,9 @@ export class TelemetryStore {
       record.outcome ?? "",
       record.attributesJson ? JSON.stringify(record.attributesJson) : "",
     ].filter(Boolean).join(" "));
+    if (record.severity === "error" || record.severity === "warn") {
+      this.appendErrorLog(this.formatEventLogLine(record));
+    }
   }
 
   query(params: TelemetryQueryParams) {
@@ -426,5 +447,60 @@ export class TelemetryStore {
     this.db.query(
       "INSERT INTO telemetry_fts (row_type, row_id, body) VALUES (?1, ?2, ?3)",
     ).run(rowType, rowId, body);
+  }
+
+  private appendErrorLog(line: string) {
+    if (this.dbPath === ":memory:") return;
+    try {
+      if (!this.logDirReady) {
+        fs.mkdirSync(path.dirname(this.logPath), { recursive: true });
+        this.logDirReady = true;
+      }
+      fs.appendFileSync(this.logPath, line + "\n", "utf8");
+      this.writeCount++;
+      const now = Date.now();
+      if (this.writeCount % 100 === 0 || now - this.lastSizeCheckMs > 60_000) {
+        this.lastSizeCheckMs = now;
+        try {
+          const stat = fs.statSync(this.logPath);
+          if (stat.size > 10 * 1024 * 1024) {
+            const rotated = path.join(path.dirname(this.logPath), "errors.1.jsonl");
+            fs.renameSync(this.logPath, rotated);
+          }
+        } catch {
+          // stat/rename failure is non-fatal
+        }
+      }
+    } catch {
+      // file I/O failure is non-fatal — don't crash the app
+    }
+  }
+
+  private formatEventLogLine(record: TelemetryEventRecord): string {
+    const obj: Record<string, unknown> = { ts: record.timestamp, level: record.severity };
+    if (record.component) obj.component = record.component;
+    if (record.eventName) obj.event = record.eventName;
+    if (record.message) obj.message = record.message;
+    if (record.outcome) obj.outcome = record.outcome;
+    if (record.traceId) obj.traceId = record.traceId;
+    if (record.spanId) obj.spanId = record.spanId;
+    if (record.conversationKey) obj.conversationKey = record.conversationKey;
+    if (record.profileId) obj.profileId = record.profileId;
+    if (record.attributesJson) obj.attributes = truncateAttributes(record.attributesJson);
+    return JSON.stringify(obj);
+  }
+
+  private formatSpanLogLine(record: TelemetrySpanRecord): string {
+    const obj: Record<string, unknown> = { ts: record.endedAt, level: "error" };
+    if (record.component) obj.component = record.component;
+    if (record.operation) obj.operation = record.operation;
+    if (record.durationMs != null) obj.durationMs = record.durationMs;
+    if (record.outcome) obj.outcome = record.outcome;
+    if (record.traceId) obj.traceId = record.traceId;
+    if (record.spanId) obj.spanId = record.spanId;
+    if (record.conversationKey) obj.conversationKey = record.conversationKey;
+    if (record.profileId) obj.profileId = record.profileId;
+    if (record.attributesJson) obj.attributes = truncateAttributes(record.attributesJson);
+    return JSON.stringify(obj);
   }
 }
