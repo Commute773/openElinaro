@@ -89,6 +89,8 @@ export interface SubagentController {
   getAgentRun: (runId: string) => SubagentRun | undefined;
   listAgentRuns: () => SubagentRun[];
   captureAgentPane: (runId: string, lines?: number) => Promise<string>;
+  /** List available subagent providers for the source profile, with descriptions. */
+  listAvailableProviders: (profileId?: string) => Array<{ provider: "claude" | "codex"; path: string; description?: string }>;
 }
 
 export function createSubagentController(ctx: {
@@ -454,6 +456,12 @@ export function createSubagentController(ctx: {
       const hasWindow = await tmux.hasWindow(run.id);
       if (!hasWindow) return "(tmux window no longer exists)";
       return tmux.capturePane(run.id, lines);
+    },
+
+    listAvailableProviders: (profileId) => {
+      const targetProfileId = profileId?.trim() || sourceProfileId;
+      const targetProfile = profiles.getProfile(targetProfileId);
+      return profiles.listAvailableSubagents(targetProfile);
     },
   };
 }

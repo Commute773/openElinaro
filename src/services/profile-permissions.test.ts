@@ -465,6 +465,7 @@ describe("profile-scoped auth and permissions", () => {
         getAgentRun: () => undefined,
         listAgentRuns: () => [],
         captureAgentPane: async () => "",
+        listAvailableProviders: () => [],
       },
       access,
     );
@@ -558,6 +559,7 @@ describe("profile-scoped auth and permissions", () => {
         getAgentRun: () => undefined,
         listAgentRuns: () => [],
         captureAgentPane: async () => "",
+        listAvailableProviders: () => [],
       },
       access,
     );
@@ -655,6 +657,7 @@ describe("profile-scoped auth and permissions", () => {
         getAgentRun: () => undefined,
         listAgentRuns: () => [],
         captureAgentPane: async () => "",
+        listAvailableProviders: () => [],
       },
       access,
     );
@@ -750,6 +753,7 @@ describe("profile-scoped auth and permissions", () => {
         getAgentRun: () => undefined,
         listAgentRuns: () => [],
         captureAgentPane: async () => "",
+        listAvailableProviders: () => [],
       },
       access,
     );
@@ -911,6 +915,7 @@ describe("profile-scoped auth and permissions", () => {
         getAgentRun: () => undefined,
         listAgentRuns: () => [],
         captureAgentPane: async () => "",
+        listAvailableProviders: () => [],
       },
       access,
     );

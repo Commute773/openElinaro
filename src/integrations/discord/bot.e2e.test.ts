@@ -305,6 +305,7 @@ function createWorkflowStub() {
     getAgentRun: () => undefined,
     listAgentRuns: () => [],
     captureAgentPane: async () => "",
+    listAvailableProviders: () => [],
   };
 }
 
