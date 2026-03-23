@@ -21,7 +21,6 @@ import {
   approximateContentTokens,
   extractTextFromMessage,
   normalizeChatPromptContent,
-  resolveRemoteImageUrl,
 } from "./message-content-service";
 import {
   UsageTrackingService,
@@ -793,17 +792,6 @@ function toAnthropicUserContent(content: unknown): string | Array<Record<string,
   return blocks.map((block) => {
     if (block.type === "text") {
       return { type: "text", text: block.text };
-    }
-
-    const remoteImageUrl = resolveRemoteImageUrl(block.sourceUrl);
-    if (remoteImageUrl) {
-      return {
-        type: "image",
-        source: {
-          type: "url",
-          url: remoteImageUrl,
-        },
-      };
     }
 
     return {
