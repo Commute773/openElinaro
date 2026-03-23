@@ -323,16 +323,10 @@ export function createDiscordDmMessageBatcher(params: {
     clearBatchTimer(batch);
     batch.timer = scheduleTimeout(() => {
       void dispatchBatch(batchKey, "timeout").catch((error) => {
-        discordTelemetry.event(
-          "discord.message.batch_timeout_dispatch.error",
-          {
-            batchKey,
-            error: error instanceof Error
-              ? { name: error.name, message: error.message, stack: error.stack }
-              : String(error),
-          },
-          { level: "error", outcome: "error" },
-        );
+        discordTelemetry.recordError(error, {
+          batchKey,
+          eventName: "discord.message.batch_timeout_dispatch",
+        });
       });
     }, timeoutMs);
   };
@@ -772,17 +766,11 @@ export function createDiscordEventHandlers(params: {
       try {
         await dmMessageBatcher.handleMessage(message);
       } catch (error) {
-        discordTelemetry.event(
-          "discord.message.error",
-          {
-            userId: message.author.id,
-            channelId: message.channelId,
-            error: error instanceof Error
-              ? { name: error.name, message: error.message, stack: error.stack }
-              : String(error),
-          },
-          { level: "error", outcome: "error" },
-        );
+        discordTelemetry.recordError(error, {
+          userId: message.author.id,
+          channelId: message.channelId,
+          eventName: "discord.message",
+        });
         await replyToMessageWithChunks(message, error instanceof Error ? error.message : String(error));
       }
     },
