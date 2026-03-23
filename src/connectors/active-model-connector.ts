@@ -414,6 +414,20 @@ export class ActiveModelConnector implements ProviderConnector {
         const messages = options.prompt
           .filter((message) => message.role !== "system")
           .flatMap((message) => toPiMessages(message));
+        const imageBlockCount = messages
+          .filter((msg) => msg.role === "user" && Array.isArray(msg.content))
+          .reduce((count, msg) => count + (msg.content as Array<{ type: string }>).filter((b) => b.type === "image").length, 0);
+        if (imageBlockCount > 0) {
+          connectorTelemetry.event(
+            "connector.active_model.image_blocks",
+            {
+              sessionId: providerOptions.sessionId,
+              imageBlockCount,
+              modelInput: JSON.stringify(resolved.runtimeModel.input),
+            },
+            { level: "info" },
+          );
+        }
         const context: Context = {
           systemPrompt,
           messages,
