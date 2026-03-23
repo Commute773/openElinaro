@@ -102,6 +102,7 @@ const FEATURE_TOOL_LIBRARY: Record<FeatureId, string> = {
   tickets: "tickets",
   localVoice: "",
   media: "media",
+  extensions: "",
 };
 
 function buildRuntimeOverviewPrompt() {
