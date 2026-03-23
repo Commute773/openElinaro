@@ -20,7 +20,7 @@ import {
   toLanguageModelUsage,
 } from "../services/ai-sdk-message-service";
 import { getAssistantDisplayName } from "../config/runtime-identity";
-import { InferencePromptDriftMonitor } from "../services/inference-prompt-drift-monitor";
+import { InferencePromptDriftMonitor, type InferencePromptDriftWarning } from "../services/inference-prompt-drift-monitor";
 
 import { ModelService } from "../services/model-service";
 import { telemetry } from "../services/telemetry";
@@ -384,8 +384,13 @@ export class ActiveModelConnector implements ProviderConnector {
   readonly supportedUrls = {};
   private readonly promptDriftMonitor = new InferencePromptDriftMonitor();
   private readonly thinkingCallbacks = new Map<string, (message: string) => Promise<void> | void>();
+  private onPromptDriftWarning?: (warning: InferencePromptDriftWarning) => void;
 
   constructor(private readonly modelService: ModelService) {}
+
+  setPromptDriftWarningCallback(callback?: (warning: InferencePromptDriftWarning) => void) {
+    this.onPromptDriftWarning = callback;
+  }
 
   setThinkingCallback(sessionId: string, callback?: (message: string) => Promise<void> | void) {
     if (!callback) {
@@ -401,7 +406,7 @@ export class ActiveModelConnector implements ProviderConnector {
       "connector.active_model.generate",
       async () => {
         const providerOptions = resolveProviderOptions(options);
-        const resolved = await this.modelService.resolveActiveRuntimeModel();
+        const resolved = await this.modelService.resolveModelForPurpose(providerOptions.usagePurpose);
         const systemPrompt = options.prompt
           .filter((message) => message.role === "system")
           .map((message) => message.content)
@@ -456,6 +461,14 @@ export class ActiveModelConnector implements ProviderConnector {
             },
             { level: "warn" },
           );
+
+          if (this.onPromptDriftWarning) {
+            try {
+              this.onPromptDriftWarning(promptDriftWarning);
+            } catch {
+              // best-effort notification
+            }
+          }
         }
 
         const executeRequest = async (transport: "websocket" | "auto" | "sse" | undefined) => {
