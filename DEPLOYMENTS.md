@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.15
+- Released at: 2026-03-23T20:23:14Z
+- Release id: 20260323T202314Z-fde43ee
+- Previous version: 2026.03.23.14
+- Trigger: ci/release workflow
+
+- feat: notify chat when media playback ends (ET-054)
+
 ## 2026.03.23.14
 - Released at: 2026-03-23T20:22:13Z
 - Release id: 20260323T202213Z-6fc2ec7
