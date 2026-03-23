@@ -84,7 +84,7 @@ describe("InferencePromptDriftMonitor", () => {
     expect(warning).toBeNull();
   });
 
-  test("does not warn on rollback plus append when the system prompt is unchanged", () => {
+  test("warns on rollback plus rewrite when shared prefix is below threshold", () => {
     const monitor = new InferencePromptDriftMonitor();
     monitor.inspect({
       sessionId: "session-1",
@@ -99,6 +99,32 @@ describe("InferencePromptDriftMonitor", () => {
       sessionId: "session-1",
       prompt: [
         { role: "system", content: "base prompt" },
+        { role: "user", content: "replacement" },
+      ],
+    });
+
+    expect(warning).not.toBeNull();
+    expect(warning?.sharedPrefixPercentOfPrevious).toBeLessThan(0.8);
+    expect(warning?.addedLength).toBeGreaterThan(0);
+  });
+
+  test("does not warn on rollback plus append when shared prefix is above threshold", () => {
+    const monitor = new InferencePromptDriftMonitor();
+    // Use a long system prompt so the shared prefix dominates
+    const longSystemContent = "base prompt ".repeat(100).trim();
+    monitor.inspect({
+      sessionId: "session-1",
+      prompt: [
+        { role: "system", content: longSystemContent },
+        { role: "user", content: "hello" },
+        { role: "assistant", content: "world" },
+      ],
+    });
+
+    const warning = monitor.inspect({
+      sessionId: "session-1",
+      prompt: [
+        { role: "system", content: longSystemContent },
         { role: "user", content: "replacement" },
       ],
     });

@@ -153,17 +153,30 @@ export class InferencePromptDriftMonitor {
       return null;
     }
 
-    const sharedMessagePrefixLength = getSharedMessagePrefixLength(previousMessages, currentMessages);
-    if (sharedMessagePrefixLength >= 1) {
-      return null;
-    }
-
     const sharedPrefixLength = getSharedPrefixLength(previousPrompt, currentPrompt);
     const removedLength = previousPrompt.length - sharedPrefixLength;
     const addedLength = currentPrompt.length - sharedPrefixLength;
     const sharedPrefixPercentOfPrevious = previousPrompt.length > 0
       ? sharedPrefixLength / previousPrompt.length
       : 0;
+
+    // Allow clean message-boundary rollbacks (trailing messages removed, no
+    // content rewritten) regardless of percentage — this is normal compaction.
+    // For mutations that also rewrite earlier content, require at least 80% of
+    // the previous prompt to be preserved as a shared prefix.  Without the
+    // percentage gate the monitor silently ignored mutations that happened to
+    // keep the first serialized message identical even when large portions of
+    // the prompt were rewritten.
+    const sharedMessagePrefixLength = getSharedMessagePrefixLength(previousMessages, currentMessages);
+    const isCleanRollback = sharedMessagePrefixLength >= 1
+      && currentMessages.length <= previousMessages.length
+      && addedLength === 0;
+    if (isCleanRollback) {
+      return null;
+    }
+    if (sharedMessagePrefixLength >= 1 && sharedPrefixPercentOfPrevious >= 0.8) {
+      return null;
+    }
     const previousChanged = findChangedMessageContext(previousMessages ?? [], sharedPrefixLength);
     const currentChanged = findChangedMessageContext(currentMessages, sharedPrefixLength);
     const previousChangedMessageRole = extractChangedRole(previousChanged.preview);

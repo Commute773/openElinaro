@@ -8,6 +8,7 @@ import { ProfileService } from "../services/profile-service";
 import { ProjectWorkspaceService } from "../services/project-workspace-service";
 import { HeartbeatService } from "../services/heartbeat-service";
 import type { CacheMissWarning } from "../services/cache-miss-monitor";
+import type { InferencePromptDriftWarning } from "../services/inference-prompt-drift-monitor";
 import { RoutinesService } from "../services/routines-service";
 import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
 import { SystemPromptService } from "../services/system-prompt-service";
@@ -84,6 +85,7 @@ export class OpenElinaroApp {
   private readonly activeProfile: ProfileRecord;
   private readonly scopes = new Map<string, RuntimeScope>();
   private onCacheMissWarning?: (warning: CacheMissWarning) => Promise<void> | void;
+  private onPromptDriftWarning?: (warning: InferencePromptDriftWarning) => Promise<void> | void;
   private onBackgroundConversationResponse?: BackgroundConversationResponseNotifier;
   private onConversationActivityChange?: (params: {
     conversationKey: string;
@@ -349,6 +351,10 @@ export class OpenElinaroApp {
 
   setCacheMissWarningNotifier(notifier?: (warning: CacheMissWarning) => Promise<void> | void) {
     this.onCacheMissWarning = notifier;
+  }
+
+  setPromptDriftWarningNotifier(notifier?: (warning: InferencePromptDriftWarning) => Promise<void> | void) {
+    this.onPromptDriftWarning = notifier;
   }
 
   setBackgroundConversationNotifier(notifier?: BackgroundConversationResponseNotifier) {
@@ -832,6 +838,18 @@ export class OpenElinaroApp {
             profileId,
             conversationKey: warning.conversationKey,
             operation: "app.cache_miss_warning_notifier",
+          });
+        });
+      },
+      onPromptDriftWarning: (warning) => {
+        if (!this.onPromptDriftWarning) {
+          return;
+        }
+        void Promise.resolve(this.onPromptDriftWarning(warning)).catch((error) => {
+          this.appTelemetry.recordError(error, {
+            profileId,
+            sessionId: warning.sessionId,
+            operation: "app.prompt_drift_warning_notifier",
           });
         });
       },

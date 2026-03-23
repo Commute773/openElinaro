@@ -562,6 +562,30 @@ export async function startDiscordBot() {
     });
   });
 
+  app.setPromptDriftWarningNotifier(async (warning) => {
+    const userId = app.getNotificationTargetUserId();
+    if (!userId) {
+      discordTelemetry.event(
+        "discord.prompt_drift_warning.no_target",
+        { sessionId: warning.sessionId },
+        { level: "debug" },
+      );
+      return;
+    }
+
+    const user = await client.users.fetch(userId);
+    const dm = await user.createDM();
+    const pct = (warning.sharedPrefixPercentOfPrevious * 100).toFixed(1);
+    await dm.send(
+      `⚠️ Prompt prefix mutation detected (session \`${warning.sessionId}\`): shared prefix ${pct}% of previous prompt. Removed ${warning.removedLength} chars, added ${warning.addedLength} chars at message index ${warning.firstChangedMessageIndex}.`,
+    );
+    discordTelemetry.event("discord.prompt_drift_warning.sent", {
+      userId,
+      sessionId: warning.sessionId,
+      sharedPrefixPercentOfPrevious: warning.sharedPrefixPercentOfPrevious,
+    });
+  });
+
   client.once(Events.ClientReady, async (readyClient) => {
     await syncSlashCommands(readyClient);
     new DiscordRoutinesNotifier(readyClient, app).start();
