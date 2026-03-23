@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.23.18
+- Released at: 2026-03-23T21:39:23Z
+- Release id: 20260323T213923Z-4cc1630
+- Previous version: 2026.03.23.17
+- Trigger: ci/release workflow
+
+- docs: auto commit/push/PR/merge after every completed feature
+- fix: coerce bare string to array for email tool address fields
+
 ## 2026.03.23.17
 - Released at: 2026-03-23T20:37:00Z
 - Release id: 20260323T203700Z-678b038
