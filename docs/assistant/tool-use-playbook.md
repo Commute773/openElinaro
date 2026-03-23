@@ -95,13 +95,14 @@ return {
 
 ## Web Ladder
 
-Use the least heavy web tool that fits:
+Load the `web_research` library first, then use the least heavy web tool that fits:
 
-- `web_search` for discovery and current-source lookup
-- `web_fetch` for reading a known URL as Crawl4AI-extracted markdown/text/html
+- `web_search` for discovery and current-source lookup (requires `webSearch` feature enabled)
+- `web_fetch` for reading a known URL as Crawl4AI-extracted markdown/text/html (requires `webFetch` feature enabled)
 - `openbrowser` only for interactive steps, JS-heavy pages, screenshots, or coordinate/browser actions
 
 If `web_search` finds the page and you only need the readable content, go to `web_fetch` before reaching for `openbrowser`.
+If a tool is missing from the library, the corresponding feature is not enabled or configured.
 
 ## Browser Secrets
 
@@ -263,7 +264,7 @@ Example sequence:
 - Search first when unsure.
 - Keep the visible bundle small.
 - Use dedicated tools before shell.
-- Prefer omitting arguments that already match tool defaults. Examples: `web_search` defaults to English, and coding-agent launch/resume default to a one-hour timeout.
+- Prefer omitting arguments that already match tool defaults. Example: coding-agent launch/resume defaults to a one-hour timeout.
 - Use `run_tool_program` to compress many tool calls into one model-visible result.
 - Save bulky intermediate data as artifacts.
 - Every tool call accepts `silent: true`; treat that as an exception path for background housekeeping like heartbeat checks, not the default.
