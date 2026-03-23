@@ -228,6 +228,111 @@ describe("ai-sdk message service tool-result refs", () => {
   });
 });
 
+describe("ai-sdk message service tool call round-trip", () => {
+  test("tool calls survive appendResponseMessages → storage → toModelMessages round-trip", async () => {
+    const messageModule = await import("./ai-sdk-message-service");
+    const { mapChatMessagesToStoredMessages, mapStoredMessagesToChatMessages, AIMessage: AIMsg } = await import("@langchain/core/messages");
+
+    // Simulate a multi-step response with tool calls
+    const responseMessages: Array<{
+      role: "assistant" | "tool";
+      content: any;
+    }> = [
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Loading tools" },
+          { type: "tool-call", toolCallId: "tc-1", toolName: "load_tool_library", input: { library: "shell" } },
+          { type: "tool-call", toolCallId: "tc-2", toolName: "load_tool_library", input: { library: "web" } },
+        ],
+      },
+      {
+        role: "tool",
+        content: [
+          { type: "tool-result", toolCallId: "tc-1", toolName: "load_tool_library", output: { type: "text", value: "Loaded shell" } },
+          { type: "tool-result", toolCallId: "tc-2", toolName: "load_tool_library", output: { type: "text", value: "Loaded web" } },
+        ],
+      },
+      {
+        role: "assistant",
+        content: [
+          { type: "tool-call", toolCallId: "tc-3", toolName: "exec_command", input: { command: "ls" } },
+          { type: "tool-call", toolCallId: "tc-4", toolName: "exec_command", input: { command: "pwd" } },
+        ],
+      },
+      {
+        role: "tool",
+        content: [
+          { type: "tool-result", toolCallId: "tc-3", toolName: "exec_command", output: { type: "text", value: "file1\nfile2" } },
+          { type: "tool-result", toolCallId: "tc-4", toolName: "exec_command", output: { type: "text", value: "/home" } },
+        ],
+      },
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "Done running commands" }],
+      },
+    ];
+
+    // Step 1: Convert response messages to BaseMessage[]
+    const baseMessages = messageModule.appendResponseMessages(
+      [new HumanMessage("do stuff")],
+      responseMessages,
+    );
+
+    // Verify initial conversion preserves tool calls
+    const step1ToolCalls = baseMessages
+      .filter((m) => m._getType() === "ai")
+      .flatMap((m) => (m as any).tool_calls ?? []);
+    expect(step1ToolCalls).toHaveLength(4);
+    expect(step1ToolCalls.map((tc: any) => tc.name).sort()).toEqual([
+      "exec_command", "exec_command", "load_tool_library", "load_tool_library",
+    ]);
+
+    // Step 2: Serialize to storage format
+    const stored = mapChatMessagesToStoredMessages(baseMessages);
+
+    // Step 3: Deserialize back
+    const decoded = mapStoredMessagesToChatMessages(stored);
+    const step3ToolCalls = decoded
+      .filter((m) => m._getType() === "ai")
+      .flatMap((m) => (m as any).tool_calls ?? []);
+    expect(step3ToolCalls).toHaveLength(4);
+    expect(step3ToolCalls.map((tc: any) => tc.name).sort()).toEqual([
+      "exec_command", "exec_command", "load_tool_library", "load_tool_library",
+    ]);
+
+    // Step 4: Convert back to model messages (for sending to LLM)
+    const modelMessages = messageModule.toModelMessages(decoded);
+
+    // Count tool-call parts in assistant messages
+    const toolCallPartsCount = modelMessages
+      .filter((m) => m.role === "assistant")
+      .reduce((count, m) => {
+        if (typeof m.content === "string") return count;
+        return count + m.content.filter((p: any) => p.type === "tool-call").length;
+      }, 0);
+    expect(toolCallPartsCount).toBe(4);
+
+    // Count tool-result parts in tool messages
+    const toolResultPartsCount = modelMessages
+      .filter((m) => m.role === "tool")
+      .reduce((count, m) => {
+        if (typeof m.content === "string") return count;
+        return count + m.content.filter((p: any) => p.type === "tool-result").length;
+      }, 0);
+    expect(toolResultPartsCount).toBe(4);
+
+    // Verify tool call IDs match between tool-call and tool-result
+    const toolCallIds = new Set(step3ToolCalls.map((tc: any) => tc.id));
+    const toolResultIds = new Set(
+      decoded
+        .filter((m): m is ToolMessage => m instanceof ToolMessage)
+        .map((m) => m.tool_call_id),
+    );
+    expect(toolCallIds).toEqual(toolResultIds);
+  });
+});
+
 describe("ai-sdk message service multimodal user messages", () => {
   test("uses remote image URLs when available in chat content", async () => {
     const messageModule = await import("./ai-sdk-message-service");

@@ -704,18 +704,6 @@ export class AgentChatService {
               },
             })
           );
-          this.throwIfStopRequested(session);
-          const pendingResetMessage = this.routineTools.consumePendingConversationReset(
-            job.conversationKey,
-          );
-          if (pendingResetMessage) {
-            return {
-              mode: "immediate" as const,
-              message: pendingResetMessage,
-              warnings: [],
-            };
-          }
-
           const warnings = (result.warnings ?? [])
             .map((warning) => warning.type === "other" ? warning.message : warning.details ?? warning.feature)
             .filter((warning): warning is string => Boolean(warning && warning.trim()));
@@ -735,6 +723,47 @@ export class AgentChatService {
               toolResultNamespace: job.conversationKey,
             },
           );
+
+          const toolCallCount = responseMessages
+            .filter((message): message is AIMessage => message instanceof AIMessage)
+            .reduce((count, message) => count + (message.tool_calls?.length ?? 0), 0);
+          const toolResultCount = responseMessages.filter(
+            (message) => message._getType() === "tool",
+          ).length;
+
+          if (toolCallCount > 0 || toolResultCount > 0) {
+            agentChatTelemetry.event(
+              "agent_chat.response_messages",
+              {
+                conversationKey: job.conversationKey,
+                totalMessages: responseMessages.length,
+                toolCallCount,
+                toolResultCount,
+                persistConversation: job.execution.persistConversation,
+              },
+              { level: "debug" },
+            );
+          }
+
+          // Check pending conversation reset before persistence — a pending
+          // reset means the conversation was already replaced by
+          // startFreshConversation, so appending would re-add stale messages.
+          const pendingResetMessage = this.routineTools.consumePendingConversationReset(
+            job.conversationKey,
+          );
+          if (pendingResetMessage) {
+            return {
+              mode: "immediate" as const,
+              message: pendingResetMessage,
+              warnings: [],
+            };
+          }
+
+          // Persist response messages BEFORE checking stop so that tool calls
+          // that have already executed are never silently lost.  Without this,
+          // a stop request would discard the response messages even though their
+          // side-effects already happened, leaving the model unable to see its
+          // own tool invocations on the next turn.
           let finalMessage = [...responseMessages]
             .reverse()
             .find((message): message is AIMessage => message instanceof AIMessage);
@@ -748,6 +777,12 @@ export class AgentChatService {
               .reverse()
               .find((message): message is AIMessage => message instanceof AIMessage);
           }
+
+          // Check stop AFTER persistence — the model's work (including tool
+          // calls and their results) is already recorded, so the next turn
+          // will see them even if we bail here.
+          this.throwIfStopRequested(session);
+
           const combinedWarnings = [
             ...(promptWarning ? [promptWarning] : []),
             ...(finalMessage ? extractResponseWarnings(finalMessage) : []),

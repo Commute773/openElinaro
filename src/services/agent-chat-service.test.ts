@@ -1,8 +1,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { z } from "zod";
+import { DynamicStructuredTool } from "@langchain/core/tools";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 import { AgentChatService } from "./agent-chat-service";
 import { ConversationStore } from "./conversation-store";
@@ -327,5 +329,207 @@ describe("AgentChatService", () => {
     expect(requests[0]?.humanMessages).toHaveLength(1);
     expect(requests[0]?.humanMessages[0]).toContain("Subagent turn should stay clean.");
     expect(requests[0]?.humanMessages[0]).not.toContain("<recalled_memory>");
+  });
+
+  test("persists tool calls and tool results in the conversation", async () => {
+    let callIndex = 0;
+    const toolInvocations: string[] = [];
+
+    const mockLoadLibrary = new DynamicStructuredTool({
+      name: "load_tool_library",
+      description: "Load a tool library",
+      schema: z.object({ library: z.string() }),
+      func: async (input) => {
+        toolInvocations.push(`load:${input.library}`);
+        return `Loaded library: ${input.library}`;
+      },
+    });
+
+    const mockExecCommand = new DynamicStructuredTool({
+      name: "exec_command",
+      description: "Execute a command",
+      schema: z.object({ command: z.string() }),
+      func: async (input) => {
+        toolInvocations.push(`exec:${input.command}`);
+        return `Output of: ${input.command}`;
+      },
+    });
+
+    const allTools = [mockLoadLibrary, mockExecCommand];
+    const connector = new ScriptedProviderConnector(async () => {
+      callIndex++;
+      if (callIndex === 1) {
+        return new AIMessage({
+          content: "",
+          tool_calls: [
+            { id: "tc-load-1", name: "load_tool_library", args: { library: "shell" }, type: "tool_call" as const },
+            { id: "tc-load-2", name: "load_tool_library", args: { library: "web" }, type: "tool_call" as const },
+          ],
+        });
+      }
+      if (callIndex === 2) {
+        return new AIMessage({
+          content: "",
+          tool_calls: [
+            { id: "tc-exec-1", name: "exec_command", args: { command: "ls" }, type: "tool_call" as const },
+            { id: "tc-exec-2", name: "exec_command", args: { command: "pwd" }, type: "tool_call" as const },
+          ],
+        });
+      }
+      return new AIMessage("All done. I loaded 2 libraries and ran 2 commands.");
+    });
+
+    const conversations = new ConversationStore();
+    const service = new AgentChatService(
+      connector,
+      {
+        consumePendingBackgroundExecNotifications() { return []; },
+        consumePendingConversationReset() { return null; },
+      } as any,
+      {
+        resolveAllForChat() {
+          return { entries: allTools };
+        },
+        resolveForChat() {
+          return { entries: allTools, tools: allTools.map((t) => t.name) };
+        },
+      } as any,
+      {} as any,
+      conversations,
+      new SystemPromptService(),
+      {
+        async inspectContextWindowUsage() {
+          return {
+            usedTokens: 100,
+            maxContextTokens: 8_192,
+            maxOutputTokens: 1_024,
+            utilizationPercent: 1.22,
+            breakdownMethod: "heuristic_estimate" as const,
+          };
+        },
+      } as any,
+      undefined,
+      undefined,
+    );
+
+    const result = await service.reply({
+      conversationKey: "conversation-1",
+      content: "Load shell and web libraries, then run ls and pwd",
+    });
+
+    expect(result.message).toContain("All done");
+    expect(toolInvocations).toContain("load:shell");
+    expect(toolInvocations).toContain("load:web");
+    expect(toolInvocations).toContain("exec:ls");
+    expect(toolInvocations).toContain("exec:pwd");
+
+    const conversation = conversations.get("conversation-1");
+    const aiMessages = conversation.messages.filter(
+      (message): message is AIMessage => message instanceof AIMessage,
+    );
+    const toolMessages = conversation.messages.filter(
+      (message): message is ToolMessage => message instanceof ToolMessage,
+    );
+
+    // Verify tool calls are stored in AI messages
+    const allToolCalls = aiMessages.flatMap((message) => message.tool_calls ?? []);
+    expect(allToolCalls.length).toBeGreaterThanOrEqual(4);
+    expect(allToolCalls.some((tc) => tc.name === "load_tool_library")).toBe(true);
+    expect(allToolCalls.some((tc) => tc.name === "exec_command")).toBe(true);
+
+    // Verify tool results are stored
+    expect(toolMessages.length).toBeGreaterThanOrEqual(4);
+    expect(toolMessages.some((message) => message.name === "load_tool_library")).toBe(true);
+    expect(toolMessages.some((message) => message.name === "exec_command")).toBe(true);
+  });
+
+  test("persists tool calls even when stop is requested during execution", async () => {
+    let callIndex = 0;
+    let session: any = null;
+
+    const mockTool = new DynamicStructuredTool({
+      name: "exec_command",
+      description: "Execute a command",
+      schema: z.object({ command: z.string() }),
+      func: async (input) => {
+        // Request stop AFTER the tool has executed
+        if (session) {
+          session.stopRequested = true;
+        }
+        return `Output of: ${input.command}`;
+      },
+    });
+
+    const connector = new ScriptedProviderConnector(async () => {
+      callIndex++;
+      if (callIndex === 1) {
+        return new AIMessage({
+          content: "Let me run that",
+          tool_calls: [
+            { id: "tc-1", name: "exec_command", args: { command: "ls" }, type: "tool_call" as const },
+          ],
+        });
+      }
+      return new AIMessage("Here are the results");
+    });
+
+    const conversations = new ConversationStore();
+    const service = new AgentChatService(
+      connector,
+      {
+        consumePendingBackgroundExecNotifications() { return []; },
+        consumePendingConversationReset() { return null; },
+      } as any,
+      {
+        resolveAllForChat() {
+          return { entries: [mockTool] };
+        },
+        resolveForChat() {
+          return { entries: [mockTool], tools: [mockTool.name] };
+        },
+      } as any,
+      {} as any,
+      conversations,
+      new SystemPromptService(),
+      {
+        async inspectContextWindowUsage() {
+          return {
+            usedTokens: 100,
+            maxContextTokens: 8_192,
+            maxOutputTokens: 1_024,
+            utilizationPercent: 1.22,
+            breakdownMethod: "heuristic_estimate" as const,
+          };
+        },
+      } as any,
+      undefined,
+      undefined,
+    );
+
+    // Grab the internal session after it's created
+    const originalGetSession = (service as any).getSession.bind(service);
+    (service as any).getSession = function (key: string) {
+      const s = originalGetSession(key);
+      session = s;
+      return s;
+    };
+
+    const result = await service.reply({
+      conversationKey: "conversation-1",
+      content: "Run ls",
+    });
+
+    // The stop should have been caught, but messages should be persisted
+    const conversation = conversations.get("conversation-1");
+    const allToolCalls = conversation.messages
+      .filter((message): message is AIMessage => message instanceof AIMessage)
+      .flatMap((message) => message.tool_calls ?? []);
+    const toolResults = conversation.messages.filter(
+      (message): message is ToolMessage => message instanceof ToolMessage,
+    );
+
+    // Tool calls and results must be persisted even though stop was requested
+    expect(allToolCalls.some((tc) => tc.name === "exec_command")).toBe(true);
+    expect(toolResults.some((message) => message.name === "exec_command")).toBe(true);
   });
 });
