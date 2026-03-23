@@ -311,11 +311,11 @@ describe("real-corpus memory recall", () => {
 
     expect(harness.requests).toHaveLength(1);
     expect(harness.requests[0]?.humanMessages).toHaveLength(1);
-    expect(harness.requests[0]?.humanMessages[0]).toBe(NO_HIT_PROMPT);
+    expect(harness.requests[0]?.humanMessages[0]).toContain(NO_HIT_PROMPT);
     const savedConversation = harness.conversations.get("e2e:memory:no-hit:reply");
     const savedHumanMessage = savedConversation.messages.findLast((message) => message instanceof HumanMessage);
     expect(savedHumanMessage).toBeInstanceOf(HumanMessage);
-    expect(extractHumanText(savedHumanMessage as HumanMessage)).toBe(NO_HIT_PROMPT);
+    expect(extractHumanText(savedHumanMessage as HumanMessage)).toContain(NO_HIT_PROMPT);
   });
 
   fixtureTest("prepends recalled memory to the top of the same user message", async () => {

@@ -8,6 +8,7 @@ import { appendResponseMessages, toModelMessages, toToolSet, toV3Usage } from ".
 import { ModelService } from "./model-service";
 import { guardUntrustedText } from "./prompt-injection-guard-service";
 import { prependTextToChatPromptContent } from "./message-content-service";
+import { buildCurrentLocalTimePrefix } from "./local-time-service";
 import {
   composeSystemPrompt,
   formatSystemPromptWarning,
@@ -636,9 +637,13 @@ export class AgentChatService {
         const promptWarning = formatSystemPromptWarning(systemPrompt);
         const backgroundExecMessages = this.buildBackgroundExecMessages(backgroundExecNotifications);
         const steeringMessages = this.consumePendingSteeringMessages(session);
-        const combinedUserContent = buildCombinedTurnContent(
+        const rawCombinedUserContent = buildCombinedTurnContent(
           job.content,
           steeringMessages.map((entry) => entry.content),
+        );
+        const combinedUserContent = prependTextToChatPromptContent(
+          rawCombinedUserContent,
+          buildCurrentLocalTimePrefix(),
         );
         const userContentWithAutomaticContext = await this.buildUserContentWithAutomaticContext({
           conversationKey: job.contextConversationKey ?? job.conversationKey,
@@ -699,7 +704,7 @@ export class AgentChatService {
                   sessionId: job.execution.providerSessionId ?? job.conversationKey,
                   conversationKey: job.execution.providerSessionId ?? job.conversationKey,
                   usagePurpose: job.execution.usagePurpose,
-                  prependLocalTimeToUserAndToolMessages: true,
+
                 },
               },
             })
