@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.13
+- Released at: 2026-03-23T20:07:08Z
+- Release id: 20260323T200708Z-4c2a007
+- Previous version: 2026.03.23.12
+- Trigger: ci/release workflow
+
+- fix: use base64 for token counting images + add image block diagnostic
+
 ## 2026.03.23.12
 - Released at: 2026-03-23T19:46:33Z
 - Release id: 20260323T194633Z-9b9db6d
