@@ -42,8 +42,10 @@ describe("SystemPromptService", () => {
 
     expect(snapshot.text.startsWith("## Runtime\nRuntime: OpenElinaro local-first agent runtime.")).toBe(true);
     expect(snapshot.text).toContain("Core toggles: automatic conversation memory off; docs indexer on.");
-    expect(snapshot.text).toContain("Optional features enabled in config: webSearch, finance.");
-    expect(snapshot.text).toContain("Optional features disabled in config:");
+    expect(snapshot.text).toContain("Feature status (only active features have their tools available):");
+    expect(snapshot.text).toContain("finance: active (library: finance)");
+    expect(snapshot.text).toContain("webSearch:");
+    expect(snapshot.text).toContain("Tools for non-active features are completely hidden.");
     expect(snapshot.text).toContain("feature_manage");
     expect(snapshot.text.indexOf("## Runtime")).toBeLessThan(snapshot.text.indexOf("<!-- system_prompt/00-test.md -->"));
   });

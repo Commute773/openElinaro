@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { buildAssistantIdentityPromptContext, getAssistantDisplayName } from "../config/runtime-identity";
-import { FEATURE_IDS } from "./feature-config-service";
+import { FeatureConfigService, type FeatureId } from "./feature-config-service";
 import { getPromptToolLibraries } from "./tool-library-service";
 import {
   formatUserDataRelativePath,
@@ -91,10 +91,23 @@ function formatPromptList(values: string[]) {
   return values.length > 0 ? values.join(", ") : "none";
 }
 
+const FEATURE_TOOL_LIBRARY: Record<FeatureId, string> = {
+  calendar: "planning",
+  email: "email",
+  communications: "communications",
+  webSearch: "web_research",
+  webFetch: "web_research",
+  openbrowser: "browser_automation",
+  finance: "finance",
+  tickets: "tickets",
+  localVoice: "",
+  media: "media",
+};
+
 function buildRuntimeOverviewPrompt() {
   const config = getRuntimeConfig();
-  const enabledFeatures = FEATURE_IDS.filter((featureId) => config[featureId].enabled);
-  const disabledFeatures = FEATURE_IDS.filter((featureId) => !config[featureId].enabled);
+  const featureConfig = new FeatureConfigService();
+  const statuses = featureConfig.listStatuses();
   const toolLibraries = getPromptToolLibraries();
   const configPath = formatUserDataRelativePath("config.yaml");
   const secretStorePath = formatUserDataRelativePath("secret-store.json");
@@ -103,13 +116,20 @@ function buildRuntimeOverviewPrompt() {
     `docs indexer ${config.core.app.docsIndexerEnabled ? "on" : "off"}`,
   ].join("; ");
 
+  const featureLines = statuses.map((s) => {
+    const status = s.active ? "active" : s.enabled ? "enabled but not configured" : "off";
+    const library = FEATURE_TOOL_LIBRARY[s.featureId];
+    const libraryNote = library ? ` (library: ${library})` : "";
+    return `  ${s.featureId}: ${status}${libraryNote}`;
+  });
+
   return [
     "## Runtime",
     "Runtime: OpenElinaro local-first agent runtime.",
     `Core toggles: ${coreToggles}.`,
-    `Optional features enabled in config: ${formatPromptList(enabledFeatures)}.`,
-    `Optional features disabled in config: ${formatPromptList(disabledFeatures)}.`,
-    "Optional feature tools stay hidden until the feature is enabled and fully configured.",
+    "Feature status (only active features have their tools available):",
+    ...featureLines,
+    "Tools for non-active features are completely hidden. Do not attempt to use tools from disabled features.",
     `To inspect or enable features, use \`feature_manage\` (\`action=status\` then \`action=apply\`) or update ${configPath} and ${secretStorePath}. Run \`bun run setup:python\` for Python-backed features.`,
     "Tool libraries load latent tool groups into the active run. Use `load_tool_library` with one library id when the tool you need is not already visible.",
     `Available tool libraries: ${toolLibraries.map((library) => `${library.id} (${library.description})`).join("; ")}.`,
