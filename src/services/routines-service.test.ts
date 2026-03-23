@@ -393,4 +393,117 @@ describe("RoutinesService", () => {
 
     expect(nextAttentionAt).toBe("2026-03-17T09:00:00.000Z");
   });
+
+  test("addItem with alarm: true stores the flag", () => {
+    const service = new RoutinesService();
+    const item = service.addItem({
+      title: "Take morning meds",
+      kind: "med",
+      alarm: true,
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    expect(item.alarm).toBe(true);
+    const loaded = service.getItem(item.id);
+    expect(loaded?.alarm).toBe(true);
+  });
+
+  test("updateItem can toggle alarm", () => {
+    const service = new RoutinesService();
+    const item = service.addItem({
+      title: "Take meds",
+      kind: "med",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    expect(item.alarm).toBeUndefined();
+
+    const updated = service.updateItem(item.id, { alarm: true });
+    expect(updated.alarm).toBe(true);
+
+    const toggled = service.updateItem(item.id, { alarm: false });
+    expect(toggled.alarm).toBe(false);
+  });
+
+  test("assessNow sets nextAttentionAt to occurrence dueAt for alarm-flagged upcoming items", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: {
+        ...service.loadData().settings,
+        timezone: "UTC",
+      },
+    });
+    service.addItem({
+      title: "Alarm routine",
+      kind: "routine",
+      priority: "low",
+      alarm: true,
+      schedule: { kind: "daily", time: "14:00" },
+    });
+
+    const assessment = service.assessNow(new Date("2026-03-17T10:00:00.000Z"));
+    const entry = assessment.items.find((item) => item.item.title === "Alarm routine");
+
+    expect(entry).toBeTruthy();
+    expect(entry?.state).toBe("upcoming");
+    expect(entry?.nextAttentionAt).toBe("2026-03-17T14:00:00.000Z");
+  });
+
+  test("hasAlarmRoutinesDueNow returns true when an alarm routine is due", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: {
+        ...service.loadData().settings,
+        timezone: "UTC",
+      },
+    });
+    service.addItem({
+      title: "Alarm med",
+      kind: "med",
+      alarm: true,
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    expect(service.hasAlarmRoutinesDueNow(new Date("2026-03-17T09:05:00.000Z"))).toBe(true);
+  });
+
+  test("hasAlarmRoutinesDueNow returns false when no alarm routines are due", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: {
+        ...service.loadData().settings,
+        timezone: "UTC",
+      },
+    });
+    service.addItem({
+      title: "Non-alarm med",
+      kind: "med",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    expect(service.hasAlarmRoutinesDueNow(new Date("2026-03-17T09:05:00.000Z"))).toBe(false);
+  });
+
+  test("formatItem includes alarm tag", () => {
+    const service = new RoutinesService();
+    const item = service.addItem({
+      title: "Alarm item",
+      kind: "med",
+      alarm: true,
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    expect(service.formatItem(item)).toContain("alarm");
+
+    const nonAlarmItem = service.addItem({
+      title: "Normal item",
+      kind: "med",
+      schedule: { kind: "daily", time: "10:00" },
+    });
+
+    expect(service.formatItem(nonAlarmItem)).not.toContain("alarm");
+  });
 });

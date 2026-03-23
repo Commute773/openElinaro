@@ -574,6 +574,76 @@ describe("DiscordRoutinesNotifier", () => {
     expect(harness.recorded).toEqual([]);
   });
 
+  test("runs the heartbeat when alarm routines are due even if the heartbeat interval has not elapsed", async () => {
+    const recentCompletedAt = new Date(Date.now() - (10 * 60 * 1000)).toISOString();
+    writeHeartbeatState(recentCompletedAt);
+
+    const sent: string[] = [];
+    const recorded: Array<{ conversationKey: string; message: string }> = [];
+    let heartbeatCalls = 0;
+    let routineScheduleChangedListener: (() => void) | null = null;
+    const client = {
+      users: {
+        fetch: async () => ({
+          createDM: async () => ({
+            send: async (message: string) => {
+              sent.push(message);
+            },
+          }),
+        }),
+      },
+    };
+    const app = {
+      getNotificationTargetUserId: () => "discord-user",
+      getNextAlarmDueAt: () => null,
+      getNextRoutineAttentionAt: () => null,
+      getNextAutonomousTimeAt: () => undefined,
+      listDueAlarms: () => [],
+      markAlarmDelivered: () => {},
+      recordAssistantMessage: async (conversationKey: string, message: string) => {
+        recorded.push({ conversationKey, message });
+      },
+      onAlarmScheduleChanged: () => () => {},
+      onRoutineScheduleChanged: (listener: () => void) => {
+        routineScheduleChangedListener = listener;
+        return () => {
+          routineScheduleChangedListener = null;
+        };
+      },
+      hasAlarmRoutinesDueNow: () => true,
+      runHourlyHeartbeat: async () => {
+        heartbeatCalls += 1;
+        return {
+          requestId: "heartbeat-request",
+          mode: "immediate" as const,
+          message: "Alarm routine reminder.",
+          warnings: [],
+          completed: true,
+        };
+      },
+      runAlarmNotification: async () => ({
+        requestId: "alarm-request",
+        mode: "immediate" as const,
+        message: "",
+        warnings: [],
+      }),
+      runAutonomousTimeSession: async () => ({
+        requestId: "autonomous-time-request",
+        mode: "accepted" as const,
+        message: "",
+        warnings: [],
+        triggered: false,
+      }),
+    };
+
+    const notifier = new DiscordRoutinesNotifier(client as never, app as never);
+    await (notifier as never as { runTick: () => Promise<void> }).runTick();
+    notifier.stop();
+
+    expect(heartbeatCalls).toBe(1);
+    expect(sent).toEqual(["Alarm routine reminder."]);
+  });
+
   test("schedules autonomous time when it is earlier than the next heartbeat", () => {
     const realSetTimeout = globalThis.setTimeout;
     const realClearTimeout = globalThis.clearTimeout;
