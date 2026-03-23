@@ -4,6 +4,7 @@ import { DISCORD_MAX_ATTACHMENT_BYTES as MAX_DISCORD_ATTACHMENT_BYTES } from "..
 
 const DISCORD_FILE_DIRECTIVE_PATTERN = /<discord-file\b([^>]*)\/?>/gi;
 const DISCORD_FILE_ATTRIBUTE_PATTERN = /(\w+)=(?:"([^"]*)"|'([^']*)')/g;
+export const ATTACHMENT_FAILED_PREFIX = "[ATTACHMENT FAILED]";
 const UNTRUSTED_CONTENT_WARNING_LINE = "UNTRUSTED CONTENT WARNING";
 const UNTRUSTED_DATA_BEGIN_LINE = "BEGIN_UNTRUSTED_DATA";
 const UNTRUSTED_DATA_END_LINE = "END_UNTRUSTED_DATA";
@@ -91,32 +92,36 @@ export function resolveDiscordResponse(params: {
 }): AppResponse {
   const matches = [...params.response.message.matchAll(DISCORD_FILE_DIRECTIVE_PATTERN)];
   const warnings = [...(params.response.warnings ?? [])];
+  const attachmentErrors: string[] = [...(params.response.attachmentErrors ?? [])];
   const attachments: AppResponseAttachment[] = [...(params.response.attachments ?? [])];
+
+  const recordAttachmentFailure = (reason: string, failedPath: string) => {
+    warnings.push(`${ATTACHMENT_FAILED_PREFIX} ${reason}`);
+    attachmentErrors.push(failedPath);
+  };
 
   for (const match of matches) {
     const attributes = parseDiscordFileDirectiveAttributes(match[1] ?? "");
     if (!attributes.path?.trim()) {
-      warnings.push("A Discord file directive was ignored because it did not include a path.");
+      warnings.push(`${ATTACHMENT_FAILED_PREFIX} A Discord file directive was ignored because it did not include a path.`);
       continue;
     }
 
     try {
       const resolvedPath = params.assertPathAccess(attributes.path);
       if (!fs.existsSync(resolvedPath)) {
-        warnings.push(`Discord file attachment was skipped because the file was not found: ${resolvedPath}`);
+        recordAttachmentFailure(`Discord file attachment was skipped because the file was not found: ${resolvedPath}`, resolvedPath);
         continue;
       }
 
       const stat = fs.statSync(resolvedPath);
       if (!stat.isFile()) {
-        warnings.push(`Discord file attachment was skipped because the path is not a file: ${resolvedPath}`);
+        recordAttachmentFailure(`Discord file attachment was skipped because the path is not a file: ${resolvedPath}`, resolvedPath);
         continue;
       }
 
       if (stat.size > MAX_DISCORD_ATTACHMENT_BYTES) {
-        warnings.push(
-          `Discord file attachment was skipped because it exceeds the ${MAX_DISCORD_ATTACHMENT_BYTES} byte limit: ${resolvedPath}`,
-        );
+        recordAttachmentFailure(`Discord file attachment was skipped because it exceeds the ${MAX_DISCORD_ATTACHMENT_BYTES} byte limit: ${resolvedPath}`, resolvedPath);
         continue;
       }
 
@@ -125,9 +130,8 @@ export function resolveDiscordResponse(params: {
         name: attributes.name?.trim() || undefined,
       });
     } catch (error) {
-      warnings.push(
-        `Discord file attachment was skipped: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const detail = error instanceof Error ? error.message : String(error);
+      recordAttachmentFailure(`Discord file attachment was skipped: ${detail}`, attributes.path);
     }
   }
 
@@ -136,6 +140,7 @@ export function resolveDiscordResponse(params: {
     ...params.response,
     message: cleanedMessage || (attachments.length > 0 ? "Attached file." : params.response.message),
     warnings: warnings.map((warning) => sanitizeDiscordText(warning)),
+    attachmentErrors: attachmentErrors.length > 0 ? attachmentErrors : undefined,
     attachments,
   };
 }
