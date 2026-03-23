@@ -143,25 +143,15 @@ Example:
 }
 ```
 
-## Coding-Agent Task Lists
-
-`todo_write` and `todo_read` are for coding agents tracking their own session work. They are not the user's real task list.
-
-- Do not reach for them by default. Prefer visible repo/file tools first, and only use them when the work is genuinely long-horizon or branching
-- Keep at most one item `in_progress`
-- Mark items complete immediately as work finishes
-- If the main agent needs the user's actual todos, use routines tools such as `routine_list` or `routine_check`
-
-## Background Workflow Checks
+## Background Agent Checks
 
 - Chat-launched coding subagents send a completion update back into the parent conversation automatically.
-- Use `workflow_status` for occasional manual spot checks or when you think a completion update was missed.
-- `workflow_status` now includes elapsed runtime so you can tell whether a run is actually making progress or just sitting long-running.
-- For deeper postmortems, inspect `~/.openelinaro/workflow-session-history.json` after a run finishes. It keeps archived planner/worker session progress plus per-turn model/tool/token traces, including the visible tool bundle at each turn, even after the active `~/.openelinaro/workflow-sessions.json` entry is cleared.
-- Do not poll `workflow_status` every few seconds while waiting; that wastes context and tool budget without adding signal.
-- If an in-flight coding run needs new instructions, use `steer_coding_agent` instead of waiting for it to finish and then resuming.
-- If a pending, backing-off, or actively running coding run needs to stop, use `cancel_coding_agent`.
-- If you need to investigate slowness, pair `workflow_status` with `telemetry_query` against workflow spans and events instead of guessing from chat timing alone.
+- Use `agent_status` for occasional manual spot checks or when you think a completion update was missed.
+- `agent_status` includes elapsed runtime so you can tell whether a run is actually making progress or just sitting long-running.
+- Do not poll `agent_status` every few seconds while waiting; that wastes context and tool budget without adding signal.
+- If an in-flight coding run needs new instructions, use `steer_agent` instead of waiting for it to finish and then resuming.
+- If a running coding run needs to stop, use `cancel_agent`.
+- If you need to investigate slowness, pair `agent_status` with `telemetry_query` against workflow spans and events instead of guessing from chat timing alone.
 - Use `usage_summary` when you need provider-reported token spend and USD cost for the active conversation or the current local day, instead of inferring pricing from raw token counts.
 
 ## Service Version Checks
@@ -182,7 +172,7 @@ Example:
 
 ## Coding-Agent Workspaces
 
-- Local `launch_coding_agent` runs now fork into isolated linked Git worktrees by default when the target cwd is inside a Git repo.
+- Local `launch_agent` runs now fork into isolated linked Git worktrees by default when the target cwd is inside a Git repo.
 - New linked worktrees are created only from a clean source workspace. If the source repo has uncommitted changes, the launch now fails instead of silently dropping them from the child workspace.
 - The workflow run keeps its linked worktree after completion or timeout so unfinished edits and local commits stay inspectable.
 

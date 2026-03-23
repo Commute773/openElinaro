@@ -118,9 +118,9 @@ The app now treats routines as a first-class subsystem rather than scattered cha
 - The Discord `/update` command is custom and now fast-forwards the source checkout by default, then formats the `DEPLOYMENTS.md` entries whose versions are newer than the current running version; pass `confirm:true` to actually deploy the prepared source version into the local installation.
 - `update_preview` fast-forwards the source workspace without deploying, then summarizes the pending deployment entries newer than the current running version.
 - `service_rollback` still uses the managed-service rollback helpers when invoked from inside the live service process.
-- The shared tool set also includes `launch_coding_agent`, which lets the foreground conversation agent enqueue a goal-driven background coding worker built in LangGraph.
-- The shared tool set also includes `resume_coding_agent`, which lets the foreground conversation agent send follow-up instructions back to a returned coding run on the same run id.
-- The shared tool set also includes `workflow_status`, which reports the latest background workflow and coding-agent run state, task completion, and summaries.
+- The shared tool set also includes `launch_agent`, which lets the foreground conversation agent enqueue a goal-driven background coding worker built in LangGraph.
+- The shared tool set also includes `resume_agent`, which lets the foreground conversation agent send follow-up instructions back to a returned coding run on the same run id.
+- The shared tool set also includes `agent_status`, which reports the latest background workflow and coding-agent run state, task completion, and summaries.
 - Background `exec_command` launches persist their logs under `~/.openelinaro/shell-tasks/<job-id>/`, and completed jobs queue a completion notification back into the originating conversation so the next agent turn can react to the tail output.
 - Legacy routine imports are explicit through `routine_import_legacy`, which imports a caller-provided JSON file into `~/.openelinaro/routines.json`.
 - Memory imports are explicit through `memory_import`, which copies markdown from a caller-provided directory into `~/.openelinaro/memory/documents/`.

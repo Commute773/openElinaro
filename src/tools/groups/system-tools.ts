@@ -5,10 +5,6 @@ import { z } from "zod";
 import type { MediaKind } from "../../services/media-service";
 import type { ModelProviderId, ActiveExtendedContextStatus } from "../../services/model-service";
 import { SECRET_STORE_KINDS } from "../../services/secret-store-service";
-import {
-  SESSION_TODO_PRIORITIES,
-  SESSION_TODO_STATUSES,
-} from "../../services/session-todo-store";
 import { isRunningInsideManagedService } from "../../services/runtime-platform";
 import type { FeatureId } from "../../services/feature-config-service";
 import { parseFeatureValue } from "../../services/feature-config-service";
@@ -100,24 +96,6 @@ const mediaPlaySchema = z.object({
 const mediaVolumeSchema = z.object({
   volume: z.number().int().min(0).max(130),
   speaker: z.string().min(1).optional(),
-});
-
-const todoStatusSchema = z.enum(SESSION_TODO_STATUSES);
-const todoPrioritySchema = z.enum(SESSION_TODO_PRIORITIES);
-
-const todoItemSchema = z.object({
-  content: z.string().min(1),
-  status: todoStatusSchema,
-  priority: todoPrioritySchema,
-});
-
-const todoReadSchema = z.object({
-  conversationKey: z.string().min(1).optional(),
-});
-
-const todoWriteSchema = z.object({
-  conversationKey: z.string().min(1).optional(),
-  todos: z.array(todoItemSchema).max(100),
 });
 
 function parseOpenBrowserActionsInput(value: unknown) {
@@ -736,65 +714,6 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
       ),
     );
   }
-
-  // Todo tools (session coding todos)
-  tools.push(
-    tool(
-      async (input) =>
-        traceSpan(
-          "tool.todo_read",
-          async () => {
-            if (!input.conversationKey?.trim()) {
-              throw new Error("todo_read needs a conversationKey unless it is called from an active session.");
-            }
-            const todos = ctx.sessionTodos.get(input.conversationKey.trim());
-            return {
-              conversationKey: input.conversationKey.trim(),
-              count: todos.length,
-              todos,
-            };
-          },
-          { attributes: { conversationKey: input.conversationKey } },
-        ),
-      {
-        name: "todo_read",
-        description:
-          "Read the coding agent's session task list. This is for agent-managed implementation steps, not the user's real todos. If you are the main agent looking for the user's tasks, use routines tools instead.",
-        schema: todoReadSchema,
-      },
-    ),
-    tool(
-      async (input) =>
-        traceSpan(
-          "tool.todo_write",
-          async () => {
-            if (!input.conversationKey?.trim()) {
-              throw new Error("todo_write needs a conversationKey unless it is called from an active session.");
-            }
-            const conversationKey = input.conversationKey.trim();
-            const todos = ctx.sessionTodos.update(conversationKey, input.todos);
-            return {
-              conversationKey,
-              count: todos.length,
-              activeCount: todos.filter((item) => item.status !== "completed" && item.status !== "cancelled").length,
-              todos,
-            };
-          },
-          {
-            attributes: {
-              conversationKey: input.conversationKey,
-              todoCount: input.todos.length,
-            },
-          },
-        ),
-      {
-        name: "todo_write",
-        description:
-          "Create or replace the coding agent's session task list for multi-step implementation work. This is for coding agents tracking their own plan, not for managing the user's real todos. If you are the main agent and need the user's tasks, use routines tools instead. Keep at most one item in_progress and update statuses as work completes.",
-        schema: todoWriteSchema,
-      },
-    ),
-  );
 
   // OpenBrowser (feature-gated)
   if (ctx.featureConfig.isActive("openbrowser")) {

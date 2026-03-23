@@ -688,7 +688,7 @@ async function main() {
 
   try {
     const app = new runtimeModule.OpenElinaroApp({ profileId: "root" });
-    const launchResponse = await app.invokeRoutineTool("launch_coding_agent", {
+    const launchResponse = await app.invokeRoutineTool("launch_agent", {
       profile: "swebench-smoke",
       cwd: workspaceRoot,
       timeoutMs: RUN_TIMEOUT_MS,
@@ -701,7 +701,7 @@ async function main() {
     });
 
     const runId = launchResponse.match(/Run id: (run-[a-z0-9-]+)/i)?.[1];
-    assert.ok(runId, "Expected launch_coding_agent to return a run id.");
+    assert.ok(runId, "Expected launch_agent to return a run id.");
     streamLine(`[smoke][launch] ${launchResponse.replace(/\n/g, " | ")}`);
 
     try {

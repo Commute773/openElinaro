@@ -79,7 +79,7 @@ Expected:
 - Text mode reports path, type, size, modified time, and created time.
 - JSON mode returns `path`, `type`, `sizeBytes`, `modifiedAt`, and `createdAt`.
 
-## `workflow_status`
+## `agent_status`
 
 Known-good text output:
 

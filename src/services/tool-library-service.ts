@@ -167,15 +167,13 @@ export const TOOL_LIBRARY_DEFINITIONS: readonly ToolLibraryDefinition[] = [
   },
   {
     id: "coding_agents",
-    description: "Background coding-agent launch, steering, status, and session task lists.",
+    description: "Background coding-agent launch, steering, status, and cancellation.",
     toolNames: [
-      "launch_coding_agent",
-      "resume_coding_agent",
-      "steer_coding_agent",
-      "cancel_coding_agent",
-      "workflow_status",
-      "todo_read",
-      "todo_write",
+      "launch_agent",
+      "resume_agent",
+      "steer_agent",
+      "cancel_agent",
+      "agent_status",
     ],
   },
 ] as const;

@@ -18,7 +18,6 @@ import { SecretStoreService } from "../services/secret-store-service";
 import { ToolResultStore } from "../services/tool-result-store";
 import type { ElinaroTicket, ElinaroTicketsService } from "../services/elinaro-tickets-service";
 import type { ShellService } from "../services/shell-service";
-import { SessionTodoStore } from "../services/session-todo-store";
 import { SystemPromptService } from "../services/system-prompt-service";
 import { ToolResolutionService } from "../services/tool-resolution-service";
 import { resolveRuntimePlatform, type RuntimePlatform } from "../services/runtime-platform";
@@ -341,9 +340,6 @@ function createHarnessWithOptions(options?: {
     models,
     systemPrompts,
   );
-  const todoStore = new SessionTodoStore(
-    path.join(fs.mkdtempSync(path.join(os.tmpdir(), "session-todos-")), "session-todos.json"),
-  );
   const tickets = options?.tickets ?? {
     isConfigured: () => false,
     getConfigurationError: () => null,
@@ -368,7 +364,6 @@ function createHarnessWithOptions(options?: {
     access,
     options?.shell,
       undefined,
-      todoStore,
       finance,
       health,
       undefined,
@@ -1553,44 +1548,7 @@ describe("ToolRegistry tool catalog", () => {
     expect(calls).toHaveLength(1);
   });
 
-  test("round-trips coding session todos by conversation key", async () => {
-    const harness = createHarness();
-    await harness.registry.invokeRaw("todo_write", {
-      conversationKey: "coding-session-1",
-      todos: [
-        {
-          content: "Inspect the failing test output",
-          status: "in_progress",
-          priority: "high",
-        },
-        {
-          content: "Patch the bug and rerun targeted tests",
-          status: "pending",
-          priority: "medium",
-        },
-      ],
-    });
-
-    const result = await harness.registry.invokeRaw("todo_read", {
-      conversationKey: "coding-session-1",
-    }) as { count: number; todos: Array<{ content: string; status: string; priority: string }> };
-
-    expect(result.count).toBe(2);
-    expect(result.todos).toEqual([
-      {
-        content: "Inspect the failing test output",
-        status: "in_progress",
-        priority: "high",
-      },
-      {
-        content: "Patch the bug and rerun targeted tests",
-        status: "pending",
-        priority: "medium",
-      },
-    ]);
-  });
-
-  test("keeps todo tools out of the default chat bundle and out of coding-worker defaults", () => {
+  test("keeps coding-worker defaults focused on file edits and does not include chat-only tools", () => {
     const harness = createHarness();
 
     const chatTools = harness.resolver.resolveForChat({ context: { conversationKey: "chat-1" } }).tools;
@@ -1603,10 +1561,6 @@ describe("ToolRegistry tool catalog", () => {
     expect(chatTools).toContain("exec_command");
     expect(chatTools).toContain("exec_status");
     expect(chatTools).toContain("exec_output");
-    expect(chatTools).not.toContain("todo_read");
-    expect(chatTools).not.toContain("todo_write");
-    expect(codingTools).not.toContain("todo_read");
-    expect(codingTools).not.toContain("todo_write");
     expect(codingTools).toContain("write_file");
     expect(codingTools).toContain("edit_file");
     expect(codingTools).toContain("apply_patch");
@@ -1632,7 +1586,6 @@ describe("ToolRegistry tool catalog", () => {
     expect(planningTools).not.toContain("write_file");
     expect(planningTools).not.toContain("exec_command");
     expect(planningTools).not.toContain("web_search");
-    expect(planningTools).not.toContain("todo_write");
   });
 
   test("keeps coding-worker defaults focused on file edits plus exec", () => {
@@ -2343,14 +2296,11 @@ describe("ToolRegistry tool catalog", () => {
     const cards = harness.registry.getToolCatalog();
     const webSearch = cards.find((card) => card.canonicalName === "web_search");
     const writeFile = cards.find((card) => card.canonicalName === "write_file");
-    const todoWrite = cards.find((card) => card.canonicalName === "todo_write");
 
     expect(webSearch?.defaultVisibleToMainAgent).toBe(false);
     expect(webSearch?.defaultVisibleToSubagent).toBe(false);
     expect(writeFile?.defaultVisibleToSubagent).toBe(true);
     expect(writeFile?.defaultVisibleToMainAgent).toBe(false);
-    expect(todoWrite?.defaultVisibleToMainAgent).toBe(false);
-    expect(todoWrite?.defaultVisibleToSubagent).toBe(false);
   });
 
   test("omits media tools from the Linux runtime", () => {
