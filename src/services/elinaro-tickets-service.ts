@@ -2,6 +2,9 @@ import net from "node:net";
 import { spawn } from "node:child_process";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { SecretStoreService } from "./secret-store-service";
+import { telemetry } from "./telemetry";
+
+const ticketsTelemetry = telemetry.child({ component: "tickets" });
 
 export const ELINARO_TICKET_STATUSES = [
   "backlog",
@@ -190,7 +193,15 @@ export class ElinaroTicketsService {
         body: body === undefined ? undefined : JSON.stringify(body),
       });
 
-      const payload = (await response.json().catch(() => null)) as TicketsEnvelope<unknown> | null;
+      const payload = (await response.json().catch((error) => {
+        ticketsTelemetry.event("tickets.response_parse_failed", {
+          method,
+          path,
+          status: response.status,
+          error: error instanceof Error ? error.message : String(error),
+        }, { level: "warn", outcome: "error" });
+        return null;
+      })) as TicketsEnvelope<unknown> | null;
       if (!response.ok || !payload || payload.ok === false) {
         const message = payload?.error?.message?.trim() || `Ticket API request failed with ${response.status}.`;
         throw new Error(message);

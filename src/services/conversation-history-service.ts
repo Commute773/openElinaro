@@ -489,7 +489,10 @@ export class ConversationHistoryService {
         return null;
       }
       return parsed;
-    } catch {
+    } catch (error) {
+      conversationHistoryTelemetry.event("conversation_history.index_read_failed", {
+        error: error instanceof Error ? error.message : String(error),
+      }, { level: "debug", outcome: "error" });
       return null;
     }
   }

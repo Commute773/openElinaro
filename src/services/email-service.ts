@@ -612,7 +612,11 @@ class PurelymailEmailBackend implements EmailBackend {
       } finally {
         lock.release();
         if (client.usable) {
-          await client.logout().catch(() => undefined);
+          await client.logout().catch((error) => {
+            emailTelemetry.event("email.imap_logout_failed", {
+              error: error instanceof Error ? error.message : String(error),
+            }, { level: "debug", outcome: "error" });
+          });
         }
       }
     });
