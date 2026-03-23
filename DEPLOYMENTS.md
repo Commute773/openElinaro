@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.23.2
+- Released at: 2026-03-23T00:18:41Z
+- Release id: 20260323T001841Z-523be0e
+- Previous version: 2026.03.23
+- Trigger: ci/release workflow
+
+- feat: improve update error messages with full version triple and verbose rollback
+- feat: surface subagent provider descriptions for multi-provider profiles
+
 ## 2026.03.23
 - Released at: 2026-03-23T00:04:20Z
 - Release id: 20260323T000420Z-2dda8a0
