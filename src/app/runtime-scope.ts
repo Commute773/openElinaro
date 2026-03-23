@@ -222,6 +222,7 @@ export function createRuntimeScope(ctx: {
         }
       : undefined,
   );
+  chat.setTimezoneProvider(() => routines.getTimezone());
 
   return {
     profile,
