@@ -445,6 +445,10 @@ export class RoutinesService {
 
   constructor(private readonly projects?: ProjectsService) {}
 
+  getTimezone(): string {
+    return this.store.load().settings.timezone;
+  }
+
   private isQuietHours(reference: Date = new Date()) {
     const { quietHours } = this.store.load().settings;
     if (!quietHours.enabled) {

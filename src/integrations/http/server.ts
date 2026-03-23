@@ -16,7 +16,7 @@ export function createHttpRequestHandler(
   geminiLivePhone?: GeminiLivePhoneService,
 ) {
   return async (request: Request) => {
-    const url = new URL(request.url);
+    const url = new URL(request.url, "http://localhost");
     const pathname = normalizePath(url.pathname);
 
     if (pathname === "/healthz") {
@@ -54,7 +54,7 @@ function maybeUpgradeGeminiLiveCallSocket(
   vonage: VonageService,
   geminiLivePhone: GeminiLivePhoneService,
 ) {
-  const pathname = normalizePath(new URL(request.url).pathname);
+  const pathname = normalizePath(new URL(request.url, "http://localhost").pathname);
   const sessionId = geminiLivePhone.resolveSessionIdFromPath(pathname);
   if (!sessionId) {
     return null;
