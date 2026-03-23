@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { getLocalTimezone } from "./local-time-service";
-import { openDatabase } from "../utils/sqlite-helpers";
+import { openDatabase, withSqliteRetry } from "../utils/sqlite-helpers";
 import { resolveRuntimePath } from "./runtime-root";
 import { telemetry as rootTelemetry, type TelemetryService } from "./telemetry";
 
@@ -226,18 +226,20 @@ export class AlarmService {
       entityId: alarm.id,
       attributes: alarm,
     }, () => {
-      this.db.query(
-        `INSERT INTO alarms (id, kind, name, trigger_at, timezone, created_at, original_spec)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
-      ).run(
-        alarm.id,
-        alarm.kind,
-        alarm.name,
-        alarm.triggerAt,
-        alarm.timezone,
-        alarm.createdAt,
-        alarm.originalSpec,
-      );
+      withSqliteRetry(() => {
+        this.db.query(
+          `INSERT INTO alarms (id, kind, name, trigger_at, timezone, created_at, original_spec)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+        ).run(
+          alarm.id,
+          alarm.kind,
+          alarm.name,
+          alarm.triggerAt,
+          alarm.timezone,
+          alarm.createdAt,
+          alarm.originalSpec,
+        );
+      }, { label: "alarm-service" });
     });
     this.notifyScheduleChanged();
     return alarm;
@@ -266,18 +268,20 @@ export class AlarmService {
       entityId: timer.id,
       attributes: timer,
     }, () => {
-      this.db.query(
-        `INSERT INTO alarms (id, kind, name, trigger_at, timezone, created_at, original_spec)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
-      ).run(
-        timer.id,
-        timer.kind,
-        timer.name,
-        timer.triggerAt,
-        timer.timezone,
-        timer.createdAt,
-        timer.originalSpec,
-      );
+      withSqliteRetry(() => {
+        this.db.query(
+          `INSERT INTO alarms (id, kind, name, trigger_at, timezone, created_at, original_spec)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+        ).run(
+          timer.id,
+          timer.kind,
+          timer.name,
+          timer.triggerAt,
+          timer.timezone,
+          timer.createdAt,
+          timer.originalSpec,
+        );
+      }, { label: "alarm-service" });
     });
     this.notifyScheduleChanged();
     return timer;
@@ -344,7 +348,9 @@ export class AlarmService {
         entityType: "alarm",
         entityId: id,
       }, () => {
-        this.db.query("UPDATE alarms SET cancelled_at = ?2 WHERE id = ?1").run(id, timestamp(reference));
+        withSqliteRetry(() => {
+          this.db.query("UPDATE alarms SET cancelled_at = ?2 WHERE id = ?1").run(id, timestamp(reference));
+        }, { label: "alarm-service" });
       });
       this.notifyScheduleChanged();
     }
@@ -360,7 +366,9 @@ export class AlarmService {
       entityType: "alarm",
       entityId: id,
     }, () => {
-      this.db.query("UPDATE alarms SET delivered_at = ?2 WHERE id = ?1").run(id, timestamp(reference));
+      withSqliteRetry(() => {
+        this.db.query("UPDATE alarms SET delivered_at = ?2 WHERE id = ?1").run(id, timestamp(reference));
+      }, { label: "alarm-service" });
     });
     this.notifyScheduleChanged();
   }
