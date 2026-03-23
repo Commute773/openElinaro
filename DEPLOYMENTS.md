@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.7
+- Released at: 2026-03-23T17:40:48Z
+- Release id: 20260323T174048Z-edd0eea
+- Previous version: 2026.03.23.6
+- Trigger: ci/release workflow
+
+- feat: route heartbeat to lightweight model and wire prompt drift warnings to Discord
+
 ## 2026.03.23.6
 - Released at: 2026-03-23T17:31:11Z
 - Release id: 20260323T173111Z-79ff629
