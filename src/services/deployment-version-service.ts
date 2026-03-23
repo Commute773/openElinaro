@@ -46,6 +46,7 @@ type SourceVersionInfo = {
 };
 
 const DEFAULT_DEPLOYMENT_VERSION = "unversioned";
+const MAX_UPDATE_CHANGELOG_ENTRIES = 10;
 const RELEASE_FILE_NAME = "release.json";
 const VERSION_FILE_NAME = "VERSION.json";
 const CHANGELOG_FILE_NAME = "DEPLOYMENTS.md";
@@ -319,6 +320,9 @@ export class DeploymentVersionService {
       preparedSegments,
     );
 
+    const displayedEntries = changelogEntries.slice(0, MAX_UPDATE_CHANGELOG_ENTRIES);
+    const omittedCount = changelogEntries.length - displayedEntries.length;
+
     return [
       `Deployed version: ${runtime.version}.`,
       `Pulled source version: ${preparedVersion}.`,
@@ -329,7 +333,8 @@ export class DeploymentVersionService {
         changelogEntries.length > 0
           ? [
             `Pending deployment entries since ${runtime.version}: ${changelogEntries.length}.`,
-            ...changelogEntries.flatMap((entry) => renderDeploymentChangelogEntry(entry)),
+            ...displayedEntries.flatMap((entry) => renderDeploymentChangelogEntry(entry)),
+            ...(omittedCount > 0 ? [`\n(${omittedCount} older entries omitted. Use service_changelog_since_version for full history.)`] : []),
           ]
           : [`No deployment changelog entries newer than ${runtime.version} were found in ${path.basename(source.changelogPath ?? CHANGELOG_FILE_NAME)}.`]
       ),
@@ -364,9 +369,12 @@ export class DeploymentVersionService {
           "Run `/update confirm:true` to deploy the already pulled version.",
         );
         if (changelogEntries.length > 0) {
+          const displayed = changelogEntries.slice(0, MAX_UPDATE_CHANGELOG_ENTRIES);
+          const omitted = changelogEntries.length - displayed.length;
           lines.push(
             `Pending deployment entries since ${currentVersion}: ${changelogEntries.length}.`,
-            ...changelogEntries.flatMap((entry) => renderDeploymentChangelogEntry(entry)),
+            ...displayed.flatMap((entry) => renderDeploymentChangelogEntry(entry)),
+            ...(omitted > 0 ? [`\n(${omitted} older entries omitted. Use service_changelog_since_version for full history.)`] : []),
           );
         }
       }
@@ -409,9 +417,12 @@ export class DeploymentVersionService {
         "Run `/update confirm:true` to deploy the already pulled version.",
       );
       if (changelogEntries.length > 0) {
+        const displayed = changelogEntries.slice(0, MAX_UPDATE_CHANGELOG_ENTRIES);
+        const omitted = changelogEntries.length - displayed.length;
         lines.push(
           `Pending deployment entries since ${currentVersion}: ${changelogEntries.length}.`,
-          ...changelogEntries.flatMap((entry) => renderDeploymentChangelogEntry(entry)),
+          ...displayed.flatMap((entry) => renderDeploymentChangelogEntry(entry)),
+          ...(omitted > 0 ? [`\n(${omitted} older entries omitted. Use service_changelog_since_version for full history.)`] : []),
         );
       }
       return lines.join("\n");
