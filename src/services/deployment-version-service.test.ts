@@ -350,7 +350,7 @@ describe("deployment version service", () => {
 
     expect(result).toContain("Deployed version: 2026.03.16.2.");
     expect(result).toContain("Pulled source version: 2026.03.16.2.");
-    expect(result).toContain("The pulled source version is not newer than the deployed service.");
+    expect(result).toContain("Update skipped: the deployed service is already at version 2026.03.16.2, which matches the pulled source version.");
     expect(result).toContain("Nothing to deploy.");
   });
 
@@ -446,7 +446,7 @@ describe("deployment version service", () => {
     expect(result).toContain("Pulled source version: 2026.03.16.2.");
     expect(result).toContain("Latest remote tag version: 2026.03.16.2.");
     expect(result).toContain("Source checkout is up to date with the latest remote tag.");
-    expect(result).toContain("Deployed service is already at the pulled source version. No deploy needed.");
+    expect(result).toContain("Update skipped: the deployed service is already at version 2026.03.16.2, which matches the pulled source version. No deploy needed.");
     expect(new DeploymentVersionService().hasPreparedUpdate()).toBe(false);
   });
 
