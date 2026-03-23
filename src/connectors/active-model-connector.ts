@@ -21,7 +21,7 @@ import {
 } from "../services/ai-sdk-message-service";
 import { getAssistantDisplayName } from "../config/runtime-identity";
 import { InferencePromptDriftMonitor } from "../services/inference-prompt-drift-monitor";
-import { buildCurrentLocalTimePrefix } from "../services/local-time-service";
+
 import { ModelService } from "../services/model-service";
 import { telemetry } from "../services/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
@@ -226,24 +226,11 @@ function toToolCallArgs(input: unknown) {
   return {};
 }
 
-type ConnectorMessageOptions = {
-  localTimePrefix?: string;
-};
-
 type OpenElinaroProviderOptions = {
   sessionId?: string;
   conversationKey?: string;
   usagePurpose?: string;
-  prependLocalTimeToUserAndToolMessages?: boolean;
 };
-
-function prependCurrentLocalTime(text: string, localTimePrefix: string | undefined) {
-  if (!localTimePrefix) {
-    return text;
-  }
-
-  return `${localTimePrefix}\n\n${text}`.trim();
-}
 
 function resolveProviderOptions(options: LanguageModelV3CallOptions): OpenElinaroProviderOptions {
   const metadata = options.providerOptions?.openelinaro;
@@ -285,7 +272,7 @@ function resolveImageMimeType(mediaType: unknown, image: unknown) {
   return dataUrlMatch?.[1]?.trim() || undefined;
 }
 
-function toPiMessages(message: ModelMessage, options?: ConnectorMessageOptions): Message[] {
+function toPiMessages(message: ModelMessage): Message[] {
   switch (message.role) {
     case "system":
       return [];
@@ -293,20 +280,16 @@ function toPiMessages(message: ModelMessage, options?: ConnectorMessageOptions):
       if (typeof message.content === "string") {
         return [{
           role: "user",
-          content: prependCurrentLocalTime(message.content, options?.localTimePrefix),
+          content: message.content,
           timestamp: Date.now(),
         }];
       }
 
       {
-        const contentPrefix = options?.localTimePrefix;
         const content: Array<
           | { type: "text"; text: string }
           | { type: "image"; data: string; mimeType: string }
         > = [];
-        if (contentPrefix) {
-          content.push({ type: "text", text: contentPrefix });
-        }
         for (const part of message.content) {
           if (part.type === "text") {
             content.push({ type: "text", text: part.text });
@@ -338,10 +321,7 @@ function toPiMessages(message: ModelMessage, options?: ConnectorMessageOptions):
           toolName: part.toolName ?? "tool",
           content: [{
             type: "text",
-            text: prependCurrentLocalTime(
-              stringifyToolResultOutput(part.output),
-              options?.localTimePrefix,
-            ),
+            text: stringifyToolResultOutput(part.output),
           }],
           isError: part.output.type === "error-text" || part.output.type === "error-json",
           timestamp: Date.now(),
@@ -426,12 +406,9 @@ export class ActiveModelConnector implements ProviderConnector {
           .filter((message) => message.role === "system")
           .map((message) => message.content)
           .join("\n\n");
-        const localTimePrefix = providerOptions.prependLocalTimeToUserAndToolMessages
-          ? buildCurrentLocalTimePrefix()
-          : undefined;
         const messages = options.prompt
           .filter((message) => message.role !== "system")
-          .flatMap((message) => toPiMessages(message, { localTimePrefix }));
+          .flatMap((message) => toPiMessages(message));
         const context: Context = {
           systemPrompt,
           messages,
