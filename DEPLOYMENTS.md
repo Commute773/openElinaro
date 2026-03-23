@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.10
+- Released at: 2026-03-23T18:30:03Z
+- Release id: 20260323T183003Z-f6d403d
+- Previous version: 2026.03.23.9
+- Trigger: ci/release workflow
+
+- fix: cap /update changelog display to 10 most recent entries
+
 ## 2026.03.23.9
 - Released at: 2026-03-23T18:29:18Z
 - Release id: 20260323T182918Z-5c33165
