@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.4
+- Released at: 2026-03-23T01:38:20Z
+- Release id: 20260323T013820Z-e64e40f
+- Previous version: 2026.03.23.3
+- Trigger: ci/release workflow
+
+- fix: align subagent tool names and remove obsolete todo tools
+
 ## 2026.03.23.3
 - Released at: 2026-03-23T01:08:05Z
 - Release id: 20260323T010805Z-e2022b3
