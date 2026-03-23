@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.17
+- Released at: 2026-03-23T20:37:00Z
+- Release id: 20260323T203700Z-678b038
+- Previous version: 2026.03.23.16
+- Trigger: ci/release workflow
+
+- docs: add log file layout and reading guide to observability doc
+
 ## 2026.03.23.16
 - Released at: 2026-03-23T20:30:50Z
 - Release id: 20260323T203050Z-a39d18e
