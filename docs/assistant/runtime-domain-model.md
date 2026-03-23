@@ -288,7 +288,7 @@ Media is a local runtime object, not just prompt text.
 
 - Library sources: runtime-local `media/`
 - Optional tag SSOT: `media/catalog.json` when present
-- Optional speaker alias SSOT: `~/.openclaw/workspace/skills/play-sound/references/speakers.json`
+- Optional speaker alias SSOT: `~/.openelinaro/media/speakers.json` (legacy fallback: `~/.openclaw/workspace/skills/play-sound/references/speakers.json`)
 - Managed runtime state: `~/.openelinaro/media/` for playback metadata/logs, plus a short-lived temp-directory root for `mpv` IPC sockets
 
 Current media tools operate on two explicit content kinds:
@@ -296,4 +296,4 @@ Current media tools operate on two explicit content kinds:
 - `song`
 - `ambience`
 
-Playback is only exposed on Darwin today. Linux does not register media tools at all. On supported hosts, playback is per speaker and managed through local `mpv` IPC sockets. Those sockets use a short temp-directory path so managed-service release snapshots do not hit Darwin socket-length limits. Speaker availability is read from the machine's current output-device list, while speaker aliases such as `bedroom -> B06HD` come from the OpenClaw speaker config when available.
+Playback is only exposed on Darwin today. Linux does not register media tools at all. On supported hosts, playback is per speaker and managed through local `mpv` IPC sockets. Those sockets use a short temp-directory path so managed-service release snapshots do not hit Darwin socket-length limits. Speaker availability is read from the machine's current output-device list, while speaker aliases such as `bedroom -> B06HD` come from the speaker config at `~/.openelinaro/media/speakers.json` when available.

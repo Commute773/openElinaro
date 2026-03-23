@@ -30,7 +30,8 @@ The runtime-local `media/ambience/thunder.mp3` track is indexed explicitly so "t
 
 Speaker aliases and preferred names come from:
 
-- `~/.openclaw/workspace/skills/play-sound/references/speakers.json`
+- `~/.openelinaro/media/speakers.json`
+- Legacy fallback: `~/.openclaw/workspace/skills/play-sound/references/speakers.json` (used only when the native path does not exist; logs a warning)
 
 Live output availability comes from the local audio device list. This is how the app can detect speakers such as `B06HD`.
 

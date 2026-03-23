@@ -5,7 +5,7 @@ Projects are first-class local context, but they are not the core agent system. 
 ## Inventory
 
 - `~/.openelinaro/projects/registry.json` is the inventory single source of truth.
-- It records the project id, status, summary, workspace path, embedded long-form `state`/`future`/optional `milestone` content, and source docs copied from `~/.openclaw/workspace`.
+- It records the project id, status, summary, workspace path, embedded long-form `state`/`future`/optional `milestone` content, and source docs (originally imported from the legacy `~/.openclaw/workspace`).
 - Use `workspaceOverrides` when one profile, such as an SSH-backed profile, needs a different real workspace root than the default local `workspacePath`.
 - Projects with a `jobId` are work projects; projects without a `jobId` are personal projects.
 
