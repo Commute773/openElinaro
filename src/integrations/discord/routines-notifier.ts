@@ -29,6 +29,7 @@ const traceSpan = createTraceSpan(discordNotifierTelemetry);
 export class DiscordRoutinesNotifier {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private unsubscribeAlarmScheduleChange: (() => void) | null = null;
+  private unsubscribeRoutineScheduleChange: (() => void) | null = null;
   private readonly heartbeatState = new HeartbeatStateService();
   private readonly docsIndexState: DocsIndexStateService;
   private readonly docsIndexer: DocsIndexService;
@@ -58,12 +59,17 @@ export class DiscordRoutinesNotifier {
     this.unsubscribeAlarmScheduleChange ??= this.app.onAlarmScheduleChanged(() => {
       this.scheduleNextRun();
     });
+    this.unsubscribeRoutineScheduleChange ??= this.app.onRoutineScheduleChanged?.(() => {
+      this.scheduleNextRun();
+    }) ?? null;
     this.scheduleNextRun();
   }
 
   stop() {
     this.unsubscribeAlarmScheduleChange?.();
     this.unsubscribeAlarmScheduleChange = null;
+    this.unsubscribeRoutineScheduleChange?.();
+    this.unsubscribeRoutineScheduleChange = null;
     if (!this.timer) {
       return;
     }
@@ -241,7 +247,8 @@ export class DiscordRoutinesNotifier {
               });
             }
 
-            if (Date.now() >= this.nextHeartbeatAt) {
+            const alarmRoutinesDue = this.app.hasAlarmRoutinesDueNow?.() ?? false;
+            if (Date.now() >= this.nextHeartbeatAt || alarmRoutinesDue) {
               const response = await this.app.runHourlyHeartbeat(userId, {
                 onBackgroundResponse: async (message) => {
                   if (!await this.sendAssistantMessage(dm, message)) {

@@ -796,6 +796,14 @@ export class OpenElinaroApp {
     this.routines.markReminded(itemIds, occurrenceKeys);
   }
 
+  hasAlarmRoutinesDueNow(reference?: Date) {
+    return this.routines.hasAlarmRoutinesDueNow(reference);
+  }
+
+  onRoutineScheduleChanged(listener: () => void) {
+    return this.routines.onScheduleChanged(listener);
+  }
+
   getNextRoutineAttentionAt(reference?: Date) {
     return this.routines.getNextRoutineAttentionAt(reference);
   }
