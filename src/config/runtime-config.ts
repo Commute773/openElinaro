@@ -96,6 +96,7 @@ const DEFAULT_KOKORO = { baseUrl: "http://127.0.0.1:8801/v1", model: "kokoro", v
 const DEFAULT_LOCAL_VOICE = { enabled: false, localLlm: DEFAULT_LOCAL_LLM, kokoro: DEFAULT_KOKORO };
 const DEFAULT_MEDIA = { enabled: false, roots: [] as string[] };
 const DEFAULT_AUTONOMOUS_TIME = { enabled: false, promptPath: "assistant_context/autonomous-time.md" };
+const DEFAULT_SERVICE = { user: "root", group: "root" };
 
 export const RuntimeConfigSchema = z.object({
   configVersion: z.number().int().nonnegative().default(0),
@@ -229,6 +230,10 @@ export const RuntimeConfigSchema = z.object({
     enabled: z.boolean().default(false),
     promptPath: z.string().min(1).default("assistant_context/autonomous-time.md"),
   }).default(DEFAULT_AUTONOMOUS_TIME),
+  service: z.object({
+    user: z.string().min(1).default("root"),
+    group: z.string().min(1).default("root"),
+  }).default(DEFAULT_SERVICE),
 });
 
 export type RuntimeConfig = z.infer<typeof RuntimeConfigSchema>;

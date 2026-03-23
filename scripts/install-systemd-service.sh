@@ -3,8 +3,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${OPENELINARO_ROOT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
-SERVICE_USER="${OPENELINARO_SERVICE_USER:-openelinaro}"
-SERVICE_GROUP="${OPENELINARO_SERVICE_GROUP:-${SERVICE_USER}}"
+
+# Read service.user and service.group from config.yaml if available.
+# Environment variables take precedence, then config.yaml, then "root".
+_CONFIG_FILE="${OPENELINARO_USER_DATA_DIR:-${HOME}/.openelinaro}/config.yaml"
+_config_yaml_value() {
+  local key="$1"
+  if [[ -f "${_CONFIG_FILE}" ]]; then
+    sed -n "s/^[[:space:]]*${key}:[[:space:]]*\(.*\)/\1/p" "${_CONFIG_FILE}" | head -n 1 | tr -d '"'"'" | xargs
+  fi
+}
+_CFG_USER="$(_config_yaml_value "user")"
+_CFG_GROUP="$(_config_yaml_value "group")"
+SERVICE_USER="${OPENELINARO_SERVICE_USER:-${_CFG_USER:-root}}"
+SERVICE_GROUP="${OPENELINARO_SERVICE_GROUP:-${_CFG_GROUP:-${SERVICE_USER}}}"
 SERVICE_HOME="$(getent passwd "${SERVICE_USER}" 2>/dev/null | cut -d: -f6)"
 SERVICE_HOME="${SERVICE_HOME:-/home/${SERVICE_USER}}"
 export OPENELINARO_USER_DATA_DIR="${OPENELINARO_USER_DATA_DIR:-${SERVICE_HOME}/.openelinaro}"
