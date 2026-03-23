@@ -25,6 +25,32 @@ const DEFAULT_EMAIL_MAX_BODY_CHARS = 12_000;
 
 const emailTelemetry = telemetry.child({ component: "email" });
 
+function enrichImapError(error: unknown, context: string): Error {
+  if (!(error instanceof Error)) {
+    return new Error(`${context}: ${String(error)}`);
+  }
+  const imapError = error as Error & {
+    responseStatus?: string;
+    responseText?: string;
+    code?: string;
+  };
+  const parts = [context];
+  if (imapError.responseStatus) {
+    parts.push(`[${imapError.responseStatus}]`);
+  }
+  if (imapError.responseText) {
+    parts.push(imapError.responseText);
+  } else {
+    parts.push(imapError.message);
+  }
+  if (imapError.code) {
+    parts.push(`(code: ${imapError.code})`);
+  }
+  const enriched = new Error(parts.join(" — "));
+  enriched.cause = error;
+  return enriched;
+}
+
 export type EmailAction =
   | "status"
   | "count"
@@ -605,10 +631,21 @@ class PurelymailEmailBackend implements EmailBackend {
     });
 
     return traceSpan(`email.backend.${operation}`, async () => {
-      await client.connect();
-      const lock = await client.getMailboxLock(this.config.imapMailbox);
+      try {
+        await client.connect();
+      } catch (error) {
+        throw enrichImapError(error, `IMAP connect to ${this.config.imapHost}:${this.config.imapPort} as ${this.config.username}`);
+      }
+      let lock;
+      try {
+        lock = await client.getMailboxLock(this.config.imapMailbox);
+      } catch (error) {
+        throw enrichImapError(error, `IMAP mailbox lock on ${this.config.imapMailbox}`);
+      }
       try {
         return await fn(client);
+      } catch (error) {
+        throw enrichImapError(error, `IMAP ${operation}`);
       } finally {
         lock.release();
         if (client.usable) {
