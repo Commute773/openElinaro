@@ -21,7 +21,11 @@ if [[ -z "${SOURCE_VERSION}" ]]; then
 fi
 
 if [[ -n "${CURRENT_RELEASE_VERSION}" ]] && ! openelinaro_version_is_newer "${SOURCE_VERSION}" "${CURRENT_RELEASE_VERSION}"; then
-  echo "No prepared update is newer than the current deployed version (${CURRENT_RELEASE_VERSION})." >&2
+  if [[ "${SOURCE_VERSION}" == "${CURRENT_RELEASE_VERSION}" ]]; then
+    echo "Update skipped: deployed service is already at version ${CURRENT_RELEASE_VERSION}, which matches the source version ${SOURCE_VERSION}." >&2
+  else
+    echo "Update skipped: source version ${SOURCE_VERSION} is not newer than the deployed version ${CURRENT_RELEASE_VERSION}." >&2
+  fi
   exit 1
 fi
 
@@ -32,24 +36,41 @@ NEW_RELEASE_DIR="${OPENELINARO_RELEASES_DIR}/${RELEASE_ID}"
 openelinaro_create_release_snapshot "${NEW_RELEASE_DIR}" "${RELEASE_ID}" "${SOURCE_VERSION}" "${RELEASED_AT}" "${CURRENT_RELEASE_VERSION}"
 
 rollback_to_previous() {
-  echo "Update ${SOURCE_VERSION} failed. Rolling back to ${CURRENT_RELEASE_DIR}." >&2
-  if ! OPENELINARO_ROLLBACK_TARGET="${CURRENT_RELEASE_DIR}" \
-    "${ROOT_DIR}/scripts/service-rollback.sh"
-  then
-    echo "Rollback failed." >&2
+  local failed_step="$1"
+  echo "" >&2
+  echo "Update failed during: ${failed_step}" >&2
+  echo "  Attempted version: ${SOURCE_VERSION}" >&2
+  echo "  Previous version:  ${CURRENT_RELEASE_VERSION:-none}" >&2
+  echo "  Release directory: ${NEW_RELEASE_DIR}" >&2
+  echo "" >&2
+  if [[ -n "${CURRENT_RELEASE_DIR}" ]]; then
+    echo "Rolling back to previous release: ${CURRENT_RELEASE_DIR}" >&2
+    if OPENELINARO_ROLLBACK_TARGET="${CURRENT_RELEASE_DIR}" \
+      "${ROOT_DIR}/scripts/service-rollback.sh"
+    then
+      echo "Rollback succeeded. Service restored to version ${CURRENT_RELEASE_VERSION:-unknown}." >&2
+    else
+      echo "Rollback also failed. Service may be in a broken state. Manual intervention required." >&2
+      echo "  Try: OPENELINARO_ROLLBACK_TARGET=\"${CURRENT_RELEASE_DIR}\" ${ROOT_DIR}/scripts/service-rollback.sh" >&2
+    fi
+  else
+    echo "No previous release to roll back to." >&2
   fi
 }
 
+echo "Installing service from release snapshot: ${NEW_RELEASE_DIR}"
+echo "  Version: ${SOURCE_VERSION} (was: ${CURRENT_RELEASE_VERSION:-none})"
 if ! OPENELINARO_SERVICE_ROOT_DIR="${NEW_RELEASE_DIR}" "${ROOT_DIR}/scripts/service-install.sh"; then
-  rollback_to_previous
+  rollback_to_previous "service install (launchd/systemd registration)"
   exit 1
 fi
 
+echo "Running post-deploy healthcheck (timeout: ${OPENELINARO_HEALTHCHECK_TIMEOUT_MS}ms)..."
 if ! "${BUN_BIN}" src/cli/healthcheck.ts --timeout-ms="${OPENELINARO_HEALTHCHECK_TIMEOUT_MS}"; then
-  rollback_to_previous
+  rollback_to_previous "post-deploy healthcheck — the new version started but did not pass the health check"
   exit 1
 fi
 
 openelinaro_update_release_state "${NEW_RELEASE_DIR}" "${CURRENT_RELEASE_DIR}"
 echo "Updated openelinaro service to ${NEW_RELEASE_DIR}."
-echo "Version: ${SOURCE_VERSION}"
+echo "Version: ${SOURCE_VERSION} (was: ${CURRENT_RELEASE_VERSION:-none})"

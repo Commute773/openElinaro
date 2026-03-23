@@ -294,13 +294,22 @@ export class DeploymentVersionService {
     }
 
     if (runtimeSegments && compareVersionSegments(preparedSegments, runtimeSegments) <= 0) {
+      const isExactMatch = compareVersionSegments(preparedSegments, runtimeSegments) === 0;
+      const reason = isExactMatch
+        ? `Update skipped: the deployed service is already at version ${runtime.version}, which matches the pulled source version.`
+        : `Update skipped: the pulled source version (${preparedVersion}) is older than the deployed service (${runtime.version}).`;
       return [
-        `Deployed version: ${runtime.version}.`,
+        reason,
+        "",
+        `Latest remote tag version: ${latestTagVersion || "unknown"}.`,
         `Pulled source version: ${preparedVersion}.`,
+        `Deployed version: ${runtime.version}.`,
         `Source root: ${source.sourceRoot}`,
-        "The pulled source version is not newer than the deployed service.",
-        ...(latestTagVersion ? [`Latest remote tag version: ${latestTagVersion}.`] : []),
-        "Nothing to deploy.",
+        "",
+        ...(latestTagVersion && tryParseVersionSegments(latestTagVersion) && runtimeSegments
+          && compareVersionSegments(parseVersionSegments(latestTagVersion), runtimeSegments) > 0
+          ? [`A newer remote version (${latestTagVersion}) is available but has not been pulled into the local source checkout yet.`]
+          : ["Nothing to deploy."]),
       ].join("\n");
     }
 
@@ -336,8 +345,9 @@ export class DeploymentVersionService {
     const sourceSegments = tryParseVersionSegments(sourceVersion);
 
     const lines = [
-      `Deployed version: ${currentVersion}.`,
+      `Latest remote tag version: ${latestTagVersion || "unknown"}.`,
       `Pulled source version: ${sourceVersion ?? "unknown"}.`,
+      `Deployed version: ${currentVersion}.`,
       `Source root: ${source.sourceRoot}`,
     ];
 
@@ -368,12 +378,9 @@ export class DeploymentVersionService {
     if (!latestSegments) {
       return [
         ...lines,
-        `Latest remote tag version: ${latestTagVersion}.`,
         `Latest remote tag version ${latestTagVersion} has an unsupported format.`,
       ].join("\n");
     }
-
-    lines.push(`Latest remote tag version: ${latestTagVersion}.`);
 
     if (!sourceVersion) {
       lines.push(`No pulled source version metadata was found in ${source.sourceRoot}.`);
@@ -411,11 +418,11 @@ export class DeploymentVersionService {
     }
 
     if (currentSegments && compareVersionSegments(sourceSegments, currentSegments) === 0) {
-      lines.push("Deployed service is already at the pulled source version. No deploy needed.");
+      lines.push(`Update skipped: the deployed service is already at version ${currentVersion}, which matches the pulled source version. No deploy needed.`);
       return lines.join("\n");
     }
 
-    lines.push("Pulled source version is older than the deployed service. Deployment was skipped.");
+    lines.push(`Update skipped: the pulled source version (${sourceVersion}) is older than the deployed service (${currentVersion}). Deployment was skipped.`);
     return lines.join("\n");
   }
 
