@@ -59,7 +59,8 @@ describe("FEATURE_IDS", () => {
     expect(FEATURE_IDS).toContain("tickets");
     expect(FEATURE_IDS).toContain("localVoice");
     expect(FEATURE_IDS).toContain("media");
-    expect(FEATURE_IDS.length).toBe(10);
+    expect(FEATURE_IDS).toContain("extensions");
+    expect(FEATURE_IDS.length).toBe(11);
   });
 });
 

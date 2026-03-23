@@ -27,6 +27,7 @@ export const FEATURE_IDS = [
   "tickets",
   "localVoice",
   "media",
+  "extensions",
 ] as const;
 
 export type FeatureId = (typeof FEATURE_IDS)[number];
@@ -227,6 +228,17 @@ export class FeatureConfigService {
           active: enabled && configured,
           missing: configured ? [] : ["media.roots"],
           notes: ["Local media playback tools."],
+        };
+      }
+      case "extensions": {
+        const enabled = config.extensions.enabled;
+        return {
+          featureId,
+          enabled,
+          configured: true,
+          active: enabled,
+          missing: [],
+          notes: ["User-installed extension modules."],
         };
       }
     }
