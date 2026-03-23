@@ -1934,6 +1934,10 @@ export class ToolRegistry {
       .filter((name) => this.access.canUseTool(name));
   }
 
+  getMediaService() {
+    return this.media;
+  }
+
   getUserFacingToolNames() {
     return getRuntimeUserFacingToolNames(this.runtimePlatform)
       .filter((name) => this.access.canUseTool(name))

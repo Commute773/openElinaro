@@ -861,7 +861,35 @@ export class OpenElinaroApp {
       createSubagentController: (pid: string) => this.buildSubagentController(pid),
     });
     this.scopes.set(scopeKey, scope);
+    this.wirePlaybackEndNotification(scope);
     return scope;
+  }
+
+  private wirePlaybackEndNotification(scope: RuntimeScope) {
+    const mediaService = scope.routineTools.getMediaService();
+    if (!mediaService) {
+      return;
+    }
+    mediaService.onPlaybackEnd((event) => {
+      const userId = this.getNotificationTargetUserId();
+      const conversationKey = userId ?? scope.profile.id;
+      const text = `Playback ended: ${event.title} on speaker ${event.speakerId}.`;
+      void this.handleRequest(
+        {
+          id: `playback-end-${event.speakerId}-${Date.now()}`,
+          kind: "chat",
+          text,
+          conversationKey,
+        },
+        { typingEligible: false },
+      ).catch((error) => {
+        this.appTelemetry.recordError(error, {
+          speakerId: event.speakerId,
+          title: event.title,
+          operation: "media.playback_end_notification",
+        });
+      });
+    });
   }
 
   private buildSubagentController(sourceProfileId: string) {
