@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.11
+- Released at: 2026-03-23T18:43:02Z
+- Release id: 20260323T184302Z-ee2258f
+- Previous version: 2026.03.23.10
+- Trigger: ci/release workflow
+
+- fix: use base64 for images in Anthropic token counting instead of URL sources
+
 ## 2026.03.23.10
 - Released at: 2026-03-23T18:30:03Z
 - Release id: 20260323T183003Z-f6d403d
