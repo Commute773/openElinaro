@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.3
+- Released at: 2026-03-23T01:08:05Z
+- Release id: 20260323T010805Z-e2022b3
+- Previous version: 2026.03.23.2
+- Trigger: ci/release workflow
+
+- fix: persist tool calls before stop check so the model can see its own invocations
+
 ## 2026.03.23.2
 - Released at: 2026-03-23T00:18:41Z
 - Release id: 20260323T001841Z-523be0e
