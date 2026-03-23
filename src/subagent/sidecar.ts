@@ -9,7 +9,7 @@ import {
 } from "./events";
 import { telemetry } from "../services/telemetry";
 
-type EventHandler = (event: SubagentEvent) => void;
+type EventHandler = (event: SubagentEvent) => void | Promise<void>;
 
 const sidecarTelemetry = telemetry.child({ component: "subagent_sidecar" });
 
@@ -29,15 +29,15 @@ export class SubagentSidecar {
     this.socketPath = socketPath;
   }
 
-  /** Register an event handler. Called synchronously on each normalized event. */
+  /** Register an event handler. Handlers may be async. */
   onEvent(handler: EventHandler): void {
     this.handlers.push(handler);
   }
 
-  private emit(event: SubagentEvent): void {
+  private async emit(event: SubagentEvent): Promise<void> {
     for (const handler of this.handlers) {
       try {
-        handler(event);
+        await handler(event);
       } catch (error) {
         sidecarTelemetry.recordError(error, {
           operation: "sidecar.handler",
@@ -89,7 +89,7 @@ export class SubagentSidecar {
               runId: event.runId,
               eventKind: event.kind,
             });
-            self.emit(event);
+            await self.emit(event);
             return Response.json({ ok: true });
           } catch (error) {
             sidecarTelemetry.recordError(error, { operation: "sidecar.claude_route" });
@@ -109,7 +109,7 @@ export class SubagentSidecar {
               runId: event.runId,
               eventKind: event.kind,
             });
-            self.emit(event);
+            await self.emit(event);
             return Response.json({ ok: true });
           } catch (error) {
             sidecarTelemetry.recordError(error, { operation: "sidecar.codex_route" });

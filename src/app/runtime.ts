@@ -111,7 +111,7 @@ export class OpenElinaroApp {
 
     // Start sidecar and subscribe to events
     this.subagentSidecar.start();
-    this.subagentSidecar.onEvent((event) => {
+    this.subagentSidecar.onEvent(async (event) => {
       const run = this.subagentRegistry.get(event.runId);
       if (!run) return;
 
@@ -127,6 +127,8 @@ export class OpenElinaroApp {
           event.runId,
           (event.payload.result as string) || (event.payload.output as string) || undefined,
         );
+        // Clean up remain-on-exit window (process succeeded, no need to keep)
+        void this.tmux.killWindow(event.runId);
         if (completedRun) {
           const controller = this.buildSubagentController(this.activeProfile.id);
           // Inject completion into parent conversation
@@ -149,10 +151,35 @@ export class OpenElinaroApp {
 
       if (event.kind === "worker.failed") {
         this.subagentTimeouts.clear(event.runId);
-        const failedRun = this.subagentRegistry.markFailed(
-          event.runId,
-          (event.payload.error as string) || "Agent failed",
-        );
+
+        // Build verbose error from all available sources
+        const exitCode = event.payload.exitCode;
+        const errorField = (event.payload.error as string) || "";
+        const outputField = (event.payload.result as string) || (event.payload.output as string) || "";
+
+        const errorParts: string[] = [];
+        if (errorField) {
+          errorParts.push(errorField);
+        } else {
+          errorParts.push(`Agent failed with exit code ${exitCode ?? "unknown"}.`);
+        }
+
+        // Capture tmux pane output for additional diagnostics (window stays
+        // alive thanks to remain-on-exit)
+        try {
+          const paneOutput = await this.tmux.capturePane(event.runId, 80);
+          if (paneOutput) {
+            errorParts.push(`\nTerminal output (last 80 lines):\n${paneOutput}`);
+          }
+        } catch {
+          // Pane capture is best-effort
+        }
+
+        // Clean up remain-on-exit window after capturing
+        void this.tmux.killWindow(event.runId);
+
+        const verboseError = errorParts.join("\n");
+        const failedRun = this.subagentRegistry.markFailed(event.runId, verboseError);
         if (failedRun) {
           void this.handleRequest(
             {
