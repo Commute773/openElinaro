@@ -79,8 +79,6 @@ export const TOOL_AUTH_DECLARATIONS: Record<string, ToolAuthorizationDeclaration
   media_stop: { access: "root", behavior: "uniform", note: "Controls local audio playback and speaker routing on this machine." },
   media_set_volume: { access: "root", behavior: "uniform", note: "Controls local audio playback volume on this machine." },
   media_status: { access: "root", behavior: "uniform", note: "Reads local audio playback state from the managed mpv player." },
-  todo_read: { access: "anyone", behavior: "uniform", note: "Reads the agent-managed session task list for the active conversation or worker session." },
-  todo_write: { access: "anyone", behavior: "uniform", note: "Writes the agent-managed session task list for the active conversation or worker session." },
   openbrowser: { access: "root", behavior: "uniform", note: "Launches a local browser session and may write screenshot artifacts to disk." },
   secret_list: { access: "root", behavior: "uniform", note: "Lists local secret-store metadata for the active root profile without revealing secret values." },
   secret_import_file: { access: "root", behavior: "uniform", note: "Imports a flat JSON secret payload from a local file into the local secret store." },

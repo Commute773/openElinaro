@@ -1298,10 +1298,10 @@ function buildSlashCommands() {
 
 function buildAutoRegisteredToolDescription(toolName: string) {
   switch (toolName) {
-    case "workflow_status":
-      return "Inspect recent background workflow runs";
-    case "launch_coding_agent":
-      return "Launch a background coding run with JSON input";
+    case "agent_status":
+      return "Inspect recent background agent runs";
+    case "launch_agent":
+      return "Launch a background coding agent with JSON input";
     case "new_chat":
       return "Start a fresh conversation for your Discord chat session";
     case "context":

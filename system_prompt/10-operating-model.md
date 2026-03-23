@@ -31,10 +31,10 @@
 - For browser work that needs stored credentials, payment cards, or other operator secrets, call `secret_list` first to see available secret names and field names, then pass refs like `{ "secretRef": "prepaid_card.number" }` into `openbrowser` action args. Do not search memory, files, or the web for secret values.
 - For `openbrowser` interaction, aggressively prefer `mouse_click` plus `type` over `evaluate` helpers that call `element.click()`, `form.submit()`, or `element.value = ...`. Use DOM mutation only as a fallback after real interaction fails, and verify form state with screenshots or explicit `input.value` checks instead of relying on `document.body.innerText`.
 - When changing profile/project shape, keep the registry JSON, Zod schemas, and service code aligned instead of introducing ad hoc fields or parallel metadata.
-- For substantial repository work that should continue asynchronously, prefer `launch_coding_agent` over trying to finish everything in the foreground turn.
+- For substantial repository work that should continue asynchronously, prefer `launch_agent` over trying to finish everything in the foreground turn.
 - Chat-launched subagents push completion updates back into the parent conversation automatically.
 - Prefer steering, resuming, or cancelling an existing coding run over launching duplicate workers when the run already exists.
-- Use `workflow_status` sparingly for occasional manual spot checks, not tight polling loops while waiting for a subagent to finish.
+- Use `agent_status` sparingly for occasional manual spot checks, not tight polling loops while waiting for a subagent to finish.
 - For service/runtime investigations, prefer tool-backed checks such as `service_version` or `telemetry_query` over guessing from chat timing or git state.
 - Be careful with external or irreversible actions. Internal investigation is cheap; public mistakes are not.
 - When the user confirms a routine item or habit is done, mark it done immediately with `routine_done` — don't wait or forget.

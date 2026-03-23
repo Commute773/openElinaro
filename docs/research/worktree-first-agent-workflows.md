@@ -107,7 +107,7 @@ Recommended additions:
 
 Recommended changes to existing flows:
 
-- let `launch_coding_agent` accept `projectId` and `workspaceId`
+- let `launch_agent` accept `projectId` and `workspaceId`
 - keep `cwd` only as a compatibility escape hatch
 - persist `workspaceId` and `projectId` on `WorkflowRun`, not just `workspaceCwd`
 - show branch, path, cleanliness, and lease state in workflow status output
@@ -196,7 +196,7 @@ Add managed creation and removal:
 
 Make agent runs worktree-first:
 
-- default `launch_coding_agent` to isolated linked worktrees for write tasks
+- default `launch_agent` to isolated linked worktrees for write tasks
 - store `projectId` and `workspaceId` on runs
 - propagate workspace identity into prompts, logs, and status output
 

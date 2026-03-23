@@ -18,7 +18,6 @@ import type { WebSearchService } from "../../services/web-search-service";
 import type { WorkPlanningService } from "../../services/work-planning-service";
 import type { TelemetryQueryService } from "../../services/telemetry-query-service";
 import type { DeploymentVersionService } from "../../services/deployment-version-service";
-import type { SessionTodoStore } from "../../services/session-todo-store";
 import type { FeatureConfigService } from "../../services/feature-config-service";
 import type { ConversationStore } from "../../services/conversation-store";
 import type { FilesystemService } from "../../services/filesystem-service";
@@ -71,7 +70,6 @@ export interface ToolBuildContext {
   workPlanning: WorkPlanningService;
   telemetryQuery: TelemetryQueryService;
   deploymentVersion: DeploymentVersionService;
-  sessionTodos: SessionTodoStore;
   featureConfig: FeatureConfigService;
   runtimePlatform: RuntimePlatform;
   resolvePhoneCallBackend: (requestedBackend?: string) => PhoneCallBackend;

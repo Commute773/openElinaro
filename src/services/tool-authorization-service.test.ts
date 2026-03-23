@@ -75,6 +75,6 @@ describe("TOOL_AUTH_DECLARATIONS", () => {
       .map(([name]) => name);
     expect(anyoneTools).toContain("web_search");
     expect(anyoneTools).toContain("routine_list");
-    expect(anyoneTools).toContain("todo_read");
+    expect(anyoneTools).toContain("launch_agent");
   });
 });

@@ -178,7 +178,6 @@ export function createRuntimeScope(ctx: {
     access,
     shell,
     filesystem,
-    undefined,
     finance,
     health,
     reflection,

@@ -98,7 +98,7 @@ export class ProjectWorkspaceService {
     if (dirtyEntries.length > 0) {
       throw new Error(
         [
-          "launch_coding_agent refuses to fork a local git workspace with uncommitted changes.",
+          "launch_agent refuses to fork a local git workspace with uncommitted changes.",
           "Linked worktrees only include committed content, so continuing would risk missing or later losing work.",
           "Commit or stash the current changes first, then launch the coding agent again.",
           "Dirty paths:",

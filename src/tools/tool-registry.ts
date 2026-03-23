@@ -70,11 +70,6 @@ import {
 } from "../services/tool-authorization-service";
 import { OpenBrowserService } from "../services/openbrowser-service";
 import {
-  SessionTodoStore,
-  SESSION_TODO_PRIORITIES,
-  SESSION_TODO_STATUSES,
-} from "../services/session-todo-store";
-import {
   MissingSecretStoreKeyError,
   SECRET_STORE_KINDS,
   SecretStoreService,
@@ -772,24 +767,6 @@ const mediaVolumeSchema = z.object({
   speaker: z.string().min(1).optional(),
 });
 
-const todoStatusSchema = z.enum(SESSION_TODO_STATUSES);
-const todoPrioritySchema = z.enum(SESSION_TODO_PRIORITIES);
-
-const todoItemSchema = z.object({
-  content: z.string().min(1),
-  status: todoStatusSchema,
-  priority: todoPrioritySchema,
-});
-
-const todoReadSchema = z.object({
-  conversationKey: z.string().min(1).optional(),
-});
-
-const todoWriteSchema = z.object({
-  conversationKey: z.string().min(1).optional(),
-  todos: z.array(todoItemSchema).max(100),
-});
-
 const openBrowserViewportSchema = z.object({
   width: z.number().int().min(200).max(4_000),
   height: z.number().int().min(200).max(4_000),
@@ -1174,8 +1151,6 @@ export const ROUTINE_TOOL_NAMES = [
   "media_stop",
   "media_set_volume",
   "media_status",
-  "todo_read",
-  "todo_write",
   "openbrowser",
   "secret_list",
   "secret_import_file",
@@ -1688,9 +1663,11 @@ const TOOL_SCOPE_DEFAULTS: Record<string, AgentToolScope[]> = {
   tickets_get: ["chat", "coding-planner", "coding-worker", "direct"],
   tickets_create: ["chat", "coding-planner", "coding-worker", "direct"],
   tickets_update: ["chat", "coding-planner", "coding-worker", "direct"],
-  launch_coding_agent: ["chat", "direct"],
-  resume_coding_agent: ["chat", "direct"],
-  workflow_status: ["chat", "direct"],
+  launch_agent: ["chat", "direct"],
+  resume_agent: ["chat", "direct"],
+  steer_agent: ["chat", "direct"],
+  cancel_agent: ["chat", "direct"],
+  agent_status: ["chat", "direct"],
   context: ["chat", "direct"],
   usage_summary: ["chat", "direct"],
   email: ["chat", "direct"],
@@ -1714,8 +1691,6 @@ const TOOL_SCOPE_DEFAULTS: Record<string, AgentToolScope[]> = {
   media_stop: ["chat", "direct"],
   media_set_volume: ["chat", "direct"],
   media_status: ["chat", "direct"],
-  todo_read: ["chat", "coding-planner", "coding-worker", "direct"],
-  todo_write: ["chat", "coding-planner", "coding-worker", "direct"],
   openbrowser: ["chat", "coding-planner", "coding-worker", "direct"],
   secret_list: ["chat", "direct"],
   secret_import_file: ["chat", "direct"],
@@ -1790,9 +1765,6 @@ function inferToolDomains(name: string) {
   }
   if (name === "web_fetch") {
     return ["web", "retrieval", "research"];
-  }
-  if (["todo_read", "todo_write"].includes(name)) {
-    return ["planning", "session", "agents"];
   }
   if (name === "openbrowser") {
     return ["browser", "automation", "web"];
@@ -2005,10 +1977,6 @@ function inferToolExamples(name: string) {
       return ["search the web", "look up current docs"];
     case "web_fetch":
       return ["fetch a docs page", "turn a URL into markdown"];
-    case "todo_read":
-      return ["read the coding task list", "resume the next coding step"];
-    case "todo_write":
-      return ["update coding task statuses", "replace the session task list"];
     case "openbrowser":
       return [
         "open page and screenshot",
@@ -2164,7 +2132,6 @@ function buildToolCatalogCard(entry: StructuredToolInterface): ToolCatalogCard {
         "media_pause",
         "media_stop",
         "media_set_volume",
-        "todo_write",
         "openbrowser",
         "secret_import_file",
         "secret_generate_password",
@@ -2618,7 +2585,6 @@ export class ToolRegistry {
   private readonly telemetryQuery = new TelemetryQueryService();
   private readonly deploymentVersion = new DeploymentVersionService();
   private readonly serviceRestartNotices = new ServiceRestartNoticeService();
-  private readonly sessionTodos: SessionTodoStore;
   private readonly workPlanning: WorkPlanningService;
   private readonly pendingConversationResets = new Map<string, string>();
   private readonly reflection?: Pick<ReflectionService, "runExplicitReflection">;
@@ -2635,7 +2601,6 @@ export class ToolRegistry {
     private readonly access: AccessControlService,
     shell?: ShellRuntime,
     filesystem?: FilesystemRuntime,
-    sessionTodos?: SessionTodoStore,
     finance?: FinanceService,
     health?: HealthTrackingService,
     reflection?: Pick<ReflectionService, "runExplicitReflection">,
@@ -2647,7 +2612,6 @@ export class ToolRegistry {
     this.runtimePlatform = runtimePlatform ?? resolveRuntimePlatform();
     this.shell = shell ?? new ShellService(this.access);
     this.filesystem = filesystem ?? new FilesystemService(this.access);
-    this.sessionTodos = sessionTodos ?? new SessionTodoStore();
     this.finance = finance ?? new FinanceService();
     this.email = new EmailService();
     this.vonage = new VonageService();
@@ -2692,7 +2656,6 @@ export class ToolRegistry {
       get workPlanning() { return self.workPlanning; },
       get telemetryQuery() { return self.telemetryQuery; },
       get deploymentVersion() { return self.deploymentVersion; },
-      get sessionTodos() { return self.sessionTodos; },
       get featureConfig() { return self.featureConfig; },
       get runtimePlatform() { return self.runtimePlatform; },
       resolvePhoneCallBackend: (requestedBackend) => this.resolvePhoneCallBackend(requestedBackend),
@@ -3073,7 +3036,7 @@ export class ToolRegistry {
 
   private injectToolContext(name: string, input: unknown, context?: ToolContext) {
     if (
-      !["exec_command", "todo_read", "todo_write", "openbrowser", "update", "service_rollback"].includes(name) ||
+      !["exec_command", "openbrowser", "update", "service_rollback"].includes(name) ||
       !context?.conversationKey
     ) {
       return input;
@@ -4019,7 +3982,6 @@ export class ToolRegistry {
               flushMemory,
               onProgress: async (message) => this.reportProgress(context, message, input),
             });
-            this.sessionTodos.clear(conversationKey);
 
             const resultMessage = [
               `Started a new conversation for ${conversationKey}.`,
