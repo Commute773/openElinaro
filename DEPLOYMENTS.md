@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.5
+- Released at: 2026-03-23T02:08:42Z
+- Release id: 20260323T020842Z-4c23169
+- Previous version: 2026.03.23.4
+- Trigger: ci/release workflow
+
+- fix: resolve datetime prefix once at message creation and remove ~850 lines of dead schemas
+
 ## 2026.03.23.4
 - Released at: 2026-03-23T01:38:20Z
 - Release id: 20260323T013820Z-e64e40f
