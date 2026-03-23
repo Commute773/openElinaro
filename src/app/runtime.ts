@@ -558,20 +558,14 @@ export class OpenElinaroApp {
           messageChars: message.length,
         });
       } catch (error) {
-        this.appTelemetry.event(
-          "app.heartbeat.main_thread_handoff_error",
-          {
-            conversationKey,
-            heartbeatConversationKey,
-            requestId,
-            source,
-            messageChars: message.length,
-            error: error instanceof Error
-              ? { name: error.name, message: error.message, stack: error.stack }
-              : String(error),
-          },
-          { level: "error", outcome: "error" },
-        );
+        this.appTelemetry.recordError(error, {
+          conversationKey,
+          heartbeatConversationKey,
+          requestId,
+          source,
+          messageChars: message.length,
+          eventName: "app.heartbeat.main_thread_handoff",
+        });
       }
     };
     const finalizeHeartbeatMessage = async (rawMessage: string | undefined, source: string) => {

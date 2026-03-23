@@ -410,16 +410,10 @@ export class AgentChatService {
     session.processing = true;
     void this.processSession(conversationKey, session)
       .catch((error) => {
-        agentChatTelemetry.event(
-          "agent_chat.session.error",
-          {
-            conversationKey,
-            error: error instanceof Error
-              ? { name: error.name, message: error.message, stack: error.stack }
-              : String(error),
-          },
-          { level: "error", outcome: "error" },
-        );
+        agentChatTelemetry.recordError(error, {
+          conversationKey,
+          eventName: "agent_chat.session",
+        });
       })
       .finally(() => {
         session.processing = false;
