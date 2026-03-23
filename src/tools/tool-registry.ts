@@ -1398,6 +1398,7 @@ type SubagentController = {
   getAgentRun: (runId: string) => SubagentRun | undefined;
   listAgentRuns: () => SubagentRun[];
   captureAgentPane: (runId: string, lines?: number) => Promise<string>;
+  listAvailableProviders: (profileId?: string) => Array<{ provider: "claude" | "codex"; path: string; description?: string }>;
 };
 
 const TOOL_SUMMARY_KEY_LIMIT = 4;
@@ -3267,11 +3268,31 @@ export class ToolRegistry {
   }
 
   private createLaunchAgentTool(context?: ToolContext) {
+    const availableProviders = this.subagents.listAvailableProviders();
+    const providerHints = availableProviders.length > 1
+      ? "\n\nAvailable providers for this profile:\n" + availableProviders
+          .map((p) => `- ${p.provider}${p.description ? `: ${p.description}` : ""}`)
+          .join("\n")
+        + "\n\nChoose the provider that best fits the task. Pass provider explicitly when multiple are available."
+      : "";
+
     return tool(
       async (input) =>
         traceSpan(
           "tool.launch_agent",
           async () => {
+            // If provider not specified and multiple available, include guidance
+            if (!input.provider && availableProviders.length > 1) {
+              return [
+                "Multiple agent providers are available. Please specify which provider to use:",
+                ...availableProviders.map((p) =>
+                  `- provider: "${p.provider}"${p.description ? ` — ${p.description}` : ""}`
+                ),
+                "",
+                "Re-call launch_agent with provider set to your choice.",
+              ].join("\n");
+            }
+
             const run = await this.subagents.launchAgent({
               goal: input.goal,
               cwd: input.cwd,
@@ -3300,7 +3321,7 @@ export class ToolRegistry {
         {
           name: "launch_agent",
           description:
-          "Launch a background agent (Claude Code or Codex) in the current repository or a provided cwd. The agent runs in its own tmux window with an isolated worktree. Optionally target a permitted profile and/or provider. Completion updates are pushed back automatically. Omit timeoutMs to use the default (one hour).",
+          `Launch a background agent (Claude Code or Codex) in the current repository or a provided cwd. The agent runs in its own tmux window with an isolated worktree. Completion updates are pushed back automatically. Omit timeoutMs to use the default (one hour).${providerHints}`,
           schema: launchAgentSchema,
         },
     );

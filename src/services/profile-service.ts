@@ -344,8 +344,31 @@ export class ProfileService {
     return currentDepth < this.getMaxSubagentDepth(profile);
   }
 
+  private resolveSubagentEntry(profile: Pick<ProfileRecord, "subagentPaths">, provider: "claude" | "codex"): { path: string; description?: string } | undefined {
+    const entry = profile.subagentPaths?.[provider];
+    if (!entry) return undefined;
+    if (typeof entry === "string") return { path: entry };
+    return entry;
+  }
+
   getSubagentBinaryPath(profile: Pick<ProfileRecord, "subagentPaths">, provider: "claude" | "codex"): string | undefined {
-    return profile.subagentPaths?.[provider];
+    return this.resolveSubagentEntry(profile, provider)?.path;
+  }
+
+  getSubagentDescription(profile: Pick<ProfileRecord, "subagentPaths">, provider: "claude" | "codex"): string | undefined {
+    return this.resolveSubagentEntry(profile, provider)?.description;
+  }
+
+  /** List available subagent providers for a profile, with their descriptions. */
+  listAvailableSubagents(profile: ProfileRecord): Array<{ provider: "claude" | "codex"; path: string; description?: string }> {
+    const result: Array<{ provider: "claude" | "codex"; path: string; description?: string }> = [];
+    for (const provider of ["claude", "codex"] as const) {
+      const entry = this.resolveSubagentEntry(profile, provider);
+      if (entry) {
+        result.push({ provider, ...entry });
+      }
+    }
+    return result;
   }
 
   resolveSubagentProvider(profile: ProfileRecord): "claude" | "codex" {
@@ -459,8 +482,11 @@ export class ProfileService {
         ? `Subagent preferred model provider: ${profile.subagentPreferredProvider}`
         : "",
       profile.subagentDefaultModelId ? `Subagent default model: ${profile.subagentDefaultModelId}` : "",
-      profile.subagentPaths?.claude ? `Subagent Claude binary: ${profile.subagentPaths.claude}` : "",
-      profile.subagentPaths?.codex ? `Subagent Codex binary: ${profile.subagentPaths.codex}` : "",
+      ...this.listAvailableSubagents(profile).map((entry) =>
+        entry.description
+          ? `Subagent ${entry.provider}: ${entry.path} — ${entry.description}`
+          : `Subagent ${entry.provider}: ${entry.path}`
+      ),
     ]
       .filter(Boolean)
       .join("\n");

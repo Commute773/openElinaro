@@ -18,7 +18,17 @@
       "subagentDefaultModelId": "gpt-5.4",
       "maxSubagentDepth": 1,
       "memoryProvider": "claude",
-      "memoryModelId": "claude-haiku-4-5"
+      "memoryModelId": "claude-haiku-4-5",
+      "subagentPaths": {
+        "claude": {
+          "path": "/Users/elinaro/.local/bin/claude",
+          "description": "Best for deep multi-file refactoring, large codebase analysis, thorough code review, and complex architectural changes. 200K context window handles entire applications. More expensive but produces more thorough, deterministic output."
+        },
+        "codex": {
+          "path": "/opt/homebrew/bin/codex",
+          "description": "Best for quick targeted fixes, terminal/DevOps workflows, prototyping, and autonomous patch-and-PR workflows. Dramatically cheaper (~10x). Stronger on novel engineering challenges (SWE-Bench Pro) and computer-use automation."
+        }
+      }
     }
   ]
 }
