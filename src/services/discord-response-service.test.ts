@@ -91,7 +91,7 @@ describe("resolveDiscordResponse", () => {
     expect(response.warnings ?? []).toEqual([]);
   });
 
-  test("reports invalid file directives as warnings", () => {
+  test("reports invalid file directives as warnings with ATTACHMENT FAILED prefix", () => {
     const response = resolveDiscordResponse({
       response: {
         requestId: "req-2",
@@ -103,6 +103,58 @@ describe("resolveDiscordResponse", () => {
 
     expect(response.message).toBe("Sending file.");
     expect(response.attachments ?? []).toEqual([]);
+    expect(response.warnings?.[0]).toContain("[ATTACHMENT FAILED]");
     expect(response.warnings?.[0]).toContain("file was not found");
+  });
+
+  test("collects failed attachment paths in attachmentErrors", () => {
+    const response = resolveDiscordResponse({
+      response: {
+        requestId: "req-3",
+        mode: "immediate",
+        message: 'Files.\n<discord-file path="a.txt" />\n<discord-file path="b.txt" />',
+      },
+      assertPathAccess: (targetPath) => path.resolve(targetPath),
+    });
+
+    expect(response.attachments ?? []).toEqual([]);
+    expect(response.attachmentErrors).toBeDefined();
+    expect(response.attachmentErrors).toHaveLength(2);
+    expect(response.attachmentErrors![0]).toContain("a.txt");
+    expect(response.attachmentErrors![1]).toContain("b.txt");
+  });
+
+  test("does not set attachmentErrors when all attachments succeed", () => {
+    const filePath = createTempFile("deliver/ok.txt", "ok\n");
+
+    const response = resolveDiscordResponse({
+      response: {
+        requestId: "req-4",
+        mode: "immediate",
+        message: `File.\n<discord-file path="${filePath}" name="ok.txt" />`,
+      },
+      assertPathAccess: (targetPath) => path.resolve(targetPath),
+    });
+
+    expect(response.attachments).toHaveLength(1);
+    expect(response.attachmentErrors).toBeUndefined();
+  });
+
+  test("prefixes path-access error warnings with ATTACHMENT FAILED", () => {
+    const response = resolveDiscordResponse({
+      response: {
+        requestId: "req-5",
+        mode: "immediate",
+        message: 'File.\n<discord-file path="/etc/shadow" />',
+      },
+      assertPathAccess: () => {
+        throw new Error("Access denied");
+      },
+    });
+
+    expect(response.attachments ?? []).toEqual([]);
+    expect(response.warnings?.[0]).toContain("[ATTACHMENT FAILED]");
+    expect(response.warnings?.[0]).toContain("Access denied");
+    expect(response.attachmentErrors).toEqual(["/etc/shadow"]);
   });
 });

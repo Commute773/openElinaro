@@ -49,5 +49,6 @@ export interface AppResponse {
   mode: "immediate" | "accepted";
   message: string;
   warnings?: string[];
+  attachmentErrors?: string[];
   attachments?: AppResponseAttachment[];
 }
