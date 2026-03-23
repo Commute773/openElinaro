@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.23.16
+- Released at: 2026-03-23T20:30:50Z
+- Release id: 20260323T203050Z-a39d18e
+- Previous version: 2026.03.23.15
+- Trigger: ci/release workflow
+
+- fix: enrich IMAP error messages and surface raw errors in tool failures
+
 ## 2026.03.23.15
 - Released at: 2026-03-23T20:23:14Z
 - Release id: 20260323T202314Z-fde43ee
