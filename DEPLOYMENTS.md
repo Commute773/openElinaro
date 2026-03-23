@@ -1,5 +1,18 @@
 # Deployments
 
+## 2026.03.23.12
+- Released at: 2026-03-23T19:46:33Z
+- Release id: 20260323T194633Z-9b9db6d
+- Previous version: 2026.03.23.11
+- Trigger: ci/release workflow
+
+- feat: add JSONL error log appender to TelemetryStore for tailable error logs
+- add: CLI tail-errors command for tailing the centralized error log
+- fix: log swallowed errors to telemetry in email, tickets, and conversation history services
+- fix: standardize error logging in runtime and agent-chat to use recordError()
+- fix: standardize routines-notifier error logging to use recordError()
+- fix: use recordError() for Discord bot error catch blocks
+
 ## 2026.03.23.11
 - Released at: 2026-03-23T18:43:02Z
 - Release id: 20260323T184302Z-ee2258f
