@@ -1,4 +1,5 @@
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { type StructuredToolInterface } from "@langchain/core/tools";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { telemetry } from "../../services/telemetry";
@@ -29,7 +30,7 @@ const healthLogCheckinSchema = z.object({
 
 export function buildHealthTools(ctx: ToolBuildContext): StructuredToolInterface[] {
   return [
-    tool(
+    defineTool(
       async () =>
         traceSpan(
           "tool.health_summary",
@@ -42,7 +43,7 @@ export function buildHealthTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: z.object({}),
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.health_history",
@@ -56,7 +57,7 @@ export function buildHealthTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: healthHistorySchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.health_log_checkin",

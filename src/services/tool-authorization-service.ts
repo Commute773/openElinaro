@@ -1,6 +1,6 @@
 import type { ToolAuthorizationDeclaration } from "../domain/tool-catalog";
 
-export const TOOL_AUTH_DECLARATIONS: Record<string, ToolAuthorizationDeclaration> = {
+export const TOOL_AUTH_DECLARATIONS = {
   load_tool_library: { access: "anyone", behavior: "role-sensitive", note: "Visible libraries and activated tools depend on the active profile and scope." },
   tool_result_read: { access: "anyone", behavior: "role-sensitive", note: "Stored tool-result refs are scoped to the active conversation or worker session unless the operator reads them directly." },
   run_tool_program: { access: "anyone", behavior: "role-sensitive", note: "The callable tool bundle is filtered by profile." },
@@ -101,16 +101,21 @@ export const TOOL_AUTH_DECLARATIONS: Record<string, ToolAuthorizationDeclaration
   update_preview: { access: "root", behavior: "uniform", note: "Reads the prepared source-root update metadata and changelog entries newer than the running service version." },
   update: { access: "root", behavior: "uniform", note: "Applies the latest prepared local update to the managed service, runs the healthcheck, and rolls back on failure." },
   service_rollback: { access: "root", behavior: "uniform", note: "Restarts the managed service on the previous release and verifies it with the healthcheck." },
+  restart: { access: "root", behavior: "uniform", note: "Restarts the managed service process via the platform service manager." },
   launch_agent: { access: "anyone", behavior: "role-sensitive", note: "Subagent profile selection is restricted by the caller's roles." },
   resume_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can be resumed." },
   steer_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can receive steering instructions." },
   cancel_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can be cancelled." },
   agent_status: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile are returned." },
   read_agent_terminal: { access: "anyone", behavior: "role-sensitive", note: "Only terminal output for runs visible to the active profile is returned." },
-};
+} as const satisfies Record<string, ToolAuthorizationDeclaration>;
+
+export type ToolName = keyof typeof TOOL_AUTH_DECLARATIONS;
+
+const declarations: Record<string, ToolAuthorizationDeclaration> = TOOL_AUTH_DECLARATIONS;
 
 export function getToolAuthorizationDeclaration(name: string): ToolAuthorizationDeclaration {
-  const declaration = TOOL_AUTH_DECLARATIONS[name];
+  const declaration = declarations[name];
   if (!declaration) {
     throw new Error(`Missing tool authorization declaration for ${name}`);
   }
@@ -118,7 +123,7 @@ export function getToolAuthorizationDeclaration(name: string): ToolAuthorization
 }
 
 export function assertToolAuthorizationCoverage(toolNames: string[]) {
-  const missing = toolNames.filter((name) => !TOOL_AUTH_DECLARATIONS[name]);
+  const missing = toolNames.filter((name) => !declarations[name]);
   if (missing.length > 0) {
     throw new Error(`Missing tool authorization declarations for: ${missing.sort().join(", ")}`);
   }

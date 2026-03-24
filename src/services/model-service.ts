@@ -31,6 +31,7 @@ import {
 import { CacheMissMonitor, type CacheMissWarning } from "./cache-miss-monitor";
 import { getClaudeSetupToken, getCodexCredentials, saveCodexCredentials } from "../auth/store";
 import type { ProfileRecord } from "../domain/profiles";
+import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
@@ -265,14 +266,6 @@ const DEFAULT_HEARTBEAT_MODEL_IDS: Record<ModelProviderId, string> = {
   claude: "claude-haiku-4-5",
 };
 
-const STANDARD_CONTEXT_WINDOW_OVERRIDES: Record<string, number> = {
-  "openai-codex/gpt-5.4": 272_000,
-};
-
-const EXTENDED_CONTEXT_WINDOW_OVERRIDES: Record<string, number> = {
-  "openai-codex/gpt-5.4": 1_050_000,
-};
-
 function ensureStoreDir() {
   fs.mkdirSync(path.dirname(getStorePath()), { recursive: true });
 }
@@ -396,19 +389,13 @@ function providerModelKey(providerId: ModelProviderId, modelId: string) {
   return `${providerId}/${modelId}`;
 }
 
-function getStandardContextWindowOverride(providerId: ModelProviderId, modelId: string) {
-  return STANDARD_CONTEXT_WINDOW_OVERRIDES[providerModelKey(providerId, modelId)];
-}
-
 function getExtendedContextWindowOverride(providerId: ModelProviderId, modelId: string) {
-  return EXTENDED_CONTEXT_WINDOW_OVERRIDES[providerModelKey(providerId, modelId)];
+  const key = providerModelKey(providerId, modelId);
+  return getRuntimeConfig().models.extendedContext[key]?.extendedContextWindow;
 }
 
 function supportsExtendedContext(providerId: ModelProviderId, modelId: string) {
-  return Boolean(
-    getStandardContextWindowOverride(providerId, modelId) ||
-      getExtendedContextWindowOverride(providerId, modelId),
-  );
+  return getExtendedContextWindowOverride(providerId, modelId) !== undefined;
 }
 
 function getSelectedContextWindow(
@@ -416,19 +403,10 @@ function getSelectedContextWindow(
   selection: Pick<ActiveModelSelection, "providerId" | "modelId" | "extendedContextEnabled">,
   runtimeContextWindow?: number,
 ) {
-  const standard = getStandardContextWindowOverride(selection.providerId, selection.modelId);
   const extended = getExtendedContextWindowOverride(selection.providerId, selection.modelId);
-  const uncapped = (() => {
-    if (!standard && !extended) {
-      return runtimeContextWindow;
-    }
-
-    if (selection.extendedContextEnabled) {
-      return extended ?? runtimeContextWindow ?? standard;
-    }
-
-    return standard ?? runtimeContextWindow ?? extended;
-  })();
+  const uncapped = (extended && selection.extendedContextEnabled)
+    ? extended
+    : runtimeContextWindow;
 
   return profile.maxContextTokens
     ? Math.min(profile.maxContextTokens, uncapped ?? profile.maxContextTokens)
@@ -446,11 +424,7 @@ function getListedContextWindow(
     return getSelectedContextWindow(profile, activeSelection, runtimeContextWindow);
   }
 
-  const uncapped = (
-    getExtendedContextWindowOverride(providerId, modelId) ??
-    getStandardContextWindowOverride(providerId, modelId) ??
-    runtimeContextWindow
-  );
+  const uncapped = getExtendedContextWindowOverride(providerId, modelId) ?? runtimeContextWindow;
   return profile.maxContextTokens
     ? Math.min(profile.maxContextTokens, uncapped ?? profile.maxContextTokens)
     : uncapped;
@@ -947,18 +921,20 @@ export class ModelService {
 
   getActiveExtendedContextStatus(): ActiveExtendedContextStatus {
     const active = this.getActiveModel();
-    const standardContextWindow = getStandardContextWindowOverride(active.providerId, active.modelId);
+    const runtimeCatalog = getRuntimeCatalog(active.providerId);
+    const runtimeModel = resolveRuntimeModelIdentifier(active.modelId, [...runtimeCatalog.values()]);
+    const runtimeContextWindow = runtimeModel?.contextWindow;
     const extendedContextWindow = getExtendedContextWindowOverride(active.providerId, active.modelId);
-    const supported = supportsExtendedContext(active.providerId, active.modelId);
+    const supported = extendedContextWindow !== undefined;
 
     return {
       providerId: active.providerId,
       modelId: active.modelId,
       supported,
       enabled: supported ? active.extendedContextEnabled : false,
-      standardContextWindow,
+      standardContextWindow: runtimeContextWindow,
       extendedContextWindow,
-      activeContextWindow: getSelectedContextWindow(this.profile, active, extendedContextWindow),
+      activeContextWindow: getSelectedContextWindow(this.profile, active, runtimeContextWindow),
     };
   }
 

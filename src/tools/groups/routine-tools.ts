@@ -1,4 +1,5 @@
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { type StructuredToolInterface } from "@langchain/core/tools";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
 import type {
   RoutineItemKind,
@@ -169,7 +170,7 @@ export function buildSchedule(input: {
 
 export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterface[] {
   return [
-    tool(
+    defineTool(
       async () =>
         traceSpan("tool.routine_check", async () => ctx.routines.buildCheckSummary()),
       {
@@ -178,7 +179,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: z.object({}),
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_list",
@@ -206,7 +207,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: listRoutineSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_get",
@@ -225,7 +226,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: idSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_add",
@@ -253,7 +254,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: addRoutineSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_update",
@@ -297,7 +298,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: updateRoutineSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_delete",
@@ -313,7 +314,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: idSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_done",
@@ -329,7 +330,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: idSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_undo_done",
@@ -345,7 +346,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: idSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_snooze",
@@ -361,7 +362,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: snoozeSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_skip",
@@ -377,7 +378,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: idSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_pause",
@@ -393,7 +394,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: idSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.routine_resume",
@@ -410,7 +411,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
       },
     ),
     // Alarm/timer tools are closely related to routines
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.set_alarm",
@@ -432,7 +433,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: setAlarmSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.set_timer",
@@ -454,7 +455,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: setTimerSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.alarm_list",
@@ -483,7 +484,7 @@ export function buildRoutineTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: listAlarmSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.alarm_cancel",

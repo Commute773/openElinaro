@@ -1,4 +1,5 @@
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { type StructuredToolInterface } from "@langchain/core/tools";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
 import type { JobStatus, ProjectStatus } from "../../domain/projects";
 import {
@@ -215,7 +216,7 @@ async function resolveProfileModelSelection(
 
 export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterface[] {
   const tools: StructuredToolInterface[] = [
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.job_list",
@@ -243,7 +244,7 @@ export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: listJobSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.job_get",
@@ -263,7 +264,7 @@ export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: idSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.work_summary",
@@ -283,7 +284,7 @@ export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: workSummarySchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.project_list",
@@ -315,7 +316,7 @@ export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: listProjectSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.project_get",
@@ -335,7 +336,7 @@ export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: idSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.profile_list_launchable",
@@ -405,7 +406,7 @@ export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: listLaunchableProfilesSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.profile_set_defaults",
@@ -495,7 +496,7 @@ export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterfac
   // Tickets tools (feature-gated)
   if (ctx.featureConfig.isActive("tickets")) {
     tools.push(
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.tickets_list",
@@ -526,7 +527,7 @@ export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterfac
           schema: listElinaroTicketsSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.tickets_get",
@@ -543,7 +544,7 @@ export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterfac
           schema: idSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.tickets_create",
@@ -566,7 +567,7 @@ export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterfac
           schema: createElinaroTicketSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.tickets_update",

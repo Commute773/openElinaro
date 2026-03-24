@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { parse, stringify } from "yaml";
 import { telemetry } from "../services/telemetry";
 
-export const CURRENT_CONFIG_VERSION = 1;
+export const CURRENT_CONFIG_VERSION = 2;
 
 type RawConfig = Record<string, unknown>;
 type Migration = (config: RawConfig) => RawConfig;
@@ -54,8 +54,19 @@ function migrationV1(config: RawConfig): RawConfig {
   };
 }
 
+/**
+ * Migration 2 (v1 → v2): Bump version for new models.extendedContext config section.
+ *
+ * The new `models` section is populated by Zod defaults during validation,
+ * so this migration only needs to bump the version number.
+ */
+function migrationV2(config: RawConfig): RawConfig {
+  return { ...config, configVersion: 2 };
+}
+
 const MIGRATIONS: Migration[] = [
   migrationV1,
+  migrationV2,
 ];
 
 /**

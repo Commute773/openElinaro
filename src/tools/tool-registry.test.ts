@@ -1067,8 +1067,8 @@ describe("ToolRegistry tool catalog", () => {
       expect(updatePreviewResult).toContain("Latest remote tag version: 2026.03.21.35.");
       expect(updatePreviewResult).toContain("Deployment available: 2026.03.21.34 -> 2026.03.21.35.");
       expect(updateResult).toContain("scripts/service-update-detached.sh");
-      expect(updateResult).toContain("detached helper");
-      expect(rollbackResult).toContain("detached helper");
+      expect(updateResult).toContain("SCHEDULED");
+      expect(rollbackResult).toContain("SCHEDULED");
     } finally {
       if (previous === undefined) {
         delete process.env.OPENELINARO_SERVICE_ROOT_DIR;

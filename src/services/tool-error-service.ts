@@ -102,10 +102,13 @@ function summarizeToolError(toolName: string, error: ToolErrorEnvelope["error"])
 }
 
 function formatAgentMessage(summary: string, raw: string) {
-  if (raw && raw !== "Command failed" && !summary.includes(raw)) {
-    return `${summary} ${raw}`;
-  }
-  return summary;
+  if (!raw || raw === "Command failed") return summary;
+  // The summary already conveys the classified error type, so only append
+  // the raw message when it adds information beyond what was classified.
+  if (summary.includes(raw)) return summary;
+  const classified = inferToolErrorType(raw);
+  if (classified.type !== "tool_error") return summary;
+  return `${summary} ${raw}`;
 }
 
 export function buildToolErrorEnvelope(toolName: string, error: unknown): ToolErrorEnvelope {

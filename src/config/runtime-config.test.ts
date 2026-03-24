@@ -78,6 +78,7 @@ describe("RuntimeConfigSchema", () => {
     expect(config.media.roots).toEqual([]);
     expect(config.autonomousTime.enabled).toBe(false);
     expect(config.autonomousTime.promptPath).toBe("assistant_context/autonomous-time.md");
+    expect(config.models.extendedContext["openai-codex/gpt-5.4"]?.extendedContextWindow).toBe(1_050_000);
   });
 
   test("preserves explicit overrides alongside defaults", () => {
@@ -113,6 +114,42 @@ describe("RuntimeConfigSchema", () => {
     expect(config.core.app.cacheMissMonitor.minMissTokens).toBe(20_000);
     expect(config.core.app.cacheMissMonitor.maxCacheReadRatio).toBe(0.2);
     expect(config.core.app.cacheMissMonitor.discordCooldownMs).toBe(15 * 60 * 1_000);
+  });
+
+  test("applies models.extendedContext defaults", () => {
+    const config = RuntimeConfigSchema.parse({});
+    expect(config.models.extendedContext).toEqual({
+      "openai-codex/gpt-5.4": { extendedContextWindow: 1_050_000 },
+    });
+  });
+
+  test("preserves custom extended context overrides", () => {
+    const config = RuntimeConfigSchema.parse({
+      models: {
+        extendedContext: {
+          "openai-codex/gpt-5.4": { extendedContextWindow: 500_000 },
+          "claude/claude-opus-4-6": { extendedContextWindow: 1_000_000 },
+        },
+      },
+    });
+    expect(config.models.extendedContext["openai-codex/gpt-5.4"]?.extendedContextWindow).toBe(500_000);
+    expect(config.models.extendedContext["claude/claude-opus-4-6"]?.extendedContextWindow).toBe(1_000_000);
+  });
+
+  test("accepts an empty extendedContext map", () => {
+    const config = RuntimeConfigSchema.parse({
+      models: { extendedContext: {} },
+    });
+    expect(config.models.extendedContext).toEqual({});
+  });
+
+  test("rejects invalid extendedContextWindow values", () => {
+    expect(() => RuntimeConfigSchema.parse({
+      models: { extendedContext: { "test/model": { extendedContextWindow: -1 } } },
+    })).toThrow();
+    expect(() => RuntimeConfigSchema.parse({
+      models: { extendedContext: { "test/model": { extendedContextWindow: 0 } } },
+    })).toThrow();
   });
 });
 

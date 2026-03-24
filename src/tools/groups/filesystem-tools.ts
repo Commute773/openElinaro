@@ -1,4 +1,5 @@
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { type StructuredToolInterface } from "@langchain/core/tools";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
 import type { ToolBuildContext } from "./tool-group-types";
 
@@ -75,68 +76,68 @@ const deletePathSchema = pathSchema.extend({
 
 export function buildFilesystemTools(ctx: ToolBuildContext): StructuredToolInterface[] {
   return [
-    tool(async (input) => ctx.filesystem.read(input), {
+    defineTool(async (input) => ctx.filesystem.read(input), {
       name: "read_file",
       description:
         "Read a file or directory. File reads return numbered lines. Directory reads return entries. Supports offset and limit for paging.",
       schema: readFileSchema,
     }),
-    tool(async (input) => ctx.filesystem.write(input), {
+    defineTool(async (input) => ctx.filesystem.write(input), {
       name: "write_file",
       description:
         "Write or append text to a file. Creates parent directories when needed.",
       schema: writeFileSchema,
     }),
-    tool(async (input) => ctx.filesystem.edit(input), {
+    defineTool(async (input) => ctx.filesystem.edit(input), {
       name: "edit_file",
       description:
         "Replace text in a file using an exact oldString -> newString edit. Errors if the match is missing or ambiguous.",
       schema: editFileSchema,
     }),
-    tool(async (input) => ctx.filesystem.applyPatch(input), {
+    defineTool(async (input) => ctx.filesystem.applyPatch(input), {
       name: "apply_patch",
       description:
         "Apply a structured multi-file patch with add, update, move, and delete operations. Prefer this for diff-shaped edits instead of full rewrites.",
       schema: applyPatchSchema,
     }),
-    tool(async (input) => ctx.filesystem.listDir(input), {
+    defineTool(async (input) => ctx.filesystem.listDir(input), {
       name: "list_dir",
       description:
         "List directory contents. Supports recursive listing, result limits, and format=json for structured output.",
       schema: listDirSchema,
     }),
-    tool(async (input) => ctx.filesystem.glob(input), {
+    defineTool(async (input) => ctx.filesystem.glob(input), {
       name: "glob",
       description: "Find paths matching a glob pattern under a directory.",
       schema: globSchema,
     }),
-    tool(async (input) => ctx.filesystem.grep(input), {
+    defineTool(async (input) => ctx.filesystem.grep(input), {
       name: "grep",
       description:
         "Search file contents with ripgrep. Returns matching file paths, line numbers, and lines.",
       schema: grepSchema,
     }),
-    tool(async (input) => ctx.filesystem.statPath(input), {
+    defineTool(async (input) => ctx.filesystem.statPath(input), {
       name: "stat_path",
       description: "Show metadata for a file or directory path. Supports format=json for structured output.",
       schema: statPathSchema,
     }),
-    tool(async (input) => ctx.filesystem.mkdir(input), {
+    defineTool(async (input) => ctx.filesystem.mkdir(input), {
       name: "mkdir",
       description: "Create a directory.",
       schema: mkdirSchema,
     }),
-    tool(async (input) => ctx.filesystem.movePath(input), {
+    defineTool(async (input) => ctx.filesystem.movePath(input), {
       name: "move_path",
       description: "Move or rename a file or directory.",
       schema: copyMoveSchema,
     }),
-    tool(async (input) => ctx.filesystem.copyPath(input), {
+    defineTool(async (input) => ctx.filesystem.copyPath(input), {
       name: "copy_path",
       description: "Copy a file or directory.",
       schema: copyMoveSchema,
     }),
-    tool(async (input) => ctx.filesystem.deletePath(input), {
+    defineTool(async (input) => ctx.filesystem.deletePath(input), {
       name: "delete_path",
       description: "Delete a file or directory.",
       schema: deletePathSchema,

@@ -1,4 +1,5 @@
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { type StructuredToolInterface } from "@langchain/core/tools";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { telemetry } from "../../services/telemetry";
@@ -125,7 +126,7 @@ export function buildFinanceTools(ctx: ToolBuildContext): StructuredToolInterfac
   }
 
   return [
-    tool(
+    defineTool(
       async () =>
         traceSpan(
           "tool.finance_summary",
@@ -138,7 +139,7 @@ export function buildFinanceTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: z.object({}),
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.finance_budget",
@@ -155,7 +156,7 @@ export function buildFinanceTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: financeBudgetSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.finance_history",
@@ -178,7 +179,7 @@ export function buildFinanceTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: financeHistorySchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.finance_review",
@@ -197,7 +198,7 @@ export function buildFinanceTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: financeReviewSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.finance_import",
@@ -218,7 +219,7 @@ export function buildFinanceTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: financeImportSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.finance_manage",
@@ -363,7 +364,7 @@ export function buildFinanceTools(ctx: ToolBuildContext): StructuredToolInterfac
         schema: financeManageSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.finance_forecast",
