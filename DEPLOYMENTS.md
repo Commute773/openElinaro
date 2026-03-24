@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.16
+- Released at: 2026-03-24T18:09:30Z
+- Release id: 20260324T180930Z-0bfa3c3
+- Previous version: 2026.03.24.15
+- Trigger: ci/release workflow
+
+- feat: add schema introspection action to config_edit tool (#78)
+
 ## 2026.03.24.15
 - Released at: 2026-03-24T18:02:22Z
 - Release id: 20260324T180222Z-bec0df3
