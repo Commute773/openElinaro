@@ -2353,7 +2353,7 @@ export class ToolRegistry {
     }
   }
 
-  private async requestManagedServiceRestart(source: "config_edit" | "feature_manage") {
+  private async requestManagedServiceRestart(source: "config_edit" | "feature_manage" | "manual") {
     if (!isRunningInsideManagedService()) {
       return "Restart skipped: this runtime is not running inside the managed service.";
     }

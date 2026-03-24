@@ -74,5 +74,5 @@ export interface ToolBuildContext {
   runtimePlatform: RuntimePlatform;
   resolvePhoneCallBackend: (requestedBackend?: string) => PhoneCallBackend;
   createWebSearchService: () => WebSearchService | null;
-  requestManagedServiceRestart: (source: "config_edit" | "feature_manage") => Promise<string>;
+  requestManagedServiceRestart: (source: "config_edit" | "feature_manage" | "manual") => Promise<string>;
 }

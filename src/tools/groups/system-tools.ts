@@ -1205,6 +1205,19 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: serviceActionSchema,
       },
     ),
+    tool(
+      async () =>
+        traceSpan(
+          "tool.restart",
+          async () => ctx.requestManagedServiceRestart("manual"),
+        ),
+      {
+        name: "restart",
+        description:
+          "Restart the managed service process. The current process will exit and the service manager will start a fresh instance. Running background agents will resume automatically after restart.",
+        schema: z.object({}),
+      },
+    ),
   );
 
   return tools;
