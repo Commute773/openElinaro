@@ -986,6 +986,41 @@ describe("RoutinesService", () => {
     expect(result).toBeNull();
   });
 
+  test("assessNow uses quietHours timezone for mode calculation instead of settings.timezone", () => {
+    const service = new RoutinesService();
+    // Set top-level timezone to UTC but quietHours timezone to America/New_York.
+    // The sleep block is 00:00-09:00 (local time).
+    // At midnight UTC it is 8 PM ET — that should NOT be sleep mode.
+    service.saveData({
+      ...service.loadData(),
+      settings: {
+        ...service.loadData().settings,
+        timezone: "UTC",
+        sleepBlock: {
+          days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+          start: "00:00",
+          end: "09:00",
+        },
+        quietHours: {
+          enabled: true,
+          timezone: "America/New_York",
+          start: "00:01",
+          end: "09:00",
+        },
+      },
+    });
+
+    // Midnight UTC = 8 PM ET (EDT, March 17 2026). Should be "personal", not "sleep".
+    const assessment = service.assessNow(new Date("2026-03-17T00:00:00.000Z"));
+    expect(assessment.context.mode).not.toBe("sleep");
+    expect(assessment.context.timezone).toBe("America/New_York");
+
+    // 5 AM UTC = 1 AM ET. Should be "sleep".
+    const lateNight = service.assessNow(new Date("2026-03-17T05:00:00.000Z"));
+    expect(lateNight.context.mode).toBe("sleep");
+    expect(lateNight.context.timezone).toBe("America/New_York");
+  });
+
   test("buildSchedule in routine tools passes days through for daily schedules", async () => {
     const { buildSchedule } = await import("../tools/groups/routine-tools");
 
