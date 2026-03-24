@@ -1,4 +1,5 @@
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { type StructuredToolInterface } from "@langchain/core/tools";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
 import { PHONE_CALL_BACKENDS } from "../../services/phone-call-backends";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
@@ -135,7 +136,7 @@ export function buildCommunicationTools(ctx: ToolBuildContext): StructuredToolIn
 
   if (ctx.featureConfig.isActive("email")) {
     tools.push(
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.email",
@@ -166,7 +167,7 @@ export function buildCommunicationTools(ctx: ToolBuildContext): StructuredToolIn
 
   if (ctx.featureConfig.isActive("communications")) {
     tools.push(
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.communications_status",
@@ -186,7 +187,7 @@ export function buildCommunicationTools(ctx: ToolBuildContext): StructuredToolIn
           schema: communicationsStatusSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.make_phone_call",
@@ -207,7 +208,7 @@ export function buildCommunicationTools(ctx: ToolBuildContext): StructuredToolIn
           schema: makePhoneCallSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.call_list",
@@ -231,7 +232,7 @@ export function buildCommunicationTools(ctx: ToolBuildContext): StructuredToolIn
           schema: callListSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.call_get",
@@ -245,7 +246,7 @@ export function buildCommunicationTools(ctx: ToolBuildContext): StructuredToolIn
           schema: idSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.call_control",
@@ -267,7 +268,7 @@ export function buildCommunicationTools(ctx: ToolBuildContext): StructuredToolIn
           schema: callControlSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.message_send",
@@ -287,7 +288,7 @@ export function buildCommunicationTools(ctx: ToolBuildContext): StructuredToolIn
           schema: messageSendSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.message_list",
@@ -312,7 +313,7 @@ export function buildCommunicationTools(ctx: ToolBuildContext): StructuredToolIn
           schema: messageListSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.message_get",

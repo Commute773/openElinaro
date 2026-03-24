@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { defineTool } from "./define-tool";
 import { stringify as stringifyYaml } from "yaml";
 import { z } from "zod";
 import {
@@ -2384,7 +2385,7 @@ export class ToolRegistry {
         + "\n\nChoose the provider that best fits the task. Pass provider explicitly when multiple are available."
       : "";
 
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.launch_agent",
@@ -2436,7 +2437,7 @@ export class ToolRegistry {
   }
 
   private createResumeAgentTool(_context?: ToolContext) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.resume_agent",
@@ -2469,7 +2470,7 @@ export class ToolRegistry {
   }
 
   private createSteerAgentTool(_context?: ToolContext) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.steer_agent",
@@ -2498,7 +2499,7 @@ export class ToolRegistry {
   }
 
   private createCancelAgentTool(_context?: ToolContext) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.cancel_agent",
@@ -2524,7 +2525,7 @@ export class ToolRegistry {
   }
 
   private createAgentStatusTool(_context?: ToolContext) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.agent_status",
@@ -2614,7 +2615,7 @@ export class ToolRegistry {
   }
 
   private createLoadToolLibraryTool(context?: ToolContext): StructuredToolInterface {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.load_tool_library",
@@ -2719,7 +2720,7 @@ export class ToolRegistry {
   }
 
   private createToolResultReadTool(context?: ToolContext) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.tool_result_read",
@@ -2810,7 +2811,7 @@ export class ToolRegistry {
   }
 
   private createRunToolProgramTool(context?: ToolContext) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.run_tool_program",
@@ -2904,7 +2905,7 @@ export class ToolRegistry {
   }
 
   private createUsageSummaryTool(context?: ToolContext) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.usage_summary",
@@ -2952,7 +2953,7 @@ export class ToolRegistry {
   }
 
   private createCompactTool(context?: ToolContext) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.compact",
@@ -2993,7 +2994,7 @@ export class ToolRegistry {
   }
 
   private createReloadTool(context?: ToolContext) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.reload",
@@ -3031,7 +3032,7 @@ export class ToolRegistry {
   }
 
   private createReflectTool(_context?: ToolContext) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           "tool.reflect",
@@ -3103,7 +3104,7 @@ export class ToolRegistry {
     },
     context?: ToolContext,
   ) {
-    return tool(
+    return defineTool(
       async (input) =>
         traceSpan(
           config.spanName,

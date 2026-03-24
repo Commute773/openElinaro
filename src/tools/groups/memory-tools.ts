@@ -1,4 +1,5 @@
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { type StructuredToolInterface } from "@langchain/core/tools";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { telemetry } from "../../services/telemetry";
@@ -48,7 +49,7 @@ const telemetryQuerySchema = z.object({
 
 export function buildMemoryTools(ctx: ToolBuildContext): StructuredToolInterface[] {
   return [
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.memory_import",
@@ -70,7 +71,7 @@ export function buildMemoryTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: importDirectorySchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.memory_search",
@@ -84,7 +85,7 @@ export function buildMemoryTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: memorySearchSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.conversation_search",
@@ -98,7 +99,7 @@ export function buildMemoryTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: conversationSearchSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.telemetry_query",
@@ -112,7 +113,7 @@ export function buildMemoryTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: telemetryQuerySchema,
       },
     ),
-    tool(
+    defineTool(
       async () =>
         traceSpan("tool.memory_reindex", async () => {
           const result = await ctx.memory.reindex();

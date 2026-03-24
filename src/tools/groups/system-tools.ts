@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { type StructuredToolInterface } from "@langchain/core/tools";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
 import type { MediaKind } from "../../services/media-service";
 import type { ModelProviderId, ActiveExtendedContextStatus } from "../../services/model-service";
@@ -411,7 +412,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
 
   // Model tool
   tools.push(
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.model",
@@ -509,7 +510,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
   // Web search (feature-gated)
   if (ctx.featureConfig.isActive("webSearch")) {
     tools.push(
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.web_search",
@@ -537,7 +538,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
   // Web fetch (feature-gated)
   if (ctx.featureConfig.isActive("webFetch")) {
     tools.push(
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.web_fetch",
@@ -558,7 +559,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
   if (ctx.media && ctx.featureConfig.isActive("media")) {
     const media = ctx.media;
     tools.push(
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.media_list",
@@ -588,7 +589,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
           schema: mediaListSchema,
         },
       ),
-      tool(
+      defineTool(
         async () =>
           traceSpan(
             "tool.media_list_speakers",
@@ -609,7 +610,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
           schema: z.object({}),
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.media_play",
@@ -639,7 +640,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
           schema: mediaPlaySchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.media_pause",
@@ -655,7 +656,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
           schema: mediaSpeakerSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.media_stop",
@@ -671,7 +672,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
           schema: mediaSpeakerSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.media_set_volume",
@@ -687,7 +688,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
           schema: mediaVolumeSchema,
         },
       ),
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.media_status",
@@ -718,7 +719,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
   // OpenBrowser (feature-gated)
   if (ctx.featureConfig.isActive("openbrowser")) {
     tools.push(
-      tool(
+      defineTool(
         async (input) =>
           traceSpan(
             "tool.openbrowser",
@@ -743,7 +744,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
 
   // Secret management
   tools.push(
-    tool(
+    defineTool(
       async () =>
         traceSpan(
           "tool.secret_list",
@@ -776,7 +777,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: z.object({}),
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.secret_import_file",
@@ -793,7 +794,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: importSecretFileSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.secret_generate_password",
@@ -829,7 +830,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: generateSecretPasswordSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.secret_delete",
@@ -849,7 +850,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
 
   // Config edit
   tools.push(
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.config_edit",
@@ -926,7 +927,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
 
   // Feature management
   tools.push(
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.feature_manage",
@@ -996,7 +997,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
 
   // Benchmark
   tools.push(
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.benchmark",
@@ -1111,7 +1112,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
     );
 
   tools.push(
-    tool(
+    defineTool(
       async () =>
         traceSpan(
           "tool.service_version",
@@ -1124,7 +1125,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: z.object({}),
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.service_changelog_since_version",
@@ -1141,7 +1142,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: serviceChangelogSinceVersionSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.service_healthcheck",
@@ -1163,7 +1164,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: serviceActionSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) => runUpdatePreview(input, "tool.update_preview"),
       {
         name: "update_preview",
@@ -1172,7 +1173,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: serviceActionSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) => runUpdate(input, "tool.update"),
       {
         name: "update",
@@ -1181,7 +1182,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         schema: serviceActionSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.service_rollback",

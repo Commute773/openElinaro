@@ -1,4 +1,5 @@
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { type StructuredToolInterface } from "@langchain/core/tools";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { telemetry } from "../../services/telemetry";
@@ -44,7 +45,7 @@ export function renderShellExecResult(result: Awaited<ReturnType<ShellRuntime["e
 
 export function buildShellTools(ctx: ToolBuildContext): StructuredToolInterface[] {
   return [
-    tool(
+    defineTool(
       async (input) => {
         if (input.background) {
           const launched = ctx.shell.launchBackground({
@@ -78,7 +79,7 @@ export function buildShellTools(ctx: ToolBuildContext): StructuredToolInterface[
         schema: execCommandSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.exec_status",
@@ -137,7 +138,7 @@ export function buildShellTools(ctx: ToolBuildContext): StructuredToolInterface[
         schema: execStatusSchema,
       },
     ),
-    tool(
+    defineTool(
       async (input) =>
         traceSpan(
           "tool.exec_output",
