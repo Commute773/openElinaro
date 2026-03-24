@@ -26,6 +26,7 @@ const DEFAULT_CORE_SUBAGENT = {
 };
 const DEFAULT_CORE_APP = {
   automaticConversationMemoryEnabled: true,
+  heartbeatEnabled: true,
   docsIndexerEnabled: false,
   cacheMissMonitor: DEFAULT_CORE_CACHE_MISS,
   subagent: DEFAULT_CORE_SUBAGENT,
@@ -126,6 +127,7 @@ export const RuntimeConfigSchema = z.object({
     }).default(DEFAULT_CORE_PYTHON),
     app: z.object({
       automaticConversationMemoryEnabled: z.boolean().default(true),
+      heartbeatEnabled: z.boolean().default(true),
       docsIndexerEnabled: z.boolean().default(false),
       cacheMissMonitor: z.object({
         minInputTokens: z.number().int().nonnegative().default(30_000),
