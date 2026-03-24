@@ -1,5 +1,6 @@
 import type { Client } from "discord.js";
 import { OpenElinaroApp } from "../../app/runtime";
+import { getRuntimeConfig } from "../../config/runtime-config";
 import { DocsIndexService } from "../../services/docs-index-service";
 import { DocsIndexStateService } from "../../services/docs-index-state-service";
 import { HeartbeatStateService } from "../../services/heartbeat-state-service";
@@ -84,7 +85,9 @@ export class DiscordRoutinesNotifier {
     }
     const nextAlarmDueAt = this.app.getNextAlarmDueAt();
     const nextRoutineAttentionAt = this.app.getNextRoutineAttentionAt?.();
-    const heartbeatDelayMs = Math.max(ALERT_POLL_MIN_MS, this.nextHeartbeatAt - Date.now());
+    const heartbeatDelayMs = getRuntimeConfig().core.app.heartbeatEnabled
+      ? Math.max(ALERT_POLL_MIN_MS, this.nextHeartbeatAt - Date.now())
+      : Number.POSITIVE_INFINITY;
     const alarmDelayMs = nextAlarmDueAt
       ? Math.max(ALERT_POLL_MIN_MS, new Date(nextAlarmDueAt).getTime() - Date.now())
       : Number.POSITIVE_INFINITY;
@@ -248,7 +251,9 @@ export class DiscordRoutinesNotifier {
             }
 
             const alarmRoutinesDue = this.app.hasAlarmRoutinesDueNow?.() ?? false;
-            if (Date.now() >= this.nextHeartbeatAt || alarmRoutinesDue) {
+            const heartbeatEnabled = getRuntimeConfig().core.app.heartbeatEnabled;
+            const heartbeatDue = heartbeatEnabled && Date.now() >= this.nextHeartbeatAt;
+            if (heartbeatDue || alarmRoutinesDue) {
               const response = await this.app.runHourlyHeartbeat(userId, {
                 onBackgroundResponse: async (message) => {
                   if (!await this.sendAssistantMessage(dm, message)) {
