@@ -79,7 +79,7 @@ function isWorkScopedItem(item: Pick<RoutineItem, "jobId" | "projectId">) {
   return Boolean(item.jobId);
 }
 
-function computeRoutineContext(data: RoutineStoreData, now: Date): RoutineContext {
+function computeRoutineContext(data: RoutineStoreData, now: Date, effectiveTimezone?: string): RoutineContext {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const inBlock = (block: { days: Weekday[]; start: string; end: string }) => {
     if (!block.days.includes(weekdayKey(now))) {
@@ -105,7 +105,7 @@ function computeRoutineContext(data: RoutineStoreData, now: Date): RoutineContex
   });
 
   return {
-    timezone: data.settings.timezone,
+    timezone: effectiveTimezone ?? data.settings.timezone,
     now: toIso(now),
     mode: inBlock(data.settings.sleepBlock)
       ? "sleep"
@@ -920,8 +920,9 @@ export class RoutinesService {
 
   assessNow(reference: Date = new Date()) {
     const data = this.store.load();
-    const now = nowInTimezone(data.settings.timezone, reference);
-    const context = computeRoutineContext(data, now);
+    const effectiveTimezone = data.settings.quietHours?.timezone ?? data.settings.timezone;
+    const now = nowInTimezone(effectiveTimezone, reference);
+    const context = computeRoutineContext(data, now, effectiveTimezone);
 
     const assessments: RoutineAssessment[] = [];
     for (const item of this.filterVisibleItems(Object.values(data.items))) {
