@@ -96,6 +96,11 @@ const DEFAULT_KOKORO = { baseUrl: "http://127.0.0.1:8801/v1", model: "kokoro", v
 const DEFAULT_LOCAL_VOICE = { enabled: false, localLlm: DEFAULT_LOCAL_LLM, kokoro: DEFAULT_KOKORO };
 const DEFAULT_MEDIA = { enabled: false, roots: [] as string[] };
 const DEFAULT_AUTONOMOUS_TIME = { enabled: false, promptPath: "assistant_context/autonomous-time.md" };
+const DEFAULT_MODELS = {
+  extendedContext: {
+    "openai-codex/gpt-5.4": { extendedContextWindow: 1_050_000 },
+  } as Record<string, { extendedContextWindow: number }>,
+};
 
 export const RuntimeConfigSchema = z.object({
   configVersion: z.number().int().nonnegative().default(0),
@@ -229,6 +234,12 @@ export const RuntimeConfigSchema = z.object({
     enabled: z.boolean().default(false),
     promptPath: z.string().min(1).default("assistant_context/autonomous-time.md"),
   }).default(DEFAULT_AUTONOMOUS_TIME),
+  models: z.object({
+    extendedContext: z.record(
+      z.string().min(1),
+      z.object({ extendedContextWindow: z.number().int().positive() }),
+    ).default(DEFAULT_MODELS.extendedContext),
+  }).default(DEFAULT_MODELS),
 });
 
 export type RuntimeConfig = z.infer<typeof RuntimeConfigSchema>;
