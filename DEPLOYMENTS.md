@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.10
+- Released at: 2026-03-24T03:03:17Z
+- Release id: 20260324T030317Z-0245fa2
+- Previous version: 2026.03.24.9
+- Trigger: ci/release workflow
+
+- fix: add missing tool auth declaration and crash on startup errors
+
 ## 2026.03.24.9
 - Released at: 2026-03-24T02:53:47Z
 - Release id: 20260324T025347Z-fb25f3c
