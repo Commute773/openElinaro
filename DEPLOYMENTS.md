@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.12
+- Released at: 2026-03-24T03:21:51Z
+- Release id: 20260324T032151Z-b235bd5
+- Previous version: 2026.03.24.11
+- Trigger: ci/release workflow
+
+- fix: route subagent completion responses to Discord via background notifier
+
 ## 2026.03.24.11
 - Released at: 2026-03-24T03:10:26Z
 - Release id: 20260324T031026Z-1a51d1c
