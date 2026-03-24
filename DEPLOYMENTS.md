@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.4
+- Released at: 2026-03-24T01:51:56Z
+- Release id: 20260324T015156Z-1fa4fa0
+- Previous version: 2026.03.24.3
+- Trigger: ci/release workflow
+
+- fix: make detached update tool result explicit that update is NOT complete
+
 ## 2026.03.24.3
 - Released at: 2026-03-24T01:44:19Z
 - Release id: 20260324T014419Z-190814a
