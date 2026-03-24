@@ -73,7 +73,7 @@ describe("DocsIndexService", () => {
       "<!-- docs-index:end:inventory -->",
       "",
     ].join("\n"));
-    writeFile("system_prompt/40-docs-and-reload.md", [
+    writeFile("system_prompt/universal/40-docs-and-reload.md", [
       "# Docs And Reload",
       "",
       "Useful docs:",
@@ -106,7 +106,7 @@ describe("DocsIndexService", () => {
     const assistantReadme = fs.readFileSync(path.join(runtimeRoot, "docs/assistant/README.md"), "utf8");
     const researchReadme = fs.readFileSync(path.join(runtimeRoot, "docs/research/README.md"), "utf8");
     const agents = fs.readFileSync(path.join(runtimeRoot, "AGENTS.md"), "utf8");
-    const systemPrompt = fs.readFileSync(path.join(runtimeRoot, "system_prompt/40-docs-and-reload.md"), "utf8");
+    const systemPrompt = fs.readFileSync(path.join(runtimeRoot, "system_prompt/universal/40-docs-and-reload.md"), "utf8");
     const persistedReport = JSON.parse(fs.readFileSync(path.join(runtimeRoot, ".openelinarotest", "docs-index.json"), "utf8")) as {
       orphanDocs: string[];
       changedFiles: string[];
@@ -126,7 +126,7 @@ describe("DocsIndexService", () => {
       "docs/README.md",
       "docs/assistant/README.md",
       "docs/research/README.md",
-      "system_prompt/40-docs-and-reload.md",
+      "system_prompt/universal/40-docs-and-reload.md",
     ]));
   });
 

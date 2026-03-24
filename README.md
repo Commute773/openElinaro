@@ -17,7 +17,7 @@ This README stays as a quick operator-side overview of the current runtime.
 - `src/tools/tool-registry.ts` defines the shared backend tool catalog plus the separate user-facing and agent-default-visible tool subsets; domain-specific tool builders live in `src/tools/groups/` (routine, finance, health, communication, project, filesystem, shell, memory, and system tool groups).
 - `src/connectors/active-model-connector.ts` routes chat requests through whichever model is currently active.
 - `src/services/model-service.ts` discovers provider models from live provider endpoints, persists the active model, and inspects context-window usage.
-- `src/services/system-prompt-service.ts` compiles shared `system_prompt/*.md` plus user-managed `~/.openelinaro/system_prompt/*.md` into the per-thread system-prompt snapshot.
+- `src/services/system-prompt-service.ts` compiles universal platform prompts from `system_prompt/universal/`, operator-managed agent prompts from `~/.openelinaro/system_prompt/`, and in-code defaults for fresh installs into the per-thread system-prompt snapshot.
 - `src/integrations/discord/auth-session-manager.ts` handles Codex OAuth and Claude setup-token flows in DMs.
 - `src/auth/store.ts` persists provider auth in the unified secret store under `~/.openelinaro/`, scoped by profile.
 
@@ -103,7 +103,7 @@ The app treats routines as a first-class subsystem rather than scattered chat st
 
 ## System prompt
 
-- New conversations snapshot the concatenated contents of shared `system_prompt/*.md` plus user-managed `~/.openelinaro/system_prompt/*.md` as their base system prompt.
+- New conversations snapshot the concatenated contents of universal platform prompts (`system_prompt/universal/*.md`) plus operator-managed agent prompts (`~/.openelinaro/system_prompt/*.md`) as their base system prompt. Universal prompts cannot be overridden; operator prompts are additive.
 - Existing conversations keep that snapshot until `reload` is called.
 - The final prompt sent to the model is capped at 100,000 characters.
 - Deeper platform guidance lives under `docs/assistant/`, while user-specific docs and injected assistant context live under `~/.openelinaro/docs/assistant/` and `~/.openelinaro/assistant_context/`.

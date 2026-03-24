@@ -9,8 +9,8 @@ The agent system is the runtime under `src/` plus its local configuration, promp
 It includes:
 
 - `src/` for runtime code, orchestration, services, tools, and integrations
-- `system_prompt/` for shared prompt fragments compiled into per-thread snapshots
-- `~/.openelinaro/system_prompt/` for operator-specific prompt fragments that are merged with the shared prompt set
+- `system_prompt/universal/` for universal platform prompts that apply to every agent and cannot be overridden
+- `~/.openelinaro/system_prompt/` for operator-managed agent-specific prompts (identity, user profile, etc.) that are appended alongside universal prompts
 - `~/.openelinaro/assistant_context/` for internal prompt-like runtime instructions that are injected selectively, such as heartbeat guidance, rather than compiled into every thread snapshot
 - `~/.openelinaro/docs/assistant/` for operator-specific assistant docs such as persona, profile, and local vision notes
 - `~/.openelinaro/` for live local operator data, including config, secrets, profiles, projects, logs, memory, and workflow state

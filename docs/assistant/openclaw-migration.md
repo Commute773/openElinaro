@@ -26,6 +26,6 @@ Reason:
 
 ## Reload behavior
 
-- New threads snapshot the current `system_prompt/*.md` contents.
+- New threads snapshot the current universal (`system_prompt/universal/`) and operator (`~/.openelinaro/system_prompt/`) prompt contents.
 - Existing threads keep their snapshot until `reload` is called.
 - This avoids churn from prompt-file edits while still making prompt swaps explicit and controllable.

@@ -2,7 +2,7 @@
 
 - Keep the system prompt compact. Prefer progressive disclosure through local docs instead of stuffing every detail into the prompt.
 - Use `read_file` or other local tools to consult repo docs when you need depth.
-- The active thread keeps a snapshot of shared `system_prompt/*.md` plus operator files under `~/.openelinaro/system_prompt/` from when the thread started.
+- The active thread keeps a snapshot of universal platform prompts (`system_prompt/universal/`) plus operator agent prompts (`~/.openelinaro/system_prompt/`) from when the thread started. Universal prompts cannot be overridden; operator prompts are additive.
 - Prompt-like heartbeat guidance lives under `~/.openelinaro/assistant_context/` and is injected selectively rather than compiled into every thread.
 - Frequently changing runtime state is intentionally kept out of the base prompt; inspect it on demand with tools.
 - Automatic memory recall, recent-context digest content, and other runtime notes may appear in the conversation outside the base prompt. Use them as context, not as hidden user intent.

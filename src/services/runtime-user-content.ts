@@ -1,6 +1,10 @@
 import path from "node:path";
 import { getUserDataRootDir, resolveRuntimePath, resolveUserDataPath } from "./runtime-root";
 
+export function getUniversalSystemPromptRoot() {
+  return resolveRuntimePath("system_prompt", "universal");
+}
+
 export function getRepoSystemPromptRoot() {
   return resolveRuntimePath("system_prompt");
 }
