@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.15
+- Released at: 2026-03-24T18:02:22Z
+- Release id: 20260324T180222Z-bec0df3
+- Previous version: 2026.03.24.14
+- Trigger: ci/release workflow
+
+- feat: separate system prompts into universal and operator collections
+
 ## 2026.03.24.14
 - Released at: 2026-03-24T17:21:15Z
 - Release id: 20260324T172115Z-5324b8d
