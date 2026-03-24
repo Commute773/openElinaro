@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.3
+- Released at: 2026-03-24T01:44:19Z
+- Release id: 20260324T014419Z-190814a
+- Previous version: 2026.03.24.2
+- Trigger: ci/release workflow
+
+- test: add TmuxManager PATH resolution tests
+
 ## 2026.03.24.2
 - Released at: 2026-03-24T01:27:13Z
 - Release id: 20260324T012713Z-4888ca2
