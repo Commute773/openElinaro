@@ -1,5 +1,15 @@
 # Deployments
 
+## 2026.03.24.17
+- Released at: 2026-03-24T18:15:10Z
+- Release id: 20260324T181510Z-5dca89d
+- Previous version: 2026.03.24.16
+- Trigger: ci/release workflow
+
+- fix: enforce tool auth declarations at compile time via ToolName type
+- fix: add missing tool authorization declaration for restart tool
+- refactor: use pi-ai context windows as source of truth, make extended context configurable
+
 ## 2026.03.24.16
 - Released at: 2026-03-24T18:09:30Z
 - Release id: 20260324T180930Z-0bfa3c3
