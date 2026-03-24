@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.13
+- Released at: 2026-03-24T17:16:23Z
+- Release id: 20260324T171623Z-9da37f4
+- Previous version: 2026.03.24.12
+- Trigger: ci/release workflow
+
+- feat: replace free-form cwd with named workspace param on launch_agent
+
 ## 2026.03.24.12
 - Released at: 2026-03-24T03:21:51Z
 - Release id: 20260324T032151Z-b235bd5
