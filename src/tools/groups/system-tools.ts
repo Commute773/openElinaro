@@ -20,6 +20,7 @@ import {
   validateRuntimeConfigFile,
   validateRuntimeConfigText,
 } from "../../config/runtime-config";
+import { describeRuntimeConfigSchema } from "../../config/schema-introspect";
 import { stringify as stringifyYaml } from "yaml";
 import {
   DEFAULT_WEB_SEARCH_LANGUAGE,
@@ -208,7 +209,7 @@ const generateSecretPasswordSchema = z.object({
 });
 
 const configEditSchema = z.object({
-  action: z.enum(["get", "set", "unset", "validate", "replace"]),
+  action: z.enum(["get", "set", "unset", "validate", "replace", "schema"]),
   path: z.string().optional(),
   value: z.string().optional(),
   yaml: z.string().optional(),
@@ -875,6 +876,10 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
               }
             }
 
+            if (input.action === "schema") {
+              return describeRuntimeConfigSchema(input.path);
+            }
+
             const lines: string[] = [];
 
             if (input.action === "replace") {
@@ -918,7 +923,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
       {
         name: "config_edit",
         description:
-          "Read, validate, or edit ~/.openelinaro/config.yaml. Supports whole-file reads, path-based set/unset operations, whole-file replacement, schema validation, and optional managed-service restart only after validation succeeds.",
+          "Read, validate, inspect schema, or edit ~/.openelinaro/config.yaml. Actions: get (read value at path or whole file), schema (describe types, constraints, defaults at a path or the whole root — use to discover available config paths before setting values), set/unset (path-based mutations), replace (whole-file), validate (check syntax and schema). All mutations are validated against the schema before saving. Optional managed-service restart after mutations.",
         schema: configEditSchema,
       },
     ),
