@@ -22,6 +22,7 @@ import { resolveRuntimePath } from "../services/runtime-root";
 
 import { type RuntimeScope, createRuntimeScope } from "./runtime-scope";
 import {
+  buildSubagentCompletionTurn,
   createSubagentController,
   recoverSubagentRuns,
 } from "./runtime-subagent";
@@ -130,22 +131,7 @@ export class OpenElinaroApp {
         // Clean up remain-on-exit window (process succeeded, no need to keep)
         void this.tmux.killWindow(event.runId);
         if (completedRun) {
-          const controller = this.buildSubagentController(this.activeProfile.id);
-          // Inject completion into parent conversation
-          void this.handleRequest(
-            {
-              id: `subagent-complete-${completedRun.id}`,
-              kind: "chat",
-              text: `Background subagent completion update.\n\nRun id: ${completedRun.id}\nProvider: ${completedRun.provider}\nProfile: ${completedRun.profileId}\nSubagent depth: ${completedRun.launchDepth}\n\n${completedRun.completionMessage ?? ""}\n\nDecide what to do next in the main thread. This completion update was pushed into the parent conversation automatically. If the same subagent should continue, call resume_agent with runId ${completedRun.id}. If more work should happen in a fresh worker, launch a new agent.`,
-              conversationKey: completedRun.originConversationKey ?? completedRun.id,
-            },
-            { typingEligible: false },
-          ).catch((error) => {
-            this.appTelemetry.recordError(error, {
-              subagentRunId: completedRun.id,
-              operation: "subagent.completion_injection",
-            });
-          });
+          void this.injectSubagentCompletion(completedRun);
         }
       }
 
@@ -155,7 +141,6 @@ export class OpenElinaroApp {
         // Build verbose error from all available sources
         const exitCode = event.payload.exitCode;
         const errorField = (event.payload.error as string) || "";
-        const outputField = (event.payload.result as string) || (event.payload.output as string) || "";
 
         const errorParts: string[] = [];
         if (errorField) {
@@ -181,20 +166,7 @@ export class OpenElinaroApp {
         const verboseError = errorParts.join("\n");
         const failedRun = this.subagentRegistry.markFailed(event.runId, verboseError);
         if (failedRun) {
-          void this.handleRequest(
-            {
-              id: `subagent-complete-${failedRun.id}`,
-              kind: "chat",
-              text: `Background subagent completion update.\n\nRun id: ${failedRun.id}\nProvider: ${failedRun.provider}\nProfile: ${failedRun.profileId}\nSubagent depth: ${failedRun.launchDepth}\n\n${failedRun.completionMessage ?? ""}\n\nDecide what to do next in the main thread. This completion update was pushed into the parent conversation automatically. If the same subagent should continue, call resume_agent with runId ${failedRun.id}. If more work should happen in a fresh worker, launch a new agent.`,
-              conversationKey: failedRun.originConversationKey ?? failedRun.id,
-            },
-            { typingEligible: false },
-          ).catch((error) => {
-            this.appTelemetry.recordError(error, {
-              subagentRunId: failedRun.id,
-              operation: "subagent.completion_injection",
-            });
-          });
+          void this.injectSubagentCompletion(failedRun);
         }
       }
     });
@@ -956,6 +928,49 @@ export class OpenElinaroApp {
         conversationKey,
         operation: "app.inject_attachment_error_feedback",
         failedPaths: errors.join(", "),
+      });
+    }
+  }
+
+  private async injectSubagentCompletion(run: SubagentRun) {
+    if (!run.originConversationKey || !run.completionMessage) return;
+
+    const conversationKey = run.originConversationKey;
+    const text = buildSubagentCompletionTurn(this.activeProfile.id, run);
+
+    try {
+      const response = await this.handleRequest(
+        {
+          id: `subagent-complete-${run.id}`,
+          kind: "chat",
+          text,
+          conversationKey,
+        },
+        {
+          typingEligible: false,
+          onBackgroundResponse: async (queuedResponse: AppResponse) => {
+            if (this.onBackgroundConversationResponse) {
+              await this.onBackgroundConversationResponse({
+                conversationKey,
+                response: queuedResponse,
+              });
+            }
+          },
+        },
+      );
+
+      // Also handle immediate responses
+      if (response.mode === "immediate" && this.onBackgroundConversationResponse) {
+        await this.onBackgroundConversationResponse({
+          conversationKey,
+          response,
+        });
+      }
+    } catch (error) {
+      this.appTelemetry.recordError(error, {
+        conversationKey,
+        subagentRunId: run.id,
+        operation: "subagent.completion_injection",
       });
     }
   }
