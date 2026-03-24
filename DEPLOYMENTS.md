@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.7
+- Released at: 2026-03-24T02:25:23Z
+- Release id: 20260324T022523Z-1e98bb5
+- Previous version: 2026.03.24.6
+- Trigger: ci/release workflow
+
+- fix: stop passing subagentDefaultModelId to subagent spawn commands
+
 ## 2026.03.24.6
 - Released at: 2026-03-24T02:18:33Z
 - Release id: 20260324T021833Z-a19f0cc
