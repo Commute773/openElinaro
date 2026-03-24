@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.19
+- Released at: 2026-03-24T22:18:44Z
+- Release id: 20260324T221844Z-64e0d95
+- Previous version: 2026.03.24.18
+- Trigger: ci/release workflow
+
+- fix: preserve image content blocks during conversation compaction
+
 ## 2026.03.24.18
 - Released at: 2026-03-24T22:17:01Z
 - Release id: 20260324T221701Z-568cbed
