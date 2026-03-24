@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.21
+- Released at: 2026-03-24T22:33:50Z
+- Release id: 20260324T223350Z-20a67bb
+- Previous version: 2026.03.24.20
+- Trigger: ci/release workflow
+
+- feat: add heartbeatEnabled config toggle
+
 ## 2026.03.24.20
 - Released at: 2026-03-24T22:24:24Z
 - Release id: 20260324T222424Z-9d80de4
