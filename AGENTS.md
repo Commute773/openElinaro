@@ -71,7 +71,7 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 
 ## What Is The Agent System
 
-The core agent system lives under `src/`, shared prompt fragments in `system_prompt/`, user-managed prompt/context/docs under `~/.openelinaro/`, bundled defaults under `profiles/` and `projects/`, and platform docs under `docs/assistant/`.
+The core agent system lives under `src/`, universal platform prompts in `system_prompt/universal/`, operator-managed agent prompts under `~/.openelinaro/system_prompt/`, bundled defaults under `profiles/` and `projects/`, and platform docs under `docs/assistant/`. Universal prompts ship with the app and cannot be overridden; operator prompts are additive and agent-specific. In-code default agent prompts (in `src/services/system-prompt-service.ts`) are used on fresh installs when no operator prompts exist yet.
 
 `projects/` is not the live project state. It is bundled starter content that the runtime copies into `~/.openelinaro/projects/` on first run. Treat the live project registry and docs under `~/.openelinaro/projects/` as managed context the agent can read about and route into, not as the platform's own architecture.
 

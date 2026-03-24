@@ -263,7 +263,7 @@ export class DocsIndexService {
         "docs/README.md",
         "docs/assistant/README.md",
         "docs/research/README.md",
-        "system_prompt/40-docs-and-reload.md",
+        "system_prompt/universal/40-docs-and-reload.md",
       ],
     };
   }
@@ -328,8 +328,8 @@ export class DocsIndexService {
             .join("\n")
           : "- none",
       )],
-      ["system_prompt/40-docs-and-reload.md", replaceManagedBlock(
-        fs.readFileSync(path.join(this.rootDir, "system_prompt/40-docs-and-reload.md"), "utf8"),
+      ["system_prompt/universal/40-docs-and-reload.md", replaceManagedBlock(
+        fs.readFileSync(path.join(this.rootDir, "system_prompt/universal/40-docs-and-reload.md"), "utf8"),
         "assistant-docs",
         renderPathList(["docs/assistant/README.md", ...assistantDocs]),
       )],
@@ -353,7 +353,7 @@ export class DocsIndexService {
       ...inventory.docs.map((entry) => entry.path),
       "AGENTS.md",
       "README.md",
-      "system_prompt/40-docs-and-reload.md",
+      "system_prompt/universal/40-docs-and-reload.md",
     ]
       .filter((relativePath, index, values) => values.indexOf(relativePath) === index)
       .filter((relativePath) => fs.existsSync(path.join(this.rootDir, relativePath)));

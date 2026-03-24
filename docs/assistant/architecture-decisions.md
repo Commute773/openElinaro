@@ -73,12 +73,13 @@ Where to look:
 
 ## 7. Prompts Stay Compact; Docs Carry The Detail
 
-The base prompt is assembled from `system_prompt/*.md`, but deeper operating guidance belongs in docs and should be pulled in progressively rather than copied wholesale into the prompt. Fast-changing runtime state should be fetched on demand through tools instead of being auto-injected into every chat turn.
+The base prompt is assembled from two collections: universal platform prompts in `system_prompt/universal/` (always included, not overridable) and operator-managed agent prompts in `~/.openelinaro/system_prompt/` (additive, agent-specific). Deeper operating guidance belongs in docs and should be pulled in progressively rather than copied wholesale into the prompt. Fast-changing runtime state should be fetched on demand through tools instead of being auto-injected into every chat turn.
 
 Where to look:
 
 - `src/services/system-prompt-service.ts`
-- `system_prompt/`
+- `system_prompt/universal/`
+- `~/.openelinaro/system_prompt/`
 - `docs/assistant/`
 
 ## 8. State Is Local-First
