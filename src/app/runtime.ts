@@ -8,6 +8,7 @@ import { ProfileService } from "../services/profile-service";
 import { ProjectWorkspaceService } from "../services/project-workspace-service";
 import { HeartbeatService } from "../services/heartbeat-service";
 import type { CacheMissWarning } from "../services/cache-miss-monitor";
+import type { InferencePromptDriftWarning } from "../services/inference-prompt-drift-monitor";
 import { RoutinesService } from "../services/routines-service";
 import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
 import { SystemPromptService } from "../services/system-prompt-service";
@@ -21,6 +22,7 @@ import { resolveRuntimePath } from "../services/runtime-root";
 
 import { type RuntimeScope, createRuntimeScope } from "./runtime-scope";
 import {
+  buildSubagentCompletionTurn,
   createSubagentController,
   recoverSubagentRuns,
 } from "./runtime-subagent";
@@ -36,6 +38,7 @@ import {
   buildHeartbeatWorkFocus,
   buildAutomationSessionKey,
 } from "./runtime-automation";
+import { ATTACHMENT_FAILED_PREFIX } from "../services/discord-response-service";
 
 type BackgroundConversationResponseNotifier = (params: {
   conversationKey: string;
@@ -84,6 +87,7 @@ export class OpenElinaroApp {
   private readonly activeProfile: ProfileRecord;
   private readonly scopes = new Map<string, RuntimeScope>();
   private onCacheMissWarning?: (warning: CacheMissWarning) => Promise<void> | void;
+  private onPromptDriftWarning?: (warning: InferencePromptDriftWarning) => Promise<void> | void;
   private onBackgroundConversationResponse?: BackgroundConversationResponseNotifier;
   private onConversationActivityChange?: (params: {
     conversationKey: string;
@@ -108,7 +112,7 @@ export class OpenElinaroApp {
 
     // Start sidecar and subscribe to events
     this.subagentSidecar.start();
-    this.subagentSidecar.onEvent((event) => {
+    this.subagentSidecar.onEvent(async (event) => {
       const run = this.subagentRegistry.get(event.runId);
       if (!run) return;
 
@@ -124,47 +128,45 @@ export class OpenElinaroApp {
           event.runId,
           (event.payload.result as string) || (event.payload.output as string) || undefined,
         );
+        // Clean up remain-on-exit window (process succeeded, no need to keep)
+        void this.tmux.killWindow(event.runId);
         if (completedRun) {
-          const controller = this.buildSubagentController(this.activeProfile.id);
-          // Inject completion into parent conversation
-          void this.handleRequest(
-            {
-              id: `subagent-complete-${completedRun.id}`,
-              kind: "chat",
-              text: `Background subagent completion update.\n\nRun id: ${completedRun.id}\nProvider: ${completedRun.provider}\nProfile: ${completedRun.profileId}\nSubagent depth: ${completedRun.launchDepth}\n\n${completedRun.completionMessage ?? ""}\n\nDecide what to do next in the main thread. This completion update was pushed into the parent conversation automatically. If the same subagent should continue, call resume_agent with runId ${completedRun.id}. If more work should happen in a fresh worker, launch a new agent.`,
-              conversationKey: completedRun.originConversationKey ?? completedRun.id,
-            },
-            { typingEligible: false },
-          ).catch((error) => {
-            this.appTelemetry.recordError(error, {
-              subagentRunId: completedRun.id,
-              operation: "subagent.completion_injection",
-            });
-          });
+          void this.injectSubagentCompletion(completedRun);
         }
       }
 
       if (event.kind === "worker.failed") {
         this.subagentTimeouts.clear(event.runId);
-        const failedRun = this.subagentRegistry.markFailed(
-          event.runId,
-          (event.payload.error as string) || "Agent failed",
-        );
+
+        // Build verbose error from all available sources
+        const exitCode = event.payload.exitCode;
+        const errorField = (event.payload.error as string) || "";
+
+        const errorParts: string[] = [];
+        if (errorField) {
+          errorParts.push(errorField);
+        } else {
+          errorParts.push(`Agent failed with exit code ${exitCode ?? "unknown"}.`);
+        }
+
+        // Capture tmux pane output for additional diagnostics (window stays
+        // alive thanks to remain-on-exit)
+        try {
+          const paneOutput = await this.tmux.capturePane(event.runId, 80);
+          if (paneOutput) {
+            errorParts.push(`\nTerminal output (last 80 lines):\n${paneOutput}`);
+          }
+        } catch {
+          // Pane capture is best-effort
+        }
+
+        // Clean up remain-on-exit window after capturing
+        void this.tmux.killWindow(event.runId);
+
+        const verboseError = errorParts.join("\n");
+        const failedRun = this.subagentRegistry.markFailed(event.runId, verboseError);
         if (failedRun) {
-          void this.handleRequest(
-            {
-              id: `subagent-complete-${failedRun.id}`,
-              kind: "chat",
-              text: `Background subagent completion update.\n\nRun id: ${failedRun.id}\nProvider: ${failedRun.provider}\nProfile: ${failedRun.profileId}\nSubagent depth: ${failedRun.launchDepth}\n\n${failedRun.completionMessage ?? ""}\n\nDecide what to do next in the main thread. This completion update was pushed into the parent conversation automatically. If the same subagent should continue, call resume_agent with runId ${failedRun.id}. If more work should happen in a fresh worker, launch a new agent.`,
-              conversationKey: failedRun.originConversationKey ?? failedRun.id,
-            },
-            { typingEligible: false },
-          ).catch((error) => {
-            this.appTelemetry.recordError(error, {
-              subagentRunId: failedRun.id,
-              operation: "subagent.completion_injection",
-            });
-          });
+          void this.injectSubagentCompletion(failedRun);
         }
       }
     });
@@ -242,14 +244,16 @@ export class OpenElinaroApp {
             systemContext,
             typingEligible: options?.typingEligible,
             onBackgroundResponse: options?.onBackgroundResponse
-              ? async (result) => options.onBackgroundResponse?.(
-                  finalizeAppResponse(scope, {
+              ? async (result) => {
+                  const finalized = finalizeAppResponse(scope, {
                     requestId: request.id,
                     mode: result.mode,
                     message: result.message,
                     warnings: result.warnings,
-                  }),
-                )
+                  });
+                  await options.onBackgroundResponse?.(finalized);
+                  await this.injectAttachmentErrorFeedback(scope, conversationKey, finalized);
+                }
               : undefined,
             onToolUse: options?.onToolUse,
             persistConversation: options?.chatOptions?.persistConversation,
@@ -260,12 +264,14 @@ export class OpenElinaroApp {
             providerSessionId: options?.chatOptions?.providerSessionId,
             usagePurpose: options?.chatOptions?.usagePurpose,
           });
-          return finalizeAppResponse(scope, {
+          const response = finalizeAppResponse(scope, {
             requestId: request.id,
             mode: result.mode,
             message: result.message,
             warnings: result.warnings,
           });
+          await this.injectAttachmentErrorFeedback(scope, conversationKey, response);
+          return response;
         }
 
         if (request.kind === "todo") {
@@ -349,6 +355,10 @@ export class OpenElinaroApp {
 
   setCacheMissWarningNotifier(notifier?: (warning: CacheMissWarning) => Promise<void> | void) {
     this.onCacheMissWarning = notifier;
+  }
+
+  setPromptDriftWarningNotifier(notifier?: (warning: InferencePromptDriftWarning) => Promise<void> | void) {
+    this.onPromptDriftWarning = notifier;
   }
 
   setBackgroundConversationNotifier(notifier?: BackgroundConversationResponseNotifier) {
@@ -552,20 +562,14 @@ export class OpenElinaroApp {
           messageChars: message.length,
         });
       } catch (error) {
-        this.appTelemetry.event(
-          "app.heartbeat.main_thread_handoff_error",
-          {
-            conversationKey,
-            heartbeatConversationKey,
-            requestId,
-            source,
-            messageChars: message.length,
-            error: error instanceof Error
-              ? { name: error.name, message: error.message, stack: error.stack }
-              : String(error),
-          },
-          { level: "error", outcome: "error" },
-        );
+        this.appTelemetry.recordError(error, {
+          conversationKey,
+          heartbeatConversationKey,
+          requestId,
+          source,
+          messageChars: message.length,
+          eventName: "app.heartbeat.main_thread_handoff",
+        });
       }
     };
     const finalizeHeartbeatMessage = async (rawMessage: string | undefined, source: string) => {
@@ -639,7 +643,7 @@ export class OpenElinaroApp {
             enableThreadStartContext: false,
             enableCompaction: false,
             includeBackgroundExecNotifications: false,
-            providerSessionId: heartbeatConversationKey,
+            providerSessionId: `${heartbeatConversationKey}-${turnId}`,
             usagePurpose: "automation_heartbeat_turn",
           },
         },
@@ -773,7 +777,7 @@ export class OpenElinaroApp {
           enableThreadStartContext: false,
           enableCompaction: false,
           includeBackgroundExecNotifications: false,
-          providerSessionId: buildAutomationSessionKey(alarm.kind, conversationKey),
+          providerSessionId: `${buildAutomationSessionKey(alarm.kind, conversationKey)}-alarm-notification-${alarm.id}`,
           usagePurpose: `automation_${alarm.kind}_turn`,
         },
       },
@@ -789,6 +793,14 @@ export class OpenElinaroApp {
 
   markRoutineReminderDelivered(itemIds: string[], occurrenceKeys: string[]) {
     this.routines.markReminded(itemIds, occurrenceKeys);
+  }
+
+  hasAlarmRoutinesDueNow(reference?: Date) {
+    return this.routines.hasAlarmRoutinesDueNow(reference);
+  }
+
+  onRoutineScheduleChanged(listener: () => void) {
+    return this.routines.onScheduleChanged(listener);
   }
 
   getNextRoutineAttentionAt(reference?: Date) {
@@ -835,6 +847,18 @@ export class OpenElinaroApp {
           });
         });
       },
+      onPromptDriftWarning: (warning) => {
+        if (!this.onPromptDriftWarning) {
+          return;
+        }
+        void Promise.resolve(this.onPromptDriftWarning(warning)).catch((error) => {
+          this.appTelemetry.recordError(error, {
+            profileId,
+            sessionId: warning.sessionId,
+            operation: "app.prompt_drift_warning_notifier",
+          });
+        });
+      },
       onConversationActivityChange: this.onConversationActivityChange
         ? (params) => {
             void Promise.resolve(this.onConversationActivityChange?.(params)).catch((error) => {
@@ -849,7 +873,106 @@ export class OpenElinaroApp {
       createSubagentController: (pid: string) => this.buildSubagentController(pid),
     });
     this.scopes.set(scopeKey, scope);
+    this.wirePlaybackEndNotification(scope);
     return scope;
+  }
+
+  private wirePlaybackEndNotification(scope: RuntimeScope) {
+    const mediaService = scope.routineTools.getMediaService();
+    if (!mediaService) {
+      return;
+    }
+    mediaService.onPlaybackEnd((event) => {
+      const userId = this.getNotificationTargetUserId();
+      const conversationKey = userId ?? scope.profile.id;
+      const text = `Playback ended: ${event.title} on speaker ${event.speakerId}.`;
+      void this.handleRequest(
+        {
+          id: `playback-end-${event.speakerId}-${Date.now()}`,
+          kind: "chat",
+          text,
+          conversationKey,
+        },
+        { typingEligible: false },
+      ).catch((error) => {
+        this.appTelemetry.recordError(error, {
+          speakerId: event.speakerId,
+          title: event.title,
+          operation: "media.playback_end_notification",
+        });
+      });
+    });
+  }
+
+  private async injectAttachmentErrorFeedback(
+    scope: RuntimeScope,
+    conversationKey: string,
+    response: AppResponse,
+  ): Promise<void> {
+    const errors = response.attachmentErrors;
+    if (!errors || errors.length === 0) {
+      return;
+    }
+    const feedbackLines = [
+      `${ATTACHMENT_FAILED_PREFIX} The following file attachments failed to send to the user:`,
+      ...errors.map((filePath) => `- ${filePath}`),
+      "You should inform the user or recreate the file and try again.",
+    ];
+    try {
+      await scope.chat.recordAssistantMessage({
+        conversationKey,
+        message: feedbackLines.join("\n"),
+      });
+    } catch (error) {
+      this.appTelemetry.recordError(error, {
+        conversationKey,
+        operation: "app.inject_attachment_error_feedback",
+        failedPaths: errors.join(", "),
+      });
+    }
+  }
+
+  private async injectSubagentCompletion(run: SubagentRun) {
+    if (!run.originConversationKey || !run.completionMessage) return;
+
+    const conversationKey = run.originConversationKey;
+    const text = buildSubagentCompletionTurn(this.activeProfile.id, run);
+
+    try {
+      const response = await this.handleRequest(
+        {
+          id: `subagent-complete-${run.id}`,
+          kind: "chat",
+          text,
+          conversationKey,
+        },
+        {
+          typingEligible: false,
+          onBackgroundResponse: async (queuedResponse: AppResponse) => {
+            if (this.onBackgroundConversationResponse) {
+              await this.onBackgroundConversationResponse({
+                conversationKey,
+                response: queuedResponse,
+              });
+            }
+          },
+        },
+      );
+
+      // Also handle immediate responses
+      if (response.mode === "immediate" && this.onBackgroundConversationResponse) {
+        await this.onBackgroundConversationResponse({
+          conversationKey,
+          response,
+        });
+      }
+    } catch (error) {
+      this.appTelemetry.recordError(error, {
+        conversationKey,
+        subagentRunId: run.id,
+        operation: "subagent.completion_injection",
+      });
+    }
   }
 
   private buildSubagentController(sourceProfileId: string) {

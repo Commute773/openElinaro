@@ -157,6 +157,7 @@ function buildCombinedTurnContent(
 export class AgentChatService {
   private readonly sessions = new Map<string, ConversationSessionState>();
   private readonly toolResults = new ToolResultStore();
+  private timezoneProvider?: () => string;
 
   constructor(
     private readonly connector: ProviderConnector,
@@ -171,6 +172,10 @@ export class AgentChatService {
     private readonly superagentMode = false,
     private conversationActivityNotifier?: (params: { conversationKey: string; active: boolean }) => void,
   ) {}
+
+  setTimezoneProvider(provider: () => string) {
+    this.timezoneProvider = provider;
+  }
 
   setConversationActivityNotifier(
     notifier?: (params: { conversationKey: string; active: boolean }) => void,
@@ -410,16 +415,10 @@ export class AgentChatService {
     session.processing = true;
     void this.processSession(conversationKey, session)
       .catch((error) => {
-        agentChatTelemetry.event(
-          "agent_chat.session.error",
-          {
-            conversationKey,
-            error: error instanceof Error
-              ? { name: error.name, message: error.message, stack: error.stack }
-              : String(error),
-          },
-          { level: "error", outcome: "error" },
-        );
+        agentChatTelemetry.recordError(error, {
+          conversationKey,
+          eventName: "agent_chat.session",
+        });
       })
       .finally(() => {
         session.processing = false;
@@ -641,10 +640,15 @@ export class AgentChatService {
           job.content,
           steeringMessages.map((entry) => entry.content),
         );
-        const combinedUserContent = prependTextToChatPromptContent(
-          rawCombinedUserContent,
-          buildCurrentLocalTimePrefix(),
-        );
+        const rawText = typeof rawCombinedUserContent === "string"
+          ? rawCombinedUserContent
+          : rawCombinedUserContent.map((b) => "text" in b ? b.text : "").join(" ");
+        const combinedUserContent = rawText.includes("Current local time:")
+          ? rawCombinedUserContent
+          : prependTextToChatPromptContent(
+            rawCombinedUserContent,
+            buildCurrentLocalTimePrefix(new Date(), this.timezoneProvider?.()),
+          );
         const userContentWithAutomaticContext = await this.buildUserContentWithAutomaticContext({
           conversationKey: job.contextConversationKey ?? job.conversationKey,
           systemContext: job.systemContext,

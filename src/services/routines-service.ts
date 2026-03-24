@@ -442,8 +442,26 @@ export class RoutinesService {
   private readonly profiles = new ProfileService();
   private readonly activeProfile = this.profiles.getActiveProfile();
   private cachedProjects?: ProjectsService;
+  private readonly scheduleChangeListeners = new Set<() => void>();
 
   constructor(private readonly projects?: ProjectsService) {}
+
+  onScheduleChanged(listener: () => void) {
+    this.scheduleChangeListeners.add(listener);
+    return () => {
+      this.scheduleChangeListeners.delete(listener);
+    };
+  }
+
+  private notifyScheduleChanged() {
+    for (const listener of this.scheduleChangeListeners) {
+      listener();
+    }
+  }
+
+  getTimezone(): string {
+    return this.store.load().settings.timezone;
+  }
 
   private isQuietHours(reference: Date = new Date()) {
     const { quietHours } = this.store.load().settings;
@@ -506,6 +524,7 @@ export class RoutinesService {
     jobId?: string;
     projectId?: string;
     blockedBy?: string[];
+    alarm?: boolean;
     schedule: RoutineSchedule;
     reminder?: Partial<ReminderPolicy>;
     state?: Partial<RoutineState>;
@@ -537,6 +556,7 @@ export class RoutinesService {
       jobId: scope.jobId,
       projectId: scope.projectId,
       blockedBy: input.blockedBy,
+      alarm: input.alarm,
       schedule: input.schedule,
       reminder: {
         followUpMinutes:
@@ -560,6 +580,9 @@ export class RoutinesService {
       kind: item.kind,
       status: item.status,
     });
+    if (item.alarm) {
+      this.notifyScheduleChanged();
+    }
     return item;
   }
 
@@ -620,6 +643,7 @@ export class RoutinesService {
       jobId?: string;
       projectId?: string;
       blockedBy?: string[];
+      alarm?: boolean;
       schedule?: RoutineSchedule;
     },
   ) {
@@ -651,6 +675,7 @@ export class RoutinesService {
     item.jobId = scope.jobId;
     item.projectId = scope.projectId;
     item.blockedBy = updates.blockedBy ?? item.blockedBy;
+    item.alarm = updates.alarm ?? item.alarm;
     item.schedule = updates.schedule ?? item.schedule;
 
     this.store.save(data);
@@ -660,6 +685,9 @@ export class RoutinesService {
       kind: item.kind,
       status: item.status,
     });
+    if (item.alarm) {
+      this.notifyScheduleChanged();
+    }
     return item;
   }
 
@@ -677,12 +705,16 @@ export class RoutinesService {
       entityId: item.id,
       kind: item.kind,
     });
+    if (item.alarm) {
+      this.notifyScheduleChanged();
+    }
     return item;
   }
 
   formatItem(item: RoutineItem) {
     const blocked = item.blockedBy?.length ? ` blocked-by:${item.blockedBy.join(",")}` : "";
     const streak = item.state.streak > 0 ? ` streak:${item.state.streak}` : "";
+    const alarmTag = item.alarm ? " alarm" : "";
     const scope = item.projectId
       ? ` profile:${item.profileId} project:${item.projectId}${item.jobId ? ` job:${item.jobId}` : ""}`
       : item.jobId
@@ -694,7 +726,7 @@ export class RoutinesService {
       `${item.kind}/${item.priority}`,
       item.status,
       formatSchedule(item.schedule),
-      scope + blocked + streak,
+      scope + blocked + streak + alarmTag,
     ]
       .filter(Boolean)
       .join(" | ");
@@ -937,6 +969,10 @@ export class RoutinesService {
         && (item.priority === "high" || item.priority === "urgent" || item.kind === "med")
       ) {
         nextAttentionAt = new Date(occurrence.dueAt.getTime() - (60 * 60000));
+      }
+
+      if (item.alarm && occurrence?.state === "upcoming" && !nextAttentionAt) {
+        nextAttentionAt = occurrence.dueAt;
       }
 
       if (occurrence && shouldSuppressForContext(item, context, occurrence.state)) {
@@ -1301,6 +1337,29 @@ export class RoutinesService {
       `Heartbeat follow-up (${snapshot.context.mode} mode, ${snapshot.currentLocalTime}).`,
       ...lines,
     ].join("\n");
+  }
+
+  hasAlarmRoutinesDueNow(reference: Date = new Date()) {
+    const data = this.store.load();
+    const now = nowInTimezone(data.settings.timezone, reference);
+    for (const item of this.filterVisibleItems(Object.values(data.items))) {
+      if (!item.alarm || !item.enabled || item.status !== "active") {
+        continue;
+      }
+      const occurrence = findCurrentOccurrence(item, now);
+      if (!occurrence || occurrence.state !== "due") {
+        continue;
+      }
+      if (countsAsCompleted(item, occurrence) || countsAsSkipped(item, occurrence.occurrenceKey)) {
+        continue;
+      }
+      const snoozedUntil = parseIso(item.state.snoozedUntil);
+      if (snoozedUntil && snoozedUntil.getTime() > now.getTime()) {
+        continue;
+      }
+      return true;
+    }
+    return false;
   }
 
   getNextRoutineAttentionAt(reference: Date = new Date()) {

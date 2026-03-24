@@ -4,6 +4,7 @@ import type { Database } from "bun:sqlite";
 import type { FinanceForecastConfig } from "../../config/finance-config";
 import { DEFAULT_FINANCE_SETTINGS } from "../../config/finance-config";
 import { timestamp as nowIso } from "../../utils/timestamp";
+import { withSqliteRetry } from "../../utils/sqlite-helpers";
 import type { SqlValue } from "./finance-types";
 
 export const SCHEMA = `
@@ -212,24 +213,24 @@ export function getRow<T extends Record<string, unknown>>(db: Database, sql: str
 }
 
 export function run(db: Database, sql: string, ...params: SqlValue[]) {
-  return db.query(sql).run(...params);
+  return withSqliteRetry(() => db.query(sql).run(...params), { label: "finance" });
 }
 
 export function migrateReceivables(db: Database) {
   const columns = allRows<{ name: string }>(db, "PRAGMA table_info(receivables)").map((row) => String(row.name));
   if (!columns.includes("currency")) {
-    db.exec("ALTER TABLE receivables ADD COLUMN currency TEXT DEFAULT 'CAD';");
+    withSqliteRetry(() => db.exec("ALTER TABLE receivables ADD COLUMN currency TEXT DEFAULT 'CAD';"), { label: "finance" });
   }
   if (!columns.includes("amount")) {
-    db.exec("ALTER TABLE receivables ADD COLUMN amount REAL;");
-    db.exec("UPDATE receivables SET amount = amount_cad WHERE amount IS NULL AND currency = 'CAD';");
+    withSqliteRetry(() => db.exec("ALTER TABLE receivables ADD COLUMN amount REAL;"), { label: "finance" });
+    withSqliteRetry(() => db.exec("UPDATE receivables SET amount = amount_cad WHERE amount IS NULL AND currency = 'CAD';"), { label: "finance" });
   }
 }
 
 export function migrateRecurring(db: Database) {
   const columns = allRows<{ name: string }>(db, "PRAGMA table_info(recurring)").map((row) => String(row.name));
   if (!columns.includes("amount_tolerance_cad")) {
-    db.exec("ALTER TABLE recurring ADD COLUMN amount_tolerance_cad REAL NOT NULL DEFAULT 0;");
+    withSqliteRetry(() => db.exec("ALTER TABLE recurring ADD COLUMN amount_tolerance_cad REAL NOT NULL DEFAULT 0;"), { label: "finance" });
   }
 }
 

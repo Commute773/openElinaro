@@ -89,6 +89,8 @@ export interface SubagentController {
   getAgentRun: (runId: string) => SubagentRun | undefined;
   listAgentRuns: () => SubagentRun[];
   captureAgentPane: (runId: string, lines?: number) => Promise<string>;
+  /** Read the full terminal buffer (scrollback + visible) for a running agent. */
+  readAgentTerminal: (runId: string) => Promise<string>;
   /** List available subagent providers for the source profile, with descriptions. */
   listAvailableProviders: (profileId?: string) => Array<{ provider: "claude" | "codex"; path: string; description?: string }>;
 }
@@ -253,7 +255,6 @@ export function createSubagentController(ctx: {
             profileId: targetProfileId,
             sidecarSocketPath: socketPath,
             timeoutMs,
-            model: targetProfile.subagentDefaultModelId,
             hooksSettingsPath,
           })
         : buildCodexSpawnCommand({
@@ -265,7 +266,6 @@ export function createSubagentController(ctx: {
             profileId: targetProfileId,
             sidecarSocketPath: socketPath,
             timeoutMs,
-            model: targetProfile.subagentDefaultModelId,
             notifyScriptPath,
           });
 
@@ -293,6 +293,49 @@ export function createSubagentController(ctx: {
 
       // Register timeout
       timeouts.register(runId, timeoutMs, onTimeout);
+
+      // Schedule early health check: if the process dies in the first few
+      // seconds without firing hooks, we capture the pane output and mark
+      // the run as failed so the error is never silently swallowed.
+      const EARLY_HEALTH_CHECK_MS = 5_000;
+      setTimeout(async () => {
+        try {
+          const currentRun = registry.get(runId);
+          if (!currentRun) return;
+          if (currentRun.status === "completed" || currentRun.status === "failed" || currentRun.status === "cancelled") return;
+
+          const alive = await tmux.isWindowProcessAlive(runId);
+          if (alive) return;
+
+          // Process died without firing hooks — capture pane for diagnostics
+          let paneOutput = "";
+          try {
+            paneOutput = await tmux.capturePane(runId, 100);
+          } catch {
+            // best effort
+          }
+          // Clean up remain-on-exit window
+          await tmux.killWindow(runId);
+
+          const errorParts = [`Agent process exited early without reporting completion (provider: ${provider}).`];
+          if (paneOutput) {
+            errorParts.push(`Terminal output:\n${paneOutput}`);
+          } else {
+            errorParts.push("No terminal output was captured. The process may have crashed on startup. Check that the binary path is correct and API keys are configured.");
+          }
+
+          timeouts.clear(runId);
+          const failedRun = registry.markFailed(runId, errorParts.join("\n"));
+          if (failedRun) {
+            void injectCompletion(failedRun);
+          }
+        } catch (error) {
+          telemetry.recordError(error, {
+            runId,
+            operation: "subagent.early_health_check",
+          });
+        }
+      }, EARLY_HEALTH_CHECK_MS);
 
       telemetry.event("subagent.launched", {
         runId,
@@ -360,7 +403,6 @@ export function createSubagentController(ctx: {
             profileId: existingRun.profileId,
             sidecarSocketPath: socketPath,
             timeoutMs,
-            model: profiles.getProfile(existingRun.profileId).subagentDefaultModelId,
             hooksSettingsPath: resumeHooksSettingsPath,
           })
         : buildCodexSpawnCommand({
@@ -372,7 +414,6 @@ export function createSubagentController(ctx: {
             profileId: existingRun.profileId,
             sidecarSocketPath: socketPath,
             timeoutMs,
-            model: profiles.getProfile(existingRun.profileId).subagentDefaultModelId,
             notifyScriptPath: resumeNotifyScriptPath,
           });
 
@@ -456,6 +497,14 @@ export function createSubagentController(ctx: {
       const hasWindow = await tmux.hasWindow(run.id);
       if (!hasWindow) return "(tmux window no longer exists)";
       return tmux.capturePane(run.id, lines);
+    },
+
+    readAgentTerminal: async (runId) => {
+      const run = registry.get(runId);
+      if (!run) return `No agent run found for ${runId}.`;
+      const hasWindow = await tmux.hasWindow(run.id);
+      if (!hasWindow) return "(tmux window no longer exists)";
+      return tmux.readTerminal(run.id);
     },
 
     listAvailableProviders: (profileId) => {

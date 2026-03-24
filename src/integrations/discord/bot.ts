@@ -323,16 +323,10 @@ export function createDiscordDmMessageBatcher(params: {
     clearBatchTimer(batch);
     batch.timer = scheduleTimeout(() => {
       void dispatchBatch(batchKey, "timeout").catch((error) => {
-        discordTelemetry.event(
-          "discord.message.batch_timeout_dispatch.error",
-          {
-            batchKey,
-            error: error instanceof Error
-              ? { name: error.name, message: error.message, stack: error.stack }
-              : String(error),
-          },
-          { level: "error", outcome: "error" },
-        );
+        discordTelemetry.recordError(error, {
+          batchKey,
+          eventName: "discord.message.batch_timeout_dispatch",
+        });
       });
     }, timeoutMs);
   };
@@ -562,27 +556,54 @@ export async function startDiscordBot() {
     });
   });
 
+  app.setPromptDriftWarningNotifier(async (warning) => {
+    const userId = app.getNotificationTargetUserId();
+    if (!userId) {
+      discordTelemetry.event(
+        "discord.prompt_drift_warning.no_target",
+        { sessionId: warning.sessionId },
+        { level: "debug" },
+      );
+      return;
+    }
+
+    const user = await client.users.fetch(userId);
+    const dm = await user.createDM();
+    const pct = (warning.sharedPrefixPercentOfPrevious * 100).toFixed(1);
+    await dm.send(
+      `⚠️ Prompt prefix mutation detected (session \`${warning.sessionId}\`): shared prefix ${pct}% of previous prompt. Removed ${warning.removedLength} chars, added ${warning.addedLength} chars at message index ${warning.firstChangedMessageIndex}.`,
+    );
+    discordTelemetry.event("discord.prompt_drift_warning.sent", {
+      userId,
+      sessionId: warning.sessionId,
+      sharedPrefixPercentOfPrevious: warning.sharedPrefixPercentOfPrevious,
+    });
+  });
+
+  // Start healthcheck watcher before Discord connects so deploys don't
+  // time out waiting for the Discord gateway.
+  healthchecks.start({
+    run: async ({ requestId, conversationKey, prompt, onBackgroundResponse }) =>
+      app.handleRequest(
+        {
+          id: requestId,
+          kind: "chat",
+          text: prompt,
+          conversationKey,
+        },
+        {
+          onBackgroundResponse: onBackgroundResponse
+            ? async (response) => onBackgroundResponse(response.message)
+            : undefined,
+          onToolUse: async () => {},
+          typingEligible: false,
+        },
+      ),
+  });
+
   client.once(Events.ClientReady, async (readyClient) => {
     await syncSlashCommands(readyClient);
     new DiscordRoutinesNotifier(readyClient, app).start();
-    healthchecks.start({
-      run: async ({ requestId, conversationKey, prompt, onBackgroundResponse }) =>
-        app.handleRequest(
-          {
-            id: requestId,
-            kind: "chat",
-            text: prompt,
-            conversationKey,
-          },
-          {
-            onBackgroundResponse: onBackgroundResponse
-              ? async (response) => onBackgroundResponse(response.message)
-              : undefined,
-            onToolUse: async () => {},
-            typingEligible: false,
-          },
-        ),
-    });
     discordTelemetry.event("discord.ready", {
       botTag: readyClient.user.tag,
     });
@@ -748,17 +769,11 @@ export function createDiscordEventHandlers(params: {
       try {
         await dmMessageBatcher.handleMessage(message);
       } catch (error) {
-        discordTelemetry.event(
-          "discord.message.error",
-          {
-            userId: message.author.id,
-            channelId: message.channelId,
-            error: error instanceof Error
-              ? { name: error.name, message: error.message, stack: error.stack }
-              : String(error),
-          },
-          { level: "error", outcome: "error" },
-        );
+        discordTelemetry.recordError(error, {
+          userId: message.author.id,
+          channelId: message.channelId,
+          eventName: "discord.message",
+        });
         await replyToMessageWithChunks(message, error instanceof Error ? error.message : String(error));
       }
     },
@@ -943,13 +958,18 @@ async function handleSlashCommand(params: {
       return;
     }
     await deferInteractionReply(interaction);
-    await app.invokeRoutineTool("update", {}, {
+    const updateResult = await app.invokeRoutineTool("update", {}, {
       conversationKey: getDiscordConversationKey(interaction),
     });
-    await replyWithChunks(
-      interaction,
-      "updating... don't send messages. you'll get `update complete` when it's done.",
-    );
+    const resultText = typeof updateResult === "string" ? updateResult : String(updateResult ?? "");
+    if (resultText.includes("Update skipped") || resultText.includes("Nothing to deploy") || resultText.includes("already at version")) {
+      await replyWithChunks(interaction, resultText);
+    } else {
+      await replyWithChunks(
+        interaction,
+        "updating... don't send messages. you'll get `update complete` when it's done.",
+      );
+    }
     return;
   }
 

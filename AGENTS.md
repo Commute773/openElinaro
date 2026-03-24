@@ -13,7 +13,7 @@ All work should be done in git worktrees, submitted as pull requests, and merged
 5. CI runs `bun run check`, generates the next version, updates VERSION.json and DEPLOYMENTS.md, tags, and pushes.
 6. Deploy explicitly via `/update confirm:true` when ready.
 
-After completing every feature or discrete change, commit and push immediately. Do not batch multiple features into a single commit.
+After completing every feature or discrete change, automatically commit, push, open a PR, and merge it. Do not wait for the user to ask. Do not batch multiple features into a single commit.
 
 See also: [Worktree-first agent workflows](docs/research/worktree-first-agent-workflows.md)
 

@@ -137,6 +137,7 @@ function buildDiffPreview(text: string, start: number, length: number, limit = 1
 export class InferencePromptDriftMonitor {
   private readonly promptBySession = new Map<string, string>();
   private readonly promptMessagesBySession = new Map<string, string[]>();
+  private static readonly MAX_TRACKED_SESSIONS = 200;
 
   inspect(params: {
     sessionId: string;
@@ -148,13 +149,9 @@ export class InferencePromptDriftMonitor {
     const previousMessages = this.promptMessagesBySession.get(params.sessionId);
     this.promptBySession.set(params.sessionId, currentPrompt);
     this.promptMessagesBySession.set(params.sessionId, currentMessages);
+    this.evictStaleEntries();
 
     if (!previousPrompt || !previousMessages || currentPrompt === previousPrompt || currentPrompt.startsWith(previousPrompt)) {
-      return null;
-    }
-
-    const sharedMessagePrefixLength = getSharedMessagePrefixLength(previousMessages, currentMessages);
-    if (sharedMessagePrefixLength >= 1) {
       return null;
     }
 
@@ -164,6 +161,24 @@ export class InferencePromptDriftMonitor {
     const sharedPrefixPercentOfPrevious = previousPrompt.length > 0
       ? sharedPrefixLength / previousPrompt.length
       : 0;
+
+    // Allow clean message-boundary rollbacks (trailing messages removed, no
+    // content rewritten) regardless of percentage — this is normal compaction.
+    // For mutations that also rewrite earlier content, require at least 80% of
+    // the previous prompt to be preserved as a shared prefix.  Without the
+    // percentage gate the monitor silently ignored mutations that happened to
+    // keep the first serialized message identical even when large portions of
+    // the prompt were rewritten.
+    const sharedMessagePrefixLength = getSharedMessagePrefixLength(previousMessages, currentMessages);
+    const isCleanRollback = sharedMessagePrefixLength >= 1
+      && currentMessages.length <= previousMessages.length
+      && addedLength === 0;
+    if (isCleanRollback) {
+      return null;
+    }
+    if (sharedMessagePrefixLength >= 1 && sharedPrefixPercentOfPrevious >= 0.8) {
+      return null;
+    }
     const previousChanged = findChangedMessageContext(previousMessages ?? [], sharedPrefixLength);
     const currentChanged = findChangedMessageContext(currentMessages, sharedPrefixLength);
     const previousChangedMessageRole = extractChangedRole(previousChanged.preview);
@@ -201,5 +216,20 @@ export class InferencePromptDriftMonitor {
         addedPreview ? `added_preview=${JSON.stringify(addedPreview)}` : "",
       ].join(" "),
     };
+  }
+
+  private evictStaleEntries() {
+    if (this.promptBySession.size <= InferencePromptDriftMonitor.MAX_TRACKED_SESSIONS) {
+      return;
+    }
+    const excess = this.promptBySession.size - InferencePromptDriftMonitor.MAX_TRACKED_SESSIONS;
+    const keys = this.promptBySession.keys();
+    for (let i = 0; i < excess; i++) {
+      const { value: key } = keys.next();
+      if (key) {
+        this.promptBySession.delete(key);
+        this.promptMessagesBySession.delete(key);
+      }
+    }
   }
 }

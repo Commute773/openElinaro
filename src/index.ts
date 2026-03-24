@@ -13,10 +13,18 @@ process.on("uncaughtException", (error) => {
   telemetry.recordError(error, {
     eventName: "process.uncaught_exception",
   });
+  process.exit(1);
 });
 
 startHttpServer();
-await startDiscordBot();
+try {
+  await startDiscordBot();
+} catch (error) {
+  telemetry.recordError(error, {
+    eventName: "process.startup_failed",
+  });
+  process.exit(1);
+}
 
 const localVoiceSidecars = await startLocalVoiceSidecarRuntime();
 

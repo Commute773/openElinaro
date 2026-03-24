@@ -21,7 +21,6 @@ import {
   approximateContentTokens,
   extractTextFromMessage,
   normalizeChatPromptContent,
-  resolveRemoteImageUrl,
 } from "./message-content-service";
 import {
   UsageTrackingService,
@@ -154,6 +153,12 @@ export interface MemoryModelSelection {
   thinkingLevel: ThinkingLevel;
 }
 
+export interface HeartbeatModelSelection {
+  providerId: ModelProviderId;
+  modelId: string;
+  thinkingLevel: ThinkingLevel;
+}
+
 interface ModelServiceOptions {
   usageTracking?: UsageTrackingService;
   cacheMissMonitor?: CacheMissMonitor;
@@ -256,6 +261,10 @@ const DEFAULT_TOOL_SUMMARIZER_MODEL_IDS: Record<ModelProviderId, string> = {
   claude: "claude-haiku-4-5",
 };
 
+const DEFAULT_HEARTBEAT_MODEL_IDS: Record<ModelProviderId, string> = {
+  "openai-codex": "gpt-5.1-codex-mini",
+  claude: "claude-haiku-4-5",
+};
 
 function ensureStoreDir() {
   fs.mkdirSync(path.dirname(getStorePath()), { recursive: true });
@@ -324,6 +333,17 @@ function getDefaultMemorySelection(profile: ProfileRecord): MemoryModelSelection
       profile.toolSummarizerModelId ??
       DEFAULT_TOOL_SUMMARIZER_MODEL_IDS[providerId],
     thinkingLevel: "minimal",
+  };
+}
+
+function getDefaultHeartbeatSelection(profile: ProfileRecord): HeartbeatModelSelection {
+  const providerId = profile.heartbeatProvider ??
+    profile.preferredProvider ??
+    DEFAULT_ACTIVE_MODEL.providerId;
+  return {
+    providerId,
+    modelId: profile.heartbeatModelId ?? DEFAULT_HEARTBEAT_MODEL_IDS[providerId],
+    thinkingLevel: "low",
   };
 }
 
@@ -748,17 +768,6 @@ function toAnthropicUserContent(content: unknown): string | Array<Record<string,
       return { type: "text", text: block.text };
     }
 
-    const remoteImageUrl = resolveRemoteImageUrl(block.sourceUrl);
-    if (remoteImageUrl) {
-      return {
-        type: "image",
-        source: {
-          type: "url",
-          url: remoteImageUrl,
-        },
-      };
-    }
-
     return {
       type: "image",
       source: {
@@ -887,6 +896,10 @@ export class ModelService {
 
   getMemorySelection(): MemoryModelSelection {
     return getDefaultMemorySelection(this.profile);
+  }
+
+  getHeartbeatSelection(): HeartbeatModelSelection {
+    return getDefaultHeartbeatSelection(this.profile);
   }
 
   getActiveModel(): ActiveModelSelection {
@@ -1188,6 +1201,21 @@ export class ModelService {
   async resolveActiveRuntimeModel(): Promise<ResolvedRuntimeModel> {
     const selection = this.getActiveModel();
     return this.resolveRuntimeModelForSelection(selection);
+  }
+
+  async resolveModelForPurpose(purpose?: string): Promise<ResolvedRuntimeModel> {
+    if (purpose?.startsWith("automation_heartbeat")) {
+      const heartbeat = this.getHeartbeatSelection();
+      const selection: ActiveModelSelection = {
+        providerId: heartbeat.providerId,
+        modelId: heartbeat.modelId,
+        thinkingLevel: heartbeat.thinkingLevel,
+        extendedContextEnabled: false,
+        updatedAt: new Date(0).toISOString(),
+      };
+      return this.resolveRuntimeModelForSelection(selection);
+    }
+    return this.resolveActiveRuntimeModel();
   }
 
   private async resolveRuntimeModelForSelection(

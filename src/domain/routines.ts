@@ -52,6 +52,7 @@ export interface RoutineItem {
   jobId?: string;
   projectId?: string;
   blockedBy?: string[];
+  alarm?: boolean;
   schedule: RoutineSchedule;
   reminder: ReminderPolicy;
   state: RoutineState;

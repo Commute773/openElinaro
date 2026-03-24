@@ -1,5 +1,288 @@
 # Deployments
 
+## 2026.03.24.14
+- Released at: 2026-03-24T17:21:15Z
+- Release id: 20260324T172115Z-5324b8d
+- Previous version: 2026.03.24.13
+- Trigger: ci/release workflow
+
+- feat: add restart tool for manual service restart
+
+## 2026.03.24.13
+- Released at: 2026-03-24T17:16:23Z
+- Release id: 20260324T171623Z-9da37f4
+- Previous version: 2026.03.24.12
+- Trigger: ci/release workflow
+
+- feat: replace free-form cwd with named workspace param on launch_agent
+
+## 2026.03.24.12
+- Released at: 2026-03-24T03:21:51Z
+- Release id: 20260324T032151Z-b235bd5
+- Previous version: 2026.03.24.11
+- Trigger: ci/release workflow
+
+- fix: route subagent completion responses to Discord via background notifier
+
+## 2026.03.24.11
+- Released at: 2026-03-24T03:10:26Z
+- Release id: 20260324T031026Z-1a51d1c
+- Previous version: 2026.03.24.10
+- Trigger: ci/release workflow
+
+- fix: unify error logging — recordError now always writes to stderr
+
+## 2026.03.24.10
+- Released at: 2026-03-24T03:03:17Z
+- Release id: 20260324T030317Z-0245fa2
+- Previous version: 2026.03.24.9
+- Trigger: ci/release workflow
+
+- fix: add missing tool auth declaration and crash on startup errors
+
+## 2026.03.24.9
+- Released at: 2026-03-24T02:53:47Z
+- Release id: 20260324T025347Z-fb25f3c
+- Previous version: 2026.03.24.8
+- Trigger: ci/release workflow
+
+- fix: start healthcheck watcher before Discord gateway connects
+
+## 2026.03.24.8
+- Released at: 2026-03-24T02:39:45Z
+- Release id: 20260324T023945Z-74fcce0
+- Previous version: 2026.03.24.7
+- Trigger: ci/release workflow
+
+- feat: add read_agent_terminal tool and readTerminal tmux method
+
+## 2026.03.24.7
+- Released at: 2026-03-24T02:25:23Z
+- Release id: 20260324T022523Z-1e98bb5
+- Previous version: 2026.03.24.6
+- Trigger: ci/release workflow
+
+- fix: stop passing subagentDefaultModelId to subagent spawn commands
+
+## 2026.03.24.6
+- Released at: 2026-03-24T02:18:33Z
+- Release id: 20260324T021833Z-a19f0cc
+- Previous version: 2026.03.24.5
+- Trigger: ci/release workflow
+
+- fix: use absolute path for tmux binary instead of relying on PATH
+
+## 2026.03.24.5
+- Released at: 2026-03-24T02:08:37Z
+- Release id: 20260324T020837Z-0d02cb0
+- Previous version: 2026.03.24.4
+- Trigger: ci/release workflow
+
+- fix: /update confirm:true shows actual result when no update is needed
+
+## 2026.03.24.4
+- Released at: 2026-03-24T01:51:56Z
+- Release id: 20260324T015156Z-1fa4fa0
+- Previous version: 2026.03.24.3
+- Trigger: ci/release workflow
+
+- fix: make detached update tool result explicit that update is NOT complete
+
+## 2026.03.24.3
+- Released at: 2026-03-24T01:44:19Z
+- Release id: 20260324T014419Z-190814a
+- Previous version: 2026.03.24.2
+- Trigger: ci/release workflow
+
+- test: add TmuxManager PATH resolution tests
+
+## 2026.03.24.2
+- Released at: 2026-03-24T01:27:13Z
+- Release id: 20260324T012713Z-4888ca2
+- Previous version: 2026.03.24
+- Trigger: ci/release workflow
+
+- fix: pass proper PATH env to tmux subprocess calls
+
+## 2026.03.24
+- Released at: 2026-03-24T00:44:39Z
+- Release id: 20260324T004439Z-63f7d8e
+- Previous version: 2026.03.23.20
+- Trigger: ci/release workflow
+
+- fix: enforce append-only conversation history and eliminate heartbeat prompt drift
+
+## 2026.03.23.20
+- Released at: 2026-03-23T23:08:12Z
+- Release id: 20260323T230812Z-b46fc4d
+- Previous version: 2026.03.23.19
+- Trigger: ci/release workflow
+
+- fix: make subagent failure errors verbose with exit codes, output, and pane capture
+- feat: add alarm flag to routines for exact-time firing
+
+## 2026.03.23.19
+- Released at: 2026-03-23T22:01:53Z
+- Release id: 20260323T220153Z-f01e768
+- Previous version: 2026.03.23.18
+- Trigger: ci/release workflow
+
+- fix: use profile timezone for heartbeat time prefix, deduplicate time injection, fix URL parsing
+
+## 2026.03.23.18
+- Released at: 2026-03-23T21:39:23Z
+- Release id: 20260323T213923Z-4cc1630
+- Previous version: 2026.03.23.17
+- Trigger: ci/release workflow
+
+- docs: auto commit/push/PR/merge after every completed feature
+- fix: coerce bare string to array for email tool address fields
+
+## 2026.03.23.17
+- Released at: 2026-03-23T20:37:00Z
+- Release id: 20260323T203700Z-678b038
+- Previous version: 2026.03.23.16
+- Trigger: ci/release workflow
+
+- docs: add log file layout and reading guide to observability doc
+
+## 2026.03.23.16
+- Released at: 2026-03-23T20:30:50Z
+- Release id: 20260323T203050Z-a39d18e
+- Previous version: 2026.03.23.15
+- Trigger: ci/release workflow
+
+- fix: enrich IMAP error messages and surface raw errors in tool failures
+
+## 2026.03.23.15
+- Released at: 2026-03-23T20:23:14Z
+- Release id: 20260323T202314Z-fde43ee
+- Previous version: 2026.03.23.14
+- Trigger: ci/release workflow
+
+- feat: notify chat when media playback ends (ET-054)
+
+## 2026.03.23.14
+- Released at: 2026-03-23T20:22:13Z
+- Release id: 20260323T202213Z-6fc2ec7
+- Previous version: 2026.03.23.13
+- Trigger: ci/release workflow
+
+- add: extension system scaffold (ET-057)
+- add withSqliteRetry helper for SQLITE_BUSY retry with exponential backoff
+- fix: surface discord-file attachment failures to assistant context
+- migrate media speaker config from ~/.openclaw to openElinaro-native path
+
+## 2026.03.23.13
+- Released at: 2026-03-23T20:07:08Z
+- Release id: 20260323T200708Z-4c2a007
+- Previous version: 2026.03.23.12
+- Trigger: ci/release workflow
+
+- fix: use base64 for token counting images + add image block diagnostic
+
+## 2026.03.23.12
+- Released at: 2026-03-23T19:46:33Z
+- Release id: 20260323T194633Z-9b9db6d
+- Previous version: 2026.03.23.11
+- Trigger: ci/release workflow
+
+- feat: add JSONL error log appender to TelemetryStore for tailable error logs
+- add: CLI tail-errors command for tailing the centralized error log
+- fix: log swallowed errors to telemetry in email, tickets, and conversation history services
+- fix: standardize error logging in runtime and agent-chat to use recordError()
+- fix: standardize routines-notifier error logging to use recordError()
+- fix: use recordError() for Discord bot error catch blocks
+
+## 2026.03.23.11
+- Released at: 2026-03-23T18:43:02Z
+- Release id: 20260323T184302Z-ee2258f
+- Previous version: 2026.03.23.10
+- Trigger: ci/release workflow
+
+- fix: use base64 for images in Anthropic token counting instead of URL sources
+
+## 2026.03.23.10
+- Released at: 2026-03-23T18:30:03Z
+- Release id: 20260323T183003Z-f6d403d
+- Previous version: 2026.03.23.9
+- Trigger: ci/release workflow
+
+- fix: cap /update changelog display to 10 most recent entries
+
+## 2026.03.23.9
+- Released at: 2026-03-23T18:29:18Z
+- Release id: 20260323T182918Z-5c33165
+- Previous version: 2026.03.23.8
+- Trigger: ci/release workflow
+
+- fix: always use base64 image data instead of sourceUrl for LLM inference
+
+## 2026.03.23.8
+- Released at: 2026-03-23T17:47:30Z
+- Release id: 20260323T174730Z-456829d
+- Previous version: 2026.03.23.7
+- Trigger: ci/release workflow
+
+- fix: read service user/group from config.yaml instead of hardcoding
+
+## 2026.03.23.7
+- Released at: 2026-03-23T17:40:48Z
+- Release id: 20260323T174048Z-edd0eea
+- Previous version: 2026.03.23.6
+- Trigger: ci/release workflow
+
+- feat: route heartbeat to lightweight model and wire prompt drift warnings to Discord
+
+## 2026.03.23.6
+- Released at: 2026-03-23T17:31:11Z
+- Release id: 20260323T173111Z-79ff629
+- Previous version: 2026.03.23.5
+- Trigger: ci/release workflow
+
+- fix: show per-feature active/off status in system prompt and stop hard-coding web_search
+
+## 2026.03.23.5
+- Released at: 2026-03-23T02:08:42Z
+- Release id: 20260323T020842Z-4c23169
+- Previous version: 2026.03.23.4
+- Trigger: ci/release workflow
+
+- fix: resolve datetime prefix once at message creation and remove ~850 lines of dead schemas
+
+## 2026.03.23.4
+- Released at: 2026-03-23T01:38:20Z
+- Release id: 20260323T013820Z-e64e40f
+- Previous version: 2026.03.23.3
+- Trigger: ci/release workflow
+
+- fix: align subagent tool names and remove obsolete todo tools
+
+## 2026.03.23.3
+- Released at: 2026-03-23T01:08:05Z
+- Release id: 20260323T010805Z-e2022b3
+- Previous version: 2026.03.23.2
+- Trigger: ci/release workflow
+
+- fix: persist tool calls before stop check so the model can see its own invocations
+
+## 2026.03.23.2
+- Released at: 2026-03-23T00:18:41Z
+- Release id: 20260323T001841Z-523be0e
+- Previous version: 2026.03.23
+- Trigger: ci/release workflow
+
+- feat: improve update error messages with full version triple and verbose rollback
+- feat: surface subagent provider descriptions for multi-provider profiles
+
+## 2026.03.23
+- Released at: 2026-03-23T00:04:20Z
+- Release id: 20260323T000420Z-2dda8a0
+- Previous version: 2026.03.22.9
+- Trigger: ci/release workflow
+
+- feat: surface subagent provider descriptions for multi-provider profiles (#33)
+
 ## 2026.03.22.9
 - Released at: 2026-03-22T23:24:19Z
 - Release id: 20260322T232419Z-7788e1d

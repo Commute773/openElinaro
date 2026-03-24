@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { defineTool } from "./define-tool";
@@ -150,7 +151,8 @@ const newConversationSchema = z.object({
 
 const launchAgentSchema = z.object({
   goal: z.string().min(12),
-  cwd: z.string().optional(),
+  workspace: z.string().min(1)
+    .describe("Required. The workspace to launch the agent in. Use a project ID for project work, \"openElinaro\" for platform work, or \"root\" for general tasks in the home directory."),
   profile: z.string().min(1).optional(),
   provider: z.enum(["claude", "codex"]).optional(),
   timeoutMs: z.number()
@@ -324,6 +326,7 @@ export const ROUTINE_TOOL_NAMES = [
   "steer_agent",
   "cancel_agent",
   "agent_status",
+  "read_agent_terminal",
 ] as const;
 
 const BASE_USER_FACING_TOOL_NAMES = [
@@ -394,6 +397,7 @@ const BASE_USER_FACING_TOOL_NAMES = [
   "secret_generate_password",
   "secret_delete",
   "agent_status",
+  "read_agent_terminal",
   "launch_agent",
   "resume_agent",
   "steer_agent",
@@ -519,6 +523,7 @@ type SubagentController = {
   getAgentRun: (runId: string) => SubagentRun | undefined;
   listAgentRuns: () => SubagentRun[];
   captureAgentPane: (runId: string, lines?: number) => Promise<string>;
+  readAgentTerminal: (runId: string) => Promise<string>;
   listAvailableProviders: (profileId?: string) => Array<{ provider: "claude" | "codex"; path: string; description?: string }>;
 };
 
@@ -948,7 +953,7 @@ function inferToolDomains(name: string) {
   ) {
     return ["filesystem", "code"];
   }
-  if (["launch_agent", "resume_agent", "steer_agent", "cancel_agent", "agent_status"].includes(name)) {
+  if (["launch_agent", "resume_agent", "steer_agent", "cancel_agent", "agent_status", "read_agent_terminal"].includes(name)) {
     return ["workflow", "agents"];
   }
   return ["general"];
@@ -1170,6 +1175,8 @@ function inferToolExamples(name: string) {
       return ["send follow-up to returned subagent", "resume an existing coding run"];
     case "agent_status":
       return ["spot-check coding agent run", "list recent workflows"];
+    case "read_agent_terminal":
+      return ["read agent terminal output", "see what an agent is doing"];
     default:
       return [];
   }
@@ -1833,6 +1840,7 @@ export class ToolRegistry {
       "steer_agent",
       "cancel_agent",
       "agent_status",
+      "read_agent_terminal",
     ]);
     this.toolsByName = new Map(this.tools.map((entry) => [entry.name, entry]));
   }
@@ -1933,6 +1941,10 @@ export class ToolRegistry {
       .map((entry) => entry.name)
       .filter((name, index, values) => values.indexOf(name) === index)
       .filter((name) => this.access.canUseTool(name));
+  }
+
+  getMediaService() {
+    return this.media;
   }
 
   getUserFacingToolNames() {
@@ -2061,6 +2073,8 @@ export class ToolRegistry {
                     ? this.createCancelAgentTool(context)
                 : name === "agent_status"
                   ? this.createAgentStatusTool(context)
+                  : name === "read_agent_terminal"
+                    ? this.createReadAgentTerminalTool(context)
                   : name === "load_tool_library"
                   ? this.createLoadToolLibraryTool(context)
                   : name === "tool_result_read"
@@ -2085,6 +2099,7 @@ export class ToolRegistry {
       this.createSteerAgentTool(context),
       this.createCancelAgentTool(context),
       this.createAgentStatusTool(context),
+      this.createReadAgentTerminalTool(context),
     ].filter((entry) => this.access.canUseTool(entry.name));
   }
 
@@ -2339,7 +2354,7 @@ export class ToolRegistry {
     }
   }
 
-  private async requestManagedServiceRestart(source: "config_edit" | "feature_manage") {
+  private async requestManagedServiceRestart(source: "config_edit" | "feature_manage" | "manual") {
     if (!isRunningInsideManagedService()) {
       return "Restart skipped: this runtime is not running inside the managed service.";
     }
@@ -2376,6 +2391,35 @@ export class ToolRegistry {
       : this.conversations.ensureSystemPrompt(latest.key, this.systemPrompts.load());
   }
 
+  private resolveWorkspacePath(workspace: string): string {
+    if (workspace === "root") {
+      return os.homedir();
+    }
+    if (workspace === "openElinaro") {
+      return process.cwd();
+    }
+    // Look up as a project ID
+    const project = this.projects.getProject(workspace);
+    if (project) {
+      return this.projects.resolveWorkspacePath(project);
+    }
+    throw new Error(
+      `Unknown workspace "${workspace}". Use "root", "openElinaro", or a valid project ID.`,
+    );
+  }
+
+  private buildWorkspaceHints(): string {
+    const projectList = this.projects
+      .listProjects({ status: "active" })
+      .map((p) => `- "${p.id}": ${p.name} — ${p.workspacePath}`);
+    return [
+      "\n\nAvailable workspaces (workspace parameter is required):",
+      '- "openElinaro": the openElinaro platform repo (use for platform features, bugs, and infra)',
+      '- "root": home directory (use for general tasks not tied to a specific project)',
+      ...projectList,
+    ].join("\n");
+  }
+
   private createLaunchAgentTool(context?: ToolContext) {
     const availableProviders = this.subagents.listAvailableProviders();
     const providerHints = availableProviders.length > 1
@@ -2384,6 +2428,8 @@ export class ToolRegistry {
           .join("\n")
         + "\n\nChoose the provider that best fits the task. Pass provider explicitly when multiple are available."
       : "";
+
+    const workspaceHints = this.buildWorkspaceHints();
 
     return defineTool(
       async (input) =>
@@ -2402,9 +2448,11 @@ export class ToolRegistry {
               ].join("\n");
             }
 
+            const resolvedCwd = this.resolveWorkspacePath(input.workspace);
+
             const run = await this.subagents.launchAgent({
               goal: input.goal,
-              cwd: input.cwd,
+              cwd: resolvedCwd,
               profileId: input.profile,
               provider: input.provider,
               originConversationKey: context?.conversationKey,
@@ -2420,7 +2468,7 @@ export class ToolRegistry {
               `Provider: ${run.provider}`,
               `Subagent depth: ${run.launchDepth}`,
               `Timeout: ${run.timeoutMs}ms`,
-              `Workspace: ${run.workspaceCwd}`,
+              `Workspace: ${input.workspace} → ${run.workspaceCwd}`,
               "Completion updates are pushed back automatically.",
               "Use agent_status only for occasional manual spot checks.",
             ].join("\n");
@@ -2430,7 +2478,7 @@ export class ToolRegistry {
         {
           name: "launch_agent",
           description:
-          `Launch a background agent (Claude Code or Codex) in the current repository or a provided cwd. The agent runs in its own tmux window with an isolated worktree. Completion updates are pushed back automatically. Omit timeoutMs to use the default (one hour).${providerHints}`,
+          `Launch a background agent (Claude Code or Codex) in a named workspace. You MUST specify a workspace — choose the one that matches where the work should happen. The agent runs in its own tmux window with an isolated worktree. Completion updates are pushed back automatically. Omit timeoutMs to use the default (one hour).${workspaceHints}${providerHints}`,
           schema: launchAgentSchema,
         },
     );
@@ -2610,6 +2658,28 @@ export class ToolRegistry {
           description:
           "Inspect one agent run by id or list the most recent background agent runs. Set capture=true to include what the agent's tmux pane is currently displaying. Use this for occasional manual spot checks, not tight polling.",
           schema: agentStatusSchema,
+        },
+    );
+  }
+
+  private createReadAgentTerminalTool(_context?: ToolContext) {
+    return defineTool(
+      async (input) =>
+        traceSpan(
+          "tool.read_agent_terminal",
+          async () => {
+            const output = await this.subagents.readAgentTerminal(input.runId);
+            return output || "(empty terminal buffer)";
+          },
+          { attributes: input },
+        ),
+        {
+          name: "read_agent_terminal",
+          description:
+          "Read the full terminal buffer (scrollback + visible area) for a running or recently exited agent. Returns the raw text content of the tmux pane. Useful for debugging what an agent is doing or why it failed.",
+          schema: z.object({
+            runId: z.string().min(1).describe("The run ID of the agent whose terminal to read."),
+          }),
         },
     );
   }

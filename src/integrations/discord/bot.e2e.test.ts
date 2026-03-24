@@ -305,6 +305,7 @@ function createWorkflowStub() {
     getAgentRun: () => undefined,
     listAgentRuns: () => [],
     captureAgentPane: async () => "",
+    readAgentTerminal: async () => "",
     listAvailableProviders: () => [],
   };
 }
@@ -1046,7 +1047,7 @@ if (RUN_CHILD_SUITE) {
     expect(replyText).toContain("This syncs the source checkout, shows the latest remote tag, and tells you whether deployment is still pending.");
   });
 
-  test("still runs the update tool when confirm is passed", async () => {
+  test("shows updating message when update is actually scheduled", async () => {
     const invoked: string[] = [];
     const authManager = new authSessionManagerModule.DiscordAuthSessionManager();
     const handlers = botModule.createDiscordEventHandlers({
@@ -1065,7 +1066,7 @@ if (RUN_CHILD_SUITE) {
         async invokeRoutineTool(name: string) {
           invoked.push(name);
           if (name === "update") {
-            return "Updated openelinaro service to /tmp/release.\nnote: this update was scheduled through a detached helper because the live service cannot safely update itself in-process.";
+            return "Scheduled detached update helper.\nhelperLabel: com.openelinaro.bot.update-helper\nIMPORTANT: the update has been SCHEDULED but is NOT complete yet.";
           }
           throw new Error(`Unexpected tool: ${name}`);
         },
@@ -1090,8 +1091,61 @@ if (RUN_CHILD_SUITE) {
     await handlers.handleInteraction(interaction as unknown as ChatInputCommandInteraction);
 
     expect(invoked).toEqual(["update"]);
-    expect(interaction.replies.map((reply) => reply.content).join("\n"))
-      .toContain("updating... don't send messages. you'll get `update complete` when it's done.");
+    const replyText = interaction.replies.map((reply) => reply.content).join("\n");
+    expect(replyText).toContain("updating... don't send messages. you'll get `update complete` when it's done.");
+    expect(replyText).not.toContain("Update skipped");
+  });
+
+  test("shows skip message instead of updating when versions already match", async () => {
+    const invoked: string[] = [];
+    const authManager = new authSessionManagerModule.DiscordAuthSessionManager();
+    const handlers = botModule.createDiscordEventHandlers({
+      app: {
+        noteDiscordUser() {},
+        stopConversation() {
+          return { stopped: false, message: "No active agent is running for this conversation." };
+        },
+        async handleRequest(request: { id: string }) {
+          return {
+            requestId: request.id,
+            mode: "immediate" as const,
+            message: "unused",
+          };
+        },
+        async invokeRoutineTool(name: string) {
+          invoked.push(name);
+          if (name === "update") {
+            return "Update skipped: the deployed service is already at version 2026.03.24.4, which matches the pulled source version.\n\nNothing to deploy.";
+          }
+          throw new Error(`Unexpected tool: ${name}`);
+        },
+        getActiveModel() {
+          return { providerId: "openai-codex" as const };
+        },
+        getActiveProfile() {
+          return { id: "root" };
+        },
+          getAgentRun() {
+          return undefined;
+        },
+        listAgentRuns() {
+          return [];
+        },
+      },
+      authManager,
+      profileId: "root",
+    });
+    const interaction = new FakeInteraction("update", { confirm: true });
+
+    await handlers.handleInteraction(interaction as unknown as ChatInputCommandInteraction);
+
+    expect(invoked).toEqual(["update"]);
+    const replyText = interaction.replies.map((reply) => reply.content).join("\n");
+    // Must NOT say "updating" when there's nothing to update
+    expect(replyText).not.toContain("updating... don't send messages");
+    // Must show the actual skip reason so the user knows what happened
+    expect(replyText).toContain("Update skipped");
+    expect(replyText).toContain("already at version");
   });
 
   test("emulates an ablative Discord thread with compact and new inside the temp clone only", async () => {

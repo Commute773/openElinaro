@@ -247,7 +247,7 @@ export class ConversationStore {
     };
   }
 
-  save(state: ConversationState): ConversationState {
+  private save(state: ConversationState): ConversationState {
     const store = readStore();
     const existing = store.conversations[state.key];
     const nextMessages = encodeMessages(state.messages);

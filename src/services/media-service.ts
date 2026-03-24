@@ -37,7 +37,8 @@ function getDefaultCatalogPath() {
   return resolveRuntimePath("media", "catalog.json");
 }
 
-const DEFAULT_SPEAKER_CONFIG_PATH = path.join(
+const DEFAULT_SPEAKER_CONFIG_PATH = resolveRuntimePath("media", "speakers.json");
+const LEGACY_SPEAKER_CONFIG_PATH = path.join(
   os.homedir(),
   ".openclaw",
   "workspace",
@@ -63,8 +64,17 @@ const DEFAULT_OSASCRIPT_BIN = "/usr/bin/osascript";
 const DEFAULT_PLAYER_READY_TIMEOUT_MS = 5_000;
 const DEFAULT_PLAYER_STOP_TIMEOUT_MS = 3_000;
 const PLAYER_WAIT_POLL_MS = 50;
+const EOF_POLL_INTERVAL_MS = 3_000;
 
 export type MediaKind = "song" | "ambience";
+
+export type PlaybackEndEvent = {
+  speakerId: string;
+  title: string;
+  reason: "eof" | "stopped";
+};
+
+type PlaybackEndCallback = (event: PlaybackEndEvent) => void;
 
 type SpeakerTransport = "aux" | "bluetooth" | "built-in" | "system" | "unknown";
 
@@ -227,6 +237,23 @@ function readJsonFile<T>(filePath: string): T | null {
   }
 }
 
+function resolveSpeakerConfigPath(): string {
+  if (fs.existsSync(DEFAULT_SPEAKER_CONFIG_PATH)) {
+    return DEFAULT_SPEAKER_CONFIG_PATH;
+  }
+  if (fs.existsSync(LEGACY_SPEAKER_CONFIG_PATH)) {
+    telemetry.event("media.legacy_speaker_config", {
+      legacyPath: LEGACY_SPEAKER_CONFIG_PATH,
+      expectedPath: DEFAULT_SPEAKER_CONFIG_PATH,
+    }, {
+      level: "warn",
+      outcome: "ok",
+    });
+    return LEGACY_SPEAKER_CONFIG_PATH;
+  }
+  return DEFAULT_SPEAKER_CONFIG_PATH;
+}
+
 async function defaultRunCommand(params: {
   file: string;
   args?: string[];
@@ -332,6 +359,9 @@ export class MediaService {
   private readonly signalProcessImpl: SignalProcess;
   private readonly playerReadyTimeoutMs: number;
   private readonly playerStopTimeoutMs: number;
+  private readonly eofPollIntervalMs: number;
+  private readonly eofWatchers = new Map<string, ReturnType<typeof setInterval>>();
+  private readonly playbackEndCallbacks: PlaybackEndCallback[] = [];
 
   constructor(options?: {
     mediaRoots?: string[];
@@ -350,6 +380,7 @@ export class MediaService {
     signalProcess?: SignalProcess;
     playerReadyTimeoutMs?: number;
     playerStopTimeoutMs?: number;
+    eofPollIntervalMs?: number;
   }) {
     const configuredRoots = options?.mediaRoots?.length
       ? options.mediaRoots
@@ -359,7 +390,7 @@ export class MediaService {
       path.resolve(entry)
     ));
     this.catalogPath = path.resolve(options?.catalogPath ?? getDefaultCatalogPath());
-    this.speakerConfigPath = path.resolve(options?.speakerConfigPath ?? DEFAULT_SPEAKER_CONFIG_PATH);
+    this.speakerConfigPath = path.resolve(options?.speakerConfigPath ?? resolveSpeakerConfigPath());
     this.stateRoot = path.resolve(options?.stateRoot ?? DEFAULT_STATE_ROOT);
     this.socketsRoot = path.resolve(options?.socketRoot ?? DEFAULT_SOCKET_ROOT);
     this.metadataRoot = path.join(this.stateRoot, "players");
@@ -375,6 +406,7 @@ export class MediaService {
     this.signalProcessImpl = options?.signalProcess ?? defaultSignalProcess;
     this.playerReadyTimeoutMs = Math.max(0, options?.playerReadyTimeoutMs ?? DEFAULT_PLAYER_READY_TIMEOUT_MS);
     this.playerStopTimeoutMs = Math.max(0, options?.playerStopTimeoutMs ?? DEFAULT_PLAYER_STOP_TIMEOUT_MS);
+    this.eofPollIntervalMs = Math.max(500, options?.eofPollIntervalMs ?? EOF_POLL_INTERVAL_MS);
     fs.mkdirSync(this.socketsRoot, { recursive: true });
     fs.mkdirSync(this.metadataRoot, { recursive: true });
     fs.mkdirSync(this.logsRoot, { recursive: true });
@@ -528,6 +560,7 @@ export class MediaService {
       pid: spawnResult.pid,
     };
     this.writePlayerMetadata(metadata);
+    this.startEofWatcher(speaker.id, item.title, loop);
 
     return {
       speaker,
@@ -629,6 +662,59 @@ export class MediaService {
       tagSample.length > 0 ? `- Tag vocabulary sample: ${tagSample.join(", ")}` : "- Tag vocabulary sample: none",
       "- Use media tools for speaker listing, playback, pause, stop, volume, and current status.",
     ].join("\n");
+  }
+
+  onPlaybackEnd(callback: PlaybackEndCallback): () => void {
+    this.playbackEndCallbacks.push(callback);
+    return () => {
+      const index = this.playbackEndCallbacks.indexOf(callback);
+      if (index >= 0) {
+        this.playbackEndCallbacks.splice(index, 1);
+      }
+    };
+  }
+
+  private startEofWatcher(speakerId: string, title: string, loop: boolean) {
+    this.stopEofWatcher(speakerId);
+    if (loop) {
+      return;
+    }
+    const interval = setInterval(() => {
+      void this.checkEof(speakerId, title);
+    }, this.eofPollIntervalMs);
+    this.eofWatchers.set(speakerId, interval);
+  }
+
+  private stopEofWatcher(speakerId: string) {
+    const existing = this.eofWatchers.get(speakerId);
+    if (existing) {
+      clearInterval(existing);
+      this.eofWatchers.delete(speakerId);
+    }
+  }
+
+  private async checkEof(speakerId: string, title: string) {
+    const socketPath = this.getSocketPath(speakerId);
+    if (!fs.existsSync(socketPath)) {
+      this.stopEofWatcher(speakerId);
+      this.emitPlaybackEnd({ speakerId, title, reason: "eof" });
+      return;
+    }
+    const eofReached = await this.queryPlayerProperty(socketPath, "eof-reached");
+    if (eofReached === true) {
+      this.stopEofWatcher(speakerId);
+      this.emitPlaybackEnd({ speakerId, title, reason: "eof" });
+    }
+  }
+
+  private emitPlaybackEnd(event: PlaybackEndEvent) {
+    for (const callback of this.playbackEndCallbacks) {
+      try {
+        callback(event);
+      } catch {
+        // Best effort only.
+      }
+    }
   }
 
   private getLibrary() {
@@ -1045,6 +1131,7 @@ export class MediaService {
   }
 
   private async stopSpeaker(speakerId: string) {
+    this.stopEofWatcher(speakerId);
     const metadata = this.readPlayerMetadata(speakerId);
     const socketPath = this.getSocketPath(speakerId);
     if (fs.existsSync(socketPath)) {

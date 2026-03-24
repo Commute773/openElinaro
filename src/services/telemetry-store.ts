@@ -1,6 +1,8 @@
 import type { Database } from "bun:sqlite";
+import fs from "node:fs";
+import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";
-import { openDatabase } from "../utils/sqlite-helpers";
+import { openDatabase, withSqliteRetry } from "../utils/sqlite-helpers";
 
 export type TelemetrySeverity = "debug" | "info" | "warn" | "error";
 export type TelemetryOutcome = "ok" | "error" | "cancelled" | "timeout" | "rejected";
@@ -79,8 +81,20 @@ function normalizeLikePattern(value: string) {
   return `%${value.trim().toLowerCase()}%`;
 }
 
+const ATTR_MAX_CHARS = 4000;
+
+function truncateAttributes(attrs: Record<string, unknown>): unknown {
+  const raw = JSON.stringify(attrs);
+  if (raw.length <= ATTR_MAX_CHARS) return attrs;
+  return raw.slice(0, ATTR_MAX_CHARS) + "...";
+}
+
 export class TelemetryStore {
   private readonly db: Database;
+  private readonly logPath: string;
+  private logDirReady = false;
+  private writeCount = 0;
+  private lastSizeCheckMs = 0;
 
   constructor(private readonly dbPath = getStorePath()) {
     this.db = openDatabase(this.dbPath);
@@ -161,6 +175,7 @@ export class TelemetryStore {
       CREATE INDEX IF NOT EXISTS idx_events_corr ON events(conversation_key, workflow_run_id, task_id, tool_name, profile_id);
       CREATE INDEX IF NOT EXISTS idx_events_entity ON events(entity_type, entity_id, job_id, provider);
     `);
+    this.logPath = resolveRuntimePath("logs", "errors.jsonl");
   }
 
   getPath() {
@@ -175,101 +190,119 @@ export class TelemetryStore {
   }
 
   completeMigration(key: string, completedAt: string) {
-    this.db.query(
-      `INSERT INTO migrations (key, completed_at)
-       VALUES (?1, ?2)
-       ON CONFLICT(key) DO UPDATE SET completed_at = excluded.completed_at`,
-    ).run(key, completedAt);
+    withSqliteRetry(() => {
+      this.db.query(
+        `INSERT INTO migrations (key, completed_at)
+         VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET completed_at = excluded.completed_at`,
+      ).run(key, completedAt);
+    }, { label: "telemetry-store" });
   }
 
   insertSpan(record: TelemetrySpanRecord) {
-    const result = this.db.query(
-      `INSERT INTO spans (
-        trace_id, span_id, parent_span_id, component, operation, started_at, ended_at,
-        duration_ms, outcome, level, conversation_key, workflow_run_id, task_id, tool_name,
-        profile_id, provider, job_id, entity_type, entity_id, attributes_json,
-        service_name, service_version
-      ) VALUES (
-        ?1, ?2, ?3, ?4, ?5, ?6, ?7,
-        ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-        ?15, ?16, ?17, ?18, ?19, ?20,
-        ?21, ?22
-      )`,
-    ).run(
-      record.traceId,
-      record.spanId,
-      record.parentSpanId ?? null,
-      record.component,
-      record.operation,
-      record.startedAt,
-      record.endedAt,
-      record.durationMs,
-      record.outcome,
-      record.level,
-      record.conversationKey ?? null,
-      record.workflowRunId ?? null,
-      record.taskId ?? null,
-      record.toolName ?? null,
-      record.profileId ?? null,
-      record.provider ?? null,
-      record.jobId ?? null,
-      record.entityType ?? null,
-      record.entityId ?? null,
-      record.attributesJson ? JSON.stringify(record.attributesJson) : null,
-      record.serviceName,
-      record.serviceVersion,
-    );
+    const retryOpts = { label: "telemetry-store" } as const;
+    const result = withSqliteRetry(() =>
+      this.db.query(
+        `INSERT INTO spans (
+          trace_id, span_id, parent_span_id, component, operation, started_at, ended_at,
+          duration_ms, outcome, level, conversation_key, workflow_run_id, task_id, tool_name,
+          profile_id, provider, job_id, entity_type, entity_id, attributes_json,
+          service_name, service_version
+        ) VALUES (
+          ?1, ?2, ?3, ?4, ?5, ?6, ?7,
+          ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+          ?15, ?16, ?17, ?18, ?19, ?20,
+          ?21, ?22
+        )`,
+      ).run(
+        record.traceId,
+        record.spanId,
+        record.parentSpanId ?? null,
+        record.component,
+        record.operation,
+        record.startedAt,
+        record.endedAt,
+        record.durationMs,
+        record.outcome,
+        record.level,
+        record.conversationKey ?? null,
+        record.workflowRunId ?? null,
+        record.taskId ?? null,
+        record.toolName ?? null,
+        record.profileId ?? null,
+        record.provider ?? null,
+        record.jobId ?? null,
+        record.entityType ?? null,
+        record.entityId ?? null,
+        record.attributesJson ? JSON.stringify(record.attributesJson) : null,
+        record.serviceName,
+        record.serviceVersion,
+      ),
+    retryOpts);
     const rowId = Number(result.lastInsertRowid);
-    this.insertFts("span", rowId, [
-      record.component,
-      record.operation,
-      record.outcome,
-      record.attributesJson ? JSON.stringify(record.attributesJson) : "",
-    ].filter(Boolean).join(" "));
+    withSqliteRetry(() =>
+      this.insertFts("span", rowId, [
+        record.component,
+        record.operation,
+        record.outcome,
+        record.attributesJson ? JSON.stringify(record.attributesJson) : "",
+      ].filter(Boolean).join(" ")),
+    retryOpts);
+    if (record.outcome === "error") {
+      this.appendErrorLog(this.formatSpanLogLine(record));
+    }
   }
 
   insertEvent(record: TelemetryEventRecord) {
-    const result = this.db.query(
-      `INSERT INTO events (
-        trace_id, span_id, parent_span_id, timestamp, component, event_name, severity, message,
-        outcome, conversation_key, workflow_run_id, task_id, tool_name, profile_id, provider,
-        job_id, entity_type, entity_id, attributes_json, service_name, service_version
-      ) VALUES (
-        ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
-        ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-        ?16, ?17, ?18, ?19, ?20, ?21
-      )`,
-    ).run(
-      record.traceId ?? null,
-      record.spanId ?? null,
-      record.parentSpanId ?? null,
-      record.timestamp,
-      record.component,
-      record.eventName,
-      record.severity,
-      record.message ?? null,
-      record.outcome ?? null,
-      record.conversationKey ?? null,
-      record.workflowRunId ?? null,
-      record.taskId ?? null,
-      record.toolName ?? null,
-      record.profileId ?? null,
-      record.provider ?? null,
-      record.jobId ?? null,
-      record.entityType ?? null,
-      record.entityId ?? null,
-      record.attributesJson ? JSON.stringify(record.attributesJson) : null,
-      record.serviceName,
-      record.serviceVersion,
-    );
+    const retryOpts = { label: "telemetry-store" } as const;
+    const result = withSqliteRetry(() =>
+      this.db.query(
+        `INSERT INTO events (
+          trace_id, span_id, parent_span_id, timestamp, component, event_name, severity, message,
+          outcome, conversation_key, workflow_run_id, task_id, tool_name, profile_id, provider,
+          job_id, entity_type, entity_id, attributes_json, service_name, service_version
+        ) VALUES (
+          ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
+          ?9, ?10, ?11, ?12, ?13, ?14, ?15,
+          ?16, ?17, ?18, ?19, ?20, ?21
+        )`,
+      ).run(
+        record.traceId ?? null,
+        record.spanId ?? null,
+        record.parentSpanId ?? null,
+        record.timestamp,
+        record.component,
+        record.eventName,
+        record.severity,
+        record.message ?? null,
+        record.outcome ?? null,
+        record.conversationKey ?? null,
+        record.workflowRunId ?? null,
+        record.taskId ?? null,
+        record.toolName ?? null,
+        record.profileId ?? null,
+        record.provider ?? null,
+        record.jobId ?? null,
+        record.entityType ?? null,
+        record.entityId ?? null,
+        record.attributesJson ? JSON.stringify(record.attributesJson) : null,
+        record.serviceName,
+        record.serviceVersion,
+      ),
+    retryOpts);
     const rowId = Number(result.lastInsertRowid);
-    this.insertFts("event", rowId, [
-      record.component,
-      record.eventName,
-      record.message ?? "",
-      record.outcome ?? "",
-      record.attributesJson ? JSON.stringify(record.attributesJson) : "",
-    ].filter(Boolean).join(" "));
+    withSqliteRetry(() =>
+      this.insertFts("event", rowId, [
+        record.component,
+        record.eventName,
+        record.message ?? "",
+        record.outcome ?? "",
+        record.attributesJson ? JSON.stringify(record.attributesJson) : "",
+      ].filter(Boolean).join(" ")),
+    retryOpts);
+    if (record.severity === "error" || record.severity === "warn") {
+      this.appendErrorLog(this.formatEventLogLine(record));
+    }
   }
 
   query(params: TelemetryQueryParams) {
@@ -426,5 +459,60 @@ export class TelemetryStore {
     this.db.query(
       "INSERT INTO telemetry_fts (row_type, row_id, body) VALUES (?1, ?2, ?3)",
     ).run(rowType, rowId, body);
+  }
+
+  private appendErrorLog(line: string) {
+    if (this.dbPath === ":memory:") return;
+    try {
+      if (!this.logDirReady) {
+        fs.mkdirSync(path.dirname(this.logPath), { recursive: true });
+        this.logDirReady = true;
+      }
+      fs.appendFileSync(this.logPath, line + "\n", "utf8");
+      this.writeCount++;
+      const now = Date.now();
+      if (this.writeCount % 100 === 0 || now - this.lastSizeCheckMs > 60_000) {
+        this.lastSizeCheckMs = now;
+        try {
+          const stat = fs.statSync(this.logPath);
+          if (stat.size > 10 * 1024 * 1024) {
+            const rotated = path.join(path.dirname(this.logPath), "errors.1.jsonl");
+            fs.renameSync(this.logPath, rotated);
+          }
+        } catch {
+          // stat/rename failure is non-fatal
+        }
+      }
+    } catch {
+      // file I/O failure is non-fatal — don't crash the app
+    }
+  }
+
+  private formatEventLogLine(record: TelemetryEventRecord): string {
+    const obj: Record<string, unknown> = { ts: record.timestamp, level: record.severity };
+    if (record.component) obj.component = record.component;
+    if (record.eventName) obj.event = record.eventName;
+    if (record.message) obj.message = record.message;
+    if (record.outcome) obj.outcome = record.outcome;
+    if (record.traceId) obj.traceId = record.traceId;
+    if (record.spanId) obj.spanId = record.spanId;
+    if (record.conversationKey) obj.conversationKey = record.conversationKey;
+    if (record.profileId) obj.profileId = record.profileId;
+    if (record.attributesJson) obj.attributes = truncateAttributes(record.attributesJson);
+    return JSON.stringify(obj);
+  }
+
+  private formatSpanLogLine(record: TelemetrySpanRecord): string {
+    const obj: Record<string, unknown> = { ts: record.endedAt, level: "error" };
+    if (record.component) obj.component = record.component;
+    if (record.operation) obj.operation = record.operation;
+    if (record.durationMs != null) obj.durationMs = record.durationMs;
+    if (record.outcome) obj.outcome = record.outcome;
+    if (record.traceId) obj.traceId = record.traceId;
+    if (record.spanId) obj.spanId = record.spanId;
+    if (record.conversationKey) obj.conversationKey = record.conversationKey;
+    if (record.profileId) obj.profileId = record.profileId;
+    if (record.attributesJson) obj.attributes = truncateAttributes(record.attributesJson);
+    return JSON.stringify(obj);
   }
 }

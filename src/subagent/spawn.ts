@@ -69,10 +69,13 @@ export function buildCodexSpawnCommand(params: SpawnAgentParams & { notifyScript
     fs.writeFileSync(goalPath, params.goal, { mode: 0o600 });
     codexParts.push("-"); // Read from stdin
 
+    const outputPath = path.join(hooksDir, "codex-output.txt");
     const wrapperContent = [
       "#!/bin/bash",
-      `${codexParts.join(" ")} < ${JSON.stringify(goalPath)}`,
-      `export CODEX_EXIT_CODE=$?`,
+      `CODEX_OUTPUT_FILE=${JSON.stringify(outputPath)}`,
+      `${codexParts.join(" ")} < ${JSON.stringify(goalPath)} 2>&1 | tee "$CODEX_OUTPUT_FILE"`,
+      `export CODEX_EXIT_CODE=\${PIPESTATUS[0]}`,
+      `export CODEX_CAPTURED_OUTPUT=$(tail -c 4000 "$CODEX_OUTPUT_FILE" 2>/dev/null)`,
       params.notifyScriptPath,
     ].join("\n");
     fs.writeFileSync(wrapperPath, wrapperContent, { mode: 0o755 });
@@ -114,6 +117,12 @@ fi
 # Extract exit code from environment (Claude sets this for Stop hooks)
 EXIT_CODE="\${CLAUDE_EXIT_CODE:-0}"
 
+# Build error message when exit code is non-zero
+ERROR_MSG=""
+if [ "$EXIT_CODE" != "0" ]; then
+  ERROR_MSG="Process exited with code $EXIT_CODE."
+fi
+
 curl --silent --unix-socket "$SOCKET" \\
   -X POST "http://localhost/events/claude" \\
   -H "Content-Type: application/json" \\
@@ -123,7 +132,7 @@ curl --silent --unix-socket "$SOCKET" \\
   "hookType": "$HOOK_TYPE",
   "exitCode": $EXIT_CODE,
   "result": $(echo "$INPUT" | head -c 10000 | jq -Rs .),
-  "error": ""
+  "error": $(echo "$ERROR_MSG" | jq -Rs .)
 }
 EOF
 )" 2>/dev/null || true
@@ -152,6 +161,21 @@ if [ ! -t 0 ]; then
   OUTPUT=$(cat | head -c 10000)
 fi
 
+# Use captured output from wrapper if available
+if [ -n "\${CODEX_CAPTURED_OUTPUT:-}" ]; then
+  OUTPUT="\${CODEX_CAPTURED_OUTPUT}"
+fi
+
+# Build error message when exit code is non-zero
+ERROR_MSG=""
+if [ "$EXIT_CODE" != "0" ]; then
+  ERROR_MSG="Process exited with code $EXIT_CODE."
+  if [ -n "$OUTPUT" ]; then
+    # Include last 2000 chars of output in the error for diagnostics
+    ERROR_MSG="$ERROR_MSG Output: $(echo "$OUTPUT" | tail -c 2000)"
+  fi
+fi
+
 curl --silent --unix-socket "$SOCKET" \\
   -X POST "http://localhost/events/codex" \\
   -H "Content-Type: application/json" \\
@@ -160,7 +184,7 @@ curl --silent --unix-socket "$SOCKET" \\
   "runId": "$RUN_ID",
   "exitCode": $EXIT_CODE,
   "output": $(echo "$OUTPUT" | jq -Rs .),
-  "error": ""
+  "error": $(echo "$ERROR_MSG" | jq -Rs .)
 }
 EOF
 )" 2>/dev/null || true

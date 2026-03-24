@@ -187,7 +187,7 @@ describe("buildToolErrorEnvelope", () => {
     expect(buildToolErrorEnvelope("foo", new Error("is required")).message).toBe(
       "Validation failed while running `foo`.",
     );
-    expect(buildToolErrorEnvelope("foo", new Error("something")).message).toBe("`foo` failed.");
+    expect(buildToolErrorEnvelope("foo", new Error("something")).message).toBe("`foo` failed. something");
   });
 });
 

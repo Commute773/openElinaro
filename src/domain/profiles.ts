@@ -27,6 +27,8 @@ export const ProfileRecordSchema = z.object({
   toolSummarizerModelId: z.string().min(1).optional(),
   memoryProvider: ModelProviderSchema.optional(),
   memoryModelId: z.string().min(1).optional(),
+  heartbeatProvider: ModelProviderSchema.optional(),
+  heartbeatModelId: z.string().min(1).optional(),
   defaultThinkingLevel: ThinkingLevelSchema.optional(),
   maxContextTokens: z.number().int().positive().optional(),
   subagentPreferredProvider: ModelProviderSchema.optional(),

@@ -682,7 +682,7 @@ describe("ModelService.countAnthropicTokens", () => {
     }
   });
 
-  test("prefers remote image URLs over inline base64 for Anthropic token counting", async () => {
+  test("always uses inline base64 for Anthropic token counting even when sourceUrl is present", async () => {
     const service = new ModelService(TEST_PROFILE);
     const originalFetch = globalThis.fetch;
     let requestBody: Record<string, unknown> | null = null;
@@ -723,8 +723,9 @@ describe("ModelService.countAnthropicTokens", () => {
               {
                 type: "image",
                 source: {
-                  type: "url",
-                  url: "https://cdn.discordapp.com/attachments/example.png",
+                  type: "base64",
+                  media_type: "image/png",
+                  data: "base64data",
                 },
               },
             ],

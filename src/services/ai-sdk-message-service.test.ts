@@ -334,7 +334,7 @@ describe("ai-sdk message service tool call round-trip", () => {
 });
 
 describe("ai-sdk message service multimodal user messages", () => {
-  test("uses remote image URLs when available in chat content", async () => {
+  test("always uses inline base64 data for images even when sourceUrl is present", async () => {
     const messageModule = await import("./ai-sdk-message-service");
 
     const messages = messageModule.toModelMessages([
@@ -367,8 +367,7 @@ describe("ai-sdk message service multimodal user messages", () => {
     if (imagePart?.type !== "image") {
       throw new Error("expected image part");
     }
-    expect(imagePart.image).toBeInstanceOf(URL);
-    expect((imagePart.image as URL).toString()).toBe("https://cdn.discordapp.com/attachments/example.png");
+    expect(imagePart.image).toBe("base64data");
   });
 
   test("keeps inline image data when the source URL is not remotely fetchable", async () => {

@@ -29,6 +29,7 @@ const traceSpan = createTraceSpan(discordNotifierTelemetry);
 export class DiscordRoutinesNotifier {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private unsubscribeAlarmScheduleChange: (() => void) | null = null;
+  private unsubscribeRoutineScheduleChange: (() => void) | null = null;
   private readonly heartbeatState = new HeartbeatStateService();
   private readonly docsIndexState: DocsIndexStateService;
   private readonly docsIndexer: DocsIndexService;
@@ -58,12 +59,17 @@ export class DiscordRoutinesNotifier {
     this.unsubscribeAlarmScheduleChange ??= this.app.onAlarmScheduleChanged(() => {
       this.scheduleNextRun();
     });
+    this.unsubscribeRoutineScheduleChange ??= this.app.onRoutineScheduleChanged?.(() => {
+      this.scheduleNextRun();
+    }) ?? null;
     this.scheduleNextRun();
   }
 
   stop() {
     this.unsubscribeAlarmScheduleChange?.();
     this.unsubscribeAlarmScheduleChange = null;
+    this.unsubscribeRoutineScheduleChange?.();
+    this.unsubscribeRoutineScheduleChange = null;
     if (!this.timer) {
       return;
     }
@@ -241,7 +247,8 @@ export class DiscordRoutinesNotifier {
               });
             }
 
-            if (Date.now() >= this.nextHeartbeatAt) {
+            const alarmRoutinesDue = this.app.hasAlarmRoutinesDueNow?.() ?? false;
+            if (Date.now() >= this.nextHeartbeatAt || alarmRoutinesDue) {
               const response = await this.app.runHourlyHeartbeat(userId, {
                 onBackgroundResponse: async (message) => {
                   if (!await this.sendAssistantMessage(dm, message)) {
@@ -283,15 +290,9 @@ export class DiscordRoutinesNotifier {
               );
             } catch (error) {
               this.nextAutonomousTimeAt = this.computeInitialNextAutonomousTimeAt(new Date());
-              discordNotifierTelemetry.event(
-                "discord.autonomous_time.error",
-                {
-                  error: error instanceof Error
-                    ? { name: error.name, message: error.message, stack: error.stack }
-                    : String(error),
-                },
-                { level: "error", outcome: "error" },
-              );
+              discordNotifierTelemetry.recordError(error, {
+                eventName: "discord.autonomous_time",
+              });
             }
           }
         },
@@ -308,28 +309,16 @@ export class DiscordRoutinesNotifier {
           });
         } catch (error) {
           this.markDocsIndexFailed(new Date());
-          discordNotifierTelemetry.event(
-            "discord.docs_index.error",
-            {
-              error: error instanceof Error
-                ? { name: error.name, message: error.message, stack: error.stack }
-                : String(error),
-            },
-            { level: "error", outcome: "error" },
-          );
+          discordNotifierTelemetry.recordError(error, {
+            eventName: "discord.docs_index",
+          });
         }
       }
     } catch (error) {
       this.markHeartbeatFailed(new Date());
-      discordNotifierTelemetry.event(
-        "discord.routines_notifier.error",
-        {
-          error: error instanceof Error
-            ? { name: error.name, message: error.message, stack: error.stack }
-            : String(error),
-        },
-        { level: "error", outcome: "error" },
-      );
+      discordNotifierTelemetry.recordError(error, {
+        eventName: "discord.routines_notifier",
+      });
     } finally {
       this.running = false;
       this.scheduleNextRun();
@@ -350,16 +339,10 @@ export class DiscordRoutinesNotifier {
     try {
       await this.app.recordAssistantMessage(conversationKey, normalized);
     } catch (error) {
-      discordNotifierTelemetry.event(
-        "discord.routines_notifier.record_assistant_message_error",
-        {
-          conversationKey,
-          error: error instanceof Error
-            ? { name: error.name, message: error.message, stack: error.stack }
-            : String(error),
-        },
-        { level: "error", outcome: "error" },
-      );
+      discordNotifierTelemetry.recordError(error, {
+        conversationKey,
+        eventName: "discord.routines_notifier.record_assistant_message",
+      });
     }
     return true;
   }

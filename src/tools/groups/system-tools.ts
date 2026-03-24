@@ -399,7 +399,7 @@ function describeServiceTransition(action: "update" | "rollback") {
 
   return [
     "",
-    `note: this ${action} was scheduled through a detached helper because the live service cannot safely ${action} itself in-process.`,
+    `IMPORTANT: the ${action} has been SCHEDULED but is NOT complete yet. The service will restart in approximately 10-15 seconds. Do NOT tell the user the ${action} is finished or attempt any actions that depend on it. The user will receive an "update complete" Discord DM once the new version is running and verified.`,
   ].join("\n");
 }
 
@@ -1204,6 +1204,19 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         description:
           "Roll the managed service back to the previously deployed release and verify the restored agent with the same simulated healthcheck.",
         schema: serviceActionSchema,
+      },
+    ),
+    defineTool(
+      async () =>
+        traceSpan(
+          "tool.restart",
+          async () => ctx.requestManagedServiceRestart("manual"),
+        ),
+      {
+        name: "restart",
+        description:
+          "Restart the managed service process. The current process will exit and the service manager will start a fresh instance. Running background agents will resume automatically after restart.",
+        schema: z.object({}),
       },
     ),
   );

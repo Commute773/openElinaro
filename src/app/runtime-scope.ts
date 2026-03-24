@@ -1,4 +1,5 @@
 import type { CacheMissWarning } from "../services/cache-miss-monitor";
+import type { InferencePromptDriftWarning } from "../services/inference-prompt-drift-monitor";
 import type { ProfileRecord } from "../domain/profiles";
 import { AccessControlService } from "../services/access-control-service";
 import { ActiveModelConnector } from "../connectors/active-model-connector";
@@ -73,6 +74,7 @@ export function createRuntimeScope(ctx: {
   finance: FinanceService;
   health: HealthTrackingService;
   onCacheMissWarning?: (warning: CacheMissWarning) => Promise<void> | void;
+  onPromptDriftWarning?: (warning: InferencePromptDriftWarning) => Promise<void> | void;
   onConversationActivityChange?: (params: {
     conversationKey: string;
     active: boolean;
@@ -150,6 +152,17 @@ export function createRuntimeScope(ctx: {
   const autonomousTime = new AutonomousTimeService(profile, routines);
   const automaticConversationMemoryDisabled = isAutomaticConversationMemoryDisabled();
   const connector = new ActiveModelConnector(models);
+  if (ctx.onPromptDriftWarning) {
+    connector.setPromptDriftWarningCallback((warning) => {
+      void Promise.resolve(ctx.onPromptDriftWarning!(warning)).catch((error) => {
+        appTelemetry.recordError(error, {
+          profileId,
+          sessionId: warning.sessionId,
+          operation: "app.prompt_drift_warning_notifier",
+        });
+      });
+    });
+  }
   const shell: ShellRuntime = profiles.isSshExecutionProfile(profile)
     ? new SshShellService(profile, access, shellEnvironment)
     : new ShellService(access, shellEnvironment);
@@ -209,6 +222,7 @@ export function createRuntimeScope(ctx: {
         }
       : undefined,
   );
+  chat.setTimezoneProvider(() => routines.getTimezone());
 
   return {
     profile,
