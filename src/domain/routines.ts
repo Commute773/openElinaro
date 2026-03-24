@@ -15,7 +15,7 @@ export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 export type RoutineSchedule =
   | { kind: "manual" }
   | { kind: "once"; dueAt: string }
-  | { kind: "daily"; time: string }
+  | { kind: "daily"; time: string; days?: Weekday[] }
   | { kind: "weekly"; time: string; days: Weekday[] }
   | { kind: "interval"; time: string; everyDays: number; anchorAt?: string }
   | { kind: "monthly"; time: string; dayOfMonth: number };

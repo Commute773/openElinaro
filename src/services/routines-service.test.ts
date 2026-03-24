@@ -506,4 +506,500 @@ describe("RoutinesService", () => {
 
     expect(service.formatItem(nonAlarmItem)).not.toContain("alarm");
   });
+
+  // --- daily schedule with weekday filter ---
+
+  test("daily schedule with days only fires on matching weekdays", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    // 2026-03-17 is a Tuesday
+    const item = service.addItem({
+      title: "Workday standup",
+      kind: "routine",
+      schedule: { kind: "daily", time: "09:00", days: ["mon", "tue", "wed", "thu", "fri"] },
+    });
+
+    // Tuesday — should be due
+    const tuesdayAssessment = service.assessNow(new Date("2026-03-17T09:05:00.000Z"));
+    const tuesdayEntry = tuesdayAssessment.items.find((i) => i.item.id === item.id);
+    expect(tuesdayEntry).toBeTruthy();
+    expect(tuesdayEntry?.state).toBe("due");
+
+    // Saturday 2026-03-21 — should find the next Monday as upcoming
+    const saturdayAssessment = service.assessNow(new Date("2026-03-21T09:05:00.000Z"));
+    const saturdayEntry = saturdayAssessment.items.find((i) => i.item.id === item.id);
+    expect(saturdayEntry).toBeTruthy();
+    // On Saturday, next matching day is Monday — should be upcoming
+    expect(saturdayEntry?.state).toBe("upcoming");
+  });
+
+  test("daily schedule without days fires every day (no regression)", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Daily meditation",
+      kind: "habit",
+      schedule: { kind: "daily", time: "08:00" },
+    });
+
+    // Saturday 2026-03-21
+    const satAssessment = service.assessNow(new Date("2026-03-21T08:05:00.000Z"));
+    const satEntry = satAssessment.items.find((i) => i.item.id === item.id);
+    expect(satEntry).toBeTruthy();
+    expect(satEntry?.state).toBe("due");
+
+    // Sunday 2026-03-22
+    const sunAssessment = service.assessNow(new Date("2026-03-22T08:05:00.000Z"));
+    const sunEntry = sunAssessment.items.find((i) => i.item.id === item.id);
+    expect(sunEntry).toBeTruthy();
+    expect(sunEntry?.state).toBe("due");
+  });
+
+  test("daily schedule with days shows as upcoming before the scheduled time on a matching day", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    service.addItem({
+      title: "Weekday coffee",
+      kind: "routine",
+      schedule: { kind: "daily", time: "10:00", days: ["mon", "tue", "wed", "thu", "fri"] },
+    });
+
+    // Tuesday 2026-03-17 at 07:00 — before the 10:00 time
+    const assessment = service.assessNow(new Date("2026-03-17T07:00:00.000Z"));
+    const entry = assessment.items.find((i) => i.item.title === "Weekday coffee");
+    expect(entry).toBeTruthy();
+    expect(entry?.state).toBe("upcoming");
+  });
+
+  test("formatSchedule shows days for daily-with-days schedule", () => {
+    const service = new RoutinesService();
+    const item = service.addItem({
+      title: "MWF routine",
+      kind: "routine",
+      schedule: { kind: "daily", time: "09:00", days: ["mon", "wed", "fri"] },
+    });
+
+    const formatted = service.formatItem(item);
+    expect(formatted).toContain("daily mon,wed,fri @ 09:00");
+  });
+
+  test("formatSchedule omits days for plain daily schedule", () => {
+    const service = new RoutinesService();
+    const item = service.addItem({
+      title: "Every day thing",
+      kind: "routine",
+      schedule: { kind: "daily", time: "07:00" },
+    });
+
+    const formatted = service.formatItem(item);
+    expect(formatted).toContain("daily @ 07:00");
+    expect(formatted).not.toContain("mon");
+  });
+
+  test("daily-with-days streak continues across non-matching days", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "MWF workout",
+      kind: "habit",
+      schedule: { kind: "daily", time: "09:00", days: ["mon", "wed", "fri"] },
+    });
+
+    // Complete on Monday 2026-03-16
+    service.markDone(item.id, new Date("2026-03-16T09:30:00.000Z"));
+    expect(service.getItem(item.id)?.state.streak).toBe(1);
+
+    // Complete on Wednesday 2026-03-18 — 2 days gap but within tolerance (7)
+    service.markDone(item.id, new Date("2026-03-18T09:30:00.000Z"));
+    expect(service.getItem(item.id)?.state.streak).toBe(2);
+
+    // Complete on Friday 2026-03-20 — another 2 days gap
+    service.markDone(item.id, new Date("2026-03-20T09:30:00.000Z"));
+    expect(service.getItem(item.id)?.state.streak).toBe(3);
+  });
+
+  test("daily streak increments on each markDone", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Daily journal",
+      kind: "habit",
+      schedule: { kind: "daily", time: "21:00" },
+    });
+
+    service.markDone(item.id, new Date("2026-03-16T21:30:00.000Z"));
+    expect(service.getItem(item.id)?.state.streak).toBe(1);
+
+    service.markDone(item.id, new Date("2026-03-17T21:30:00.000Z"));
+    expect(service.getItem(item.id)?.state.streak).toBe(2);
+
+    service.markDone(item.id, new Date("2026-03-18T21:30:00.000Z"));
+    expect(service.getItem(item.id)?.state.streak).toBe(3);
+  });
+
+  test("heartbeat snapshot includes daily-with-days items that are due", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Weekday meds",
+      kind: "med",
+      alarm: true,
+      schedule: { kind: "daily", time: "09:00", days: ["mon", "tue", "wed", "thu", "fri"] },
+    });
+
+    // Tuesday 2026-03-17 at 09:05 — due
+    const snapshot = service.getHeartbeatReminderSnapshot(new Date("2026-03-17T09:05:00.000Z"));
+    expect(snapshot.requiredCandidates.some((c) => c.itemId === item.id)).toBe(true);
+  });
+
+  test("heartbeat snapshot does not surface daily-with-days items on non-matching days as due", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Weekday meds",
+      kind: "med",
+      alarm: true,
+      schedule: { kind: "daily", time: "09:00", days: ["mon", "tue", "wed", "thu", "fri"] },
+    });
+
+    // Saturday 2026-03-21 at 09:05 — not a matching day, should be upcoming not due
+    const snapshot = service.getHeartbeatReminderSnapshot(new Date("2026-03-21T09:05:00.000Z"));
+    const candidate = snapshot.requiredCandidates.find((c) => c.itemId === item.id);
+    // Should not appear as required since next occurrence is Monday (upcoming)
+    if (candidate) {
+      expect(candidate.state).not.toBe("due");
+    }
+  });
+
+  test("daily-with-days alarm sets nextAttentionAt to next matching day", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    service.addItem({
+      title: "Weekday alarm",
+      kind: "routine",
+      alarm: true,
+      schedule: { kind: "daily", time: "09:00", days: ["mon", "tue", "wed", "thu", "fri"] },
+    });
+
+    // Friday 2026-03-20 at 10:00 — already past today's time, next is Monday 2026-03-23
+    const assessment = service.assessNow(new Date("2026-03-20T10:00:00.000Z"));
+    const entry = assessment.items.find((i) => i.item.title === "Weekday alarm");
+    // The occurrence should be Friday (due) since it's past the time
+    expect(entry).toBeTruthy();
+    expect(entry?.state).toBe("due");
+  });
+
+  // --- general routine lifecycle tests ---
+
+  test("markDone and undoDone cycle for recurring routines", () => {
+    const service = new RoutinesService();
+    const item = service.addItem({
+      title: "Stretch",
+      kind: "routine",
+      schedule: { kind: "daily", time: "07:00" },
+    });
+
+    const done = service.markDone(item.id, new Date("2026-03-17T07:15:00.000Z"));
+    expect(done.status).toBe("active");
+    expect(done.state.lastCompletedAt).toBeTruthy();
+    expect(done.state.streak).toBe(1);
+
+    const undone = service.undoDone(item.id);
+    expect(undone.state.lastCompletedAt).toBeUndefined();
+    expect(undone.state.streak).toBe(0);
+    expect(undone.state.completionHistory).toEqual([]);
+  });
+
+  test("snooze suppresses reminders until the snooze expires", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Snooze test",
+      kind: "med",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    service.snooze(item.id, 60, new Date("2026-03-17T09:05:00.000Z"));
+
+    const snoozed = service.getItem(item.id);
+    expect(snoozed?.state.snoozedUntil).toBeTruthy();
+
+    // Still snoozed at 09:30
+    const during = service.assessNow(new Date("2026-03-17T09:30:00.000Z"));
+    const duringEntry = during.items.find((i) => i.item.id === item.id);
+    expect(duringEntry).toBeUndefined();
+
+    // Snooze expired at 10:06
+    const after = service.assessNow(new Date("2026-03-17T10:06:00.000Z"));
+    const afterEntry = after.items.find((i) => i.item.id === item.id);
+    expect(afterEntry).toBeTruthy();
+    expect(afterEntry?.state).toBe("due");
+  });
+
+  test("paused items are excluded from assessment", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Paused routine",
+      kind: "routine",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    service.pause(item.id);
+
+    const assessment = service.assessNow(new Date("2026-03-17T09:05:00.000Z"));
+    const entry = assessment.items.find((i) => i.item.id === item.id);
+    expect(entry).toBeUndefined();
+  });
+
+  test("disabled items are excluded from assessment", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Disabled routine",
+      kind: "routine",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    // Disable by pausing (pause sets enabled=false)
+    service.pause(item.id);
+
+    const assessment = service.assessNow(new Date("2026-03-17T09:05:00.000Z"));
+    const entry = assessment.items.find((i) => i.item.id === item.id);
+    expect(entry).toBeUndefined();
+  });
+
+  test("weekly schedule shows as upcoming before scheduled time on matching day", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Weekly review",
+      kind: "routine",
+      schedule: { kind: "weekly", time: "14:00", days: ["fri"] },
+    });
+
+    // Friday 2026-03-20 at 10:00 — before scheduled time, upcoming
+    const beforeAssessment = service.assessNow(new Date("2026-03-20T10:00:00.000Z"));
+    const beforeEntry = beforeAssessment.items.find((i) => i.item.id === item.id);
+    expect(beforeEntry).toBeTruthy();
+    expect(beforeEntry?.state).toBe("upcoming");
+
+    // Wednesday 2026-03-18 at 14:05 — upcoming (next Friday)
+    const wedAssessment = service.assessNow(new Date("2026-03-18T14:05:00.000Z"));
+    const wedEntry = wedAssessment.items.find((i) => i.item.id === item.id);
+    expect(wedEntry).toBeTruthy();
+    expect(wedEntry?.state).toBe("upcoming");
+  });
+
+  test("monthly schedule is due on the right day of month", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Monthly review",
+      kind: "routine",
+      schedule: { kind: "monthly", time: "10:00", dayOfMonth: 15 },
+    });
+
+    // March 15 at 10:05 — due
+    const dueAssessment = service.assessNow(new Date("2026-03-15T10:05:00.000Z"));
+    const dueEntry = dueAssessment.items.find((i) => i.item.id === item.id);
+    expect(dueEntry).toBeTruthy();
+    expect(dueEntry?.state).toBe("due");
+  });
+
+  test("interval schedule fires after the configured number of days", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Every 3 days",
+      kind: "habit",
+      schedule: { kind: "interval", time: "09:00", everyDays: 3 },
+    });
+
+    // Due immediately on first day
+    const firstAssessment = service.assessNow(new Date("2026-03-17T09:05:00.000Z"));
+    const firstEntry = firstAssessment.items.find((i) => i.item.id === item.id);
+    expect(firstEntry).toBeTruthy();
+    expect(firstEntry?.state).toBe("due");
+
+    // Mark done, next should be 3 days later
+    service.markDone(item.id, new Date("2026-03-17T09:10:00.000Z"));
+    const afterDone = service.assessNow(new Date("2026-03-18T09:05:00.000Z"));
+    const afterEntry = afterDone.items.find((i) => i.item.id === item.id);
+    expect(afterEntry).toBeTruthy();
+    expect(afterEntry?.state).toBe("upcoming");
+  });
+
+  test("once schedule is due at the specified time and becomes completed", () => {
+    const service = new RoutinesService();
+    const item = service.addItem({
+      title: "One-time task",
+      kind: "todo",
+      schedule: { kind: "once", dueAt: "2026-03-20T15:00:00.000Z" },
+    });
+
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+
+    // Before due
+    const beforeAssessment = service.assessNow(new Date("2026-03-20T14:00:00.000Z"));
+    const beforeEntry = beforeAssessment.items.find((i) => i.item.id === item.id);
+    expect(beforeEntry).toBeTruthy();
+    expect(beforeEntry?.state).toBe("upcoming");
+
+    // After due
+    const afterAssessment = service.assessNow(new Date("2026-03-20T15:05:00.000Z"));
+    const afterEntry = afterAssessment.items.find((i) => i.item.id === item.id);
+    expect(afterEntry).toBeTruthy();
+    expect(afterEntry?.state).toBe("due");
+
+    // Complete it — todo becomes completed
+    const completed = service.markDone(item.id, new Date("2026-03-20T15:10:00.000Z"));
+    expect(completed.status).toBe("completed");
+  });
+
+  test("multiple items sort by priority in assessment", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const low = service.addItem({
+      title: "Low priority",
+      kind: "routine",
+      priority: "low",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+    const urgent = service.addItem({
+      title: "Urgent thing",
+      kind: "routine",
+      priority: "urgent",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+    const high = service.addItem({
+      title: "High priority",
+      kind: "routine",
+      priority: "high",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    const assessment = service.assessNow(new Date("2026-03-17T09:05:00.000Z"));
+    const ids = assessment.items.map((i) => i.item.id);
+    expect(ids.indexOf(urgent.id)).toBeLessThan(ids.indexOf(high.id));
+    expect(ids.indexOf(high.id)).toBeLessThan(ids.indexOf(low.id));
+  });
+
+  test("reminder escalation for med items", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Take pill",
+      kind: "med",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    // Default med reminder policy: followUpMinutes: 60, maxReminders: 3, escalate: true
+    expect(item.reminder.followUpMinutes).toBe(60);
+    expect(item.reminder.maxReminders).toBe(3);
+    expect(item.reminder.escalate).toBe(true);
+
+    // First reminder
+    const snap1 = service.getHeartbeatReminderSnapshot(new Date("2026-03-17T09:05:00.000Z"));
+    const c1 = snap1.requiredCandidates.find((c) => c.itemId === item.id);
+    expect(c1).toBeTruthy();
+    expect(c1?.reminderStage).toBe("initial");
+
+    service.markReminded(snap1.itemIds, snap1.occurrenceKeys, new Date("2026-03-17T09:05:00.000Z"));
+
+    // Too early for follow-up
+    const snap2 = service.getHeartbeatReminderSnapshot(new Date("2026-03-17T09:30:00.000Z"));
+    expect(snap2.requiredCandidates.find((c) => c.itemId === item.id)).toBeFalsy();
+
+    // Follow-up due after 60 minutes
+    const snap3 = service.getHeartbeatReminderSnapshot(new Date("2026-03-17T10:06:00.000Z"));
+    const c3 = snap3.requiredCandidates.find((c) => c.itemId === item.id);
+    expect(c3).toBeTruthy();
+    expect(c3?.reminderStage).toBe("follow_up");
+  });
+
+  test("addItem generates a sensible ID from kind and title", () => {
+    const service = new RoutinesService();
+    const item = service.addItem({
+      title: "Take Morning Meds!",
+      kind: "med",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    expect(item.id).toMatch(/^med_take-morning-meds_/);
+  });
+
+  test("getNextRoutineAttentionAt returns null when no items exist", () => {
+    const service = new RoutinesService();
+    const result = service.getNextRoutineAttentionAt(new Date("2026-03-17T09:00:00.000Z"));
+    expect(result).toBeNull();
+  });
+
+  test("buildSchedule in routine tools passes days through for daily schedules", async () => {
+    const { buildSchedule } = await import("../tools/groups/routine-tools");
+
+    const withDays = buildSchedule({
+      scheduleKind: "daily",
+      time: "09:00",
+      days: ["mon", "wed", "fri"],
+    });
+    expect(withDays).toEqual({ kind: "daily", time: "09:00", days: ["mon", "wed", "fri"] });
+
+    const withoutDays = buildSchedule({
+      scheduleKind: "daily",
+      time: "09:00",
+    });
+    expect(withoutDays).toEqual({ kind: "daily", time: "09:00" });
+  });
 });

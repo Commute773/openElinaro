@@ -148,7 +148,9 @@ export function buildSchedule(input: {
     if (!input.time) {
       throw new Error("time is required for daily schedules.");
     }
-    return { kind: "daily", time: input.time };
+    return input.days?.length
+      ? { kind: "daily", time: input.time, days: input.days as Weekday[] }
+      : { kind: "daily", time: input.time };
   }
   if (input.scheduleKind === "weekly") {
     if (!input.time || !input.days?.length) {

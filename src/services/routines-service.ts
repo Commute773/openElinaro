@@ -149,6 +149,45 @@ function nextWindowBoundary(
   return date;
 }
 
+function findDailyWithDaysOccurrence(
+  schedule: Extract<RoutineSchedule, { kind: "daily" }>,
+  days: Weekday[],
+  now: Date,
+) {
+  // If today is a matching day, behave like a plain daily schedule.
+  if (days.includes(weekdayKey(now))) {
+    const dueAt = setTime(now, schedule.time);
+    return {
+      occurrenceKey: localDateKey(dueAt),
+      dueAt,
+      state: dueAt.getTime() <= now.getTime() ? ("due" as const) : ("upcoming" as const),
+    };
+  }
+
+  // Today is not a matching day — find the nearest upcoming matching day.
+  const today = startOfDay(now);
+  let bestUpcoming: Date | null = null;
+
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const candidateDay = addDays(today, offset);
+    if (!days.includes(weekdayKey(candidateDay))) {
+      continue;
+    }
+    bestUpcoming = setTime(candidateDay, schedule.time);
+    break;
+  }
+
+  if (!bestUpcoming) {
+    return null;
+  }
+
+  return {
+    occurrenceKey: localDateKey(bestUpcoming),
+    dueAt: bestUpcoming,
+    state: "upcoming" as const,
+  };
+}
+
 function findWeeklyOccurrence(
   schedule: Extract<RoutineSchedule, { kind: "weekly" }>,
   now: Date,
@@ -218,6 +257,9 @@ function findCurrentOccurrence(
   }
 
   if (schedule.kind === "daily") {
+    if (schedule.days && schedule.days.length > 0) {
+      return findDailyWithDaysOccurrence(schedule, schedule.days, now);
+    }
     const dueAt = setTime(now, schedule.time);
     return {
       occurrenceKey: localDateKey(dueAt),
@@ -328,8 +370,12 @@ function updateStreak(item: RoutineItem, completedAt: Date) {
   const deltaDays = Math.floor(
     (startOfDay(completedAt).getTime() - startOfDay(lastCompleted).getTime()) / 86400000,
   );
-  if (item.schedule.kind === "daily" && deltaDays <= 1) {
-    return item.state.streak + 1;
+  if (item.schedule.kind === "daily") {
+    const maxGap = item.schedule.days && item.schedule.days.length > 0 ? 7 : 1;
+    if (deltaDays <= maxGap) {
+      return item.state.streak + 1;
+    }
+    return 1;
   }
   if (item.schedule.kind === "weekly" && deltaDays <= 7) {
     return item.state.streak + 1;
@@ -348,7 +394,8 @@ function isStreakContinuation(item: RoutineItem, previous: Date, next: Date) {
     (startOfDay(next).getTime() - startOfDay(previous).getTime()) / 86400000,
   );
   if (item.schedule.kind === "daily") {
-    return deltaDays <= 1;
+    const maxGap = item.schedule.days && item.schedule.days.length > 0 ? 7 : 1;
+    return deltaDays <= maxGap;
   }
   if (item.schedule.kind === "weekly") {
     return deltaDays <= 7;
@@ -427,7 +474,9 @@ function formatSchedule(schedule: RoutineSchedule) {
     case "once":
       return `once @ ${schedule.dueAt}`;
     case "daily":
-      return `daily @ ${schedule.time}`;
+      return schedule.days && schedule.days.length > 0
+        ? `daily ${schedule.days.join(",")} @ ${schedule.time}`
+        : `daily @ ${schedule.time}`;
     case "weekly":
       return `weekly ${schedule.days.join(",")} @ ${schedule.time}`;
     case "interval":
