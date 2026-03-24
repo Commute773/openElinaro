@@ -111,6 +111,22 @@ export class TmuxManager {
     return result.text().trim();
   }
 
+  /**
+   * Capture the full visible terminal buffer for a tmux pane.
+   * Unlike capturePane (which captures the last N scrollback lines),
+   * this captures the entire visible area including any alternate screen
+   * content — useful for debugging interactive programs like claude/codex.
+   */
+  async readTerminal(windowName: string): Promise<string> {
+    // -e: include escape sequences (stripped by default) — we DON'T want them
+    // -p: print to stdout
+    // -S 0: start from the very beginning of the visible area
+    // First try the full scrollback + visible
+    const result = await $`${this.tmux} capture-pane -t ${this.sessionName}:${windowName} -p -S - -E -`.nothrow().quiet();
+    if (result.exitCode !== 0) return "";
+    return result.text();
+  }
+
   /** List all window names in this session. */
   async listWindows(): Promise<string[]> {
     const result = await $`${this.tmux} list-windows -t ${this.sessionName} -F "#{window_name}"`.nothrow().quiet();
