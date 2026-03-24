@@ -53,10 +53,7 @@ describe("ConversationStore", () => {
   });
 
   test("supports append-only writes", () => {
-    store.save({
-      key: "thread-1",
-      messages: [new HumanMessage("hello")],
-      updatedAt: new Date().toISOString(),
+    store.appendMessages("thread-1", [new HumanMessage("hello")], {
       systemPrompt: systemPrompts.load(),
     });
 
@@ -67,16 +64,11 @@ describe("ConversationStore", () => {
   });
 
   test("supports explicit rollback plus append", () => {
-    store.save({
-      key: "thread-1",
-      messages: [
-        new HumanMessage("first"),
-        new AIMessage("second"),
-        new HumanMessage("third"),
-      ],
-      updatedAt: new Date().toISOString(),
-      systemPrompt: systemPrompts.load(),
-    });
+    store.appendMessages("thread-1", [
+      new HumanMessage("first"),
+      new AIMessage("second"),
+      new HumanMessage("third"),
+    ], { systemPrompt: systemPrompts.load() });
 
     const conversation = store.rollbackAndAppend("thread-1", 2, [new AIMessage("replacement")]);
 
@@ -86,15 +78,10 @@ describe("ConversationStore", () => {
   });
 
   test("preserves image mime types across store round-trips", () => {
-    store.save({
-      key: "thread-1",
-      messages: [new HumanMessage([
-        { type: "text", text: "what is this?" },
-        { type: "image", data: "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=", mimeType: "image/webp" },
-      ])],
-      updatedAt: new Date().toISOString(),
-      systemPrompt: systemPrompts.load(),
-    });
+    store.appendMessages("thread-1", [new HumanMessage([
+      { type: "text", text: "what is this?" },
+      { type: "image", data: "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=", mimeType: "image/webp" },
+    ])], { systemPrompt: systemPrompts.load() });
 
     const conversation = store.get("thread-1");
     const message = conversation.messages[0] as HumanMessage;
@@ -103,33 +90,8 @@ describe("ConversationStore", () => {
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/webp")).toBe(true);
   });
 
-  test("rejects non-append message rewrites through save", () => {
-    store.save({
-      key: "thread-1",
-      messages: [
-        new HumanMessage("first"),
-        new AIMessage("second"),
-      ],
-      updatedAt: new Date().toISOString(),
-      systemPrompt: systemPrompts.load(),
-    });
-
-    expect(() =>
-      store.save({
-        key: "thread-1",
-        messages: [
-          new HumanMessage("edited first"),
-          new AIMessage("second"),
-        ],
-        updatedAt: new Date().toISOString(),
-      })).toThrow("Refusing non-append conversation mutation");
-  });
-
   test("journals appended conversation messages to JSONL as they are saved", () => {
-    store.save({
-      key: "thread-1",
-      messages: [new HumanMessage("hello graph cache"), new AIMessage("world")],
-      updatedAt: new Date().toISOString(),
+    store.appendMessages("thread-1", [new HumanMessage("hello graph cache"), new AIMessage("world")], {
       systemPrompt: systemPrompts.load(),
     });
 
@@ -156,16 +118,10 @@ describe("ConversationStore", () => {
   });
 
   test("searches archived conversation history with hybrid ranking and recency output", async () => {
-    store.save({
-      key: "thread-1",
-      messages: [new HumanMessage("We need to fix the cache miss issue in graph search.")],
-      updatedAt: "2026-03-14T10:00:00.000Z",
+    store.appendMessages("thread-1", [new HumanMessage("We need to fix the cache miss issue in graph search.")], {
       systemPrompt: systemPrompts.load(),
     });
-    store.save({
-      key: "thread-2",
-      messages: [new HumanMessage("Graph compaction is still weird but cache is fine.")],
-      updatedAt: "2026-03-14T11:00:00.000Z",
+    store.appendMessages("thread-2", [new HumanMessage("Graph compaction is still weird but cache is fine.")], {
       systemPrompt: systemPrompts.load(),
     });
 
@@ -196,16 +152,11 @@ describe("ConversationStore", () => {
     });
 
     for (let index = 0; index < 40; index += 1) {
-      boundedStore.save({
-        key: `thread-${index + 1}`,
-        messages: [
-          new HumanMessage(
-            index === 39 ? "Newest cache graph regression note." : `Background note ${index + 1}.`,
-          ),
-        ],
-        updatedAt: `2026-03-14T${String(index % 24).padStart(2, "0")}:00:00.000Z`,
-        systemPrompt: systemPrompts.load(),
-      });
+      boundedStore.appendMessages(`thread-${index + 1}`, [
+        new HumanMessage(
+          index === 39 ? "Newest cache graph regression note." : `Background note ${index + 1}.`,
+        ),
+      ], { systemPrompt: systemPrompts.load() });
     }
 
     const result = await boundedStore.searchHistory({
