@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24
+- Released at: 2026-03-24T00:44:39Z
+- Release id: 20260324T004439Z-63f7d8e
+- Previous version: 2026.03.23.20
+- Trigger: ci/release workflow
+
+- fix: enforce append-only conversation history and eliminate heartbeat prompt drift
+
 ## 2026.03.23.20
 - Released at: 2026-03-23T23:08:12Z
 - Release id: 20260323T230812Z-b46fc4d
