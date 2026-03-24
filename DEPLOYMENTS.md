@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.20
+- Released at: 2026-03-24T22:24:24Z
+- Release id: 20260324T222424Z-9d80de4
+- Previous version: 2026.03.24.19
+- Trigger: ci/release workflow
+
+- feat: add optional weekday filter to daily routine schedules
+
 ## 2026.03.24.19
 - Released at: 2026-03-24T22:18:44Z
 - Release id: 20260324T221844Z-64e0d95
