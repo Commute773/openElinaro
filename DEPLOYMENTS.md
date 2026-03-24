@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.2
+- Released at: 2026-03-24T01:27:13Z
+- Release id: 20260324T012713Z-4888ca2
+- Previous version: 2026.03.24
+- Trigger: ci/release workflow
+
+- fix: pass proper PATH env to tmux subprocess calls
+
 ## 2026.03.24
 - Released at: 2026-03-24T00:44:39Z
 - Release id: 20260324T004439Z-63f7d8e
