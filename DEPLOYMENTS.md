@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.18
+- Released at: 2026-03-24T22:17:01Z
+- Release id: 20260324T221701Z-568cbed
+- Previous version: 2026.03.24.17
+- Trigger: ci/release workflow
+
+- fix: cap compaction and core memory output to prevent runaway token generation (#79)
+
 ## 2026.03.24.17
 - Released at: 2026-03-24T18:15:10Z
 - Release id: 20260324T181510Z-5dca89d
