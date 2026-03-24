@@ -268,15 +268,16 @@ describe("OpenElinaroApp.runHourlyHeartbeat", () => {
 
     expect(harness.getHandleRequests()).toHaveLength(1);
     expect(harness.getHandleRequests()[0]?.request.conversationKey).toBe("automation:heartbeat:conversation-1");
-    expect(harness.getHandleRequests()[0]?.options?.chatOptions).toMatchObject({
+    const chatOptions = harness.getHandleRequests()[0]?.options?.chatOptions;
+    expect(chatOptions).toMatchObject({
       persistConversation: false,
       enableMemoryIngestion: false,
       enableThreadStartContext: false,
       enableCompaction: false,
       includeBackgroundExecNotifications: false,
-      providerSessionId: "automation:heartbeat:conversation-1",
       usagePurpose: "automation_heartbeat_turn",
     });
+    expect(chatOptions?.providerSessionId).toStartWith("automation:heartbeat:conversation-1-");
     expect(harness.getHandleRequests()[0]?.options?.chatOptions?.contextConversationKey).toBeUndefined();
     expect(harness.getRecordedMessages()).toEqual([
       { conversationKey: "conversation-1", message: "Check your urgent todo now." },

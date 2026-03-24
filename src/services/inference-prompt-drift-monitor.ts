@@ -137,6 +137,7 @@ function buildDiffPreview(text: string, start: number, length: number, limit = 1
 export class InferencePromptDriftMonitor {
   private readonly promptBySession = new Map<string, string>();
   private readonly promptMessagesBySession = new Map<string, string[]>();
+  private static readonly MAX_TRACKED_SESSIONS = 200;
 
   inspect(params: {
     sessionId: string;
@@ -148,6 +149,7 @@ export class InferencePromptDriftMonitor {
     const previousMessages = this.promptMessagesBySession.get(params.sessionId);
     this.promptBySession.set(params.sessionId, currentPrompt);
     this.promptMessagesBySession.set(params.sessionId, currentMessages);
+    this.evictStaleEntries();
 
     if (!previousPrompt || !previousMessages || currentPrompt === previousPrompt || currentPrompt.startsWith(previousPrompt)) {
       return null;
@@ -214,5 +216,20 @@ export class InferencePromptDriftMonitor {
         addedPreview ? `added_preview=${JSON.stringify(addedPreview)}` : "",
       ].join(" "),
     };
+  }
+
+  private evictStaleEntries() {
+    if (this.promptBySession.size <= InferencePromptDriftMonitor.MAX_TRACKED_SESSIONS) {
+      return;
+    }
+    const excess = this.promptBySession.size - InferencePromptDriftMonitor.MAX_TRACKED_SESSIONS;
+    const keys = this.promptBySession.keys();
+    for (let i = 0; i < excess; i++) {
+      const { value: key } = keys.next();
+      if (key) {
+        this.promptBySession.delete(key);
+        this.promptMessagesBySession.delete(key);
+      }
+    }
   }
 }
