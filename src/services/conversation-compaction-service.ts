@@ -205,7 +205,7 @@ function keepRecentMessages(messages: BaseMessage[]) {
       });
     }
     if (message instanceof HumanMessage) {
-      return new HumanMessage(extractTextFromMessage(message));
+      return new HumanMessage(message.content);
     }
     return message;
   });
