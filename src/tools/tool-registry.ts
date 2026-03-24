@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { stringify as stringifyYaml } from "yaml";
@@ -149,7 +150,8 @@ const newConversationSchema = z.object({
 
 const launchAgentSchema = z.object({
   goal: z.string().min(12),
-  cwd: z.string().optional(),
+  workspace: z.string().min(1)
+    .describe("Required. The workspace to launch the agent in. Use a project ID for project work, \"openElinaro\" for platform work, or \"root\" for general tasks in the home directory."),
   profile: z.string().min(1).optional(),
   provider: z.enum(["claude", "codex"]).optional(),
   timeoutMs: z.number()
@@ -2388,6 +2390,35 @@ export class ToolRegistry {
       : this.conversations.ensureSystemPrompt(latest.key, this.systemPrompts.load());
   }
 
+  private resolveWorkspacePath(workspace: string): string {
+    if (workspace === "root") {
+      return os.homedir();
+    }
+    if (workspace === "openElinaro") {
+      return process.cwd();
+    }
+    // Look up as a project ID
+    const project = this.projects.getProject(workspace);
+    if (project) {
+      return this.projects.resolveWorkspacePath(project);
+    }
+    throw new Error(
+      `Unknown workspace "${workspace}". Use "root", "openElinaro", or a valid project ID.`,
+    );
+  }
+
+  private buildWorkspaceHints(): string {
+    const projectList = this.projects
+      .listProjects({ status: "active" })
+      .map((p) => `- "${p.id}": ${p.name} — ${p.workspacePath}`);
+    return [
+      "\n\nAvailable workspaces (workspace parameter is required):",
+      '- "openElinaro": the openElinaro platform repo (use for platform features, bugs, and infra)',
+      '- "root": home directory (use for general tasks not tied to a specific project)',
+      ...projectList,
+    ].join("\n");
+  }
+
   private createLaunchAgentTool(context?: ToolContext) {
     const availableProviders = this.subagents.listAvailableProviders();
     const providerHints = availableProviders.length > 1
@@ -2396,6 +2427,8 @@ export class ToolRegistry {
           .join("\n")
         + "\n\nChoose the provider that best fits the task. Pass provider explicitly when multiple are available."
       : "";
+
+    const workspaceHints = this.buildWorkspaceHints();
 
     return tool(
       async (input) =>
@@ -2414,9 +2447,11 @@ export class ToolRegistry {
               ].join("\n");
             }
 
+            const resolvedCwd = this.resolveWorkspacePath(input.workspace);
+
             const run = await this.subagents.launchAgent({
               goal: input.goal,
-              cwd: input.cwd,
+              cwd: resolvedCwd,
               profileId: input.profile,
               provider: input.provider,
               originConversationKey: context?.conversationKey,
@@ -2432,7 +2467,7 @@ export class ToolRegistry {
               `Provider: ${run.provider}`,
               `Subagent depth: ${run.launchDepth}`,
               `Timeout: ${run.timeoutMs}ms`,
-              `Workspace: ${run.workspaceCwd}`,
+              `Workspace: ${input.workspace} → ${run.workspaceCwd}`,
               "Completion updates are pushed back automatically.",
               "Use agent_status only for occasional manual spot checks.",
             ].join("\n");
@@ -2442,7 +2477,7 @@ export class ToolRegistry {
         {
           name: "launch_agent",
           description:
-          `Launch a background agent (Claude Code or Codex) in the current repository or a provided cwd. The agent runs in its own tmux window with an isolated worktree. Completion updates are pushed back automatically. Omit timeoutMs to use the default (one hour).${providerHints}`,
+          `Launch a background agent (Claude Code or Codex) in a named workspace. You MUST specify a workspace — choose the one that matches where the work should happen. The agent runs in its own tmux window with an isolated worktree. Completion updates are pushed back automatically. Omit timeoutMs to use the default (one hour).${workspaceHints}${providerHints}`,
           schema: launchAgentSchema,
         },
     );
