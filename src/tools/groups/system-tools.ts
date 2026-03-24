@@ -398,7 +398,7 @@ function describeServiceTransition(action: "update" | "rollback") {
 
   return [
     "",
-    `note: this ${action} was scheduled through a detached helper because the live service cannot safely ${action} itself in-process.`,
+    `IMPORTANT: the ${action} has been SCHEDULED but is NOT complete yet. The service will restart in approximately 10-15 seconds. Do NOT tell the user the ${action} is finished or attempt any actions that depend on it. The user will receive an "update complete" Discord DM once the new version is running and verified.`,
   ].join("\n");
 }
 
