@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.6
+- Released at: 2026-03-24T02:18:33Z
+- Release id: 20260324T021833Z-a19f0cc
+- Previous version: 2026.03.24.5
+- Trigger: ci/release workflow
+
+- fix: use absolute path for tmux binary instead of relying on PATH
+
 ## 2026.03.24.5
 - Released at: 2026-03-24T02:08:37Z
 - Release id: 20260324T020837Z-0d02cb0
