@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.24
+- Released at: 2026-03-24T23:45:28Z
+- Release id: 20260324T234528Z-005933f
+- Previous version: 2026.03.24.23
+- Trigger: ci/release workflow
+
+- feat: compress Discord image attachments to stay under Claude's 5 MB base64 limit
+
 ## 2026.03.24.23
 - Released at: 2026-03-24T23:42:37Z
 - Release id: 20260324T234237Z-3f0076d
