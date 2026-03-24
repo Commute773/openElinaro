@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.22
+- Released at: 2026-03-24T23:02:39Z
+- Release id: 20260324T230239Z-007f8e7
+- Previous version: 2026.03.24.21
+- Trigger: ci/release workflow
+
+- fix: fall back to URL source for images exceeding Claude's 5 MB base64 limit
+
 ## 2026.03.24.21
 - Released at: 2026-03-24T22:33:50Z
 - Release id: 20260324T223350Z-20a67bb
