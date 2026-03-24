@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.23
+- Released at: 2026-03-24T23:42:37Z
+- Release id: 20260324T234237Z-3f0076d
+- Previous version: 2026.03.24.22
+- Trigger: ci/release workflow
+
+- fix: use quietHours timezone for routine context mode calculation
+
 ## 2026.03.24.22
 - Released at: 2026-03-24T23:02:39Z
 - Release id: 20260324T230239Z-007f8e7
