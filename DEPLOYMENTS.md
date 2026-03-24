@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.5
+- Released at: 2026-03-24T02:08:37Z
+- Release id: 20260324T020837Z-0d02cb0
+- Previous version: 2026.03.24.4
+- Trigger: ci/release workflow
+
+- fix: /update confirm:true shows actual result when no update is needed
+
 ## 2026.03.24.4
 - Released at: 2026-03-24T01:51:56Z
 - Release id: 20260324T015156Z-1fa4fa0
