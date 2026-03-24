@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.8
+- Released at: 2026-03-24T02:39:45Z
+- Release id: 20260324T023945Z-74fcce0
+- Previous version: 2026.03.24.7
+- Trigger: ci/release workflow
+
+- feat: add read_agent_terminal tool and readTerminal tmux method
+
 ## 2026.03.24.7
 - Released at: 2026-03-24T02:25:23Z
 - Release id: 20260324T022523Z-1e98bb5
