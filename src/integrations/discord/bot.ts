@@ -580,27 +580,30 @@ export async function startDiscordBot() {
     });
   });
 
+  // Start healthcheck watcher before Discord connects so deploys don't
+  // time out waiting for the Discord gateway.
+  healthchecks.start({
+    run: async ({ requestId, conversationKey, prompt, onBackgroundResponse }) =>
+      app.handleRequest(
+        {
+          id: requestId,
+          kind: "chat",
+          text: prompt,
+          conversationKey,
+        },
+        {
+          onBackgroundResponse: onBackgroundResponse
+            ? async (response) => onBackgroundResponse(response.message)
+            : undefined,
+          onToolUse: async () => {},
+          typingEligible: false,
+        },
+      ),
+  });
+
   client.once(Events.ClientReady, async (readyClient) => {
     await syncSlashCommands(readyClient);
     new DiscordRoutinesNotifier(readyClient, app).start();
-    healthchecks.start({
-      run: async ({ requestId, conversationKey, prompt, onBackgroundResponse }) =>
-        app.handleRequest(
-          {
-            id: requestId,
-            kind: "chat",
-            text: prompt,
-            conversationKey,
-          },
-          {
-            onBackgroundResponse: onBackgroundResponse
-              ? async (response) => onBackgroundResponse(response.message)
-              : undefined,
-            onToolUse: async () => {},
-            typingEligible: false,
-          },
-        ),
-    });
     discordTelemetry.event("discord.ready", {
       botTag: readyClient.user.tag,
     });
