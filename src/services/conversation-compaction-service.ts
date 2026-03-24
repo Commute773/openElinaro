@@ -14,6 +14,10 @@ import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 
 const COMPACTION_TAIL_MESSAGES = 4;
+const COMPACTION_MAX_TOKENS = 10_000;
+const MEMORY_EXTRACTION_MAX_TOKENS = 2_048;
+const CORE_MEMORY_SOFT_CAP_CHARS = 16_000;
+const CORE_MEMORY_HARD_CAP_CHARS = 24_000;
 const TOOL_RESULT_PREVIEW_CHARS = 800;
 const ASSISTANT_PREVIEW_CHARS = 1_000;
 const CORE_MEMORY_RELATIVE_PATH = "core/MEMORY.md";
@@ -259,6 +263,7 @@ export class ConversationCompactionService {
         const createdAt = new Date();
         const response = await generateText({
           model: this.connector,
+          maxOutputTokens: COMPACTION_MAX_TOKENS,
           system: [
             "You are a hidden conversation compaction agent.",
             "Your job is to prepare a continuation summary so a fresh assistant session can resume work without the old token-heavy history.",
@@ -343,6 +348,7 @@ export class ConversationCompactionService {
   }) {
     const response = await generateText({
       model: this.connector,
+      maxOutputTokens: MEMORY_EXTRACTION_MAX_TOKENS,
       system: [
         "You are a hidden durable-memory extraction agent.",
         "You receive a continuation summary that was already compacted from a conversation.",
@@ -388,7 +394,9 @@ export class ConversationCompactionService {
           "Merge the incoming durable memory into the existing core memory by editing the file.",
           "Preserve only durable facts, stable preferences, standing instructions, and long-lived project context.",
           "Deduplicate overlapping bullets, merge repeated facts, and replace stale details when the new memory is more current.",
+          "Drop transient items: account balances, streak counts, in-progress task lists, and anything that changes frequently.",
           "Keep the file compact and well organized with markdown headings.",
+          `The output MUST stay under ${CORE_MEMORY_SOFT_CAP_CHARS} characters. Aggressively prune to stay within budget.`,
           "Return markdown only for the full updated MEMORY.md file.",
           "Do not include code fences.",
         ].join(" "),
@@ -406,6 +414,17 @@ export class ConversationCompactionService {
         sessionIdPrefix: "memory-core",
       });
       nextCore = normalizeCoreMemoryDocument(responseText);
+      if (nextCore.length > CORE_MEMORY_HARD_CAP_CHARS) {
+        compactionTelemetry.event("conversation.compact.core_memory_hard_cap_exceeded", {
+          conversationKey: params.conversationKey,
+          outputChars: nextCore.length,
+          hardCapChars: CORE_MEMORY_HARD_CAP_CHARS,
+        }, {
+          level: "warn",
+          outcome: "error",
+        });
+        nextCore = fallbackMergeCoreMemory(bootstrapCore, params.memoryMarkdown);
+      }
     } catch (error) {
       compactionTelemetry.event("conversation.compact.core_memory_merge_failed", {
         conversationKey: params.conversationKey,
