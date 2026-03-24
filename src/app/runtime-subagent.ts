@@ -253,7 +253,6 @@ export function createSubagentController(ctx: {
             profileId: targetProfileId,
             sidecarSocketPath: socketPath,
             timeoutMs,
-            model: targetProfile.subagentDefaultModelId,
             hooksSettingsPath,
           })
         : buildCodexSpawnCommand({
@@ -265,7 +264,6 @@ export function createSubagentController(ctx: {
             profileId: targetProfileId,
             sidecarSocketPath: socketPath,
             timeoutMs,
-            model: targetProfile.subagentDefaultModelId,
             notifyScriptPath,
           });
 
@@ -403,7 +401,6 @@ export function createSubagentController(ctx: {
             profileId: existingRun.profileId,
             sidecarSocketPath: socketPath,
             timeoutMs,
-            model: profiles.getProfile(existingRun.profileId).subagentDefaultModelId,
             hooksSettingsPath: resumeHooksSettingsPath,
           })
         : buildCodexSpawnCommand({
@@ -415,7 +412,6 @@ export function createSubagentController(ctx: {
             profileId: existingRun.profileId,
             sidecarSocketPath: socketPath,
             timeoutMs,
-            model: profiles.getProfile(existingRun.profileId).subagentDefaultModelId,
             notifyScriptPath: resumeNotifyScriptPath,
           });
 
