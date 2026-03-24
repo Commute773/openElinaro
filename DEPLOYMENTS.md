@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.11
+- Released at: 2026-03-24T03:10:26Z
+- Release id: 20260324T031026Z-1a51d1c
+- Previous version: 2026.03.24.10
+- Trigger: ci/release workflow
+
+- fix: unify error logging — recordError now always writes to stderr
+
 ## 2026.03.24.10
 - Released at: 2026-03-24T03:03:17Z
 - Release id: 20260324T030317Z-0245fa2
