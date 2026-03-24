@@ -3,9 +3,10 @@ import type { StructuredToolInterface } from "@langchain/core/tools";
 import { tool, type LanguageModelUsage, type ToolSet } from "ai";
 import type { LanguageModelV3FinishReason, LanguageModelV3Usage } from "@ai-sdk/provider";
 import type { ModelMessage, ToolResultOutput } from "@ai-sdk/provider-utils";
-import { extractTextFromMessage, normalizeChatPromptContent } from "./message-content-service";
+import { extractTextFromMessage, normalizeChatPromptContent, resolveRemoteImageUrl } from "./message-content-service";
 import { ToolResultStore } from "./tool-result-store";
 
+const MAX_BASE64_IMAGE_BYTES = 5 * 1024 * 1024;
 const TOOL_RESULT_INLINE_CHAR_THRESHOLD = 1_000;
 const TOOL_RESULT_REFERENCE_ELIGIBLE_TOOLS = new Set([
   "read_file",
@@ -171,6 +172,13 @@ function toModelMessage(message: BaseMessage): ModelMessage | null {
       content: blocks.map((block) => {
         if (block.type === "text") {
           return { type: "text" as const, text: block.text };
+        }
+
+        const remoteUrl = block.data.length > MAX_BASE64_IMAGE_BYTES
+          ? resolveRemoteImageUrl(block.sourceUrl)
+          : null;
+        if (remoteUrl) {
+          return { type: "image" as const, image: new URL(remoteUrl) };
         }
 
         return {

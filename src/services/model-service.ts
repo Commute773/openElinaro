@@ -21,6 +21,7 @@ import {
   approximateContentTokens,
   extractTextFromMessage,
   normalizeChatPromptContent,
+  resolveRemoteImageUrl,
 } from "./message-content-service";
 import {
   UsageTrackingService,
@@ -39,6 +40,7 @@ import { timestamp } from "../utils/timestamp";
 
 export type ModelProviderId = "openai-codex" | "claude";
 const modelTelemetry = telemetry.child({ component: "model" });
+const MAX_ANTHROPIC_BASE64_BYTES = 5 * 1024 * 1024;
 
 const traceSpan = createTraceSpan(modelTelemetry);
 
@@ -766,6 +768,16 @@ function toAnthropicUserContent(content: unknown): string | Array<Record<string,
   return blocks.map((block) => {
     if (block.type === "text") {
       return { type: "text", text: block.text };
+    }
+
+    const remoteUrl = block.data.length > MAX_ANTHROPIC_BASE64_BYTES
+      ? resolveRemoteImageUrl(block.sourceUrl)
+      : null;
+    if (remoteUrl) {
+      return {
+        type: "image",
+        source: { type: "url", url: remoteUrl },
+      };
     }
 
     return {
