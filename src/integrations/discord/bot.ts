@@ -33,6 +33,7 @@ import { sanitizeDiscordText } from "../../services/discord-response-service";
 import { ProfileService } from "../../services/profile-service";
 import { SecretStoreService } from "../../services/secret-store-service";
 import { telemetry } from "../../services/telemetry";
+import { compressImageForApi } from "../../utils/image-compression";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { getRuntimeUserFacingToolNames } from "../../tools/tool-registry";
 import { DiscordAuthSessionManager } from "./auth-session-manager";
@@ -1670,7 +1671,10 @@ async function buildAttachmentBlocks(
           }
 
           const bytes = await downloadAttachment(attachment);
-          const mimeType = detectImageMimeType(bytes) ?? normalizeAttachmentMimeType(attachment) ?? "image/png";
+          const compressed = await compressImageForApi(bytes);
+          const mimeType = compressed.compressed
+            ? compressed.mimeType
+            : detectImageMimeType(bytes) ?? normalizeAttachmentMimeType(attachment) ?? "image/png";
           return [
             {
               type: "text" as const,
@@ -1678,7 +1682,7 @@ async function buildAttachmentBlocks(
             },
             {
               type: "image" as const,
-              data: Buffer.from(bytes).toString("base64"),
+              data: Buffer.from(compressed.data).toString("base64"),
               mimeType,
               sourceUrl: attachment.url,
             },
