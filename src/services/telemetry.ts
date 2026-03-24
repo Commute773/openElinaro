@@ -328,12 +328,20 @@ export class TelemetryService {
   }
 
   recordError(error: unknown, attributes?: TelemetryAttributes) {
+    const message = error instanceof Error ? error.message : String(error);
+    const component = this.component;
+    const operation = typeof attributes?.operation === "string" ? attributes.operation : undefined;
+    const prefix = [component, operation].filter(Boolean).join(".");
+    console.error(`[error${prefix ? ` ${prefix}` : ""}] ${message}`);
+    if (error instanceof Error && error.stack) {
+      console.error(error.stack);
+    }
     this.event("app.error", {
       ...(attributes ?? {}),
       error: normalizeError(error),
     }, {
       level: "error",
-      message: error instanceof Error ? error.message : String(error),
+      message,
       outcome: "error",
     });
   }
