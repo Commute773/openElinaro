@@ -89,6 +89,8 @@ export interface SubagentController {
   getAgentRun: (runId: string) => SubagentRun | undefined;
   listAgentRuns: () => SubagentRun[];
   captureAgentPane: (runId: string, lines?: number) => Promise<string>;
+  /** Read the full terminal buffer (scrollback + visible) for a running agent. */
+  readAgentTerminal: (runId: string) => Promise<string>;
   /** List available subagent providers for the source profile, with descriptions. */
   listAvailableProviders: (profileId?: string) => Array<{ provider: "claude" | "codex"; path: string; description?: string }>;
 }
@@ -495,6 +497,14 @@ export function createSubagentController(ctx: {
       const hasWindow = await tmux.hasWindow(run.id);
       if (!hasWindow) return "(tmux window no longer exists)";
       return tmux.capturePane(run.id, lines);
+    },
+
+    readAgentTerminal: async (runId) => {
+      const run = registry.get(runId);
+      if (!run) return `No agent run found for ${runId}.`;
+      const hasWindow = await tmux.hasWindow(run.id);
+      if (!hasWindow) return "(tmux window no longer exists)";
+      return tmux.readTerminal(run.id);
     },
 
     listAvailableProviders: (profileId) => {
