@@ -106,6 +106,7 @@ export const TOOL_AUTH_DECLARATIONS: Record<string, ToolAuthorizationDeclaration
   steer_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can receive steering instructions." },
   cancel_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can be cancelled." },
   agent_status: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile are returned." },
+  read_agent_terminal: { access: "anyone", behavior: "role-sensitive", note: "Only terminal output for runs visible to the active profile is returned." },
 };
 
 export function getToolAuthorizationDeclaration(name: string): ToolAuthorizationDeclaration {
