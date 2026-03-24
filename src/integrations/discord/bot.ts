@@ -955,13 +955,18 @@ async function handleSlashCommand(params: {
       return;
     }
     await deferInteractionReply(interaction);
-    await app.invokeRoutineTool("update", {}, {
+    const updateResult = await app.invokeRoutineTool("update", {}, {
       conversationKey: getDiscordConversationKey(interaction),
     });
-    await replyWithChunks(
-      interaction,
-      "updating... don't send messages. you'll get `update complete` when it's done.",
-    );
+    const resultText = typeof updateResult === "string" ? updateResult : String(updateResult ?? "");
+    if (resultText.includes("Update skipped") || resultText.includes("Nothing to deploy") || resultText.includes("already at version")) {
+      await replyWithChunks(interaction, resultText);
+    } else {
+      await replyWithChunks(
+        interaction,
+        "updating... don't send messages. you'll get `update complete` when it's done.",
+      );
+    }
     return;
   }
 
