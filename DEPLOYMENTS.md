@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.24.9
+- Released at: 2026-03-24T02:53:47Z
+- Release id: 20260324T025347Z-fb25f3c
+- Previous version: 2026.03.24.8
+- Trigger: ci/release workflow
+
+- fix: start healthcheck watcher before Discord gateway connects
+
 ## 2026.03.24.8
 - Released at: 2026-03-24T02:39:45Z
 - Release id: 20260324T023945Z-74fcce0
