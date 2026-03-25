@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.25.2
+- Released at: 2026-03-25T00:28:19Z
+- Release id: 20260325T002819Z-1ed1d54
+- Previous version: 2026.03.25
+- Trigger: ci/release workflow
+
+- docs: add bug fix reproduction policy to CLAUDE.md
+
 ## 2026.03.25
 - Released at: 2026-03-25T00:19:53Z
 - Release id: 20260325T001953Z-67155d8
