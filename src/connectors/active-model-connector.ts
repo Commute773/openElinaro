@@ -302,6 +302,20 @@ function toPiMessages(message: ModelMessage): Message[] {
               data: typeof part.image === "string" ? part.image : String(part.image),
               mimeType,
             });
+            continue;
+          }
+          // AI SDK v3 converts image parts to file parts internally
+          if (part.type === "file" && typeof part.mediaType === "string" && part.mediaType.startsWith("image/")) {
+            const imageData = part.data;
+            content.push({
+              type: "image",
+              data: typeof imageData === "string"
+                ? imageData
+                : imageData instanceof Uint8Array
+                  ? Buffer.from(imageData).toString("base64")
+                  : String(imageData),
+              mimeType: part.mediaType,
+            });
           }
         }
         return [{

@@ -227,6 +227,67 @@ describe("ActiveModelConnector", () => {
     expect(messages).toEqual(["Llvind is typing..."]);
   });
 
+  test("converts AI SDK v3 file-type image parts to pi-ai image blocks", async () => {
+    const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
+    const connectorModule = await importFresh<typeof import("./active-model-connector")>("src/connectors/active-model-connector.ts");
+
+    const modelService = new modelModule.ModelService({
+      id: "root",
+      name: "Root",
+      roles: ["root"],
+      memoryNamespace: "root",
+      preferredProvider: "openai-codex",
+      defaultModelId: "gpt-5.4",
+    });
+    const connector = new connectorModule.ActiveModelConnector(modelService);
+
+    // Capture messages sent to the mock stream
+    let capturedMessages: Array<{ role: string; content: unknown }> = [];
+    const piAi = await import("@mariozechner/pi-ai");
+    const originalStream = piAi.stream;
+    mock.module("@mariozechner/pi-ai", () => ({
+      ...piAi,
+      getModels: piAi.getModels,
+      stream: (model: unknown, context: { messages?: Array<{ role: string; content: unknown }> }, options: { transport?: string }) => {
+        capturedMessages = context.messages ?? [];
+        transportAttempts.push(options.transport ?? "auto");
+        return {
+          async *[Symbol.asyncIterator]() {},
+          result: async () => buildProviderResponse({ content: [{ type: "text", text: "saw image" }] }),
+        };
+      },
+    }));
+
+    await connector.doGenerate({
+      prompt: [
+        { role: "system", content: "Test." },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Here is an image." },
+            // AI SDK v3 converts image parts to file parts:
+            { type: "file", data: "iVBORw0KGgo=", mediaType: "image/png", filename: undefined },
+          ],
+        },
+      ],
+      providerOptions: {
+        openelinaro: {
+          sessionId: "session:image-file",
+          conversationKey: "conversation:image-file",
+          usagePurpose: "chat_turn",
+        },
+      },
+    } as never);
+
+    const userMessage = capturedMessages.find((m) => m.role === "user");
+    expect(userMessage).toBeDefined();
+    const blocks = userMessage!.content as Array<{ type: string; data?: string; mimeType?: string }>;
+    const imageBlock = blocks.find((b) => b.type === "image");
+    expect(imageBlock).toBeDefined();
+    expect(imageBlock!.data).toBe("iVBORw0KGgo=");
+    expect(imageBlock!.mimeType).toBe("image/png");
+  });
+
   test("records prompt diagnostics in the usage ledger", async () => {
     const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
     const connectorModule = await importFresh<typeof import("./active-model-connector")>("src/connectors/active-model-connector.ts");
