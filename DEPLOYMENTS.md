@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.25
+- Released at: 2026-03-25T00:19:53Z
+- Release id: 20260325T001953Z-67155d8
+- Previous version: 2026.03.24.24
+- Trigger: ci/release workflow
+
+- fix: handle AI SDK v3 converting image parts to file type
+
 ## 2026.03.24.24
 - Released at: 2026-03-24T23:45:28Z
 - Release id: 20260324T234528Z-005933f
