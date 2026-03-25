@@ -63,6 +63,29 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 - **Type check:** `bun run check`
 - Versioning is handled automatically by CI on merge to `main`. Do not run `bun run service:prepare-update` manually.
 
+## Bug Fix Policy
+
+Bugs MUST be reproduced with a failing test before they are fixed. Do not guess at the fix based on code reading alone — write a test that demonstrates the broken behavior, confirm it fails, then fix the code and confirm the test passes. This applies to all bugs, not just regressions.
+
+### Use real APIs for e2e reproduction
+
+The agent is allowed and encouraged to use real model APIs (Claude, Codex) when reproducing bugs, especially for end-to-end issues that span multiple layers (Discord attachment → message storage → AI SDK → provider connector → model API). Mocked tests at the unit level are fine for preventing regressions, but the initial reproduction should go through the real pipeline whenever practical.
+
+The existing paid e2e test pattern (`src/app/runtime-image.paid.e2e.test.ts` and `src/app/runtime-image.e2e.runner.ts`) shows how to do this: spin up a real `OpenElinaroApp` with real API credentials and assert on actual model behavior.
+
+### Isolation from production state
+
+When running e2e tests or reproducing bugs:
+
+- Never read from or write to `~/.openelinaro/` directly. Use `~/.openelinarotest/` or a temp directory with `OPENELINARO_ROOT_DIR` set.
+- Copy only what the test needs (auth credentials, system prompts, profile registry) from the machine test fixtures directory.
+- Never connect to the live Discord gateway. Use `handleRequest` or the `FakeDirectMessage` test harness instead.
+- Clean up temp directories after the test completes.
+
+### E2e assertion quality
+
+Do not write e2e assertions that pass when the feature is broken. For example, if testing that a model can see an image, assert that the model describes specific visual content (e.g., "red", "pixel") that it could only know from actually seeing the image — not just that it mentions the word "image" in its response, which it would do even when saying "I cannot see the image."
+
 ## Start Here
 
 - Docs index: [docs/README.md](docs/README.md)
