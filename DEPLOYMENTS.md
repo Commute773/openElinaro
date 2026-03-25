@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.25.4
+- Released at: 2026-03-25T17:37:06Z
+- Release id: 20260325T173706Z-8c065c4
+- Previous version: 2026.03.25.3
+- Trigger: ci/release workflow
+
+- feat: support launching subagents on remote machines via SSH
+
 ## 2026.03.25.3
 - Released at: 2026-03-25T15:53:53Z
 - Release id: 20260325T155353Z-e584665
