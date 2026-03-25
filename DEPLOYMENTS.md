@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.25.5
+- Released at: 2026-03-25T17:52:43Z
+- Release id: 20260325T175243Z-83eec99
+- Previous version: 2026.03.25.4
+- Trigger: ci/release workflow
+
+- feat: add SSH profile e2e tests using real SSH to localhost
+
 ## 2026.03.25.4
 - Released at: 2026-03-25T17:37:06Z
 - Release id: 20260325T173706Z-8c065c4
