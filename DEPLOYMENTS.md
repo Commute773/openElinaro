@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.25.6
+- Released at: 2026-03-25T22:40:12Z
+- Release id: 20260325T224012Z-988b729
+- Previous version: 2026.03.25.5
+- Trigger: ci/release workflow
+
+- fix: prevent alarm reminder runaway by enforcing maxReminders and timezone correction
+
 ## 2026.03.25.5
 - Released at: 2026-03-25T17:52:43Z
 - Release id: 20260325T175243Z-83eec99
