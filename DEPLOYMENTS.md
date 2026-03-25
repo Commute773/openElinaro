@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.25.7
+- Released at: 2026-03-25T23:12:46Z
+- Release id: 20260325T231246Z-3d95da6
+- Previous version: 2026.03.25.6
+- Trigger: ci/release workflow
+
+- feat: add dayResetHour setting to shift routine day boundary
+
 ## 2026.03.25.6
 - Released at: 2026-03-25T22:40:12Z
 - Release id: 20260325T224012Z-988b729
