@@ -99,6 +99,7 @@ export class RoutinesStore {
       settings: {
         timezone: raw.settings?.timezone || getLocalTimezone(),
         notificationTargetUserId: raw.settings?.notificationTargetUserId,
+        dayResetHour: raw.settings?.dayResetHour,
         workBlock:
           raw.settings?.workBlock ?? createEmptyStore().settings.workBlock,
         sleepBlock:

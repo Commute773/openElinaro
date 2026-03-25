@@ -153,19 +153,22 @@ function findDailyWithDaysOccurrence(
   schedule: Extract<RoutineSchedule, { kind: "daily" }>,
   days: Weekday[],
   now: Date,
+  dayResetHour = 0,
 ) {
-  // If today is a matching day, behave like a plain daily schedule.
-  if (days.includes(weekdayKey(now))) {
-    const dueAt = setTime(now, schedule.time);
+  const dayAnchor = new Date(now.getTime() - dayResetHour * 3600000);
+
+  // If the anchor day is a matching day, behave like a plain daily schedule.
+  if (days.includes(weekdayKey(dayAnchor))) {
+    const dueAt = setTime(dayAnchor, schedule.time);
     return {
-      occurrenceKey: localDateKey(dueAt),
+      occurrenceKey: localDateKey(dayAnchor),
       dueAt,
       state: dueAt.getTime() <= now.getTime() ? ("due" as const) : ("upcoming" as const),
     };
   }
 
-  // Today is not a matching day — find the nearest upcoming matching day.
-  const today = startOfDay(now);
+  // Anchor day is not a matching day — find the nearest upcoming matching day.
+  const today = startOfDay(dayAnchor);
   let bestUpcoming: Date | null = null;
 
   for (let offset = 1; offset <= 7; offset += 1) {
@@ -238,6 +241,7 @@ function findMonthlyOccurrence(
 function findCurrentOccurrence(
   item: RoutineItem,
   now: Date,
+  dayResetHour = 0,
 ): { occurrenceKey: string; dueAt: Date; state: "due" | "upcoming" } | null {
   const schedule = item.schedule;
   if (schedule.kind === "manual") {
@@ -258,11 +262,12 @@ function findCurrentOccurrence(
 
   if (schedule.kind === "daily") {
     if (schedule.days && schedule.days.length > 0) {
-      return findDailyWithDaysOccurrence(schedule, schedule.days, now);
+      return findDailyWithDaysOccurrence(schedule, schedule.days, now, dayResetHour);
     }
-    const dueAt = setTime(now, schedule.time);
+    const dayAnchor = new Date(now.getTime() - dayResetHour * 3600000);
+    const dueAt = setTime(dayAnchor, schedule.time);
     return {
-      occurrenceKey: localDateKey(dueAt),
+      occurrenceKey: localDateKey(dayAnchor),
       dueAt,
       state: dueAt.getTime() <= now.getTime() ? "due" : "upcoming",
     };
@@ -290,7 +295,7 @@ function findCurrentOccurrence(
   };
 }
 
-function countsAsCompleted(item: RoutineItem, occurrence: { dueAt: Date }) {
+function countsAsCompleted(item: RoutineItem, occurrence: { dueAt: Date }, dayResetHour = 0) {
   const lastCompleted = parseIso(item.state.lastCompletedAt);
   if (!lastCompleted) {
     return false;
@@ -304,7 +309,8 @@ function countsAsCompleted(item: RoutineItem, occurrence: { dueAt: Date }) {
     return lastCompleted.getTime() >= occurrence.dueAt.getTime();
   }
 
-  return isSameLocalDay(lastCompleted, occurrence.dueAt);
+  const shiftMs = dayResetHour * 3600000;
+  return localDateKey(new Date(lastCompleted.getTime() - shiftMs)) === localDateKey(new Date(occurrence.dueAt.getTime() - shiftMs));
 }
 
 function countsAsSkipped(item: RoutineItem, occurrenceKey: string) {
@@ -920,6 +926,7 @@ export class RoutinesService {
 
   assessNow(reference: Date = new Date()) {
     const data = this.store.load();
+    const dayResetHour = data.settings.dayResetHour ?? 0;
     const effectiveTimezone = data.settings.quietHours?.timezone ?? data.settings.timezone;
     const now = nowInTimezone(effectiveTimezone, reference);
     const context = computeRoutineContext(data, now, effectiveTimezone);
@@ -933,7 +940,7 @@ export class RoutinesService {
         continue;
       }
 
-      const occurrence = findCurrentOccurrence(item, now);
+      const occurrence = findCurrentOccurrence(item, now, dayResetHour);
       const isManualBacklog = item.schedule.kind === "manual"
         && (isTodoKind(item.kind) || item.kind === "deadline" || item.kind === "precommitment");
       if (!occurrence && !isManualBacklog) {
@@ -942,7 +949,7 @@ export class RoutinesService {
 
       if (
         occurrence
-        && (countsAsCompleted(item, occurrence) || countsAsSkipped(item, occurrence.occurrenceKey))
+        && (countsAsCompleted(item, occurrence, dayResetHour) || countsAsSkipped(item, occurrence.occurrenceKey))
       ) {
         continue;
       }
@@ -1171,7 +1178,8 @@ export class RoutinesService {
     }
 
     const now = nowInTimezone(data.settings.timezone, reference);
-    const occurrence = findCurrentOccurrence(item, now);
+    const dayResetHour = data.settings.dayResetHour ?? 0;
+    const occurrence = findCurrentOccurrence(item, now, dayResetHour);
     if (occurrence) {
       item.state.skippedOccurrenceKeys = trimHistory(
         item.state.skippedOccurrenceKeys.concat(occurrence.occurrenceKey),
@@ -1392,16 +1400,17 @@ export class RoutinesService {
 
   hasAlarmRoutinesDueNow(reference: Date = new Date()) {
     const data = this.store.load();
+    const dayResetHour = data.settings.dayResetHour ?? 0;
     const now = nowInTimezone(data.settings.timezone, reference);
     for (const item of this.filterVisibleItems(Object.values(data.items))) {
       if (!item.alarm || !item.enabled || item.status !== "active") {
         continue;
       }
-      const occurrence = findCurrentOccurrence(item, now);
+      const occurrence = findCurrentOccurrence(item, now, dayResetHour);
       if (!occurrence || occurrence.state !== "due") {
         continue;
       }
-      if (countsAsCompleted(item, occurrence) || countsAsSkipped(item, occurrence.occurrenceKey)) {
+      if (countsAsCompleted(item, occurrence, dayResetHour) || countsAsSkipped(item, occurrence.occurrenceKey)) {
         continue;
       }
       if (currentReminderCount(item, occurrence.occurrenceKey) >= item.reminder.maxReminders) {
