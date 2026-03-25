@@ -1037,4 +1037,122 @@ describe("RoutinesService", () => {
     });
     expect(withoutDays).toEqual({ kind: "daily", time: "09:00" });
   });
+
+  // --- Bug fix tests: alarm reminder runaway ---
+
+  test("upcoming high-salience path respects maxReminders", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    // Create an alarm med item scheduled at 10:00
+    const item = service.addItem({
+      title: "Melatonin alarm",
+      kind: "med",
+      alarm: true,
+      priority: "high",
+      schedule: { kind: "daily", time: "10:00" },
+      reminder: { followUpMinutes: 60, maxReminders: 3, escalate: true },
+    });
+
+    // Simulate having already been reminded maxReminders times for today's occurrence.
+    // At 09:30 the item is "upcoming" and within 60 minutes of due.
+    // First, figure out what the occurrence key would be at 09:30 UTC.
+    const referenceTime = new Date("2026-03-17T09:30:00.000Z");
+    const preAssessment = service.assessNow(referenceTime);
+    const preEntry = preAssessment.items.find((i) => i.item.id === item.id);
+    expect(preEntry).toBeTruthy();
+    expect(preEntry?.state).toBe("upcoming");
+    const occurrenceKey = preEntry!.occurrenceKey;
+
+    // Mark reminded 3 times (maxReminders) for this occurrence
+    for (let i = 0; i < 3; i++) {
+      service.markReminded(
+        [item.id],
+        [occurrenceKey],
+        new Date(`2026-03-17T09:${10 + i}:00.000Z`),
+      );
+    }
+
+    // Now assess again at 09:30 — should NOT fire because count >= maxReminders
+    const assessment = service.assessNow(referenceTime);
+    const entry = assessment.items.find((i) => i.item.id === item.id);
+    expect(entry).toBeTruthy();
+    expect(entry?.shouldRemindNow).toBe(false);
+  });
+
+  test("getNextRoutineAttentionAt returns future time for non-local timezone", () => {
+    const service = new RoutinesService();
+    // Use Pacific/Honolulu (UTC-10), which is behind both EDT and UTC.
+    // On an EDT (UTC-4) machine, the fake-local-as-UTC trick produces a Date whose
+    // epoch is 6 hours behind the real reference, so nextAttentionAt for a "due" item
+    // (where nextAttentionAt = now = fakeLocal) ends up in the past relative to the
+    // real reference time.
+    // Must also set quietHours.timezone to match, since assessNow uses
+    // quietHours.timezone as effectiveTimezone when it exists.
+    service.saveData({
+      ...service.loadData(),
+      settings: {
+        ...service.loadData().settings,
+        timezone: "Pacific/Honolulu",
+        quietHours: {
+          enabled: false,
+          timezone: "Pacific/Honolulu",
+          start: "00:01",
+          end: "09:00",
+        },
+      },
+    });
+    service.addItem({
+      title: "Morning meds Honolulu",
+      kind: "med",
+      priority: "high",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    // Reference: 2026-03-17T20:00:00Z = 2026-03-17 10:00 HST (UTC-10).
+    // In Hawaii time the item (scheduled 09:00) is already due (10:00 > 09:00).
+    // So assessNow sets nextAttentionAt = now (the fake-local Date).
+    // The returned value must still be >= reference (real UTC) for the scheduler to work.
+    const reference = new Date("2026-03-17T20:00:00.000Z");
+    const nextAttentionAt = service.getNextRoutineAttentionAt(reference);
+
+    expect(nextAttentionAt).not.toBeNull();
+    const nextDate = new Date(nextAttentionAt!);
+    expect(nextDate.getTime()).toBeGreaterThanOrEqual(reference.getTime());
+  });
+
+  test("hasAlarmRoutinesDueNow returns false when reminders exhausted", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC" },
+    });
+    const item = service.addItem({
+      title: "Alarm med exhausted",
+      kind: "med",
+      alarm: true,
+      schedule: { kind: "daily", time: "09:00" },
+      reminder: { followUpMinutes: 60, maxReminders: 3, escalate: true },
+    });
+
+    // At 09:05 it's due — should return true before any reminders
+    expect(service.hasAlarmRoutinesDueNow(new Date("2026-03-17T09:05:00.000Z"))).toBe(true);
+
+    // The occurrence key for a daily schedule at 09:00 on 2026-03-17 is "2026-03-17"
+    const occurrenceKey = "2026-03-17";
+
+    // Mark reminded 3 times (maxReminders)
+    for (let i = 0; i < 3; i++) {
+      service.markReminded(
+        [item.id],
+        [occurrenceKey],
+        new Date(`2026-03-17T09:${String(5 + i).padStart(2, "0")}:00.000Z`),
+      );
+    }
+
+    // Now hasAlarmRoutinesDueNow should return false — reminders exhausted
+    expect(service.hasAlarmRoutinesDueNow(new Date("2026-03-17T09:30:00.000Z"))).toBe(false);
+  });
 });

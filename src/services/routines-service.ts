@@ -1009,6 +1009,7 @@ export class RoutinesService {
       } else if (
         occurrence?.state === "upcoming" &&
         minutesUntilDue <= 60 &&
+        count < item.reminder.maxReminders &&
         (item.priority === "high" || item.priority === "urgent" || item.kind === "med")
       ) {
         shouldRemindNow = true;
@@ -1403,6 +1404,9 @@ export class RoutinesService {
       if (countsAsCompleted(item, occurrence) || countsAsSkipped(item, occurrence.occurrenceKey)) {
         continue;
       }
+      if (currentReminderCount(item, occurrence.occurrenceKey) >= item.reminder.maxReminders) {
+        continue;
+      }
       const snoozedUntil = parseIso(item.state.snoozedUntil);
       if (snoozedUntil && snoozedUntil.getTime() > now.getTime()) {
         continue;
@@ -1414,7 +1418,11 @@ export class RoutinesService {
 
   getNextRoutineAttentionAt(reference: Date = new Date()) {
     const data = this.store.load();
-    const now = nowInTimezone(data.settings.timezone, reference);
+    const effectiveTimezone = data.settings.quietHours?.timezone ?? data.settings.timezone;
+    const fakeLocal = nowInTimezone(effectiveTimezone, reference);
+    // assessNow computes nextAttentionAt in fake-local-as-UTC time (via nowInTimezone).
+    // Convert back to real UTC so the caller (scheduleNextRun) can compare against Date.now().
+    const fakeToRealOffset = reference.getTime() - fakeLocal.getTime();
     const assessment = this.assessNow(reference);
     const nextAttention = assessment.items
       .map((item) => item.nextAttentionAt)
@@ -1427,20 +1435,25 @@ export class RoutinesService {
       return null;
     }
 
+    // Shift from fake-local-as-UTC back to real UTC
+    const nextAttentionReal = new Date(nextAttention.getTime() + fakeToRealOffset);
+
     const { quietHours } = data.settings;
     if (!quietHours.enabled) {
-      return nextAttention.toISOString();
+      return nextAttentionReal.toISOString();
     }
 
     const quietNow = nowInTimezone(quietHours.timezone, reference);
     if (!isWithinTimeWindow(quietNow, quietHours)) {
-      return nextAttention.toISOString();
+      return nextAttentionReal.toISOString();
     }
 
     const nextAllowed = nextWindowBoundary(quietNow, quietHours);
-    if (nextAllowed.getTime() > nextAttention.getTime()) {
-      return nextAllowed.toISOString();
+    // nextAllowed is also in fake-local-as-UTC; convert it too
+    const nextAllowedReal = new Date(nextAllowed.getTime() + fakeToRealOffset);
+    if (nextAllowedReal.getTime() > nextAttentionReal.getTime()) {
+      return nextAllowedReal.toISOString();
     }
-    return nextAttention.toISOString();
+    return nextAttentionReal.toISOString();
   }
 }
