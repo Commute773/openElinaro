@@ -260,6 +260,54 @@ export function writeCodexNotifyConfig(params: {
 }
 
 /**
+ * Wrap an inner spawn command in an SSH invocation.
+ *
+ * The returned string runs the agent binary on a remote machine via SSH.
+ * The inner command (from buildClaudeSpawnCommand/buildCodexSpawnCommand)
+ * is executed inside a remote shell after cd-ing into the remote working
+ * directory.
+ *
+ * Uses -t for pseudo-terminal allocation (needed for interactive claude)
+ * and strict identity options to avoid SSH agent key confusion.
+ */
+export function buildSshWrappedSpawnCommand(params: {
+  innerCommand: string;
+  host: string;
+  user: string;
+  port?: number;
+  keyPath: string;
+  remoteCwd: string;
+}): string {
+  const sshParts = [
+    "ssh",
+    "-t",
+    "-i", params.keyPath,
+    "-o", "IdentitiesOnly=yes",
+    "-o", "StrictHostKeyChecking=accept-new",
+  ];
+  if (params.port) {
+    sshParts.push("-p", String(params.port));
+  }
+  sshParts.push(`${params.user}@${params.host}`);
+
+  // Escape single quotes in the inner command for the remote shell:
+  // replace each ' with '\'' (end current single-quote, add escaped quote, resume single-quote)
+  const escapedInner = params.innerCommand.replace(/'/g, "'\\''");
+  const remoteScript = `cd ${shellQuote(params.remoteCwd)} && ${escapedInner}`;
+  sshParts.push(`'${remoteScript}'`);
+
+  return sshParts.join(" ");
+}
+
+/**
+ * Shell-quote a string for use in a remote sh command.
+ * Wraps the value in single quotes, escaping any embedded single quotes.
+ */
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+/**
  * Clean up hook scripts for a completed run.
  */
 export function cleanupHooksDir(runId: string): void {
