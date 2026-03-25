@@ -82,6 +82,7 @@ export interface CalendarHintEvent {
 export interface RoutineSettings {
   timezone: string;
   notificationTargetUserId?: string;
+  dayResetHour?: number;
   workBlock: TimeBlockDefinition;
   sleepBlock: TimeBlockDefinition;
   quietHours: QuietHoursSettings;

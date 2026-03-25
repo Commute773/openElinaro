@@ -1155,4 +1155,107 @@ describe("RoutinesService", () => {
     // Now hasAlarmRoutinesDueNow should return false — reminders exhausted
     expect(service.hasAlarmRoutinesDueNow(new Date("2026-03-17T09:30:00.000Z"))).toBe(false);
   });
+
+  // --- dayResetHour tests ---
+
+  test("dayResetHour=4: daily med at 21:00 is still due at 02:00 next day with previous day key", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC", dayResetHour: 4 },
+    });
+    const item = service.addItem({
+      title: "Melatonin",
+      kind: "med",
+      schedule: { kind: "daily", time: "21:00" },
+    });
+
+    // At 02:00 March 25 (still in "March 24" routine day because dayResetHour=4)
+    // dayAnchor = 02:00 - 4h = 22:00 March 24
+    // dueAt = 21:00 March 24
+    // key = "2026-03-24"
+    // 21:00 March 24 <= 02:00 March 25 => "due"
+    const assessment = service.assessNow(new Date("2026-03-25T02:00:00.000Z"));
+    const entry = assessment.items.find((i) => i.item.id === item.id);
+    expect(entry).toBeTruthy();
+    expect(entry?.state).toBe("due");
+    expect(entry?.occurrenceKey).toBe("2026-03-24");
+
+    // At 04:01 March 25 (new routine day "March 25")
+    // dayAnchor = 04:01 - 4h = 00:01 March 25
+    // dueAt = 21:00 March 25
+    // key = "2026-03-25"
+    // 21:00 March 25 > 04:01 March 25 => "upcoming"
+    const assessment2 = service.assessNow(new Date("2026-03-25T04:01:00.000Z"));
+    const entry2 = assessment2.items.find((i) => i.item.id === item.id);
+    expect(entry2).toBeTruthy();
+    expect(entry2?.state).toBe("upcoming");
+    expect(entry2?.occurrenceKey).toBe("2026-03-25");
+  });
+
+  test("dayResetHour=4: completion across midnight counts as same routine day", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC", dayResetHour: 4 },
+    });
+    const item = service.addItem({
+      title: "Evening meds",
+      kind: "med",
+      schedule: { kind: "daily", time: "21:00" },
+    });
+
+    // Complete at 01:00 March 25 (still routine day "March 24" with dayResetHour=4)
+    service.markDone(item.id, new Date("2026-03-25T01:00:00.000Z"));
+
+    // At 02:00 March 25, the item should be considered completed for the "March 24" occurrence
+    // because the completion at 01:00 is in the same routine day as the 21:00 due time
+    const assessment = service.assessNow(new Date("2026-03-25T02:00:00.000Z"));
+    const entry = assessment.items.find((i) => i.item.id === item.id);
+    // Should not appear because it's counted as completed for the "March 24" routine day
+    expect(entry).toBeUndefined();
+
+    // At 22:00 March 25 (now in routine day "March 25"), the item should appear again
+    // because the completion at 01:00 was for routine day "March 24", not "March 25"
+    const assessment2 = service.assessNow(new Date("2026-03-25T22:00:00.000Z"));
+    const entry2 = assessment2.items.find((i) => i.item.id === item.id);
+    expect(entry2).toBeTruthy();
+    expect(entry2?.state).toBe("due");
+    expect(entry2?.occurrenceKey).toBe("2026-03-25");
+  });
+
+  test("dayResetHour=4: morning check-in at 08:00 is due for previous day at 03:30", () => {
+    const service = new RoutinesService();
+    service.saveData({
+      ...service.loadData(),
+      settings: { ...service.loadData().settings, timezone: "UTC", dayResetHour: 4 },
+    });
+    const item = service.addItem({
+      title: "Morning check-in",
+      kind: "routine",
+      schedule: { kind: "daily", time: "08:00" },
+    });
+
+    // At 03:30 March 25 (still routine day "March 24" with dayResetHour=4)
+    // dayAnchor = 03:30 - 4h = 23:30 March 24
+    // dueAt = 08:00 March 24
+    // key = "2026-03-24"
+    // 08:00 March 24 <= 03:30 March 25 => "due" (overdue from previous routine day)
+    const assessment = service.assessNow(new Date("2026-03-25T03:30:00.000Z"));
+    const entry = assessment.items.find((i) => i.item.id === item.id);
+    expect(entry).toBeTruthy();
+    expect(entry?.state).toBe("due");
+    expect(entry?.occurrenceKey).toBe("2026-03-24");
+
+    // At 04:30 March 25 (new routine day "March 25")
+    // dayAnchor = 04:30 - 4h = 00:30 March 25
+    // dueAt = 08:00 March 25
+    // key = "2026-03-25"
+    // 08:00 March 25 > 04:30 March 25 => "upcoming"
+    const assessment2 = service.assessNow(new Date("2026-03-25T04:30:00.000Z"));
+    const entry2 = assessment2.items.find((i) => i.item.id === item.id);
+    expect(entry2).toBeTruthy();
+    expect(entry2?.state).toBe("upcoming");
+    expect(entry2?.occurrenceKey).toBe("2026-03-25");
+  });
 });
