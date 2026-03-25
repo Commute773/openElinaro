@@ -5,6 +5,7 @@ export { SubagentRegistry, nextSubagentRunId } from "./registry";
 export {
   buildClaudeSpawnCommand,
   buildCodexSpawnCommand,
+  buildSshWrappedSpawnCommand,
   writeClaudeHooksConfig,
   writeCodexNotifyConfig,
   cleanupHooksDir,

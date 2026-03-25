@@ -17,6 +17,7 @@ import {
   nextSubagentRunId,
   buildClaudeSpawnCommand,
   buildCodexSpawnCommand,
+  buildSshWrappedSpawnCommand,
   writeClaudeHooksConfig,
   writeCodexNotifyConfig,
 } from "../subagent";
@@ -194,13 +195,15 @@ export function createSubagentController(ctx: {
       // Resolve provider
       const provider: SubagentProvider = params.provider
         ?? profiles.resolveSubagentProvider(targetProfile);
+      const isSsh = profiles.isSshExecutionProfile(targetProfile);
       const binaryPath = profiles.getSubagentBinaryPath(targetProfile, provider);
       if (!binaryPath) {
         throw new Error(
           `No ${provider} binary path configured for profile ${targetProfileId}. Set subagentPaths.${provider} in the profile registry.`,
         );
       }
-      if (!fs.existsSync(binaryPath)) {
+      // Skip local binary existence check for SSH profiles — the binary lives on the remote machine
+      if (!isSsh && !fs.existsSync(binaryPath)) {
         throw new Error(`Subagent binary not found: ${binaryPath}`);
       }
 
@@ -233,19 +236,24 @@ export function createSubagentController(ctx: {
         }
       }
 
-      // Write hook/notify config
+      // Write hook/notify config — skip for SSH profiles since hooks reference
+      // the local sidecar Unix socket which is unreachable from the remote machine.
+      // Completion detection for SSH profiles relies on the early health check
+      // (tmux process alive check) and the timeout system.
       const socketPath = sidecar.socketPath;
       let hooksSettingsPath: string | undefined;
       let notifyScriptPath: string | undefined;
-      if (provider === "claude") {
-        const hookResult = writeClaudeHooksConfig({ runId, worktreeCwd: workspaceCwd, sidecarSocketPath: socketPath });
-        hooksSettingsPath = hookResult.settingsPath;
-      } else {
-        notifyScriptPath = writeCodexNotifyConfig({ runId, sidecarSocketPath: socketPath });
+      if (!isSsh) {
+        if (provider === "claude") {
+          const hookResult = writeClaudeHooksConfig({ runId, worktreeCwd: workspaceCwd, sidecarSocketPath: socketPath });
+          hooksSettingsPath = hookResult.settingsPath;
+        } else {
+          notifyScriptPath = writeCodexNotifyConfig({ runId, sidecarSocketPath: socketPath });
+        }
       }
 
       // Build spawn command
-      const spawnCommand = provider === "claude"
+      let spawnCommand = provider === "claude"
         ? buildClaudeSpawnCommand({
             runId,
             provider,
@@ -269,6 +277,24 @@ export function createSubagentController(ctx: {
             notifyScriptPath,
           });
 
+      // For SSH profiles, wrap the spawn command in an SSH invocation so the
+      // agent binary runs on the remote machine instead of locally.
+      if (isSsh) {
+        const execution = profiles.getExecution(targetProfile);
+        if (!execution || execution.kind !== "ssh") {
+          throw new Error(`Profile ${targetProfileId} is marked as SSH but has no SSH execution config.`);
+        }
+        const { privateKeyPath } = profiles.ensureProfileSshKeyPair(targetProfile);
+        spawnCommand = buildSshWrappedSpawnCommand({
+          innerCommand: spawnCommand,
+          host: execution.host,
+          user: execution.user,
+          port: execution.port,
+          keyPath: privateKeyPath,
+          remoteCwd: workspaceCwd,
+        });
+      }
+
       // Create run record
       const run = registry.create({
         id: runId,
@@ -287,8 +313,10 @@ export function createSubagentController(ctx: {
         timeoutMs,
       });
 
-      // Spawn in tmux
-      await tmux.runInWindow(runId, spawnCommand, workspaceCwd);
+      // Spawn in tmux — for SSH profiles, use a local fallback cwd since the
+      // real working directory is on the remote machine (handled inside the SSH command).
+      const tmuxCwd = isSsh ? "/tmp" : workspaceCwd;
+      await tmux.runInWindow(runId, spawnCommand, tmuxCwd);
       registry.markStarted(runId);
 
       // Register timeout
@@ -367,33 +395,37 @@ export function createSubagentController(ctx: {
       const config = getSubagentConfig();
       const timeoutMs = params.timeoutMs ?? existingRun.timeoutMs ?? config.defaultTimeoutMs ?? DEFAULT_SUBAGENT_TIMEOUT_MS;
 
+      const resumeTargetProfile = profiles.getProfile(existingRun.profileId);
+      const isResumeSsh = profiles.isSshExecutionProfile(resumeTargetProfile);
       const binaryPath = profiles.getSubagentBinaryPath(
-        profiles.getProfile(existingRun.profileId),
+        resumeTargetProfile,
         existingRun.provider,
       );
       if (!binaryPath) {
         throw new Error(`No ${existingRun.provider} binary path configured for profile ${existingRun.profileId}.`);
       }
 
-      // Re-write hooks (in case socket path changed)
+      // Re-write hooks (in case socket path changed) — skip for SSH profiles
       const socketPath = sidecar.socketPath;
       let resumeHooksSettingsPath: string | undefined;
       let resumeNotifyScriptPath: string | undefined;
-      if (existingRun.provider === "claude") {
-        const hookResult = writeClaudeHooksConfig({
-          runId: existingRun.id,
-          worktreeCwd: existingRun.workspaceCwd,
-          sidecarSocketPath: socketPath,
-        });
-        resumeHooksSettingsPath = hookResult.settingsPath;
-      } else {
-        resumeNotifyScriptPath = writeCodexNotifyConfig({
-          runId: existingRun.id,
-          sidecarSocketPath: socketPath,
-        });
+      if (!isResumeSsh) {
+        if (existingRun.provider === "claude") {
+          const hookResult = writeClaudeHooksConfig({
+            runId: existingRun.id,
+            worktreeCwd: existingRun.workspaceCwd,
+            sidecarSocketPath: socketPath,
+          });
+          resumeHooksSettingsPath = hookResult.settingsPath;
+        } else {
+          resumeNotifyScriptPath = writeCodexNotifyConfig({
+            runId: existingRun.id,
+            sidecarSocketPath: socketPath,
+          });
+        }
       }
 
-      const spawnCommand = existingRun.provider === "claude"
+      let spawnCommand = existingRun.provider === "claude"
         ? buildClaudeSpawnCommand({
             runId: existingRun.id,
             provider: existingRun.provider,
@@ -417,6 +449,23 @@ export function createSubagentController(ctx: {
             notifyScriptPath: resumeNotifyScriptPath,
           });
 
+      // Wrap in SSH for SSH profiles
+      if (isResumeSsh) {
+        const execution = profiles.getExecution(resumeTargetProfile);
+        if (!execution || execution.kind !== "ssh") {
+          throw new Error(`Profile ${existingRun.profileId} is marked as SSH but has no SSH execution config.`);
+        }
+        const { privateKeyPath } = profiles.ensureProfileSshKeyPair(resumeTargetProfile);
+        spawnCommand = buildSshWrappedSpawnCommand({
+          innerCommand: spawnCommand,
+          host: execution.host,
+          user: execution.user,
+          port: execution.port,
+          keyPath: privateKeyPath,
+          remoteCwd: existingRun.workspaceCwd,
+        });
+      }
+
       // Kill old window if it exists
       await tmux.killWindow(existingRun.id);
 
@@ -436,8 +485,9 @@ export function createSubagentController(ctx: {
         ],
       });
 
-      // Spawn in tmux
-      await tmux.runInWindow(existingRun.id, spawnCommand, existingRun.workspaceCwd);
+      // Spawn in tmux — local fallback cwd for SSH profiles
+      const resumeTmuxCwd = isResumeSsh ? "/tmp" : existingRun.workspaceCwd;
+      await tmux.runInWindow(existingRun.id, spawnCommand, resumeTmuxCwd);
       registry.markStarted(existingRun.id);
       timeouts.register(existingRun.id, timeoutMs, onTimeout);
 
