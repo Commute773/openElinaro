@@ -72,11 +72,11 @@ export function getUserDataRootDir() {
   if (configuredRoot) {
     return path.resolve(configuredRoot);
   }
+  const configuredRuntimeRoot = process.env.OPENELINARO_ROOT_DIR?.trim();
+  if (configuredRuntimeRoot) {
+    return path.join(path.resolve(configuredRuntimeRoot), TEST_USER_DATA_ROOT_DIRNAME);
+  }
   if (process.env.NODE_ENV === "test") {
-    const configuredRuntimeRoot = process.env.OPENELINARO_ROOT_DIR?.trim();
-    if (configuredRuntimeRoot) {
-      return path.join(path.resolve(configuredRuntimeRoot), TEST_USER_DATA_ROOT_DIRNAME);
-    }
     // Fall back to a temp-dir-based path rather than touching the user's home
     // directory.  The test preload (src/test/preload.ts) should have set
     // OPENELINARO_ROOT_DIR already; this branch is a last-resort safety net.

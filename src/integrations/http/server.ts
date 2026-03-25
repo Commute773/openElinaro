@@ -22,6 +22,16 @@ export function createHttpRequestHandler(
     if (pathname === "/healthz") {
       return Response.json({ ok: true }, { status: 200 });
     }
+    if (pathname === normalizePath(`${getVonageWebhookPath("voice.answer").replace(/\/answer$/, "")}/test-answer`)) {
+      return Response.json([
+        {
+          action: "talk",
+          text: "The quick brown fox jumps over the lazy dog. The test phrase is alpha bravo charlie delta echo.",
+          language: "en-US",
+          bargeIn: false,
+        },
+      ], { status: 200, headers: { "content-type": "application/json" } });
+    }
     if (pathname === normalizePath(getVonageWebhookPath("voice.answer"))) {
       return vonage.handleVoiceAnswerWebhook(request);
     }
