@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.25.3
+- Released at: 2026-03-25T15:53:53Z
+- Release id: 20260325T155353Z-e584665
+- Previous version: 2026.03.25.2
+- Trigger: ci/release workflow
+
+- feat: add phone call e2e test with real Vonage + Gemini Live pipeline
+
 ## 2026.03.25.2
 - Released at: 2026-03-25T00:28:19Z
 - Release id: 20260325T002819Z-1ed1d54
