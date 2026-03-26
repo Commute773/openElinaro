@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { OAuthCredentials } from "@mariozechner/pi-ai/oauth";
 import { getDefaultProfileId } from "../services/profile-service";
-import { resolveRuntimePath } from "../services/runtime-root";
+import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../services/runtime-root";
 import { type ProviderAuthSecret, SecretStoreService } from "../services/secret-store-service";
 import { telemetry } from "../services/telemetry";
 import { timestamp } from "../utils/timestamp";
@@ -43,11 +43,7 @@ function getLegacyAuthStorePath() {
 }
 
 function assertAuthStoreWritesAreIsolated() {
-  if (process.env.NODE_ENV === "test" && !process.env.OPENELINARO_ROOT_DIR?.trim()) {
-    throw new Error(
-      "Auth store writes are blocked during tests unless OPENELINARO_ROOT_DIR is set to an isolated root.",
-    );
-  }
+  assertTestRuntimeRootIsIsolated("Auth store");
 }
 
 function readLegacyStore(): LegacyAuthStoreShape | null {
