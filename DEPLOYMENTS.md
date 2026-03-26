@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.26.2
+- Released at: 2026-03-26T01:20:10Z
+- Release id: 20260326T012010Z-ab24e94
+- Previous version: 2026.03.26
+- Trigger: ci/release workflow
+
+- fix: deliver alarm routine reminders without model call when heartbeat disabled (#94)
+
 ## 2026.03.26
 - Released at: 2026-03-26T00:31:50Z
 - Release id: 20260326T003150Z-ed9a4ce
