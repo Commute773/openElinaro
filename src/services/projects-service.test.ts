@@ -353,4 +353,56 @@ describe("ProjectsService", () => {
     expect(formatted).toContain("Status: active");
     expect(formatted).toContain("Client work.");
   });
+
+  test("loadRegistry skips invalid project entries and returns valid ones", () => {
+    const registryPath = path.join(runtimeRoot, ".openelinarotest", "projects", "registry.json");
+    const raw = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+    // Insert an invalid project (missing required fields like state, future)
+    raw.projects.push({ id: "broken", name: "Broken" });
+    fs.writeFileSync(registryPath, JSON.stringify(raw, null, 2));
+
+    const profiles = new ProfileService("root");
+    const service = new ProjectsService(profiles.getActiveProfile(), profiles);
+    const registry = service.loadRegistry();
+    // The 3 valid projects survive; the broken one is skipped
+    expect(registry.projects).toHaveLength(3);
+    expect(registry.projects.find((p) => p.id === "broken")).toBeUndefined();
+  });
+
+  test("loadRegistry skips invalid job entries and returns valid ones", () => {
+    const registryPath = path.join(runtimeRoot, ".openelinarotest", "projects", "registry.json");
+    const raw = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+    raw.jobs.push({ id: "bad-job" });
+    fs.writeFileSync(registryPath, JSON.stringify(raw, null, 2));
+
+    const profiles = new ProfileService("root");
+    const service = new ProjectsService(profiles.getActiveProfile(), profiles);
+    const registry = service.loadRegistry();
+    expect(registry.jobs).toHaveLength(1);
+    expect(registry.jobs.find((j) => j.id === "bad-job")).toBeUndefined();
+  });
+
+  test("loadRegistry returns empty arrays when all entries are invalid", () => {
+    const registryPath = path.join(runtimeRoot, ".openelinarotest", "projects", "registry.json");
+    fs.writeFileSync(registryPath, JSON.stringify({
+      version: 1,
+      jobs: [{}],
+      projects: [{}, { id: "also-broken" }],
+    }, null, 2));
+
+    const profiles = new ProfileService("root");
+    const service = new ProjectsService(profiles.getActiveProfile(), profiles);
+    const registry = service.loadRegistry();
+    expect(registry.projects).toHaveLength(0);
+    expect(registry.jobs).toHaveLength(0);
+  });
+
+  test("loadRegistry still throws on corrupted envelope", () => {
+    const registryPath = path.join(runtimeRoot, ".openelinarotest", "projects", "registry.json");
+    fs.writeFileSync(registryPath, JSON.stringify({ version: "not-a-number" }));
+
+    const profiles = new ProfileService("root");
+    const service = new ProjectsService(profiles.getActiveProfile(), profiles);
+    expect(() => service.loadRegistry()).toThrow();
+  });
 });

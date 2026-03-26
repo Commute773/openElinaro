@@ -1,11 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
+import { z } from "zod";
 import type { JobRecord, JobStatus, ProjectRecord, ProjectScope, ProjectStatus } from "../domain/projects";
-import { ProjectRegistrySchema, resolveProjectScope } from "../domain/projects";
+import { JobRecordSchema, ProjectRecordSchema, resolveProjectScope } from "../domain/projects";
 import type { ProfileRecord } from "../domain/profiles";
 import { ProfileService } from "./profile-service";
 import { getRuntimeRootDir, resolveServicePath, resolveUserDataPath } from "./runtime-root";
 import { telemetry } from "./telemetry";
+
+/** Envelope schema — validates structure but defers per-entry validation to loadRegistry(). */
+const RegistryEnvelopeSchema = z.object({
+  version: z.number().int().positive(),
+  description: z.string().min(1).optional(),
+  jobs: z.array(z.unknown()).max(64).default([]),
+  projects: z.array(z.unknown()),
+});
 
 const ASSISTANT_CONTEXT_LIMIT = 4;
 
@@ -87,13 +96,71 @@ export class ProjectsService {
     }
 
     const raw = fs.readFileSync(projectRegistryPath, "utf8");
-    const registry = ProjectRegistrySchema.parse(JSON.parse(raw));
+    const envelope = RegistryEnvelopeSchema.parse(JSON.parse(raw));
+
+    const projects: ProjectRecord[] = [];
+    let skippedProjects = 0;
+    for (const entry of envelope.projects) {
+      const result = ProjectRecordSchema.safeParse(entry);
+      if (result.success) {
+        projects.push(result.data);
+      } else {
+        skippedProjects++;
+        const id = typeof entry === "object" && entry !== null && "id" in entry
+          ? String((entry as Record<string, unknown>).id)
+          : "(unknown)";
+        telemetry.event("projects.project_skipped", {
+          profileId: this.profile.id,
+          entityType: "project_registry",
+          entityId: id,
+          error: result.error.message,
+        }, {
+          level: "warn",
+          message: `Skipped invalid project entry ${id}: ${result.error.message}`,
+        });
+      }
+    }
+
+    const jobs: JobRecord[] = [];
+    let skippedJobs = 0;
+    for (const entry of envelope.jobs) {
+      const result = JobRecordSchema.safeParse(entry);
+      if (result.success) {
+        jobs.push(result.data);
+      } else {
+        skippedJobs++;
+        const id = typeof entry === "object" && entry !== null && "id" in entry
+          ? String((entry as Record<string, unknown>).id)
+          : "(unknown)";
+        telemetry.event("projects.job_skipped", {
+          profileId: this.profile.id,
+          entityType: "project_registry",
+          entityId: id,
+          error: result.error.message,
+        }, {
+          level: "warn",
+          message: `Skipped invalid job entry ${id}: ${result.error.message}`,
+        });
+      }
+    }
+
+    const registry = {
+      version: envelope.version,
+      ...(envelope.description !== undefined ? { description: envelope.description } : {}),
+      jobs,
+      projects,
+    };
+
     telemetry.event("projects.registry_loaded", {
       profileId: this.profile.id,
       entityType: "project_registry",
       entityId: "default",
-      projectCount: registry.projects.length,
+      projectCount: projects.length,
+      skippedProjects,
+      jobCount: jobs.length,
+      skippedJobs,
     });
+
     return registry;
   }
 
