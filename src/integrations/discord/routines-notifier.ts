@@ -91,7 +91,7 @@ export class DiscordRoutinesNotifier {
     const alarmDelayMs = nextAlarmDueAt
       ? Math.max(ALERT_POLL_MIN_MS, new Date(nextAlarmDueAt).getTime() - Date.now())
       : Number.POSITIVE_INFINITY;
-    const routineDelayMs = nextRoutineAttentionAt && getRuntimeConfig().core.app.heartbeatEnabled
+    const routineDelayMs = nextRoutineAttentionAt
       ? Math.max(ALERT_POLL_MIN_MS, new Date(nextRoutineAttentionAt).getTime() - Date.now())
       : Number.POSITIVE_INFINITY;
     const autonomousTimeDelayMs = this.nextAutonomousTimeAt
@@ -251,31 +251,47 @@ export class DiscordRoutinesNotifier {
             }
 
             const heartbeatEnabled = getRuntimeConfig().core.app.heartbeatEnabled;
-            const alarmRoutinesDue = heartbeatEnabled && (this.app.hasAlarmRoutinesDueNow?.() ?? false);
+            const alarmRoutinesDue = this.app.hasAlarmRoutinesDueNow?.() ?? false;
             const heartbeatDue = heartbeatEnabled && Date.now() >= this.nextHeartbeatAt;
             if (heartbeatDue || alarmRoutinesDue) {
-              const response = await this.app.runHourlyHeartbeat(userId, {
-                onBackgroundResponse: async (message) => {
-                  if (!await this.sendAssistantMessage(dm, message)) {
-                    return;
+              if (heartbeatEnabled) {
+                const response = await this.app.runHourlyHeartbeat(userId, {
+                  onBackgroundResponse: async (message) => {
+                    if (!await this.sendAssistantMessage(dm, message)) {
+                      return;
+                    }
+                    discordNotifierTelemetry.event("discord.routines_notifier.sent_background", { userId });
+                  },
+                });
+                if (response.message) {
+                  await this.sendAssistantMessage(dm, response.message);
+                  discordNotifierTelemetry.event("discord.routines_notifier.sent", { userId, mode: response.mode });
+                } else {
+                  discordNotifierTelemetry.event(
+                    "discord.routines_notifier.noop",
+                    { userId, mode: response.mode },
+                    { level: "debug" },
+                  );
+                }
+                if (response.completed) {
+                  this.markHeartbeatCompleted(new Date());
+                } else {
+                  this.markHeartbeatFailed(new Date());
+                }
+              } else {
+                // Heartbeat disabled — deliver alarm routine reminders directly
+                // without a model call.
+                const reminder = this.app.prepareProactiveRoutineReminder();
+                if (reminder) {
+                  const delivered = await this.deliverAssistantMessage(userId, dm, reminder.message);
+                  if (delivered) {
+                    this.app.markRoutineReminderDelivered(reminder.itemIds, reminder.occurrenceKeys);
+                    discordNotifierTelemetry.event("discord.routines_notifier.alarm_direct", {
+                      userId,
+                      itemCount: reminder.itemIds.length,
+                    });
                   }
-                  discordNotifierTelemetry.event("discord.routines_notifier.sent_background", { userId });
-                },
-              });
-              if (response.message) {
-                await this.sendAssistantMessage(dm, response.message);
-                discordNotifierTelemetry.event("discord.routines_notifier.sent", { userId, mode: response.mode });
-              } else {
-                discordNotifierTelemetry.event(
-                  "discord.routines_notifier.noop",
-                  { userId, mode: response.mode },
-                  { level: "debug" },
-                );
-              }
-              if (response.completed) {
-                this.markHeartbeatCompleted(new Date());
-              } else {
-                this.markHeartbeatFailed(new Date());
+                }
               }
             }
           }
