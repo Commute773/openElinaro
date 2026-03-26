@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.26.4
+- Released at: 2026-03-26T16:30:18Z
+- Release id: 20260326T163018Z-9b4c16c
+- Previous version: 2026.03.26.3
+- Trigger: ci/release workflow
+
+- fix: forward maxOutputTokens to provider in active-model-connector
+- feat: add G2 simulator REST API endpoints
+
 ## 2026.03.26.3
 - Released at: 2026-03-26T02:23:42Z
 - Release id: 20260326T022342Z-1e0d2a6
