@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.26.5
+- Released at: 2026-03-26T16:35:11Z
+- Release id: 20260326T163511Z-6fee6ca
+- Previous version: 2026.03.26.4
+- Trigger: ci/release workflow
+
+- fix: harden test isolation to prevent production secret store overwrites
+
 ## 2026.03.26.4
 - Released at: 2026-03-26T16:30:18Z
 - Release id: 20260326T163018Z-9b4c16c
