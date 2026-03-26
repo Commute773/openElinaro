@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.26
+- Released at: 2026-03-26T00:31:50Z
+- Release id: 20260326T003150Z-ed9a4ce
+- Previous version: 2026.03.25.7
+- Trigger: ci/release workflow
+
+- fix: gate alarm routines and deploy healthcheck behind heartbeatEnabled (#93)
+
 ## 2026.03.25.7
 - Released at: 2026-03-25T23:12:46Z
 - Release id: 20260325T231246Z-3d95da6
