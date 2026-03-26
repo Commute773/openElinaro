@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.26.3
+- Released at: 2026-03-26T02:23:42Z
+- Release id: 20260326T022342Z-1e0d2a6
+- Previous version: 2026.03.26.2
+- Trigger: ci/release workflow
+
+- fix: make loadRegistry resilient to invalid project/job entries
+
 ## 2026.03.26.2
 - Released at: 2026-03-26T01:20:10Z
 - Release id: 20260326T012010Z-ab24e94
