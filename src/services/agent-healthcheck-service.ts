@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { AppResponse } from "../domain/assistant";
+import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
 import { timestamp as nowIso } from "../utils/timestamp";
@@ -206,6 +207,22 @@ export class AgentHealthcheckService {
   ): Promise<AgentHealthcheckResponse> {
     const timeoutMs = normalizeTimeoutMs(request.timeoutMs);
     const conversationKey = `agent-healthcheck-${request.id}`;
+
+    // When heartbeat is disabled, skip the model call and return OK immediately.
+    // The service is alive if it can process the file-based request at all.
+    if (!getRuntimeConfig().core.app.heartbeatEnabled) {
+      return {
+        id: request.id,
+        status: "ok",
+        createdAt: request.createdAt,
+        completedAt: nowIso(),
+        timeoutMs,
+        prompt: AGENT_HEALTHCHECK_PROMPT,
+        conversationKey,
+        immediateMessage: AGENT_HEALTHCHECK_SUCCESS_TOKEN,
+      };
+    }
+
     let backgroundMessage: string | undefined;
     let resolveBackground: ((message: string | undefined) => void) | undefined;
     const backgroundPromise = new Promise<string | undefined>((resolve) => {

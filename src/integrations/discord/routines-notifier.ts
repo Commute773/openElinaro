@@ -91,7 +91,7 @@ export class DiscordRoutinesNotifier {
     const alarmDelayMs = nextAlarmDueAt
       ? Math.max(ALERT_POLL_MIN_MS, new Date(nextAlarmDueAt).getTime() - Date.now())
       : Number.POSITIVE_INFINITY;
-    const routineDelayMs = nextRoutineAttentionAt
+    const routineDelayMs = nextRoutineAttentionAt && getRuntimeConfig().core.app.heartbeatEnabled
       ? Math.max(ALERT_POLL_MIN_MS, new Date(nextRoutineAttentionAt).getTime() - Date.now())
       : Number.POSITIVE_INFINITY;
     const autonomousTimeDelayMs = this.nextAutonomousTimeAt
@@ -250,8 +250,8 @@ export class DiscordRoutinesNotifier {
               });
             }
 
-            const alarmRoutinesDue = this.app.hasAlarmRoutinesDueNow?.() ?? false;
             const heartbeatEnabled = getRuntimeConfig().core.app.heartbeatEnabled;
+            const alarmRoutinesDue = heartbeatEnabled && (this.app.hasAlarmRoutinesDueNow?.() ?? false);
             const heartbeatDue = heartbeatEnabled && Date.now() >= this.nextHeartbeatAt;
             if (heartbeatDue || alarmRoutinesDue) {
               const response = await this.app.runHourlyHeartbeat(userId, {
