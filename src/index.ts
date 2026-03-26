@@ -2,6 +2,7 @@ import { telemetry } from "./services/telemetry";
 import { startHttpServer } from "./integrations/http/server";
 import { startDiscordBot } from "./integrations/discord/bot";
 import { startLocalVoiceSidecarRuntime } from "./services/local-voice-sidecar-runtime";
+import { OpenElinaroApp } from "./app/runtime";
 
 process.on("unhandledRejection", (reason) => {
   telemetry.recordError(reason, {
@@ -16,9 +17,10 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 
-startHttpServer();
+const app = new OpenElinaroApp();
+startHttpServer(undefined, undefined, app);
 try {
-  await startDiscordBot();
+  await startDiscordBot({ app });
 } catch (error) {
   telemetry.recordError(error, {
     eventName: "process.startup_failed",

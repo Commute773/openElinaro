@@ -494,7 +494,7 @@ export function createConversationTypingTracker() {
   };
 }
 
-export async function startDiscordBot() {
+export async function startDiscordBot(options?: { app?: OpenElinaroApp }) {
   const config = getRuntimeConfig();
   const token = new SecretStoreService().resolveSecretRef(config.core.discord.botTokenSecretRef);
   if (!token) {
@@ -503,7 +503,7 @@ export async function startDiscordBot() {
     );
   }
 
-  const app = new OpenElinaroApp();
+  const app = options?.app ?? new OpenElinaroApp();
   const healthchecks = new AgentHealthcheckService();
   const typingTracker = createConversationTypingTracker();
   app.setBackgroundConversationNotifier(async ({ conversationKey, response }) => {

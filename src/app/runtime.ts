@@ -811,6 +811,18 @@ export class OpenElinaroApp {
     return this.buildSubagentController(this.activeProfile.id).getAgentRun(runId);
   }
 
+  captureAgentOutput(runId: string, lines?: number): Promise<string> {
+    return this.buildSubagentController(this.activeProfile.id).captureAgentPane(runId, lines);
+  }
+
+  getRoutineTimezone(): string {
+    return this.routines.getTimezone();
+  }
+
+  assessRoutines(reference?: Date) {
+    return this.routines.assessNow(reference);
+  }
+
   private getScope(
     profileId = this.activeProfile.id,
     options?: {
