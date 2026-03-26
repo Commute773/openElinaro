@@ -10,6 +10,7 @@ const repoRoot = process.cwd();
 
 let previousCwd = "";
 let previousRootDirEnv: string | undefined;
+let previousUserDataDirEnv: string | undefined;
 let tempRoot = "";
 const transportAttempts: string[] = [];
 
@@ -85,8 +86,10 @@ describe("ActiveModelConnector", () => {
   beforeAll(() => {
     previousCwd = process.cwd();
     previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+    previousUserDataDirEnv = process.env.OPENELINARO_USER_DATA_DIR;
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-active-model-connector-"));
     process.env.OPENELINARO_ROOT_DIR = tempRoot;
+    delete process.env.OPENELINARO_USER_DATA_DIR;
     process.chdir(tempRoot);
     writeProfileRegistry();
     writeCodexAuthStore();
@@ -144,6 +147,11 @@ describe("ActiveModelConnector", () => {
       delete process.env.OPENELINARO_ROOT_DIR;
     } else {
       process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+    }
+    if (previousUserDataDirEnv === undefined) {
+      delete process.env.OPENELINARO_USER_DATA_DIR;
+    } else {
+      process.env.OPENELINARO_USER_DATA_DIR = previousUserDataDirEnv;
     }
     if (tempRoot) {
       fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -286,6 +294,99 @@ describe("ActiveModelConnector", () => {
     expect(imageBlock).toBeDefined();
     expect(imageBlock!.data).toBe("iVBORw0KGgo=");
     expect(imageBlock!.mimeType).toBe("image/png");
+  });
+
+  test("forwards maxOutputTokens as maxTokens to the underlying stream call", async () => {
+    let capturedStreamOptions: Record<string, unknown> = {};
+    const piAi = await import("@mariozechner/pi-ai");
+    mock.module("@mariozechner/pi-ai", () => ({
+      ...piAi,
+      getModels: piAi.getModels,
+      stream: (_model: unknown, _context: unknown, options: Record<string, unknown>) => {
+        capturedStreamOptions = options;
+        transportAttempts.push((options.transport as string) ?? "auto");
+        return {
+          async *[Symbol.asyncIterator]() {},
+          result: async () => buildProviderResponse({ content: [{ type: "text", text: "ok" }] }),
+        };
+      },
+    }));
+
+    const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
+    const connectorModule = await importFresh<typeof import("./active-model-connector")>("src/connectors/active-model-connector.ts");
+
+    const modelService = new modelModule.ModelService({
+      id: "root",
+      name: "Root",
+      roles: ["root"],
+      memoryNamespace: "root",
+      preferredProvider: "openai-codex",
+      defaultModelId: "gpt-5.4",
+    });
+    const connector = new connectorModule.ActiveModelConnector(modelService);
+
+    await connector.doGenerate({
+      maxOutputTokens: 10_000,
+      prompt: [
+        { role: "system", content: "You are a compaction agent." },
+        { role: "user", content: "Summarize the conversation." },
+      ],
+      providerOptions: {
+        openelinaro: {
+          sessionId: "session:compaction",
+          conversationKey: "conversation:compaction",
+          usagePurpose: "conversation_compaction",
+        },
+      },
+    } as never);
+
+    expect(capturedStreamOptions.maxTokens).toBe(10_000);
+  });
+
+  test("does not set maxTokens when maxOutputTokens is not provided", async () => {
+    let capturedStreamOptions: Record<string, unknown> = {};
+    const piAi = await import("@mariozechner/pi-ai");
+    mock.module("@mariozechner/pi-ai", () => ({
+      ...piAi,
+      getModels: piAi.getModels,
+      stream: (_model: unknown, _context: unknown, options: Record<string, unknown>) => {
+        capturedStreamOptions = options;
+        transportAttempts.push((options.transport as string) ?? "auto");
+        return {
+          async *[Symbol.asyncIterator]() {},
+          result: async () => buildProviderResponse({ content: [{ type: "text", text: "ok" }] }),
+        };
+      },
+    }));
+
+    const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
+    const connectorModule = await importFresh<typeof import("./active-model-connector")>("src/connectors/active-model-connector.ts");
+
+    const modelService = new modelModule.ModelService({
+      id: "root",
+      name: "Root",
+      roles: ["root"],
+      memoryNamespace: "root",
+      preferredProvider: "openai-codex",
+      defaultModelId: "gpt-5.4",
+    });
+    const connector = new connectorModule.ActiveModelConnector(modelService);
+
+    await connector.doGenerate({
+      prompt: [
+        { role: "system", content: "You are a test prompt." },
+        { role: "user", content: "Hello." },
+      ],
+      providerOptions: {
+        openelinaro: {
+          sessionId: "session:no-limit",
+          conversationKey: "conversation:no-limit",
+          usagePurpose: "chat_turn",
+        },
+      },
+    } as never);
+
+    expect(capturedStreamOptions.maxTokens).toBeUndefined();
   });
 
   test("records prompt diagnostics in the usage ledger", async () => {

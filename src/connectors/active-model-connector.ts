@@ -506,6 +506,7 @@ export class ActiveModelConnector implements ProviderConnector {
             sessionId,
             transport,
             signal: options.abortSignal,
+            ...(options.maxOutputTokens != null && { maxTokens: options.maxOutputTokens }),
             ...this.modelService.getInferenceOptions(resolved.selection),
           });
           let thinkingReported = false;
