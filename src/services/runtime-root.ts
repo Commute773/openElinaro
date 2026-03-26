@@ -76,7 +76,7 @@ export function getUserDataRootDir() {
   if (configuredRuntimeRoot) {
     return path.join(path.resolve(configuredRuntimeRoot), TEST_USER_DATA_ROOT_DIRNAME);
   }
-  if (process.env.NODE_ENV === "test") {
+  if (isLikelyTestProcess()) {
     // Fall back to a temp-dir-based path rather than touching the user's home
     // directory.  The test preload (src/test/preload.ts) should have set
     // OPENELINARO_ROOT_DIR already; this branch is a last-resort safety net.
@@ -109,9 +109,32 @@ export function resolveUserDataPath(...segments: string[]) {
   return path.join(getUserDataRootDir(), ...segments);
 }
 
+/**
+ * Detect test context even when NODE_ENV was not set (e.g., running a .test.ts
+ * file directly via `bun src/path/to/file.test.ts` instead of `bun test`).
+ */
+function isLikelyTestProcess(): boolean {
+  if (process.env.NODE_ENV === "test") return true;
+  const mainScript = process.argv[1] ?? "";
+  if (/\.test\.(ts|js|tsx|jsx)$/.test(mainScript)) return true;
+  return false;
+}
+
+function getProductionUserDataDir() {
+  return path.join(os.homedir(), USER_DATA_ROOT_DIRNAME);
+}
+
 export function assertTestRuntimeRootIsIsolated(feature: string) {
-  if (process.env.NODE_ENV !== "test") {
+  if (!isLikelyTestProcess()) {
     return;
+  }
+
+  const userDataDir = path.resolve(getUserDataRootDir());
+  const productionDir = path.resolve(getProductionUserDataDir());
+  if (userDataDir === productionDir) {
+    throw new Error(
+      `${feature} writes are blocked during tests because the user-data directory resolves to the production path (${productionDir}). Set OPENELINARO_ROOT_DIR or OPENELINARO_USER_DATA_DIR to an isolated directory. If running a test file directly, use \`bun test\` instead of \`bun <file>\` so the preload runs.`,
+    );
   }
 
   const runtimeRoot = getRuntimeRootDir();
