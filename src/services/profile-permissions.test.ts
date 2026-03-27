@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { AIMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { NotFoundError } from "../domain/errors";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 
 const repoRoot = process.cwd();
@@ -668,7 +669,7 @@ describe("profile-scoped auth and permissions", () => {
     const originalResolveProviderModel = modelsModule.ModelService.prototype.resolveProviderModel;
     modelsModule.ModelService.prototype.resolveProviderModel = async function resolveProviderModel(providerId, requestedModelId) {
       if (providerId === "openai-codex") {
-        throw new Error(`Model not found in the live catalog: ${requestedModelId}`);
+        throw new NotFoundError("Model", requestedModelId);
       }
 
       return {

@@ -1,6 +1,7 @@
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { AuthorizationError, ConfigurationError, NotFoundError } from "../domain/errors";
 import type { ThinkingLevel } from "@mariozechner/pi-ai";
 import type { ProjectRecord } from "../domain/projects";
 import {
@@ -40,7 +41,7 @@ function ensureUserProfileRegistry() {
 
   const bundledPath = getBundledProfileRegistryPath();
   if (!existsSync(bundledPath)) {
-    throw new Error(`Bundled profile registry is missing: ${bundledPath}`);
+    throw new NotFoundError("Bundled profile registry", bundledPath);
   }
 
   mkdirSync(path.dirname(targetPath), { recursive: true });
@@ -90,7 +91,7 @@ export class ProfileService {
   getProfile(profileId: string): ProfileRecord {
     const profile = this.loadRegistry().profiles.find((entry) => entry.id === profileId);
     if (!profile) {
-      throw new Error(`Unknown profile: ${profileId}`);
+      throw new NotFoundError("Profile", profileId);
     }
     return profile;
   }
@@ -259,12 +260,12 @@ export class ProfileService {
     const registry = this.loadRegistry();
     const index = registry.profiles.findIndex((entry) => entry.id === profileId);
     if (index < 0) {
-      throw new Error(`Unknown profile: ${profileId}`);
+      throw new NotFoundError("Profile", profileId);
     }
 
     const current = registry.profiles[index];
     if (!current) {
-      throw new Error(`Unknown profile: ${profileId}`);
+      throw new NotFoundError("Profile", profileId);
     }
     const next = updater(current);
     registry.profiles[index] = next;
@@ -376,7 +377,7 @@ export class ProfileService {
     if (profile.subagentPreferredProvider === "openai-codex" && profile.subagentPaths?.codex) return "codex";
     if (profile.subagentPaths?.claude) return "claude";
     if (profile.subagentPaths?.codex) return "codex";
-    throw new Error(`No subagent binary configured for profile ${profile.id}. Set subagentPaths in the profile registry.`);
+    throw new ConfigurationError(`No subagent binary configured for profile ${profile.id}. Set subagentPaths in the profile registry.`);
   }
 
   listLaunchableProfiles(source: ProfileRecord, currentDepth = 0) {
@@ -439,7 +440,7 @@ export class ProfileService {
     if (this.canSpawnProfile(source, target)) {
       return;
     }
-    throw new Error(
+    throw new AuthorizationError(
       `Profile ${source.id} with roles [${source.roles.join(", ")}] cannot launch profile ${target.id} with roles [${target.roles.join(", ")}].`,
     );
   }

@@ -2,6 +2,7 @@ import { type StructuredToolInterface } from "@langchain/core/tools";
 import { defineTool } from "../define-tool";
 import { z } from "zod";
 import type { JobStatus, ProjectStatus } from "../../domain/projects";
+import { NotFoundError } from "../../domain/errors";
 import {
   ELINARO_DEFAULT_VISIBLE_TICKET_STATUSES,
   ELINARO_TICKET_PRIORITIES,
@@ -185,7 +186,7 @@ async function resolveProfileModelSelection(
         continue;
       }
 
-      if (error instanceof Error && error.message === `Model not found in the live catalog: ${requestedModelId}`) {
+      if (error instanceof NotFoundError) {
         continue;
       }
 
@@ -206,12 +207,13 @@ async function resolveProfileModelSelection(
   }
 
   if (!sawCatalogLookup) {
-    throw new Error(
-      `Model "${requestedModelId}" was not found in any configured provider catalog for profile ${targetProfile.id}.`,
+    throw new NotFoundError(
+      "Model",
+      `${requestedModelId} (no configured provider catalog for profile ${targetProfile.id})`,
     );
   }
 
-  throw new Error(`Model not found in the live catalog: ${requestedModelId}`);
+  throw new NotFoundError("Model", requestedModelId);
 }
 
 export function buildProjectTools(ctx: ToolBuildContext): StructuredToolInterface[] {

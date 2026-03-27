@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { ConfigurationError, NotFoundError, ValidationError } from "../domain/errors";
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import {
@@ -385,7 +386,7 @@ function extractAccountId(token: string) {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) {
-      throw new Error("Invalid token");
+      throw new ValidationError("Invalid token");
     }
 
     const payload = JSON.parse(Buffer.from(parts[1] ?? "", "base64url").toString("utf8")) as {
@@ -405,11 +406,11 @@ function extractAccountId(token: string) {
     };
     const accountId = payload.https?.api?.openai?.com?.auth?.chatgpt_account_id;
     if (!accountId) {
-      throw new Error("Missing account id");
+      throw new ValidationError("Missing account id");
     }
     return accountId;
   } catch {
-    throw new Error("Failed to extract the ChatGPT account id from the Codex token.");
+    throw new ValidationError("Failed to extract the ChatGPT account id from the Codex token.");
   }
 }
 
@@ -582,7 +583,7 @@ export function resolveListedModelIdentifier(
 ): ListedProviderModel {
   const normalizedRequested = normalizeModelLookupValue(requested);
   if (!normalizedRequested) {
-    throw new Error("A non-empty model identifier is required.");
+    throw new ValidationError("A non-empty model identifier is required.");
   }
 
   const exactMatches = models.filter((model) => buildModelLookupKeys(model).includes(normalizedRequested));
@@ -618,7 +619,7 @@ export function resolveListedModelIdentifier(
     throw new AmbiguousModelIdentifierError(requested, partialMatches.map((model) => model.modelId));
   }
 
-  throw new Error(`Model not found in the live catalog: ${requested}`);
+  throw new NotFoundError("Model", requested);
 }
 
 
@@ -800,14 +801,14 @@ function getRuntimeCatalog(providerId: ModelProviderId) {
 async function resolveCodexApiKey(profileId: string): Promise<OAuthCredentials & { apiKey: string }> {
   const credentials = getCodexCredentials(profileId);
   if (!credentials) {
-    throw new Error("Codex auth is not configured yet. Use `/auth provider:codex` first.");
+    throw new ConfigurationError("Codex auth is not configured yet. Use `/auth provider:codex` first.");
   }
 
   const result = await getOAuthApiKey("openai-codex", {
     "openai-codex": credentials,
   });
   if (!result) {
-    throw new Error("Codex auth could not be resolved.");
+    throw new ConfigurationError("Codex auth could not be resolved.");
   }
 
   saveCodexCredentials(result.newCredentials, profileId);
@@ -820,7 +821,7 @@ async function resolveCodexApiKey(profileId: string): Promise<OAuthCredentials &
 function resolveClaudeToken(profileId: string) {
   const token = getClaudeSetupToken(profileId);
   if (!token) {
-    throw new Error("Claude auth is not configured yet. Use `/auth provider:claude` first.");
+    throw new ConfigurationError("Claude auth is not configured yet. Use `/auth provider:claude` first.");
   }
   return token;
 }
@@ -940,7 +941,7 @@ export class ModelService {
   async selectActiveModel(providerId: ModelProviderId, modelId: string) {
     const selected = await this.resolveProviderModel(providerId, modelId);
     if (!selected.supported) {
-      throw new Error(
+      throw new ValidationError(
         `Model ${providerId}/${selected.modelId} is listed by the provider but is not supported by the current runtime.`,
       );
     }
@@ -991,7 +992,7 @@ export class ModelService {
   async setExtendedContextEnabled(enabled: boolean) {
     const active = await this.getActiveModel();
     if (enabled && !supportsExtendedContext(active.providerId, active.modelId)) {
-      throw new Error(
+      throw new ValidationError(
         `Extended context is not available for ${active.providerId}/${active.modelId}.`,
       );
     }
@@ -1188,8 +1189,9 @@ export class ModelService {
     const runtimeModels = getModels(runtimeProvider);
     const runtimeModel = resolveRuntimeModelIdentifier(selection.modelId, runtimeModels);
     if (!runtimeModel) {
-      throw new Error(
-        `The active model ${selection.providerId}/${selection.modelId} is not supported by the runtime.`,
+      throw new NotFoundError(
+        "Model",
+        `${selection.providerId}/${selection.modelId} is not supported by the runtime`,
       );
     }
 
@@ -1226,7 +1228,7 @@ export class ModelService {
       resolved.runtimeModel.contextWindow,
     );
     if (!maxContextTokens) {
-      throw new Error(`No context window metadata is available for ${resolved.selection.modelId}.`);
+      throw new ConfigurationError(`No context window metadata is available for ${resolved.selection.modelId}.`);
     }
 
     const method = resolved.selection.providerId === "claude" ? "provider_count" : "heuristic_estimate";
