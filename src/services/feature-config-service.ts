@@ -15,6 +15,7 @@ import {
   resolvePythonScriptPath,
 } from "./python-runtime";
 import { SecretStoreService } from "./secret-store-service";
+import { detectZigbeeRadio } from "./zigbee2mqtt-service";
 
 export const FEATURE_IDS = [
   "calendar",
@@ -244,16 +245,16 @@ export class FeatureConfigService {
       }
       case "zigbee2mqtt": {
         const enabled = config.zigbee2mqtt.enabled;
-        const configured = Boolean(config.zigbee2mqtt.brokerUrl.trim());
+        const hasRadio = Boolean(config.zigbee2mqtt.serialPort.trim()) || detectZigbeeRadio() !== null;
         const missing: string[] = [];
-        if (!config.zigbee2mqtt.brokerUrl.trim()) missing.push("zigbee2mqtt.brokerUrl");
+        if (!hasRadio) missing.push("zigbee2mqtt.serialPort (no USB radio detected)");
         return {
           featureId,
           enabled,
-          configured,
-          active: enabled && configured,
+          configured: hasRadio,
+          active: enabled && hasRadio,
           missing,
-          notes: ["Zigbee2MQTT device control via MQTT broker."],
+          notes: ["Direct Zigbee device control via USB coordinator radio."],
         };
       }
     }
