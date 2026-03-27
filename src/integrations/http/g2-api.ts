@@ -1,36 +1,8 @@
 import type { OpenElinaroApp } from "../../app/runtime";
 import { telemetry } from "../../services/telemetry";
+import { CORS_HEADERS, json, error, formatUptime, truncateGoal } from "./response-helpers";
 
 const g2Telemetry = telemetry.child({ component: "g2_api" });
-
-const CORS_HEADERS: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-
-function json(data: unknown, status = 200): Response {
-  return Response.json(data, { status, headers: CORS_HEADERS });
-}
-
-function error(message: string, status = 400): Response {
-  return json({ error: message }, status);
-}
-
-function formatUptime(startedAt?: string, createdAt?: string): string {
-  const ref = startedAt ?? createdAt;
-  if (!ref) return "0m";
-  const ms = Date.now() - new Date(ref).getTime();
-  const minutes = Math.floor(ms / 60000);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return `${hours}h ${String(remainingMinutes).padStart(2, "0")}m`;
-}
-
-function truncateGoal(goal: string, maxLen = 60): string {
-  return goal.length > maxLen ? goal.slice(0, maxLen - 1) + "\u2026" : goal;
-}
 
 /**
  * Handles G2 API requests.
