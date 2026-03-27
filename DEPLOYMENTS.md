@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.10
+- Released at: 2026-03-27T15:20:25Z
+- Release id: 20260327T152025Z-63a1925
+- Previous version: 2026.03.27.9
+- Trigger: ci/release workflow
+
+- feat: add health, projects, and conversations read endpoints to G2 API
+
 ## 2026.03.27.9
 - Released at: 2026-03-27T15:19:06Z
 - Release id: 20260327T151906Z-cb84699
