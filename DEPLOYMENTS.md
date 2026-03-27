@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.2
+- Released at: 2026-03-27T00:58:31Z
+- Release id: 20260327T005831Z-636b99d
+- Previous version: 2026.03.27
+- Trigger: ci/release workflow
+
+- feat: replace MQTT-based zigbee2mqtt with direct zigbee-herdsman
+
 ## 2026.03.27
 - Released at: 2026-03-27T00:37:21Z
 - Release id: 20260327T003721Z-9faaf46
