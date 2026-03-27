@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type {
   FinanceNormalizedTransaction,
-} from "../finance-dashboard-types";
+} from "./finance-types";
 import type {
   SqlValue,
   CategorizationRuleRow,

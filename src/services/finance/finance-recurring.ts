@@ -3,7 +3,7 @@ import type {
   FinanceRecurringCandidateData,
   FinanceRecurringItemData,
   FinanceImportRunRowData,
-} from "../finance-dashboard-types";
+} from "./finance-types";
 import type { RecurringRecord } from "./finance-types";
 import {
   normText,
