@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.29
+- Released at: 2026-03-27T20:55:49Z
+- Release id: 20260327T205549Z-7db2605
+- Previous version: 2026.03.27.28
+- Trigger: ci/release workflow
+
+- feat: migrate routine/alarm tools to unified function layer
+
 ## 2026.03.27.28
 - Released at: 2026-03-27T20:52:53Z
 - Release id: 20260327T205253Z-256fd14
