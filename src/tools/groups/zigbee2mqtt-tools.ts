@@ -38,15 +38,12 @@ export function buildZigbee2MqttTools(ctx: ToolBuildContext): StructuredToolInte
       async () =>
         traceSpan(
           "tool.zigbee_status",
-          async () => {
-            await ctx.zigbee2mqtt.connect();
-            return ctx.zigbee2mqtt.renderStatus();
-          },
+          async () => ctx.zigbee2mqtt.renderStatus(),
         ),
       {
         name: "zigbee_status",
         description:
-          "Show Zigbee2MQTT bridge status and all paired devices with their current state.",
+          "Show Zigbee radio status and all paired devices with their current state.",
         schema: z.object({}),
       },
     ),
@@ -55,10 +52,7 @@ export function buildZigbee2MqttTools(ctx: ToolBuildContext): StructuredToolInte
       async (input) =>
         traceSpan(
           "tool.zigbee_device_detail",
-          async () => {
-            await ctx.zigbee2mqtt.connect();
-            return ctx.zigbee2mqtt.renderDeviceDetail(input.device);
-          },
+          async () => ctx.zigbee2mqtt.renderDeviceDetail(input.device),
           { attributes: input },
         ),
       {
@@ -74,7 +68,6 @@ export function buildZigbee2MqttTools(ctx: ToolBuildContext): StructuredToolInte
         traceSpan(
           "tool.zigbee_device_set",
           async () => {
-            await ctx.zigbee2mqtt.connect();
             const parsed = JSON.parse(input.state) as Record<string, unknown>;
             return ctx.zigbee2mqtt.setDeviceState(input.device, parsed);
           },
@@ -92,10 +85,7 @@ export function buildZigbee2MqttTools(ctx: ToolBuildContext): StructuredToolInte
       async (input) =>
         traceSpan(
           "tool.zigbee_device_get",
-          async () => {
-            await ctx.zigbee2mqtt.connect();
-            return ctx.zigbee2mqtt.getDeviceStateFresh(input.device);
-          },
+          async () => ctx.zigbee2mqtt.getDeviceStateFresh(input.device),
           { attributes: input },
         ),
       {
@@ -110,10 +100,7 @@ export function buildZigbee2MqttTools(ctx: ToolBuildContext): StructuredToolInte
       async (input) =>
         traceSpan(
           "tool.zigbee_permit_join",
-          async () => {
-            await ctx.zigbee2mqtt.connect();
-            return ctx.zigbee2mqtt.permitJoin(input.seconds);
-          },
+          async () => ctx.zigbee2mqtt.permitJoin(input.seconds),
           { attributes: input },
         ),
       {
@@ -128,10 +115,7 @@ export function buildZigbee2MqttTools(ctx: ToolBuildContext): StructuredToolInte
       async () =>
         traceSpan(
           "tool.zigbee_disable_join",
-          async () => {
-            await ctx.zigbee2mqtt.connect();
-            return ctx.zigbee2mqtt.disableJoin();
-          },
+          async () => ctx.zigbee2mqtt.disableJoin(),
         ),
       {
         name: "zigbee_disable_join",
@@ -145,10 +129,7 @@ export function buildZigbee2MqttTools(ctx: ToolBuildContext): StructuredToolInte
       async (input) =>
         traceSpan(
           "tool.zigbee_device_rename",
-          async () => {
-            await ctx.zigbee2mqtt.connect();
-            return ctx.zigbee2mqtt.renameDevice(input.old_name, input.new_name);
-          },
+          async () => ctx.zigbee2mqtt.renameDevice(input.old_name, input.new_name),
           { attributes: input },
         ),
       {

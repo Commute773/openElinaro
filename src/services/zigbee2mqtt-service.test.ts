@@ -1,14 +1,13 @@
 import { test, expect, describe } from "bun:test";
-import { Zigbee2MqttService } from "./zigbee2mqtt-service";
+import { Zigbee2MqttService, detectZigbeeRadio } from "./zigbee2mqtt-service";
 
 describe("Zigbee2MqttService", () => {
-  test("starts disconnected with offline bridge", () => {
+  test("starts in stopped state", () => {
     const svc = new Zigbee2MqttService();
-    expect(svc.isConnected()).toBe(false);
-    expect(svc.getBridgeState()).toBe("offline");
+    expect(svc.isStarted()).toBe(false);
   });
 
-  test("listDevices returns empty before connect", () => {
+  test("listDevices returns empty before start", () => {
     const svc = new Zigbee2MqttService();
     expect(svc.listDevices()).toEqual([]);
   });
@@ -23,22 +22,24 @@ describe("Zigbee2MqttService", () => {
     expect(svc.getDeviceState("nonexistent")).toBeUndefined();
   });
 
-  test("renderStatus shows disconnected state", () => {
+  test("renderStatus shows stopped state", () => {
     const svc = new Zigbee2MqttService();
     const status = svc.renderStatus();
-    expect(status).toContain("Bridge: offline");
-    expect(status).toContain("MQTT: disconnected");
+    expect(status).toContain("Zigbee radio: stopped");
+    expect(status).toContain("Devices: 0 paired");
     expect(status).toContain("No devices paired yet");
   });
 
-  test("renderDeviceDetail returns not found for unknown device", () => {
+  test("stop is safe when not started", async () => {
     const svc = new Zigbee2MqttService();
-    expect(svc.renderDeviceDetail("ghost")).toContain('not found');
+    await svc.stop();
+    expect(svc.isStarted()).toBe(false);
   });
+});
 
-  test("disconnect is safe when not connected", async () => {
-    const svc = new Zigbee2MqttService();
-    await svc.disconnect(); // Should not throw.
-    expect(svc.isConnected()).toBe(false);
+describe("detectZigbeeRadio", () => {
+  test("returns string or null", () => {
+    const result = detectZigbeeRadio();
+    expect(result === null || typeof result === "string").toBe(true);
   });
 });

@@ -97,7 +97,7 @@ const DEFAULT_KOKORO = { baseUrl: "http://127.0.0.1:8801/v1", model: "kokoro", v
 const DEFAULT_LOCAL_VOICE = { enabled: false, localLlm: DEFAULT_LOCAL_LLM, kokoro: DEFAULT_KOKORO };
 const DEFAULT_MEDIA = { enabled: false, roots: [] as string[] };
 const DEFAULT_EXTENSIONS = { enabled: false };
-const DEFAULT_ZIGBEE2MQTT = { enabled: false, brokerUrl: "mqtt://localhost:1883", username: "", passwordSecretRef: "zigbee2mqtt.password", baseTopic: "zigbee2mqtt" };
+const DEFAULT_ZIGBEE2MQTT = { enabled: false, serialPort: "", channel: 11 };
 const DEFAULT_AUTONOMOUS_TIME = { enabled: false, promptPath: "assistant_context/autonomous-time.md" };
 const DEFAULT_MODELS = {
   extendedContext: {
@@ -240,10 +240,8 @@ export const RuntimeConfigSchema = z.object({
   }).default(DEFAULT_EXTENSIONS),
   zigbee2mqtt: z.object({
     enabled: z.boolean().default(false),
-    brokerUrl: z.string().min(1).default("mqtt://localhost:1883"),
-    username: z.string().default(""),
-    passwordSecretRef: z.string().default("zigbee2mqtt.password"),
-    baseTopic: z.string().min(1).default("zigbee2mqtt"),
+    serialPort: z.string().default(""),
+    channel: z.number().int().min(11).max(26).default(11),
   }).default(DEFAULT_ZIGBEE2MQTT),
   autonomousTime: z.object({
     enabled: z.boolean().default(false),
