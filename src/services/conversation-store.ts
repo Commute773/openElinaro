@@ -213,6 +213,17 @@ export class ConversationStore {
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
+  listSummaries(): Array<{ key: string; messageCount: number; updatedAt: string }> {
+    const store = readStore();
+    return Object.values(store.conversations)
+      .map((entry) => ({
+        key: entry.key,
+        messageCount: entry.messages.length,
+        updatedAt: entry.updatedAt,
+      }))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
   getLatest(): ConversationState | undefined {
     return this.list().at(0);
   }
