@@ -26,7 +26,7 @@ describe("ToolResultStore", () => {
     const { ToolResultStore } = await import("./tool-result-store");
     const store = new ToolResultStore();
 
-    const saved = store.save({
+    const saved = await store.save({
       namespace: "conversation:test",
       toolCallId: "call-1",
       toolName: "read_file",
@@ -38,7 +38,7 @@ describe("ToolResultStore", () => {
     expect(saved.lineCount).toBe(3);
     expect(saved.charLength).toBe("line 1\nline 2\nline 3".length);
 
-    const loaded = store.get(saved.ref);
+    const loaded = await store.get(saved.ref);
     expect(loaded).toBeTruthy();
     expect(loaded?.namespace).toBe("conversation:test");
     expect(loaded?.toolName).toBe("read_file");

@@ -52,46 +52,46 @@ describe("ConversationStore", () => {
     tempRoot = "";
   });
 
-  test("supports append-only writes", () => {
-    store.appendMessages("thread-1", [new HumanMessage("hello")], {
+  test("supports append-only writes", async () => {
+    await store.appendMessages("thread-1", [new HumanMessage("hello")], {
       systemPrompt: systemPrompts.load(),
     });
 
-    const conversation = store.appendMessages("thread-1", [new AIMessage("world")]);
+    const conversation = await store.appendMessages("thread-1", [new AIMessage("world")]);
 
     expect(conversation.messages).toHaveLength(2);
     expect(conversation.messages[1]).toBeInstanceOf(AIMessage);
   });
 
-  test("supports explicit rollback plus append", () => {
-    store.appendMessages("thread-1", [
+  test("supports explicit rollback plus append", async () => {
+    await store.appendMessages("thread-1", [
       new HumanMessage("first"),
       new AIMessage("second"),
       new HumanMessage("third"),
     ], { systemPrompt: systemPrompts.load() });
 
-    const conversation = store.rollbackAndAppend("thread-1", 2, [new AIMessage("replacement")]);
+    const conversation = await store.rollbackAndAppend("thread-1", 2, [new AIMessage("replacement")]);
 
     expect(conversation.messages).toHaveLength(2);
     expect((conversation.messages[0] as HumanMessage).content).toBe("first");
     expect((conversation.messages[1] as AIMessage).content).toBe("replacement");
   });
 
-  test("preserves image mime types across store round-trips", () => {
-    store.appendMessages("thread-1", [new HumanMessage([
+  test("preserves image mime types across store round-trips", async () => {
+    await store.appendMessages("thread-1", [new HumanMessage([
       { type: "text", text: "what is this?" },
       { type: "image", data: "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=", mimeType: "image/webp" },
     ])], { systemPrompt: systemPrompts.load() });
 
-    const conversation = store.get("thread-1");
+    const conversation = await store.get("thread-1");
     const message = conversation.messages[0] as HumanMessage;
     const blocks = message.content as Array<{ type: string; mimeType?: string }>;
 
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/webp")).toBe(true);
   });
 
-  test("journals appended conversation messages to JSONL as they are saved", () => {
-    store.appendMessages("thread-1", [new HumanMessage("hello graph cache"), new AIMessage("world")], {
+  test("journals appended conversation messages to JSONL as they are saved", async () => {
+    await store.appendMessages("thread-1", [new HumanMessage("hello graph cache"), new AIMessage("world")], {
       systemPrompt: systemPrompts.load(),
     });
 
@@ -118,10 +118,10 @@ describe("ConversationStore", () => {
   });
 
   test("searches archived conversation history with hybrid ranking and recency output", async () => {
-    store.appendMessages("thread-1", [new HumanMessage("We need to fix the cache miss issue in graph search.")], {
+    await store.appendMessages("thread-1", [new HumanMessage("We need to fix the cache miss issue in graph search.")], {
       systemPrompt: systemPrompts.load(),
     });
-    store.appendMessages("thread-2", [new HumanMessage("Graph compaction is still weird but cache is fine.")], {
+    await store.appendMessages("thread-2", [new HumanMessage("Graph compaction is still weird but cache is fine.")], {
       systemPrompt: systemPrompts.load(),
     });
 
@@ -152,7 +152,7 @@ describe("ConversationStore", () => {
     });
 
     for (let index = 0; index < 40; index += 1) {
-      boundedStore.appendMessages(`thread-${index + 1}`, [
+      await boundedStore.appendMessages(`thread-${index + 1}`, [
         new HumanMessage(
           index === 39 ? "Newest cache graph regression note." : `Background note ${index + 1}.`,
         ),

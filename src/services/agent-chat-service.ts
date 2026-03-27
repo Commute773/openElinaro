@@ -506,7 +506,7 @@ export class AgentChatService {
     }
 
     this.throwIfStopRequested(session);
-    const conversation = this.conversations.ensureSystemPrompt(
+    const conversation = await this.conversations.ensureSystemPrompt(
       job.conversationKey,
       this.systemPrompts.load(),
     );
@@ -612,11 +612,11 @@ export class AgentChatService {
   }
 
   private async appendAssistantMessage(job: QueuedAssistantMessageJob) {
-    this.conversations.ensureSystemPrompt(
+    await this.conversations.ensureSystemPrompt(
       job.conversationKey,
       this.systemPrompts.load(),
     );
-    this.conversations.appendMessages(job.conversationKey, [new AIMessage(job.message)]);
+    await this.conversations.appendMessages(job.conversationKey, [new AIMessage(job.message)]);
     job.resolve();
   }
 
@@ -626,7 +626,7 @@ export class AgentChatService {
       async () => {
         const session = this.getSession(job.conversationKey);
         session.stopRequested = false;
-        const conversation = this.loadConversationForJob(job);
+        const conversation = await this.loadConversationForJob(job);
         const backgroundExecNotifications = job.execution.includeBackgroundExecNotifications
           ? this.routineTools.consumePendingBackgroundExecNotifications(job.conversationKey)
           : [];
@@ -716,7 +716,7 @@ export class AgentChatService {
           const warnings = (result.warnings ?? [])
             .map((warning) => warning.type === "other" ? warning.message : warning.details ?? warning.feature)
             .filter((warning): warning is string => Boolean(warning && warning.trim()));
-          const responseMessages = appendResponseMessages(
+          const responseMessages = await appendResponseMessages(
             [],
             result.response.messages,
             {
@@ -778,7 +778,7 @@ export class AgentChatService {
             .find((message): message is AIMessage => message instanceof AIMessage);
           if (job.execution.persistConversation) {
             const appendedMessages = pendingTurnMessages.concat(responseMessages);
-            const savedConversation = this.conversations.appendMessages(
+            const savedConversation = await this.conversations.appendMessages(
               job.conversationKey,
               appendedMessages,
             );
@@ -950,7 +950,7 @@ export class AgentChatService {
     });
   }
 
-  private loadConversationForJob(job: QueuedChatJob) {
+  private async loadConversationForJob(job: QueuedChatJob) {
     const systemPromptSnapshot = this.systemPrompts.load();
     if (job.execution.persistConversation) {
       return this.conversations.ensureSystemPrompt(
@@ -959,7 +959,7 @@ export class AgentChatService {
       );
     }
 
-    const conversation = this.conversations.get(job.contextConversationKey ?? job.conversationKey);
+    const conversation = await this.conversations.get(job.contextConversationKey ?? job.conversationKey);
     return {
       ...conversation,
       systemPrompt: conversation.systemPrompt ?? systemPromptSnapshot,

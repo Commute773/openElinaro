@@ -29,7 +29,7 @@ describe("ai-sdk message service tool-result refs", () => {
     const store = new toolResultStoreModule.ToolResultStore();
     const longOutput = Array.from({ length: 220 }, (_, index) => `line-${index + 1}`).join("\n");
 
-    const appended = messageModule.appendResponseMessages(
+    const appended = await messageModule.appendResponseMessages(
       [],
       [{
         role: "tool",
@@ -63,7 +63,7 @@ describe("ai-sdk message service tool-result refs", () => {
       throw new Error("expected a stored tool-result ref");
     }
 
-    const stored = store.get(ref);
+    const stored = await store.get(ref);
     expect(stored?.content).toBe(longOutput);
     expect(stored?.namespace).toBe("conversation:test");
   });
@@ -74,7 +74,7 @@ describe("ai-sdk message service tool-result refs", () => {
     const store = new toolResultStoreModule.ToolResultStore();
     const longOutput = Array.from({ length: 220 }, (_, index) => `candidate-${index + 1}`).join("\n");
 
-    const appended = messageModule.appendResponseMessages(
+    const appended = await messageModule.appendResponseMessages(
       [],
       [{
         role: "tool",
@@ -106,7 +106,7 @@ describe("ai-sdk message service tool-result refs", () => {
     const store = new toolResultStoreModule.ToolResultStore();
     const shortOutput = "alpha\nbeta\ngamma";
 
-    const appended = messageModule.appendResponseMessages(
+    const appended = await messageModule.appendResponseMessages(
       [],
       [{
         role: "tool",
@@ -138,7 +138,7 @@ describe("ai-sdk message service tool-result refs", () => {
     const store = new toolResultStoreModule.ToolResultStore();
     const mediumOutput = "x".repeat(900);
 
-    const appended = messageModule.appendResponseMessages(
+    const appended = await messageModule.appendResponseMessages(
       [],
       [{
         role: "tool",
@@ -169,7 +169,7 @@ describe("ai-sdk message service tool-result refs", () => {
     const toolResultStoreModule = await import("./tool-result-store");
     const store = new toolResultStoreModule.ToolResultStore();
 
-    const appended = messageModule.appendResponseMessages(
+    const appended = await messageModule.appendResponseMessages(
       [],
       [{
         role: "tool",
@@ -201,7 +201,7 @@ describe("ai-sdk message service tool-result refs", () => {
     const store = new toolResultStoreModule.ToolResultStore();
     const longOutput = Array.from({ length: 220 }, (_, index) => `page-line-${index + 1}`).join("\n");
 
-    const appended = messageModule.appendResponseMessages(
+    const appended = await messageModule.appendResponseMessages(
       [],
       [{
         role: "tool",
@@ -274,7 +274,7 @@ describe("ai-sdk message service tool call round-trip", () => {
     ];
 
     // Step 1: Convert response messages to BaseMessage[]
-    const baseMessages = messageModule.appendResponseMessages(
+    const baseMessages = await messageModule.appendResponseMessages(
       [new HumanMessage("do stuff")],
       responseMessages,
     );

@@ -1871,7 +1871,7 @@ export class ToolRegistry {
             await this.notifyToolResultProgress(context, entry.name, result, input);
             return await this.finalizeToolResult(result, entry.name, input);
           } catch (error) {
-            return this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
+            return await this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
           }
         },
         {
@@ -1932,7 +1932,7 @@ export class ToolRegistry {
                 await this.notifyToolResultProgress(context, entry.name, result, input);
                 return await this.finalizeToolResult(result, entry.name, input);
               } catch (error) {
-                return this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
+                return await this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
               }
             },
             {
@@ -2116,7 +2116,7 @@ export class ToolRegistry {
       const result = await this.invokeRaw(name, input, context);
       return await this.finalizeToolResult(result, name, input);
     } catch (error) {
-      return this.normalizeToolResult(this.normalizeToolFailure(name, error));
+      return await this.normalizeToolResult(this.normalizeToolFailure(name, error));
     }
   }
 
@@ -2182,7 +2182,7 @@ export class ToolRegistry {
           );
           return await this.finalizeToolResult(result, entry.name, input);
         } catch (error) {
-          return this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
+          return await this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
         }
       },
       {
@@ -2225,9 +2225,9 @@ export class ToolRegistry {
     return { ...(input as Record<string, unknown>), conversationKey: context.conversationKey };
   }
 
-  private normalizeToolResult(result: unknown, toolName?: string, input?: unknown) {
+  private async normalizeToolResult(result: unknown, toolName?: string, input?: unknown) {
     const text = truncateToolOutput(stringifyToolResult(result));
-    const descriptor = toolName ? this.getUntrustedToolDescriptor(toolName, input) : undefined;
+    const descriptor = toolName ? await this.getUntrustedToolDescriptor(toolName, input) : undefined;
     return descriptor ? guardUntrustedText(text, descriptor) : text;
   }
 
@@ -2242,8 +2242,8 @@ export class ToolRegistry {
     return buildToolErrorEnvelope(name, error);
   }
 
-  private getUntrustedToolDescriptor(toolName: string, input?: unknown): UntrustedContentDescriptor | undefined {
-    const resolvedToolName = this.resolveGuardedToolName(toolName, input);
+  private async getUntrustedToolDescriptor(toolName: string, input?: unknown): Promise<UntrustedContentDescriptor | undefined> {
+    const resolvedToolName = await this.resolveGuardedToolName(toolName, input);
     const descriptor = resolvedToolName ? UNTRUSTED_TOOL_DESCRIPTOR_MAP[resolvedToolName] : undefined;
     if (!descriptor) {
       return undefined;
@@ -2257,14 +2257,14 @@ export class ToolRegistry {
     };
   }
 
-  private resolveGuardedToolName(toolName: string, input?: unknown) {
+  private async resolveGuardedToolName(toolName: string, input?: unknown) {
     if (toolName !== "tool_result_read") {
       return toolName;
     }
     if (!input || typeof input !== "object" || Array.isArray(input) || typeof (input as { ref?: unknown }).ref !== "string") {
       return toolName;
     }
-    const record = this.toolResults.get((input as { ref: string }).ref);
+    const record = await this.toolResults.get((input as { ref: string }).ref);
     return record?.toolName ?? toolName;
   }
 
@@ -2379,17 +2379,17 @@ export class ToolRegistry {
         renderShellExecResult(result),
       ].join("\n"));
     }
-    this.serviceRestartNotices.recordPendingNotice({ source });
+    await this.serviceRestartNotices.recordPendingNotice({ source });
     return "Service restart requested. Reconnect after the bot comes back. Running background agents will resume automatically after restart.";
   }
 
-  private getConversationForTool(input: { conversationKey?: string }, context?: ToolContext) {
+  private async getConversationForTool(input: { conversationKey?: string }, context?: ToolContext) {
     const conversationKey = this.resolveConversationKey(input, context);
     if (conversationKey) {
       return this.conversations.ensureSystemPrompt(conversationKey, this.systemPrompts.load());
     }
 
-    const latest = this.conversations.getLatest();
+    const latest = await this.conversations.getLatest();
     if (!latest) {
       throw new Error("No saved conversation is available yet.");
     }
@@ -2803,7 +2803,7 @@ export class ToolRegistry {
         traceSpan(
           "tool.tool_result_read",
           async () => {
-            const record = this.toolResults.get(input.ref);
+            const record = await this.toolResults.get(input.ref);
             if (!record) {
               throw new Error(`Unknown tool result ref: ${input.ref}`);
             }
@@ -2938,7 +2938,7 @@ export class ToolRegistry {
         traceSpan(
           "tool.context",
           async () => {
-            const conversation = this.getConversationForTool(input, context);
+            const conversation = await this.getConversationForTool(input, context);
             const systemPrompt = composeSystemPrompt(
               conversation.systemPrompt?.text ?? this.systemPrompts.load().text,
             );
@@ -3085,7 +3085,7 @@ export class ToolRegistry {
             }
 
             const snapshot = this.systemPrompts.load();
-            const conversation = this.conversations.replaceSystemPrompt(conversationKey, snapshot);
+            const conversation = await this.conversations.replaceSystemPrompt(conversationKey, snapshot);
 
             return [
               `Reloaded system prompt for ${conversation.key}.`,

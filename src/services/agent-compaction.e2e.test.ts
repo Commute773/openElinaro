@@ -208,8 +208,8 @@ describe("agent compaction e2e", () => {
     const harness = await createHarness();
     const progress: string[] = [];
     const conversationKey = "conversation-success";
-    harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
-    harness.conversations.appendMessages(conversationKey, [
+    await harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
+    await harness.conversations.appendMessages(conversationKey, [
       new HumanMessage("Earlier user request."),
       new AIMessage("Earlier assistant reply."),
       new ToolMessage({
@@ -236,7 +236,7 @@ describe("agent compaction e2e", () => {
     expect(progress).toContain("Merging durable memory into core memory.");
     expect(progress).toContain("Compaction complete.");
 
-    const conversation = harness.conversations.get(conversationKey);
+    const conversation = await harness.conversations.get(conversationKey);
     expect(conversation).toBeTruthy();
     const messages = conversation.messages.map(extractText);
     expect(messages[0]).toContain("Context summary (generated automatically during compaction");
@@ -260,8 +260,8 @@ describe("agent compaction e2e", () => {
     });
     const progress: string[] = [];
     const conversationKey = "conversation-abort";
-    harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
-    harness.conversations.appendMessages(conversationKey, [
+    await harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
+    await harness.conversations.appendMessages(conversationKey, [
       new HumanMessage("Earlier user request."),
       new AIMessage("Earlier assistant reply."),
     ]);
@@ -278,7 +278,7 @@ describe("agent compaction e2e", () => {
     expect(result.message).toBe("Reply despite compaction failure.");
     expect(progress).toContain("Compaction failed. Continuing without compaction for this turn.");
 
-    const conversation = harness.conversations.get(conversationKey);
+    const conversation = await harness.conversations.get(conversationKey);
     expect(conversation).toBeTruthy();
     const messages = conversation.messages.map(extractText);
     expect(messages[0]).not.toContain("Context summary (generated automatically during compaction");

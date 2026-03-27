@@ -93,7 +93,7 @@ beforeAll(async () => {
   activeConnectorModule.ActiveModelConnector.prototype.doGenerate = async function doGenerate(
     options: LanguageModelV3CallOptions,
   ): Promise<LanguageModelV3GenerateResult> {
-    const request = buildScriptedConnectorRequest(options);
+    const request = await buildScriptedConnectorRequest(options);
     return toGenerateResultFromAIMessage(
       new AIMessage(`Acknowledged: ${latestHumanText(request)}`),
       "active-model-router",

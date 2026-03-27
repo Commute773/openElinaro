@@ -793,7 +793,7 @@ if (RUN_CHILD_SUITE) {
         .toContain(`Reloaded system prompt for ${conversationKey}.`);
       expect(projectListInteraction.replies.map((reply) => reply.content).join("\n"))
         .toContain("workspace=");
-      expect(harness.conversations.get(conversationKey).systemPrompt?.text)
+      expect((await harness.conversations.get(conversationKey)).systemPrompt?.text)
         .toContain("Reload marker from the temp Discord e2e clone.");
     expect(fs.readFileSync(repoPromptPath, "utf8")).not.toContain("Reload marker from the temp Discord e2e clone.");
   });
@@ -827,7 +827,7 @@ if (RUN_CHILD_SUITE) {
 
     expect(message.replies[0]).toContain("Acknowledged:");
 
-    const storedConversation = harness.conversations.get(message.author.id);
+    const storedConversation = await harness.conversations.get(message.author.id);
     const firstMessage = storedConversation.messages.find((entry) =>
       entry instanceof HumanMessage && typeof entry.content !== "string"
     );
@@ -873,7 +873,7 @@ if (RUN_CHILD_SUITE) {
 
     await handlers.handleMessage(message as unknown as Message);
 
-    const storedConversation = harness.conversations.get(message.author.id);
+    const storedConversation = await harness.conversations.get(message.author.id);
     const firstMessage = [...storedConversation.messages].reverse().find((entry) =>
       entry instanceof HumanMessage && typeof entry.content !== "string"
     );
@@ -903,7 +903,7 @@ if (RUN_CHILD_SUITE) {
 
     await handlers.handleMessage(message as unknown as Message);
 
-    const storedConversation = harness.conversations.get(message.author.id);
+    const storedConversation = await harness.conversations.get(message.author.id);
     const firstMessage = [...storedConversation.messages].reverse().find((entry) =>
       entry instanceof HumanMessage && typeof entry.content !== "string"
     );
@@ -945,7 +945,7 @@ if (RUN_CHILD_SUITE) {
     expect(finalMessage.replies[0]).toContain("Acknowledged: alpha\nbeta\ngamma");
     expect(seenTexts.at(-1)).toBe("alpha\nbeta\ngamma");
 
-    const storedConversation = harness.conversations.get(finalMessage.author.id);
+    const storedConversation = await harness.conversations.get(finalMessage.author.id);
     const latestHumanMessage = [...storedConversation.messages]
       .reverse()
       .find((entry): entry is HumanMessage => entry instanceof HumanMessage);
@@ -1172,7 +1172,7 @@ if (RUN_CHILD_SUITE) {
 
     await handlers.handleMessage(resetMessage as unknown as Message);
 
-    const storedConversation = harness.conversations.get(conversationKey);
+    const storedConversation = await harness.conversations.get(conversationKey);
     const tempMemoryRoot = path.join(tempRoot, ".openelinarotest", "memory");
     const tempMemoryFiles = listRelativeFiles(tempMemoryRoot);
 
@@ -1209,7 +1209,7 @@ if (RUN_CHILD_SUITE) {
     await handlers.handleMessage(helloMessage as unknown as Message);
     await handlers.handleInteraction(fastResetInteraction as unknown as ChatInputCommandInteraction);
 
-    const storedConversation = harness.conversations.get(conversationKey);
+    const storedConversation = await harness.conversations.get(conversationKey);
 
     expect(helloMessage.replies[0]).toContain("Acknowledged: hello before force reset");
     expect(fastResetInteraction.replies.map((reply) => reply.content).join("\n"))

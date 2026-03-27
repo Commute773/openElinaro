@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { ToolMessage } from "@langchain/core/messages";
+import { ToolMessage, type BaseMessage } from "@langchain/core/messages";
 
 import { getTestFixturesDir } from "../test/fixtures";
 
@@ -194,11 +194,11 @@ async function main() {
   assert(toolUseEvents.some((entry) => entry.includes("tool_result_read")));
 
   const store = new conversationStoreModule.ConversationStore();
-  await waitFor(() => {
-    const conversation = store.get(conversationKey);
-    return conversation.messages.some((message) => message instanceof ToolMessage && message.name === "tool_result_read");
+  await waitFor(async () => {
+    const conversation = await store.get(conversationKey);
+    return conversation.messages.some((message: BaseMessage) => message instanceof ToolMessage && message.name === "tool_result_read");
   });
-  const conversation = store.get(conversationKey);
+  const conversation = await store.get(conversationKey);
   const execToolMessage = [...conversation.messages]
     .reverse()
     .find((message): message is ToolMessage => message instanceof ToolMessage && message.name === "exec_command");

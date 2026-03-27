@@ -85,7 +85,7 @@ function createService(options?: {
       async compactForContinuation() {
         await options?.onCompact?.();
         return {
-          conversation: conversations.get("conversation-1"),
+          conversation: await conversations.get("conversation-1"),
           summary: "Compacted for continuation.",
           memoryFilePath: null,
         };
@@ -222,8 +222,8 @@ describe("AgentChatService", () => {
       },
     });
 
-    conversations.ensureSystemPrompt("conversation-1", new SystemPromptService().load());
-    conversations.appendMessages("conversation-1", [new HumanMessage("Existing context.")]);
+    await conversations.ensureSystemPrompt("conversation-1", new SystemPromptService().load());
+    await conversations.appendMessages("conversation-1", [new HumanMessage("Existing context.")]);
 
     const session = (service as any).getSession("conversation-1");
     session.pendingSteeringMessages.push({
@@ -291,7 +291,7 @@ describe("AgentChatService", () => {
     const injectedMessage = requests[0]?.humanMessages[0] ?? "";
     expect(injectedMessage.indexOf("<recalled_memory>"))
       .toBeLessThan(injectedMessage.indexOf("How should you answer me?"));
-    const savedConversation = conversations.get("conversation-1");
+    const savedConversation = await conversations.get("conversation-1");
     const savedHumanMessage = savedConversation.messages.findLast((message) => message instanceof HumanMessage);
     expect(savedHumanMessage).toBeInstanceOf(HumanMessage);
     expect(typeof savedHumanMessage?.content === "string" ? savedHumanMessage.content : JSON.stringify(savedHumanMessage?.content))
@@ -423,7 +423,7 @@ describe("AgentChatService", () => {
     expect(toolInvocations).toContain("exec:ls");
     expect(toolInvocations).toContain("exec:pwd");
 
-    const conversation = conversations.get("conversation-1");
+    const conversation = await conversations.get("conversation-1");
     const aiMessages = conversation.messages.filter(
       (message): message is AIMessage => message instanceof AIMessage,
     );
@@ -520,7 +520,7 @@ describe("AgentChatService", () => {
     });
 
     // The stop should have been caught, but messages should be persisted
-    const conversation = conversations.get("conversation-1");
+    const conversation = await conversations.get("conversation-1");
     const allToolCalls = conversation.messages
       .filter((message): message is AIMessage => message instanceof AIMessage)
       .flatMap((message) => message.tool_calls ?? []);

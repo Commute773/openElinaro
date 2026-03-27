@@ -602,7 +602,7 @@ describe("ToolRegistry tool catalog", () => {
 
   test("tool_result_read returns a partial slice by default", async () => {
     const toolResults = new ToolResultStore(path.join(runtimeRoot, ".openelinarotest", "tool-results"));
-    const saved = toolResults.save({
+    const saved = await toolResults.save({
       namespace: "conversation:test",
       toolCallId: "call-partial",
       toolName: "exec_command",
@@ -628,7 +628,7 @@ describe("ToolRegistry tool catalog", () => {
 
   test("tool_result_read returns the full stored payload when mode=full", async () => {
     const toolResults = new ToolResultStore(path.join(runtimeRoot, ".openelinarotest", "tool-results"));
-    const saved = toolResults.save({
+    const saved = await toolResults.save({
       namespace: "conversation:test",
       toolCallId: "call-full",
       toolName: "read_file",
@@ -667,7 +667,7 @@ describe("ToolRegistry tool catalog", () => {
 
   test("tool_result_read uses the tool summarizer when mode=summary", async () => {
     const toolResults = new ToolResultStore(path.join(runtimeRoot, ".openelinarotest", "tool-results"));
-    const saved = toolResults.save({
+    const saved = await toolResults.save({
       namespace: "conversation:test",
       toolCallId: "call-summary",
       toolName: "exec_command",
@@ -707,15 +707,15 @@ describe("ToolRegistry tool catalog", () => {
   test("new_chat force=true starts a brand new chat without flushing durable memory", async () => {
     const harness = createHarness();
     const conversationKey = "force-reset-test-thread";
-    harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
-    harness.conversations.rollbackAndAppend(
+    await harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
+    await harness.conversations.rollbackAndAppend(
       conversationKey,
-      harness.conversations.get(conversationKey).messages.length,
+      (await harness.conversations.get(conversationKey)).messages.length,
       [new HumanMessage("hello before reset")],
     );
 
     const result = await harness.registry.invoke("new_chat", { conversationKey, force: true });
-    const storedConversation = harness.conversations.get(conversationKey);
+    const storedConversation = await harness.conversations.get(conversationKey);
 
     expect(result).toContain(`Started a new conversation for ${conversationKey}.`);
     expect(result).toContain("Durable memory flush was intentionally skipped.");
@@ -736,8 +736,8 @@ describe("ToolRegistry tool catalog", () => {
           }),
       }),
     });
-    conversations.appendMessages("thread-1", [new HumanMessage("cache graph regression")]);
-    conversations.appendMessages("thread-2", [new HumanMessage("older note about graph memory")]);
+    await conversations.appendMessages("thread-1", [new HumanMessage("cache graph regression")]);
+    await conversations.appendMessages("thread-2", [new HumanMessage("older note about graph memory")]);
 
     const harness = createHarnessWithOptions({ conversations });
     const result = await harness.registry.invoke("conversation_search", {
@@ -1785,7 +1785,7 @@ describe("ToolRegistry tool catalog", () => {
 
   test("supports brief, verbose, and full context usage modes", async () => {
     const conversations = new ConversationStore();
-    conversations.appendMessages("chat-1", [new HumanMessage("How full is this conversation?")]);
+    await conversations.appendMessages("chat-1", [new HumanMessage("How full is this conversation?")]);
     const models = {
       async inspectContextWindowUsage() {
         return {
@@ -1893,7 +1893,7 @@ describe("ToolRegistry tool catalog", () => {
 
   test("reports conversation and local-day usage costs", async () => {
     const conversations = new ConversationStore();
-    conversations.appendMessages("chat-1", [new HumanMessage("How much has this thread cost today?")]);
+    await conversations.appendMessages("chat-1", [new HumanMessage("How much has this thread cost today?")]);
     const models = {
       getActiveModel() {
         return {

@@ -537,8 +537,8 @@ async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 
   throw new Error(`Timed out after ${timeoutMs}ms waiting for condition.`);
 }
 
-function buildSyntheticStopResult(options: LanguageModelV3CallOptions, modelId: string) {
-  const request = buildScriptedConnectorRequest(options);
+async function buildSyntheticStopResult(options: LanguageModelV3CallOptions, modelId: string) {
+  const request = await buildScriptedConnectorRequest(options);
   const availableTools = (options.tools ?? [])
     .filter((tool): tool is Extract<NonNullable<LanguageModelV3CallOptions["tools"]>[number], { type: "function" }> =>
       tool.type === "function"
@@ -643,7 +643,7 @@ async function main() {
   activeConnectorModule.ActiveModelConnector.prototype.doGenerate = async function doGenerate(
     options: LanguageModelV3CallOptions,
   ): Promise<LanguageModelV3GenerateResult> {
-    const request = buildScriptedConnectorRequest(options);
+    const request = await buildScriptedConnectorRequest(options);
     const availableTools = (options.tools ?? [])
       .filter((tool): tool is Extract<NonNullable<LanguageModelV3CallOptions["tools"]>[number], { type: "function" }> =>
         tool.type === "function"
@@ -660,7 +660,7 @@ async function main() {
     };
 
     if (realModelTurnCount >= TURN_LIMIT) {
-      const synthetic = buildSyntheticStopResult(options, this.modelId);
+      const synthetic = await buildSyntheticStopResult(options, this.modelId);
       turnRecords.push({
         ...baseRecord,
         syntheticStop: true,

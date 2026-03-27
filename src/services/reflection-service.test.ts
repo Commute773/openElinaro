@@ -116,7 +116,7 @@ describe("ReflectionService", () => {
     const profile = profiles.getActiveProfile();
     const routines = new RoutinesService();
     const conversations = new ConversationStore();
-    conversations.appendMessages("dm-1", [new HumanMessage("We should clean up the finance onboarding.")]);
+    await conversations.appendMessages("dm-1", [new HumanMessage("We should clean up the finance onboarding.")]);
     const memory = new MemoryService(profile, profiles);
     const reflection = new ReflectionService(
       profile,
@@ -155,7 +155,7 @@ describe("ReflectionService", () => {
     const profile = profiles.getActiveProfile();
     const routines = new RoutinesService();
     const conversations = new ConversationStore();
-    conversations.appendMessages("dm-2", [new HumanMessage("The reminder system still feels too passive.")]);
+    await conversations.appendMessages("dm-2", [new HumanMessage("The reminder system still feels too passive.")]);
     const memory = new MemoryService(profile, profiles);
     const reflection = new ReflectionService(
       profile,

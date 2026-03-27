@@ -1,3 +1,6 @@
+// TODO: Migrate from node:fs to Bun.file() per CLAUDE.md conventions.
+// Kept as node:fs because SecretStoreService methods are called synchronously
+// from auth, profile, CLI, bot startup, and feature-config callers across 20+ files.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";

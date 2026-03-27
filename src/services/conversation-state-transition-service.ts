@@ -50,7 +50,7 @@ export class ConversationStateTransitionService {
     signal?: AbortSignal;
   }): Promise<ConversationContinuationResult> {
     const fallbackSnapshot = this.systemPrompts.load();
-    const conversation = this.conversations.ensureSystemPrompt(
+    const conversation = await this.conversations.ensureSystemPrompt(
       params.conversationKey,
       fallbackSnapshot,
     );
@@ -63,7 +63,7 @@ export class ConversationStateTransitionService {
       onProgress: params.onProgress,
       signal: params.signal,
     });
-    const savedConversation = this.saveConversationState(
+    const savedConversation = await this.saveConversationState(
       params.conversationKey,
       conversation.messages.length,
       compacted.messages,
@@ -83,7 +83,7 @@ export class ConversationStateTransitionService {
     flushMemory?: boolean;
   }): Promise<FreshConversationResult> {
     const snapshot = this.systemPrompts.load();
-    const conversation = this.conversations.ensureSystemPrompt(
+    const conversation = await this.conversations.ensureSystemPrompt(
       params.conversationKey,
       snapshot,
     );
@@ -117,7 +117,7 @@ export class ConversationStateTransitionService {
     );
     const openingLine = this.extractAssistantText(openingMessage)
       || this.fallbackConversationOpening();
-    const savedConversation = this.saveConversationState(
+    const savedConversation = await this.saveConversationState(
       params.conversationKey,
       conversation.messages.length,
       [openingMessage],
@@ -134,7 +134,7 @@ export class ConversationStateTransitionService {
     };
   }
 
-  private saveConversationState(
+  private async saveConversationState(
     conversationKey: string,
     rollbackCount: number,
     messages: ConversationState["messages"],

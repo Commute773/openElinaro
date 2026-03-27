@@ -1,3 +1,6 @@
+// TODO: Migrate from node:fs to Bun.file() per CLAUDE.md conventions.
+// Kept as node:fs because HealthTrackingService methods are called synchronously
+// from ToolRegistry, runtime, and test harnesses that would need async conversion.
 import fs from "node:fs";
 import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";

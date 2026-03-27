@@ -312,7 +312,7 @@ describe("real-corpus memory recall", () => {
     expect(harness.requests).toHaveLength(1);
     expect(harness.requests[0]?.humanMessages).toHaveLength(1);
     expect(harness.requests[0]?.humanMessages[0]).toContain(NO_HIT_PROMPT);
-    const savedConversation = harness.conversations.get("e2e:memory:no-hit:reply");
+    const savedConversation = await harness.conversations.get("e2e:memory:no-hit:reply");
     const savedHumanMessage = savedConversation.messages.findLast((message) => message instanceof HumanMessage);
     expect(savedHumanMessage).toBeInstanceOf(HumanMessage);
     expect(extractHumanText(savedHumanMessage as HumanMessage)).toContain(NO_HIT_PROMPT);
@@ -340,7 +340,7 @@ describe("real-corpus memory recall", () => {
     expect(userMessage.startsWith("<recalled_memory>")).toBe(true);
     expect(userMessage).toContain(HIT_PROMPT);
     expect(userMessage.indexOf(HIT_PROMPT)).toBeGreaterThan(0);
-    const savedConversation = harness.conversations.get("e2e:memory:hit:reply");
+    const savedConversation = await harness.conversations.get("e2e:memory:hit:reply");
     const savedHumanMessage = savedConversation.messages.findLast((message) => message instanceof HumanMessage);
     expect(savedHumanMessage).toBeInstanceOf(HumanMessage);
     expect(extractHumanText(savedHumanMessage as HumanMessage)).toBe(HIT_PROMPT);
