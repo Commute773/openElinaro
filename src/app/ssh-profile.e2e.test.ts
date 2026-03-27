@@ -12,10 +12,10 @@ let tempRoot = "";
 
 let appRuntimeModule: typeof import("./runtime");
 let memoryServiceModule: typeof import("../services/memory-service");
-let sshShellServiceModule: typeof import("../services/ssh-shell-service");
+let shellServiceModule: typeof import("../services/shell-service");
 
 let originalEnsureReady: typeof memoryServiceModule.MemoryService.prototype.ensureReady;
-let originalSshExec: typeof sshShellServiceModule.SshShellService.prototype.exec;
+let originalShellExec: typeof shellServiceModule.ShellService.prototype.exec;
 
 async function importFresh<T>(relativePath: string): Promise<T> {
   const absolutePath = path.join(repoRoot, relativePath);
@@ -157,10 +157,10 @@ beforeAll(async () => {
 
   appRuntimeModule = await importFresh("src/app/runtime.ts");
   memoryServiceModule = await importFresh("src/services/memory-service.ts");
-  sshShellServiceModule = await importFresh("src/services/ssh-shell-service.ts");
+  shellServiceModule = await importFresh("src/services/shell-service.ts");
 
   originalEnsureReady = memoryServiceModule.MemoryService.prototype.ensureReady;
-  originalSshExec = sshShellServiceModule.SshShellService.prototype.exec;
+  originalShellExec = shellServiceModule.ShellService.prototype.exec;
 
   memoryServiceModule.MemoryService.prototype.ensureReady = async function ensureReadyStub() {
     return {
@@ -176,7 +176,7 @@ beforeAll(async () => {
     };
   };
 
-  sshShellServiceModule.SshShellService.prototype.exec = async function execStub(params) {
+  shellServiceModule.ShellService.prototype.exec = async function execStub(params) {
     const request = decodeFilesystemRequest(params.command);
     if (!request) {
       throw new Error(`Unexpected SSH command in test: ${params.command}`);
@@ -219,7 +219,7 @@ beforeAll(async () => {
 
 afterAll(() => {
   memoryServiceModule.MemoryService.prototype.ensureReady = originalEnsureReady;
-  sshShellServiceModule.SshShellService.prototype.exec = originalSshExec;
+  shellServiceModule.ShellService.prototype.exec = originalShellExec;
   process.chdir(previousCwd);
   if (previousRootDirEnv === undefined) {
     delete process.env.OPENELINARO_ROOT_DIR;

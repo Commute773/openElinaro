@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { ProfileRecord } from "../domain/profiles";
 import { ProfileService } from "./profile-service";
-import type { SshShellService } from "./ssh-shell-service";
+import type { ShellService } from "./shell-service";
 import type {
   FilesystemBackend,
   ReadFileResult,
@@ -202,7 +202,7 @@ export class SshFilesystemBackend implements FilesystemBackend {
 
   constructor(
     private readonly profile: ProfileRecord,
-    private readonly shell: Pick<SshShellService, "exec">,
+    private readonly shell: Pick<ShellService, "exec">,
   ) {
     this.profiles = new ProfileService(profile.id);
   }

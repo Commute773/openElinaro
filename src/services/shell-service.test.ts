@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { LocalShellBackend } from "./shell-backend-local";
 import { ShellService } from "./shell-service";
 
 function makeTmpDir() {
@@ -88,9 +89,9 @@ describe("ShellService", () => {
     });
 
     test("uses custom shell binary from environment", async () => {
-      const service = new ShellService(undefined, {
+      const service = new ShellService(new LocalShellBackend({
         OPENELINARO_SHELL_BIN: "/bin/sh",
-      });
+      }));
       const result = await service.exec({ command: "echo ok" });
 
       expect(result.exitCode).toBe(0);
@@ -110,9 +111,9 @@ describe("ShellService", () => {
 
   describe("buildCommandInvocation (via exec behavior)", () => {
     test("throws when sudo=true with a configured shell user", async () => {
-      const service = new ShellService(undefined, {
+      const service = new ShellService(new LocalShellBackend({
         OPENELINARO_PROFILE_SHELL_USER: "restricted",
-      });
+      }));
 
       await expect(
         service.exec({ command: "echo test", sudo: true }),
@@ -120,9 +121,9 @@ describe("ShellService", () => {
     });
 
     test("uses sudo -n -H -u when shell user is configured", async () => {
-      const service = new ShellService(undefined, {
+      const service = new ShellService(new LocalShellBackend({
         OPENELINARO_PROFILE_SHELL_USER: "testuser",
-      });
+      }));
 
       // This will fail because sudo isn't set up, but we can verify the effective user
       const result = await service.exec({ command: "echo test" });
@@ -139,7 +140,7 @@ describe("ShellService", () => {
         assertPathAccess,
       } as any;
 
-      const service = new ShellService(access);
+      const service = new ShellService(undefined, access);
       await service.exec({ command: "echo ok" });
 
       expect(assertToolAllowed).toHaveBeenCalledWith("exec_command");
@@ -154,7 +155,7 @@ describe("ShellService", () => {
         assertPathAccess: (p: string) => p,
       } as any;
 
-      const service = new ShellService(access);
+      const service = new ShellService(undefined, access);
       await expect(service.exec({ command: "echo no" })).rejects.toThrow("Denied");
     });
   });

@@ -20,8 +20,9 @@ import { ProjectsService } from "../services/projects-service";
 import { ReflectionService } from "../services/reflection-service";
 import type { RoutinesService } from "../services/routines-service";
 import { ShellService } from "../services/shell-service";
+import { SshShellBackend } from "../services/shell-backend-ssh";
+import { LocalShellBackend } from "../services/shell-backend-local";
 import { SoulService } from "../services/soul-service";
-import { SshShellService } from "../services/ssh-shell-service";
 import type { SystemPromptService } from "../services/system-prompt-service";
 import { ToolResolutionService } from "../services/tool-resolution-service";
 import { ToolRegistry } from "../tools/tool-registry";
@@ -164,11 +165,13 @@ export function createRuntimeScope(ctx: {
       });
     });
   }
-  const shell: ShellRuntime = profiles.isSshExecutionProfile(profile)
-    ? new SshShellService(profile, access, shellEnvironment)
-    : new ShellService(access, shellEnvironment);
-  const filesystemBackend = profiles.isSshExecutionProfile(profile)
-    ? new SshFilesystemBackend(profile, shell as SshShellService)
+  const isSsh = profiles.isSshExecutionProfile(profile);
+  const shellBackend = isSsh
+    ? new SshShellBackend(profile, access, shellEnvironment)
+    : new LocalShellBackend(shellEnvironment);
+  const shell: ShellRuntime = new ShellService(shellBackend, access);
+  const filesystemBackend = isSsh
+    ? new SshFilesystemBackend(profile, shell as ShellService)
     : new LocalFilesystemBackend();
   const filesystem: FilesystemRuntime = new FilesystemService(filesystemBackend, access);
   const transitions = appTelemetry.instrumentMethods(
