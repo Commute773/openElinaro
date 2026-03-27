@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.32
+- Released at: 2026-03-27T21:09:15Z
+- Release id: 20260327T210915Z-b3a29ad
+- Previous version: 2026.03.27.31
+- Trigger: ci/release workflow
+
+- feat: migrate all tool domains to unified function layer
+
 ## 2026.03.27.31
 - Released at: 2026-03-27T21:02:34Z
 - Release id: 20260327T210234Z-af17703
