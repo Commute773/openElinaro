@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.5
+- Released at: 2026-03-27T01:19:20Z
+- Release id: 20260327T011920Z-0370336
+- Previous version: 2026.03.27.4
+- Trigger: ci/release workflow
+
+- feat: zigbee bridge sidecar for Bun serialport compatibility
+
 ## 2026.03.27.4
 - Released at: 2026-03-27T01:11:54Z
 - Release id: 20260327T011154Z-2658de7
