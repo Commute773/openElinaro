@@ -181,6 +181,23 @@ beforeAll(async () => {
     if (!request) {
       throw new Error(`Unexpected SSH command in test: ${params.command}`);
     }
+    if (request.op === "stat" && request.path === "/Users/remote/link-coach/README.md") {
+      return {
+        command: params.command,
+        cwd: "/Users/remote/link-coach",
+        timeoutMs: params.timeoutMs ?? 120_000,
+        sudo: params.sudo === true,
+        effectiveUser: "remote@192.168.2.42",
+        exitCode: 0,
+        stdout: JSON.stringify({
+          type: "file",
+          sizeBytes: 52,
+          modifiedAt: 1700000000,
+          createdAt: 1700000000,
+        }),
+        stderr: "",
+      };
+    }
     if (request.op === "read" && request.path === "/Users/remote/link-coach/README.md") {
       return {
         command: params.command,
