@@ -910,8 +910,8 @@ function inferToolDomains(name: string) {
   if (name.startsWith("media_")) {
     return ["media", "audio", "devices"];
   }
-  if (name.startsWith("zigbee_")) {
-    return ["zigbee", "devices", "home-automation"];
+  if (name.startsWith("lights_")) {
+    return ["lights", "devices", "home-automation"];
   }
   if (name === "telemetry_query") {
     return ["observability", "logs", "tracing"];
