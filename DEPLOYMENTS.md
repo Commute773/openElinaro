@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.27
+- Released at: 2026-03-27T19:21:38Z
+- Release id: 20260327T192138Z-ecba468
+- Previous version: 2026.03.27.26
+- Trigger: ci/release workflow
+
+- refactor: extract tool output pipeline from ToolRegistry
+
 ## 2026.03.27.26
 - Released at: 2026-03-27T19:06:39Z
 - Release id: 20260327T190639Z-97d3c8b
