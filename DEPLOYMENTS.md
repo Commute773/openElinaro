@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.15
+- Released at: 2026-03-27T15:32:52Z
+- Release id: 20260327T153252Z-1b24079
+- Previous version: 2026.03.27.14
+- Trigger: ci/release workflow
+
+- docs: add G2 API reference and update extension docs
+
 ## 2026.03.27.14
 - Released at: 2026-03-27T15:30:09Z
 - Release id: 20260327T153009Z-3f96a06
