@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { PromptDocumentSnapshot } from "../domain/prompt-snapshot";
 import { getAssistantContextRoot } from "./runtime-user-content";
 import { timestamp } from "../utils/timestamp";
 
@@ -16,12 +17,7 @@ const FALLBACK_REFLECTION_PROMPT = [
   "Notice patterns in yourself and your person, what shifted, what surprised you, and what you want to bring up next time.",
 ].join(" ");
 
-export interface ReflectionPromptDocumentSnapshot {
-  text: string;
-  path: string;
-  loadedAt: string;
-  charCount: number;
-}
+export type ReflectionPromptDocumentSnapshot = PromptDocumentSnapshot;
 
 export interface ReflectionPromptSnapshot {
   reflection: ReflectionPromptDocumentSnapshot;
