@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.31
+- Released at: 2026-03-27T21:02:34Z
+- Release id: 20260327T210234Z-af17703
+- Previous version: 2026.03.27.30
+- Trigger: ci/release workflow
+
+- feat: replace G2 routine routes with function-layer generated routes
+
 ## 2026.03.27.30
 - Released at: 2026-03-27T20:58:25Z
 - Release id: 20260327T205825Z-023bf59
