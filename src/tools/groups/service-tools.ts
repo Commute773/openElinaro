@@ -38,7 +38,7 @@ const serviceChangelogSinceVersionSchema = z.object({
   }
 });
 
-function formatDurationMs(durationMs: number | null) {
+export function formatDurationMs(durationMs: number | null) {
   if (durationMs === null) {
     return "n/a";
   }

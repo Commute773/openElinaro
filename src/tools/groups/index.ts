@@ -10,6 +10,10 @@ export { buildSystemTools, renderExtendedContextStatus, formatTokenCount } from 
 export { buildWebTools } from "./web-tools";
 export { buildMediaTools } from "./media-tools";
 export { buildConfigTools } from "./config-tools";
-export { buildServiceTools } from "./service-tools";
+export { buildServiceTools, formatDurationMs } from "./service-tools";
 export { buildZigbee2MqttTools } from "./zigbee2mqtt-tools";
+export { buildSubagentTools } from "./subagent-tools";
+export type { SubagentController, SubagentToolBuildContext } from "./subagent-tools";
+export { buildConversationLifecycleTools } from "./conversation-lifecycle-tools";
+export type { ConversationLifecycleToolBuildContext } from "./conversation-lifecycle-tools";
 export type { ToolBuildContext, ShellRuntime, FilesystemRuntime, TicketsRuntime } from "./tool-group-types";
