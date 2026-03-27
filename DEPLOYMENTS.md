@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.27.24
+- Released at: 2026-03-27T19:00:04Z
+- Release id: 20260327T190004Z-91d5ac5
+- Previous version: 2026.03.27.23
+- Trigger: ci/release workflow
+
+- refactor: split finance-dashboard-types.ts into focused type modules
+- refactor: extract Discord slash command builders and profile commands from bot.ts
+
 ## 2026.03.27.23
 - Released at: 2026-03-27T18:35:19Z
 - Release id: 20260327T183519Z-9c4ca54
