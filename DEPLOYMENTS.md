@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.27.13
+- Released at: 2026-03-27T15:25:21Z
+- Release id: 20260327T152521Z-b8b7e49
+- Previous version: 2026.03.27.12
+- Trigger: ci/release workflow
+
+- feat: add OpenAPI 3.1 spec for G2 API discoverability
+- feat: allow extensions to register HTTP routes under /api/ext/<id>/
+
 ## 2026.03.27.12
 - Released at: 2026-03-27T15:23:06Z
 - Release id: 20260327T152306Z-6c92d73
