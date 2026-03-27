@@ -1,10 +1,9 @@
-import { execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 import { AccessControlService } from "./access-control-service";
+import { LocalShellBackend } from "./shell-backend-local";
+import type { ShellBackend } from "./shell-backend";
 import { resolveRuntimePath } from "./runtime-root";
-import { buildOpenElinaroCommandEnvironment } from "./shell-environment";
 import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { timestamp } from "../utils/timestamp";
@@ -14,33 +13,14 @@ import {
   SHELL_DEFAULT_NOTIFICATION_TAIL_LINES as DEFAULT_NOTIFICATION_TAIL_LINES,
 } from "../config/service-constants";
 
-const execFileAsync = promisify(execFile);
-const DEFAULT_CWD = process.cwd();
 const SHELL_TASK_ROOT = resolveRuntimePath("shell-tasks");
-const DEFAULT_SHELL_BIN = "bash";
 const shellTelemetry = telemetry.child({ component: "shell" });
-const SHELL_USER_ENV_BLOCKLIST = new Set([
-  "HOME",
-  "LOGNAME",
-  "MAIL",
-  "OLDPWD",
-  "PWD",
-  "SHELL",
-  "USER",
-]);
 
 function truncateForLog(text: string, limit = COMMAND_PREVIEW_LIMIT) {
   if (text.length <= limit) {
     return text;
   }
   return `${text.slice(0, limit)}...`;
-}
-
-function resolveCwd(cwd?: string) {
-  if (!cwd) {
-    return DEFAULT_CWD;
-  }
-  return path.isAbsolute(cwd) ? cwd : path.resolve(DEFAULT_CWD, cwd);
 }
 
 function ensureTaskRoot() {
@@ -148,70 +128,12 @@ export class ShellService {
   private readonly backgroundJobs = new Map<string, ShellBackgroundJob>();
   private readonly backgroundRuntime = new Map<string, ShellBackgroundRuntime>();
   private readonly pendingNotifications = new Map<string, string[]>();
+  private readonly backend: ShellBackend;
+  private readonly access?: AccessControlService;
 
-  constructor(
-    private readonly access?: AccessControlService,
-    private readonly environment?: Record<string, string>,
-  ) {}
-
-  private buildCommandEnvironment() {
-    return buildOpenElinaroCommandEnvironment(this.environment);
-  }
-
-  private getConfiguredShellUser() {
-    const value = this.environment?.OPENELINARO_PROFILE_SHELL_USER?.trim();
-    return value || undefined;
-  }
-
-  private resolveEffectiveUser() {
-    return this.getConfiguredShellUser() ?? process.env.USER ?? "unknown";
-  }
-
-  private getShellBinary() {
-    return this.environment?.OPENELINARO_SHELL_BIN?.trim() || DEFAULT_SHELL_BIN;
-  }
-
-  private buildCommandInvocation(command: string, sudo: boolean) {
-    const shellUser = this.getConfiguredShellUser();
-    const shellBin = this.getShellBinary();
-    if (sudo && shellUser) {
-      throw new Error("sudo=true is only available when running as the root profile.");
-    }
-
-    if (shellUser) {
-      return {
-        file: "sudo",
-        args: [
-          "-n",
-          "-H",
-          "-u",
-          shellUser,
-          "env",
-          ...this.buildEnvArgs({ stripIdentity: true }),
-          `USER=${shellUser}`,
-          `LOGNAME=${shellUser}`,
-          shellBin,
-          "-lc",
-          command,
-        ],
-        effectiveUser: shellUser,
-      };
-    }
-
-    return {
-      file: shellBin,
-      args: ["-lc", sudo ? `sudo -n ${command}` : command],
-      effectiveUser: this.resolveEffectiveUser(),
-    };
-  }
-
-  private buildEnvArgs(options?: { stripIdentity?: boolean }) {
-    return Object.entries(this.buildCommandEnvironment())
-      .filter((entry): entry is [string, string] =>
-        typeof entry[1] === "string" &&
-        !(options?.stripIdentity && SHELL_USER_ENV_BLOCKLIST.has(entry[0]))
-      )
-      .map(([key, value]) => `${key}=${value}`);
+  constructor(backend?: ShellBackend, access?: AccessControlService) {
+    this.backend = backend ?? new LocalShellBackend();
+    this.access = access;
   }
 
   private assertShellAllowed(cwd: string) {
@@ -226,94 +148,63 @@ export class ShellService {
   private async executeCommand(
     params: ShellExecParams,
     cwd: string,
-    invocation: ReturnType<ShellService["buildCommandInvocation"]>,
     operation: "tool.exec_command" | "workflow.exec_verification",
   ): Promise<ShellExecResult> {
     const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const command = params.command;
+    const displayCommand = this.backend.resolveDisplayCommand(command, params.sudo === true);
 
     return traceSpan(
       operation,
       async () => {
-        try {
-          const { stdout, stderr } = await execFileAsync(invocation.file, invocation.args, {
-            cwd,
-            timeout: timeoutMs,
-            maxBuffer: 1024 * 1024 * 4,
-            env: this.buildCommandEnvironment(),
-          });
-          return {
-            command: params.sudo ? `sudo -n ${command}` : command,
-            cwd,
-            timeoutMs,
-            sudo: params.sudo === true,
-            effectiveUser: invocation.effectiveUser,
-            exitCode: 0,
-            stdout,
-            stderr,
-          };
-        } catch (error) {
-          const execError = error as NodeJS.ErrnoException & {
-            code?: string | number;
-            stdout?: string;
-            stderr?: string;
-            killed?: boolean;
-            signal?: NodeJS.Signals;
-          };
-          return {
-            command: params.sudo ? `sudo -n ${command}` : command,
-            cwd,
-            timeoutMs,
-            sudo: params.sudo === true,
-            effectiveUser: invocation.effectiveUser,
-            exitCode:
-              typeof execError.code === "number"
-                ? execError.code
-                : execError.killed
-                  ? 124
-                  : 1,
-            stdout: execError.stdout ?? "",
-            stderr:
-              execError.stderr ??
-              execError.message ??
-              `Command failed${execError.signal ? ` with signal ${execError.signal}` : ""}.`,
-          };
-        }
+        const result = await this.backend.execCommand(command, {
+          cwd,
+          sudo: params.sudo === true,
+          timeoutMs,
+        });
+        return {
+          command: displayCommand,
+          cwd,
+          timeoutMs,
+          sudo: params.sudo === true,
+          effectiveUser: result.effectiveUser,
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+        };
       },
       {
         attributes: {
           cwd,
           sudo: params.sudo === true,
-          effectiveUser: invocation.effectiveUser,
+          effectiveUser: this.backend.resolveEffectiveUserLabel(),
           timeoutMs,
-          commandPreview: truncateForLog(params.sudo ? `sudo -n ${command}` : command),
+          commandPreview: truncateForLog(displayCommand),
         },
       },
     );
   }
 
   async exec(params: ShellExecParams): Promise<ShellExecResult> {
-    const cwd = resolveCwd(params.cwd);
+    const cwd = this.backend.resolveCwd(params.cwd);
     this.assertShellAllowed(cwd);
-    const invocation = this.buildCommandInvocation(params.command, params.sudo === true);
-    return this.executeCommand(params, cwd, invocation, "tool.exec_command");
+    return this.executeCommand(params, cwd, "tool.exec_command");
   }
 
   async execVerification(params: ShellExecParams): Promise<ShellExecResult> {
-    const cwd = resolveCwd(params.cwd);
+    const cwd = this.backend.resolveCwd(params.cwd);
     this.assertVerificationShellAllowed(cwd);
-    const invocation = this.buildCommandInvocation(params.command, params.sudo === true);
-    return this.executeCommand(params, cwd, invocation, "workflow.exec_verification");
+    return this.executeCommand(params, cwd, "workflow.exec_verification");
   }
 
   launchBackground(
     params: ShellExecParams & { conversationKey?: string },
   ): ShellBackgroundLaunchResult {
     ensureTaskRoot();
-    const cwd = resolveCwd(params.cwd);
+    const cwd = this.backend.resolveCwd(params.cwd);
     this.assertShellAllowed(cwd);
     const command = params.command;
-    const invocation = this.buildCommandInvocation(command, params.sudo === true);
+    const displayCommand = this.backend.resolveDisplayCommand(command, params.sudo === true);
     const id = nextJobId();
     const taskDir = path.join(SHELL_TASK_ROOT, id);
     fs.mkdirSync(taskDir, { recursive: true });
@@ -326,10 +217,9 @@ export class ShellService {
     const combinedStream = fs.createWriteStream(combinedOutputPath, { flags: "a" });
     const startedAt = timestamp();
 
-    const child = spawn(invocation.file, invocation.args, {
+    const { child, effectiveUser } = this.backend.spawnCommand(command, {
       cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: this.buildCommandEnvironment(),
+      sudo: params.sudo === true,
     });
 
     const job: ShellBackgroundJob = {
@@ -347,7 +237,7 @@ export class ShellService {
       outputLineCount: 0,
       outputByteCount: 0,
       conversationKey: params.conversationKey,
-      effectiveUser: invocation.effectiveUser,
+      effectiveUser,
     };
     this.backgroundJobs.set(id, job);
     this.backgroundRuntime.set(id, {
@@ -505,12 +395,12 @@ export class ShellService {
 
     shellTelemetry.event("shell.background.started", {
       jobId: id,
-      commandPreview: truncateForLog(params.sudo ? `sudo -n ${command}` : command),
+      commandPreview: truncateForLog(displayCommand),
       cwd,
       timeoutMs: params.timeoutMs,
       pid: child.pid,
       conversationKey: params.conversationKey,
-      effectiveUser: invocation.effectiveUser,
+      effectiveUser,
     });
 
     return {

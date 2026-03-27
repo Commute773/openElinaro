@@ -1458,7 +1458,7 @@ export class ToolRegistry {
     toolResults?: ToolResultStore,
   ) {
     this.runtimePlatform = runtimePlatform ?? resolveRuntimePlatform();
-    this.shell = shell ?? new ShellService(this.access);
+    this.shell = shell ?? new ShellService(undefined, this.access);
     this.filesystem = filesystem ?? new FilesystemService(this.access);
     this.finance = finance ?? new FinanceService();
     this.email = new EmailService();
