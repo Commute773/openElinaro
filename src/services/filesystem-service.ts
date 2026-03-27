@@ -1,5 +1,6 @@
 import path from "node:path";
 import { AccessControlService } from "./access-control-service";
+import { NotFoundError, ValidationError } from "../domain/errors";
 import type { FilesystemBackend } from "./filesystem-backend";
 import { LocalFilesystemBackend } from "./filesystem-backend-local";
 import {
@@ -224,13 +225,13 @@ function normalizeEditStrings(edit: {
   const oldString = edit.oldString ?? edit.old_string;
   const newString = edit.newString ?? edit.new_string;
   if (oldString === undefined) {
-    throw new Error("oldString is required");
+    throw new ValidationError("oldString is required");
   }
   if (newString === undefined) {
-    throw new Error("newString is required");
+    throw new ValidationError("newString is required");
   }
   if (oldString === newString) {
-    throw new Error("No changes to apply: oldString and newString are identical.");
+    throw new ValidationError("No changes to apply: oldString and newString are identical.");
   }
   return { oldString, newString };
 }
@@ -266,11 +267,11 @@ function applyOneEdit(
   }
 
   if (matchCount === 0) {
-    throw new Error(`${label}: oldString was not found in ${filePath}`);
+    throw new ValidationError(`${label}: oldString was not found in ${filePath}`);
   }
 
   if (!edit.replaceAll && matchCount > 1) {
-    throw new Error(
+    throw new ValidationError(
       `${label}: oldString matched ${matchCount} occurrences in ${filePath}. Provide a more specific oldString or set replaceAll=true.`,
     );
   }
@@ -316,7 +317,7 @@ export class FilesystemService {
   private resolveToolPath(input: ResolvedPathInput) {
     const requestedPath = getRequestedPath(input);
     if (!requestedPath) {
-      throw new Error("path is required");
+      throw new ValidationError("path is required");
     }
     const cwd = this.backend.resolveCwd(input.cwd);
     const resolved = this.backend.resolvePath(requestedPath, cwd);
@@ -330,10 +331,10 @@ export class FilesystemService {
         const offset = params.offset ?? 1;
         const limit = params.limit ?? DEFAULT_READ_LIMIT;
         if (offset < 1) {
-          throw new Error("offset must be greater than or equal to 1");
+          throw new ValidationError("offset must be greater than or equal to 1");
         }
         if (limit < 1) {
-          throw new Error("limit must be greater than or equal to 1");
+          throw new ValidationError("limit must be greater than or equal to 1");
         }
 
         const { resolved } = this.resolveToolPath(params);
@@ -346,14 +347,14 @@ export class FilesystemService {
             .map((entry) => `${entry.name}${entry.isDirectory ? "/" : ""}`)
             .sort((left, right) => left.localeCompare(right));
           if (entries.length > 0 && offset > entries.length) {
-            throw new Error(`Offset ${offset} is out of range for this directory (${entries.length} entries)`);
+            throw new ValidationError(`Offset ${offset} is out of range for this directory (${entries.length} entries)`);
           }
           return formatDirectoryEntries(entries, offset, limit, resolved);
         }
 
         const lines = splitFileLines(result.content);
         if (offset > lines.length && !(lines.length === 0 && offset === 1)) {
-          throw new Error(`Offset ${offset} is out of range for this file (${lines.length} lines)`);
+          throw new ValidationError(`Offset ${offset} is out of range for this file (${lines.length} lines)`);
         }
 
         const selected: string[] = [];
@@ -413,7 +414,7 @@ export class FilesystemService {
         this.authorizePath(resolved);
         const existing = await this.backend.stat(resolved);
         if (existing?.type === "directory") {
-          throw new Error(`Path is a directory, not a file: ${resolved}`);
+          throw new ValidationError(`Path is a directory, not a file: ${resolved}`);
         }
         const result = await this.backend.writeFile(resolved, params.content, params.append === true);
         return `${params.append ? "Appended" : "Wrote"} ${Buffer.byteLength(params.content, "utf8")} bytes to ${resolved}. File size is now ${result.sizeBytes} bytes.`;
@@ -437,7 +438,7 @@ export class FilesystemService {
         await this.backend.statOrThrow(resolved);
         const readResult = await this.backend.readFileOrDir(resolved);
         if (readResult.type !== "file") {
-          throw new Error(`Path is a directory, not a file: ${resolved}`);
+          throw new ValidationError(`Path is a directory, not a file: ${resolved}`);
         }
 
         const originalContent = readResult.content;
@@ -476,7 +477,7 @@ export class FilesystemService {
           if (operation.type === "add") {
             const existing = await this.backend.stat(resolvedPath);
             if (existing) {
-              throw new Error(`Add File target already exists: ${resolvedPath}`);
+              throw new ValidationError(`Add File target already exists: ${resolvedPath}`);
             }
             await this.backend.writeFile(resolvedPath, buildAddedFileContent(operation.lines), false);
             summaries.push(`A ${resolvedPath}`);
@@ -486,7 +487,7 @@ export class FilesystemService {
           await this.backend.statOrThrow(resolvedPath);
           const readResult = await this.backend.readFileOrDir(resolvedPath);
           if (readResult.type !== "file") {
-            throw new Error(`Path is a directory, not a file: ${resolvedPath}`);
+            throw new ValidationError(`Path is a directory, not a file: ${resolvedPath}`);
           }
 
           if (operation.type === "delete") {
@@ -511,7 +512,7 @@ export class FilesystemService {
           if (moveTarget && moveTarget !== resolvedPath) {
             const existingTarget = await this.backend.stat(moveTarget);
             if (existingTarget) {
-              throw new Error(`Move target already exists: ${moveTarget}`);
+              throw new ValidationError(`Move target already exists: ${moveTarget}`);
             }
             await this.backend.writeFile(moveTarget, nextContent, false);
             await this.backend.deletePath(resolvedPath, false);
@@ -543,14 +544,14 @@ export class FilesystemService {
       async () => {
         const limit = params.limit ?? DEFAULT_LIST_LIMIT;
         if (limit < 1) {
-          throw new Error("limit must be greater than or equal to 1");
+          throw new ValidationError("limit must be greater than or equal to 1");
         }
 
         const { resolved } = this.resolveToolPath({ ...params, path: params.path ?? "." });
         this.authorizePath(resolved);
         const stat = await this.backend.statOrThrow(resolved);
         if (stat.type !== "directory") {
-          throw new Error(`Path is not a directory: ${resolved}`);
+          throw new ValidationError(`Path is not a directory: ${resolved}`);
         }
 
         const result = await this.backend.listDir(resolved, params.recursive === true, limit);
@@ -580,13 +581,13 @@ export class FilesystemService {
       async () => {
         const limit = params.limit ?? DEFAULT_GLOB_LIMIT;
         if (limit < 1) {
-          throw new Error("limit must be greater than or equal to 1");
+          throw new ValidationError("limit must be greater than or equal to 1");
         }
         const { resolved } = this.resolveToolPath({ ...params, path: params.path ?? "." });
         this.authorizePath(resolved);
         const stat = await this.backend.statOrThrow(resolved);
         if (stat.type !== "directory") {
-          throw new Error(`Path is not a directory: ${resolved}`);
+          throw new ValidationError(`Path is not a directory: ${resolved}`);
         }
 
         const result = await this.backend.glob(resolved, params.pattern, limit);
@@ -617,7 +618,7 @@ export class FilesystemService {
       async () => {
         const limit = params.limit ?? DEFAULT_GREP_LIMIT;
         if (limit < 1) {
-          throw new Error("limit must be greater than or equal to 1");
+          throw new ValidationError("limit must be greater than or equal to 1");
         }
         const { resolved } = this.resolveToolPath({ ...params, path: params.path ?? "." });
         this.authorizePath(resolved);
@@ -716,7 +717,7 @@ export class FilesystemService {
         const source = params.source ?? params.src;
         const destination = params.destination ?? params.dst;
         if (!source || !destination) {
-          throw new Error("source and destination are required");
+          throw new ValidationError("source and destination are required");
         }
         const resolvedSource = this.resolveToolPath({ path: source, cwd: params.cwd }).resolved;
         const resolvedDestination = this.resolveToolPath({ path: destination, cwd: params.cwd }).resolved;
@@ -742,7 +743,7 @@ export class FilesystemService {
         const source = params.source ?? params.src;
         const destination = params.destination ?? params.dst;
         if (!source || !destination) {
-          throw new Error("source and destination are required");
+          throw new ValidationError("source and destination are required");
         }
         const resolvedSource = this.resolveToolPath({ path: source, cwd: params.cwd }).resolved;
         const resolvedDestination = this.resolveToolPath({ path: destination, cwd: params.cwd }).resolved;

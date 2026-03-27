@@ -15,6 +15,7 @@ import type {
   RoutineStoreData,
   Weekday,
 } from "../domain/routines";
+import { AuthorizationError, NotFoundError, ValidationError } from "../domain/errors";
 import { ProfileService } from "./profile-service";
 import { ProjectsService } from "./projects-service";
 import { RoutinesStore } from "./routines-store";
@@ -588,7 +589,7 @@ export class RoutinesService {
     const id = input.id ?? makeRoutineId(input.kind, input.title);
     const status = input.status ?? "active";
     if (status === "completed" && !isTodoKind(input.kind)) {
-      throw new Error("Only todo items can use completed status.");
+      throw new ValidationError("Only todo items can use completed status.");
     }
     const reminderDefaults = defaultReminderPolicy(input.kind);
     const existingState = createInitialState();
@@ -705,12 +706,12 @@ export class RoutinesService {
     const data = this.store.load();
     const item = this.requireAccessibleItem(data, id);
     if (!item) {
-      throw new Error(`Routine item not found: ${id}`);
+      throw new NotFoundError("Routine item", id);
     }
 
     const nextKind = updates.kind ?? item.kind;
     if (item.status === "completed" && !isTodoKind(nextKind)) {
-      throw new Error("Completed items must remain todo items until they are reopened.");
+      throw new ValidationError("Completed items must remain todo items until they are reopened.");
     }
 
     const scope = this.resolveWorkScope({
@@ -750,7 +751,7 @@ export class RoutinesService {
     const data = this.store.load();
     const item = this.requireAccessibleItem(data, id);
     if (!item) {
-      throw new Error(`Routine item not found: ${id}`);
+      throw new NotFoundError("Routine item", id);
     }
 
     delete data.items[id];
@@ -804,7 +805,7 @@ export class RoutinesService {
     const projects = this.getProjectsService();
     const project = projectId ? projects.getProject(projectId) : undefined;
     if (projectId && !project) {
-      throw new Error(`Unknown project for routine item: ${projectId}`);
+      throw new NotFoundError("Project", projectId);
     }
 
     const resolvedJobId = project?.jobId ?? jobId;
@@ -817,11 +818,11 @@ export class RoutinesService {
 
     const job = projects.getJob(resolvedJobId);
     if (!job) {
-      throw new Error(`Unknown job for routine item: ${resolvedJobId}`);
+      throw new NotFoundError("Job", resolvedJobId);
     }
 
     if (jobId && project?.jobId && jobId !== project.jobId) {
-      throw new Error(
+      throw new ValidationError(
         `Routine job ${jobId} does not match project ${projectId} job ${project.jobId}.`,
       );
     }
@@ -842,7 +843,7 @@ export class RoutinesService {
     if (explicitProfileId) {
       const normalizedProfileId = this.requireKnownProfileId(explicitProfileId);
       if (inferredProfileId && inferredProfileId !== normalizedProfileId) {
-        throw new Error(
+        throw new ValidationError(
           `Routine profile ${normalizedProfileId} does not match job-scoped profile ${inferredProfileId}.`,
         );
       }
@@ -882,7 +883,7 @@ export class RoutinesService {
 
   private assertProfileAccess(profileId: string) {
     if (!this.canAccessProfile(profileId)) {
-      throw new Error(`Profile not accessible for routine item: ${profileId}`);
+      throw new AuthorizationError(`Profile not accessible for routine item: ${profileId}`);
     }
   }
 
@@ -896,7 +897,7 @@ export class RoutinesService {
     }
 
     if (requestedProfileId && requestedProfileId !== this.activeProfile.id) {
-      throw new Error(`Profile not accessible for routine items: ${requestedProfileId}`);
+      throw new AuthorizationError(`Profile not accessible for routine items: ${requestedProfileId}`);
     }
 
     return items.filter((item) => item.profileId === this.activeProfile.id);
@@ -905,7 +906,7 @@ export class RoutinesService {
   private requireAccessibleItem(data: RoutineStoreData, id: string) {
     const item = data.items[id];
     if (!item || !this.canAccessProfile(item.profileId)) {
-      throw new Error(`Routine item not found: ${id}`);
+      throw new NotFoundError("Routine item", id);
     }
     return item;
   }
@@ -1075,7 +1076,7 @@ export class RoutinesService {
     const data = this.store.load();
     const item = this.requireAccessibleItem(data, id);
     if (!item) {
-      throw new Error(`Routine item not found: ${id}`);
+      throw new NotFoundError("Routine item", id);
     }
 
     const now = nowInTimezone(data.settings.timezone, reference);
@@ -1113,10 +1114,10 @@ export class RoutinesService {
     const data = this.store.load();
     const item = this.requireAccessibleItem(data, id);
     if (!item) {
-      throw new Error(`Routine item not found: ${id}`);
+      throw new NotFoundError("Routine item", id);
     }
     if (!item.state.lastCompletedAt) {
-      throw new Error(`Routine item is not marked done: ${id}`);
+      throw new ValidationError(`Routine item is not marked done: ${id}`);
     }
 
     const lastCompletedAt = item.state.lastCompletedAt;
@@ -1155,7 +1156,7 @@ export class RoutinesService {
     const data = this.store.load();
     const item = this.requireAccessibleItem(data, id);
     if (!item) {
-      throw new Error(`Routine item not found: ${id}`);
+      throw new NotFoundError("Routine item", id);
     }
 
     const now = nowInTimezone(data.settings.timezone, reference);
@@ -1174,7 +1175,7 @@ export class RoutinesService {
     const data = this.store.load();
     const item = this.requireAccessibleItem(data, id);
     if (!item) {
-      throw new Error(`Routine item not found: ${id}`);
+      throw new NotFoundError("Routine item", id);
     }
 
     const now = nowInTimezone(data.settings.timezone, reference);
@@ -1203,7 +1204,7 @@ export class RoutinesService {
     const data = this.store.load();
     const item = this.requireAccessibleItem(data, id);
     if (!item) {
-      throw new Error(`Routine item not found: ${id}`);
+      throw new NotFoundError("Routine item", id);
     }
     item.status = "paused";
     item.enabled = false;
@@ -1220,7 +1221,7 @@ export class RoutinesService {
     const data = this.store.load();
     const item = this.requireAccessibleItem(data, id);
     if (!item) {
-      throw new Error(`Routine item not found: ${id}`);
+      throw new NotFoundError("Routine item", id);
     }
     item.status = "active";
     item.enabled = true;

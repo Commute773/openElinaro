@@ -90,7 +90,7 @@ describe("ProfileService", () => {
 
   test("getProfile throws for unknown profile", () => {
     const service = new ProfileService("root");
-    expect(() => service.getProfile("nonexistent")).toThrow("Unknown profile: nonexistent");
+    expect(() => service.getProfile("nonexistent")).toThrow("Profile not found: nonexistent");
   });
 
   test("getActiveProfile returns the profile matching the constructor argument", () => {
@@ -119,7 +119,7 @@ describe("ProfileService", () => {
 
   test("updateProfile throws for unknown profile", () => {
     const service = new ProfileService("root");
-    expect(() => service.updateProfile("missing", (p) => p)).toThrow("Unknown profile: missing");
+    expect(() => service.updateProfile("missing", (p) => p)).toThrow("Profile not found: missing");
   });
 
   test("setProfileDefaultModel updates model fields", () => {

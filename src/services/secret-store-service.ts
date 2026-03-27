@@ -4,6 +4,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { NotFoundError, ValidationError } from "../domain/errors";
 import { getLocalEnv } from "../config/local-env";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
@@ -120,7 +121,7 @@ function emptyStore(): SecretStoreShape {
 function normalizeSecretName(name: string) {
   const trimmed = name.trim();
   if (!SECRET_NAME_PATTERN.test(trimmed)) {
-    throw new Error(
+    throw new ValidationError(
       `Invalid secret name "${name}". Use 1-64 chars from letters, numbers, "_" or "-".`,
     );
   }
@@ -130,7 +131,7 @@ function normalizeSecretName(name: string) {
 function normalizeSecretFieldName(name: string) {
   const trimmed = name.trim();
   if (!SECRET_FIELD_PATTERN.test(trimmed)) {
-    throw new Error(
+    throw new ValidationError(
       `Invalid secret field "${name}". Use 1-64 chars from letters, numbers, "_" or "-".`,
     );
   }
@@ -139,12 +140,12 @@ function normalizeSecretFieldName(name: string) {
 
 function normalizeSecretFields(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Secret payload must be a flat JSON object.");
+    throw new ValidationError("Secret payload must be a flat JSON object.");
   }
 
   const entries = Object.entries(value);
   if (entries.length < 1 || entries.length > MAX_SECRET_FIELDS) {
-    throw new Error(`Secret payload must contain between 1 and ${MAX_SECRET_FIELDS} fields.`);
+    throw new ValidationError(`Secret payload must contain between 1 and ${MAX_SECRET_FIELDS} fields.`);
   }
 
   const normalized: Record<string, string> = {};
@@ -152,11 +153,11 @@ function normalizeSecretFields(value: unknown) {
     const key = rawKey.trim();
     normalizeSecretFieldName(key);
     if (Array.isArray(rawValue) || (rawValue && typeof rawValue === "object")) {
-      throw new Error(`Secret field "${key}" must be a scalar, not nested JSON.`);
+      throw new ValidationError(`Secret field "${key}" must be a scalar, not nested JSON.`);
     }
     const normalizedValue = rawValue === null ? "" : String(rawValue);
     if (normalizedValue.length > MAX_SECRET_VALUE_LENGTH) {
-      throw new Error(`Secret field "${key}" exceeds the ${MAX_SECRET_VALUE_LENGTH}-character limit.`);
+      throw new ValidationError(`Secret field "${key}" exceeds the ${MAX_SECRET_VALUE_LENGTH}-character limit.`);
     }
     normalized[key] = normalizedValue;
   }
@@ -168,7 +169,7 @@ function parseSecretRef(secretRef: string) {
   const trimmed = secretRef.trim();
   const separator = trimmed.indexOf(".");
   if (separator <= 0 || separator === trimmed.length - 1) {
-    throw new Error(
+    throw new ValidationError(
       `Invalid secretRef "${secretRef}". Use the format "secretName.fieldName".`,
     );
   }
@@ -195,7 +196,7 @@ function readLegacyKeyMaterial() {
 
   const resolved = path.resolve(filePath);
   if (!fs.existsSync(resolved)) {
-    throw new Error(`Secret key file not found: ${resolved}`);
+    throw new NotFoundError("Secret key file", resolved);
   }
   return fs.readFileSync(resolved, "utf8").trim();
 }
@@ -358,7 +359,7 @@ export class SecretStoreService {
     const name = normalizeSecretName(input.name);
     const kind = input.kind ?? "generic";
     if (!SECRET_STORE_KINDS.includes(kind)) {
-      throw new Error(`Invalid secret kind "${kind}".`);
+      throw new ValidationError(`Invalid secret kind "${kind}".`);
     }
     const profileId = input.profileId ?? DEFAULT_SECRET_STORE_PROFILE_ID;
     const fields = normalizeSecretFields(input.fields);
@@ -402,14 +403,14 @@ export class SecretStoreService {
     const fieldName = normalizeSecretFieldName(input.fieldName ?? "password");
     const length = input.length ?? DEFAULT_PASSWORD_LENGTH;
     if (!Number.isInteger(length) || length < 8 || length > 256) {
-      throw new Error("Generated password length must be an integer between 8 and 256.");
+      throw new ValidationError("Generated password length must be an integer between 8 and 256.");
     }
 
     const profileId = input.profileId ?? DEFAULT_SECRET_STORE_PROFILE_ID;
     const { name, entry } = this.loadSecretEntry(input.name, profileId);
     const kind = input.kind ?? entry?.kind ?? "password";
     if (!SECRET_STORE_KINDS.includes(kind)) {
-      throw new Error(`Invalid secret kind "${kind}".`);
+      throw new ValidationError(`Invalid secret kind "${kind}".`);
     }
 
     const requestedSets = [
@@ -422,10 +423,10 @@ export class SecretStoreService {
     ].filter((value) => value.length > 0);
 
     if (requestedSets.length === 0) {
-      throw new Error("Password generation needs at least one enabled character set.");
+      throw new ValidationError("Password generation needs at least one enabled character set.");
     }
     if (length < requestedSets.length) {
-      throw new Error(`Password length ${length} is too short for ${requestedSets.length} required character sets.`);
+      throw new ValidationError(`Password length ${length} is too short for ${requestedSets.length} required character sets.`);
     }
 
     const allChars = requestedSets.join("");
@@ -469,7 +470,7 @@ export class SecretStoreService {
   }) {
     const resolvedPath = path.resolve(input.sourcePath);
     if (!fs.existsSync(resolvedPath)) {
-      throw new Error(`Secret source file not found: ${resolvedPath}`);
+      throw new NotFoundError("Secret source file", resolvedPath);
     }
     const parsed = JSON.parse(fs.readFileSync(resolvedPath, "utf8")) as unknown;
     return this.saveSecret({
@@ -503,11 +504,11 @@ export class SecretStoreService {
     const profileStore = getProfileStore(store, profileId);
     const entry = profileStore.secrets[secretName];
     if (!entry) {
-      throw new Error(`Secret "${secretName}" was not found for profile ${profileId}.`);
+      throw new NotFoundError("Secret", `${secretName} (profile ${profileId})`);
     }
     const fields = materializeSecretFields(entry);
     if (!(fieldName in fields)) {
-      throw new Error(`Secret "${secretName}" does not include field "${fieldName}".`);
+      throw new NotFoundError("Secret field", `${fieldName} in secret ${secretName}`);
     }
     if (isLegacyEntry(entry)) {
       profileStore.secrets[secretName] = {

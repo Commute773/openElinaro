@@ -237,7 +237,7 @@ describe("RoutinesService", () => {
         kind: "todo",
         projectId: "missing-project",
         schedule: { kind: "manual" },
-      })).toThrow("Unknown project for routine item: missing-project");
+      })).toThrow("Project not found: missing-project");
   });
 
   test("limits non-root profiles to their own routine items", () => {
