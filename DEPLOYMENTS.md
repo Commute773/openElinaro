@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.16
+- Released at: 2026-03-27T15:57:15Z
+- Release id: 20260327T155715Z-bd5362b
+- Previous version: 2026.03.27.15
+- Trigger: ci/release workflow
+
+- refactor: extract test env setup into createIsolatedRuntimeRoot harness
+
 ## 2026.03.27.15
 - Released at: 2026-03-27T15:32:52Z
 - Release id: 20260327T153252Z-1b24079
