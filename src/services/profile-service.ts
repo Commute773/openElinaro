@@ -66,10 +66,11 @@ function ensureSharedProfileTempDirectory(profileId: string) {
 
 export class ProfileService {
   private readonly activeProfileId: string;
-  private readonly secrets = new SecretStoreService();
+  private readonly secrets: SecretStoreService;
 
-  constructor(activeProfileId?: string) {
+  constructor(activeProfileId?: string, secrets?: SecretStoreService) {
     this.activeProfileId = normalizeProfileId(activeProfileId ?? getRuntimeConfig().core.profile.activeProfileId);
+    this.secrets = secrets ?? new SecretStoreService();
   }
 
   loadRegistry() {
