@@ -1,0 +1,650 @@
+/**
+ * Routine and alarm function definitions.
+ * Migrated from src/tools/groups/routine-tools.ts.
+ * These produce agent tools, API routes, and Discord commands from a single source.
+ */
+import { z } from "zod";
+import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import type {
+  RoutineItemKind,
+  RoutinePriority,
+  RoutineSchedule,
+  Weekday,
+} from "../../domain/routines";
+
+// ---------------------------------------------------------------------------
+// Shared schemas (same as routine-tools.ts)
+// ---------------------------------------------------------------------------
+
+const weekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+const routineKindSchema = z.enum(["todo", "routine", "habit", "med", "deadline", "precommitment"]);
+const routinePrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
+const routineScheduleKindSchema = z.enum(["manual", "once", "daily", "weekly", "interval", "monthly"]);
+const routineStatusSchema = z.enum(["active", "paused", "archived", "completed"]);
+
+const addRoutineSchema = z.object({
+  title: z.string().min(1),
+  kind: routineKindSchema.default("todo"),
+  profileId: z.string().min(1).optional(),
+  priority: routinePrioritySchema.optional(),
+  description: z.string().optional(),
+  dose: z.string().optional(),
+  labels: z.array(z.string()).optional(),
+  jobId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
+  blockedBy: z.array(z.string()).optional(),
+  scheduleKind: routineScheduleKindSchema.default("manual"),
+  dueAt: z.string().optional(),
+  time: z.string().optional(),
+  days: z.array(weekdaySchema).optional(),
+  everyDays: z.number().int().positive().optional(),
+  dayOfMonth: z.number().int().min(1).max(31).optional(),
+});
+
+const listRoutineSchema = z.object({
+  status: routineStatusSchema.or(z.literal("all")).optional(),
+  kind: routineKindSchema.or(z.literal("all")).optional(),
+  profileId: z.union([z.string().min(1), z.literal("all")]).optional(),
+  scope: z.enum(["work", "personal", "all"]).optional(),
+  jobId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+  all: z.boolean().optional(),
+});
+
+const updateRoutineSchema = z.object({
+  id: z.string().min(1),
+  profileId: z.string().min(1).optional(),
+  title: z.string().min(1).optional(),
+  kind: routineKindSchema.optional(),
+  priority: routinePrioritySchema.optional(),
+  description: z.string().optional(),
+  labels: z.array(z.string()).optional(),
+  jobId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
+  blockedBy: z.array(z.string()).optional(),
+  scheduleKind: routineScheduleKindSchema.optional(),
+  dueAt: z.string().optional(),
+  time: z.string().optional(),
+  days: z.array(weekdaySchema).optional(),
+  everyDays: z.number().int().positive().optional(),
+  dayOfMonth: z.number().int().min(1).max(31).optional(),
+}).superRefine((value, ctx) => {
+  const hasScheduleUpdate =
+    value.scheduleKind !== undefined
+    || value.dueAt !== undefined
+    || value.time !== undefined
+    || value.days !== undefined
+    || value.everyDays !== undefined
+    || value.dayOfMonth !== undefined;
+  const hasFieldUpdate =
+    value.profileId !== undefined
+    || value.title !== undefined
+    || value.kind !== undefined
+    || value.priority !== undefined
+    || value.description !== undefined
+    || value.labels !== undefined
+    || value.jobId !== undefined
+    || value.projectId !== undefined
+    || value.blockedBy !== undefined
+    || hasScheduleUpdate;
+
+  if (!hasFieldUpdate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Provide at least one field to update.",
+    });
+  }
+
+  if (hasScheduleUpdate && value.scheduleKind === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "scheduleKind is required when updating the schedule.",
+      path: ["scheduleKind"],
+    });
+  }
+});
+
+const idSchema = z.object({ id: z.string().min(1) });
+
+const snoozeSchema = z.object({
+  id: z.string().min(1),
+  minutes: z.number().int().positive().max(10080),
+});
+
+const setAlarmSchema = z.object({
+  name: z.string().min(1),
+  time: z.string().min(1),
+});
+
+const setTimerSchema = z.object({
+  name: z.string().min(1),
+  duration: z.string().min(1),
+});
+
+const listAlarmSchema = z.object({
+  state: z.enum(["pending", "delivered", "cancelled", "all"]).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Schedule builder (shared between add and update)
+// ---------------------------------------------------------------------------
+
+export function buildSchedule(input: {
+  scheduleKind: z.infer<typeof routineScheduleKindSchema>;
+  dueAt?: string;
+  time?: string;
+  days?: Weekday[];
+  everyDays?: number;
+  dayOfMonth?: number;
+}): RoutineSchedule {
+  if (input.scheduleKind === "manual") return { kind: "manual" };
+  if (input.scheduleKind === "once") {
+    if (!input.dueAt) throw new Error("dueAt is required for once schedules.");
+    return { kind: "once", dueAt: new Date(input.dueAt).toISOString() };
+  }
+  if (input.scheduleKind === "daily") {
+    if (!input.time) throw new Error("time is required for daily schedules.");
+    return input.days?.length
+      ? { kind: "daily", time: input.time, days: input.days as Weekday[] }
+      : { kind: "daily", time: input.time };
+  }
+  if (input.scheduleKind === "weekly") {
+    if (!input.time || !input.days?.length) throw new Error("time and days are required for weekly schedules.");
+    return { kind: "weekly", time: input.time, days: input.days as Weekday[] };
+  }
+  if (input.scheduleKind === "interval") {
+    if (!input.time || !input.everyDays) throw new Error("time and everyDays are required for interval schedules.");
+    return { kind: "interval", time: input.time, everyDays: input.everyDays };
+  }
+  if (!input.time || !input.dayOfMonth) throw new Error("time and dayOfMonth are required for monthly schedules.");
+  return { kind: "monthly", time: input.time, dayOfMonth: input.dayOfMonth };
+}
+
+// ---------------------------------------------------------------------------
+// Routine auth defaults
+// ---------------------------------------------------------------------------
+
+const ROUTINE_AUTH = { access: "anyone" as const, behavior: "uniform" as const };
+const ROUTINE_SCOPES: ("chat" | "direct")[] = ["chat", "direct"];
+const ROUTINE_DOMAINS = ["routines", "personal-ops"];
+
+// ---------------------------------------------------------------------------
+// Domain builder
+// ---------------------------------------------------------------------------
+
+export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
+  // -----------------------------------------------------------------------
+  // routine_check
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_check",
+    description: "Check which routine items, meds, deadlines, and todos need attention now.",
+    input: z.object({}),
+    handler: async (_input, fnCtx) => fnCtx.services.routines.buildCheckSummary(),
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    examples: ["check routines", "what's due now"],
+    http: { method: "GET", path: "/api/g2/routines/check" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_list
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_list",
+    description: "List routine items including meds, habits, todos, and deadlines with optional filters. Set all=true to ignore list filters and return every non-completed visible item.",
+    input: listRoutineSchema,
+    handler: async (input, fnCtx) => {
+      const items = fnCtx.services.routines.listItems({
+        status: input.status as any,
+        kind: (input.kind as RoutineItemKind | "all" | undefined) ?? "all",
+        profileId: input.profileId,
+        scope: input.scope,
+        jobId: input.jobId,
+        projectId: input.projectId,
+        limit: input.limit,
+        all: input.all,
+      });
+      if (items.length === 0) return "No routine items matched.";
+      return items.map((item) => `- ${fnCtx.services.routines.formatItem(item)}`).join("\n");
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    examples: ["list active routines", "show paused todos"],
+    http: {
+      method: "GET",
+      path: "/api/g2/routines",
+      queryParams: z.object({
+        status: z.string().optional(),
+        kind: z.string().optional(),
+        scope: z.string().optional(),
+        all: z.string().optional(),
+      }),
+      responseTransform: (result) => {
+        // For the API surface, return structured data (not text)
+        if (typeof result === "string") return { items: [] };
+        return { items: result };
+      },
+    },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_get
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_get",
+    description: "Get one routine item by id.",
+    input: idSchema,
+    handler: async (input, fnCtx) => {
+      const item = fnCtx.services.routines.getItem(input.id);
+      if (!item) throw new Error(`Routine item not found: ${input.id}`);
+      return fnCtx.services.routines.formatItem(item);
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    http: { method: "GET", path: "/api/g2/routines/:id" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_add
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_add",
+    description: "Create a new todo, med, routine, habit, deadline, or precommitment.",
+    input: addRoutineSchema,
+    handler: async (input, fnCtx) => {
+      const item = fnCtx.services.routines.addItem({
+        title: input.title,
+        kind: input.kind as RoutineItemKind,
+        profileId: input.profileId,
+        priority: input.priority as RoutinePriority | undefined,
+        description: input.description,
+        dose: input.dose,
+        labels: input.labels,
+        jobId: input.jobId,
+        projectId: input.projectId,
+        blockedBy: input.blockedBy,
+        schedule: buildSchedule(input),
+      });
+      return `Saved routine item ${item.id}: ${fnCtx.services.routines.formatItem(item)}`;
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/routines", successStatus: 201 },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_update
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_update",
+    description: "Edit an existing routine item's title, description, priority, kind, blocking dependencies, or full schedule. To update the schedule, provide scheduleKind plus the matching schedule fields.",
+    input: updateRoutineSchema,
+    handler: async (input, fnCtx) => {
+      const item = fnCtx.services.routines.updateItem(input.id, {
+        profileId: input.profileId,
+        title: input.title,
+        kind: input.kind as RoutineItemKind | undefined,
+        priority: input.priority as RoutinePriority | undefined,
+        description: input.description,
+        labels: input.labels,
+        jobId: input.jobId,
+        projectId: input.projectId,
+        blockedBy: input.blockedBy,
+        schedule: input.scheduleKind
+          ? buildSchedule({
+              scheduleKind: input.scheduleKind,
+              dueAt: input.dueAt,
+              time: input.time,
+              days: input.days as Weekday[] | undefined,
+              everyDays: input.everyDays,
+              dayOfMonth: input.dayOfMonth,
+            })
+          : undefined,
+      });
+      return `Updated routine item ${item.id}: ${fnCtx.services.routines.formatItem(item)}`;
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "PATCH", path: "/api/g2/routines/:id" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_delete
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_delete",
+    description: "Permanently delete a routine item by id.",
+    input: idSchema,
+    handler: async (input, fnCtx) => {
+      const item = fnCtx.services.routines.deleteItem(input.id);
+      return `Deleted routine item ${item.id}: ${item.title}`;
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "DELETE", path: "/api/g2/routines/:id" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_done
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_done",
+    description: "Mark a routine item completed.",
+    input: idSchema,
+    handler: async (input, fnCtx) => {
+      const item = fnCtx.services.routines.markDone(input.id);
+      return `Marked done: ${fnCtx.services.routines.formatItem(item)}`;
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/routines/:id/done" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_undo_done
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_undo_done",
+    description: "Undo the most recent completion for a routine item.",
+    input: idSchema,
+    handler: async (input, fnCtx) => {
+      const item = fnCtx.services.routines.undoDone(input.id);
+      return `Undid completion: ${fnCtx.services.routines.formatItem(item)}`;
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/routines/:id/undo" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_snooze
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_snooze",
+    description: "Snooze a routine item for a number of minutes.",
+    input: snoozeSchema,
+    handler: async (input, fnCtx) => {
+      const item = fnCtx.services.routines.snooze(input.id, input.minutes);
+      return `Snoozed ${item.id} until ${item.state.snoozedUntil ?? "later"}.`;
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/routines/:id/snooze" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_skip
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_skip",
+    description: "Skip the current occurrence of a routine item.",
+    input: idSchema,
+    handler: async (input, fnCtx) => {
+      const item = fnCtx.services.routines.skip(input.id);
+      return `Skipped the current occurrence for ${item.id}.`;
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/routines/:id/skip" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_pause
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_pause",
+    description: "Pause a routine item.",
+    input: idSchema,
+    handler: async (input, fnCtx) => {
+      const item = fnCtx.services.routines.pause(input.id);
+      return `Paused ${item.id}.`;
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/routines/:id/pause" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // routine_resume
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "routine_resume",
+    description: "Resume a paused routine item.",
+    input: idSchema,
+    handler: async (input, fnCtx) => {
+      const item = fnCtx.services.routines.resume(input.id);
+      return `Resumed ${item.id}.`;
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/routines/:id/resume" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // set_alarm
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "set_alarm",
+    description: "Schedule a Discord alarm. Use time as local HH:MM or a future ISO timestamp such as 07:30 or 2026-03-16T09:00:00-04:00.",
+    input: setAlarmSchema,
+    handler: async (input, fnCtx) => {
+      const alarm = fnCtx.services.alarms.setAlarm(input.name, input.time);
+      return [`Alarm set: ${alarm.name}`, `Id: ${alarm.id}`, `Triggers at: ${alarm.triggerAt}`, `Accepted formats: local HH:MM or a future ISO timestamp.`].join("\n");
+    },
+    auth: ROUTINE_AUTH,
+    domains: ["routines", "alarms"],
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/alarms", successStatus: 201 },
+  }),
+
+  // -----------------------------------------------------------------------
+  // set_timer
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "set_timer",
+    description: "Schedule a Discord timer. Use duration strings like 30s, 10m, 2h, or 1d.",
+    input: setTimerSchema,
+    handler: async (input, fnCtx) => {
+      const timer = fnCtx.services.alarms.setTimer(input.name, input.duration);
+      return [`Timer set: ${timer.name}`, `Id: ${timer.id}`, `Triggers at: ${timer.triggerAt}`, "Accepted duration suffixes: s, m, h, d."].join("\n");
+    },
+    auth: ROUTINE_AUTH,
+    domains: ["routines", "alarms"],
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/timers", successStatus: 201 },
+  }),
+
+  // -----------------------------------------------------------------------
+  // alarm_list
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "alarm_list",
+    description: "List scheduled alarms and timers. Defaults to pending items only.",
+    input: listAlarmSchema,
+    handler: async (input, fnCtx) => {
+      const alarms = fnCtx.services.alarms.listAlarms({ state: input.state, limit: input.limit });
+      if (alarms.length === 0) return "No alarms or timers matched.";
+      return alarms.map((alarm) =>
+        [`- ${alarm.id}`, `${alarm.kind}/${alarm.name}`, `triggerAt=${alarm.triggerAt}`, `state=${alarm.cancelledAt ? "cancelled" : alarm.deliveredAt ? "delivered" : "pending"}`, `spec=${alarm.originalSpec}`].join(" | "),
+      ).join("\n");
+    },
+    auth: ROUTINE_AUTH,
+    domains: ["routines", "alarms"],
+    agentScopes: ROUTINE_SCOPES,
+    http: {
+      method: "GET",
+      path: "/api/g2/alarms",
+      queryParams: z.object({
+        state: z.string().optional(),
+        limit: z.string().optional(),
+      }),
+    },
+  }),
+
+  // -----------------------------------------------------------------------
+  // alarm_cancel
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "alarm_cancel",
+    description: "Cancel a scheduled alarm or timer by id.",
+    input: idSchema,
+    handler: async (input, fnCtx) => {
+      const alarm = fnCtx.services.alarms.cancelAlarm(input.id);
+      return `Cancelled ${alarm.kind} ${alarm.id}: ${alarm.name}`;
+    },
+    auth: ROUTINE_AUTH,
+    domains: ["routines", "alarms"],
+    agentScopes: ROUTINE_SCOPES,
+    mutatesState: true,
+    http: { method: "DELETE", path: "/api/g2/alarms/:id" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // API-only: todo shortcuts (same underlying service, different API paths)
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "api_todo_list",
+    description: "List active todos.",
+    input: z.object({}),
+    surfaces: ["api"],
+    handler: async (_input, fnCtx) => {
+      const todos = fnCtx.services.routines.listItems({ kind: "todo", status: "active" });
+      return todos.map((item) => ({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        priority: item.priority,
+      }));
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: [],
+    http: { method: "GET", path: "/api/g2/todos" },
+  }),
+
+  defineFunction({
+    name: "api_todo_create",
+    description: "Create a new todo.",
+    input: z.object({
+      title: z.string().min(1),
+      priority: routinePrioritySchema.optional(),
+      description: z.string().optional(),
+      labels: z.array(z.string()).optional(),
+      jobId: z.string().min(1).optional(),
+      projectId: z.string().min(1).optional(),
+      blockedBy: z.array(z.string()).optional(),
+      schedule: z.any().optional(),
+    }),
+    surfaces: ["api"],
+    handler: async (input, fnCtx) => {
+      return fnCtx.services.routines.addItem({
+        title: input.title,
+        kind: "todo",
+        priority: input.priority as RoutinePriority | undefined,
+        description: input.description,
+        labels: input.labels,
+        jobId: input.jobId,
+        projectId: input.projectId,
+        blockedBy: input.blockedBy,
+        schedule: (input.schedule as any) ?? { kind: "once", dueAt: new Date().toISOString() },
+      });
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: [],
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/todos", successStatus: 201 },
+  }),
+
+  defineFunction({
+    name: "api_todo_done",
+    description: "Mark a todo as done.",
+    input: idSchema,
+    surfaces: ["api"],
+    handler: async (input, fnCtx) => {
+      fnCtx.services.routines.markDone(input.id);
+      return { ok: true };
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: [],
+    mutatesState: true,
+    http: { method: "POST", path: "/api/g2/todos/:id/done" },
+  }),
+
+  defineFunction({
+    name: "api_todo_update",
+    description: "Update a todo.",
+    input: z.object({
+      id: z.string().min(1),
+      title: z.string().min(1).optional(),
+      description: z.string().optional(),
+      priority: routinePrioritySchema.optional(),
+      labels: z.array(z.string()).optional(),
+      schedule: z.any().optional(),
+      jobId: z.string().min(1).optional(),
+      projectId: z.string().min(1).optional(),
+      blockedBy: z.array(z.string()).optional(),
+    }),
+    surfaces: ["api"],
+    handler: async (input, fnCtx) => {
+      return fnCtx.services.routines.updateItem(input.id, {
+        title: input.title,
+        description: input.description,
+        priority: input.priority as RoutinePriority | undefined,
+        labels: input.labels,
+        schedule: input.schedule as any,
+        jobId: input.jobId,
+        projectId: input.projectId,
+        blockedBy: input.blockedBy,
+      });
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: [],
+    mutatesState: true,
+    http: { method: "PATCH", path: "/api/g2/todos/:id" },
+  }),
+
+  defineFunction({
+    name: "api_todo_delete",
+    description: "Delete a todo.",
+    input: idSchema,
+    surfaces: ["api"],
+    handler: async (input, fnCtx) => {
+      fnCtx.services.routines.deleteItem(input.id);
+      return { ok: true };
+    },
+    auth: ROUTINE_AUTH,
+    domains: ROUTINE_DOMAINS,
+    agentScopes: [],
+    mutatesState: true,
+    http: { method: "DELETE", path: "/api/g2/todos/:id" },
+  }),
+];
