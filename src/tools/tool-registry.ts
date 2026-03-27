@@ -1124,6 +1124,46 @@ export class ToolRegistry {
     return null;
   }
 
+  /** Expose the ToolBuildContext for the function-layer API route generator. */
+  getToolBuildContext(): import("./groups/tool-group-types").ToolBuildContext {
+    const self = this;
+    return {
+      get routines() { return self.routines; },
+      get projects() { return self.projects; },
+      get models() { return self.models; },
+      get conversations() { return self.conversations; },
+      get memory() { return self.memory; },
+      get access() { return self.access; },
+      get finance() { return self.finance; },
+      get health() { return self.health; },
+      get shell() { return self.shell; },
+      get filesystem() { return self.filesystem; },
+      get email() { return self.email; },
+      get vonage() { return self.vonage; },
+      get geminiLivePhone() { return self.geminiLivePhone; },
+      get media() { return self.media; },
+      get alarms() { return self.alarms; },
+      get tickets() { return self.tickets; },
+      get openbrowser() { return self.openbrowser; },
+      get secrets() { return self.secrets; },
+      get webFetch() { return self.webFetch; },
+      get workPlanning() { return self.workPlanning; },
+      get telemetryQuery() { return self.telemetryQuery; },
+      get deploymentVersion() { return self.deploymentVersion; },
+      get featureConfig() { return self.featureConfig; },
+      get zigbee2mqtt() { return self.zigbee2mqtt; },
+      get runtimePlatform() { return self.runtimePlatform; },
+      resolvePhoneCallBackend: (requestedBackend) => this.resolvePhoneCallBackend(requestedBackend),
+      createWebSearchService: () => this.createWebSearchService(),
+      requestManagedServiceRestart: (source) => this.requestManagedServiceRestart(source),
+    };
+  }
+
+  /** Check if a feature is active (delegates to FeatureConfigService). */
+  isFeatureActive(featureId: string): boolean {
+    return this.featureConfig.isActive(featureId as any);
+  }
+
   getToolLibraries(context?: ToolContext, scope?: AgentToolScope): ToolLibraryDefinition[] {
     const availableToolNames = new Set(
       this.getToolCatalog(context)
