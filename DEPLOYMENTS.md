@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.14
+- Released at: 2026-03-27T15:30:09Z
+- Release id: 20260327T153009Z-3f96a06
+- Previous version: 2026.03.27.13
+- Trigger: ci/release workflow
+
+- feat: add full CRUD endpoints for routines and todos in G2 API
+
 ## 2026.03.27.13
 - Released at: 2026-03-27T15:25:21Z
 - Release id: 20260327T152521Z-b8b7e49
