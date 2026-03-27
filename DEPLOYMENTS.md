@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.33
+- Released at: 2026-03-27T21:21:59Z
+- Release id: 20260327T212159Z-42a341b
+- Previous version: 2026.03.27.32
+- Trigger: ci/release workflow
+
+- feat: integrate function layer into Discord command generation
+
 ## 2026.03.27.32
 - Released at: 2026-03-27T21:09:15Z
 - Release id: 20260327T210915Z-b3a29ad
