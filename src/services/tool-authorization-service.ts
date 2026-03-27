@@ -120,7 +120,7 @@ export const TOOL_AUTH_DECLARATIONS = {
 
 export type ToolName = keyof typeof TOOL_AUTH_DECLARATIONS;
 
-const declarations: Record<string, ToolAuthorizationDeclaration> = TOOL_AUTH_DECLARATIONS;
+const declarations: Record<string, ToolAuthorizationDeclaration> = { ...TOOL_AUTH_DECLARATIONS };
 
 export function getToolAuthorizationDeclaration(name: string): ToolAuthorizationDeclaration {
   const declaration = declarations[name];
@@ -134,5 +134,18 @@ export function assertToolAuthorizationCoverage(toolNames: string[]) {
   const missing = toolNames.filter((name) => !declarations[name]);
   if (missing.length > 0) {
     throw new Error(`Missing tool authorization declarations for: ${missing.sort().join(", ")}`);
+  }
+}
+
+/**
+ * Register additional auth declarations from the function layer.
+ * This allows function definitions to carry their own auth metadata
+ * without requiring changes to the static TOOL_AUTH_DECLARATIONS object.
+ */
+export function registerAuthDeclarations(
+  additional: Record<string, ToolAuthorizationDeclaration>,
+): void {
+  for (const [name, decl] of Object.entries(additional)) {
+    declarations[name] = decl;
   }
 }

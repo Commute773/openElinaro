@@ -59,7 +59,10 @@ import { ToolProgramService } from "../services/tool-program-service";
 import {
   assertToolAuthorizationCoverage,
   getToolAuthorizationDeclaration,
+  registerAuthDeclarations,
 } from "../services/tool-authorization-service";
+import { FunctionRegistry } from "../functions/function-registry";
+import { ALL_FUNCTION_BUILDERS } from "../functions/domains";
 import { OpenBrowserService } from "../services/openbrowser-service";
 import {
   SecretStoreService,
@@ -946,6 +949,9 @@ export class ToolRegistry {
   private readonly pendingConversationResets = new Map<string, string>();
   private readonly reflection?: Pick<ReflectionService, "runExplicitReflection">;
 
+  /** The unified function registry, built alongside legacy tool groups. */
+  readonly functionRegistry: FunctionRegistry;
+
   constructor(
     private readonly routines: RoutinesService,
     private readonly projects: ProjectsService,
@@ -1020,6 +1026,12 @@ export class ToolRegistry {
       createWebSearchService: () => this.createWebSearchService(),
       requestManagedServiceRestart: (source) => this.requestManagedServiceRestart(source),
     };
+    // Build the unified function registry and register its auth declarations
+    this.functionRegistry = new FunctionRegistry(ALL_FUNCTION_BUILDERS);
+    this.functionRegistry.build(toolBuildContext);
+    registerAuthDeclarations(this.functionRegistry.generateAuthDeclarations());
+
+    // Legacy tool group builders (will be removed as domains migrate)
     this.tools = [
       ...buildRoutineTools(toolBuildContext),
       ...buildFinanceTools(toolBuildContext),
@@ -1036,6 +1048,20 @@ export class ToolRegistry {
       ...buildFilesystemTools(toolBuildContext),
       ...buildZigbee2MqttTools(toolBuildContext),
     ];
+
+    // Merge function-layer agent tools (skip names already produced by legacy builders)
+    const legacyNames = new Set(this.tools.map((t) => t.name));
+    const fnResolveServices = () => toolBuildContext;
+    const fnTools = this.functionRegistry.generateAgentTools(
+      fnResolveServices,
+      undefined,
+      (featureId) => this.featureConfig.isActive(featureId as any),
+    );
+    for (const t of fnTools) {
+      if (!legacyNames.has(t.name)) {
+        this.tools.push(t);
+      }
+    }
     assertToolAuthorizationCoverage([
       ...this.tools.map((entry) => entry.name),
       "load_tool_library",
