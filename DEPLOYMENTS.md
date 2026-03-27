@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.35
+- Released at: 2026-03-27T21:27:40Z
+- Release id: 20260327T212740Z-c8f9f06
+- Previous version: 2026.03.27.34
+- Trigger: ci/release workflow
+
+- test: add E2E agent behavior and function layer tests
+
 ## 2026.03.27.34
 - Released at: 2026-03-27T21:24:35Z
 - Release id: 20260327T212435Z-bc3721e
