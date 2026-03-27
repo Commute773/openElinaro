@@ -1,20 +1,6 @@
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
 import {
-  buildRoutineTools,
-  buildFinanceTools,
-  buildHealthTools,
-  buildCommunicationTools,
-  buildProjectTools,
-  buildFilesystemTools,
-  buildShellTools,
-  buildMemoryTools,
-  buildSystemTools,
-  buildWebTools,
-  buildMediaTools,
-  buildConfigTools,
-  buildServiceTools,
-  buildZigbee2MqttTools,
   buildSubagentTools,
   buildConversationLifecycleTools,
   renderShellExecResult,
@@ -1031,37 +1017,13 @@ export class ToolRegistry {
     this.functionRegistry.build(toolBuildContext);
     registerAuthDeclarations(this.functionRegistry.generateAuthDeclarations());
 
-    // Legacy tool group builders (will be removed as domains migrate)
-    this.tools = [
-      ...buildRoutineTools(toolBuildContext),
-      ...buildFinanceTools(toolBuildContext),
-      ...buildHealthTools(toolBuildContext),
-      ...buildCommunicationTools(toolBuildContext),
-      ...buildProjectTools(toolBuildContext),
-      ...buildMemoryTools(toolBuildContext),
-      ...buildSystemTools(toolBuildContext),
-      ...buildWebTools(toolBuildContext),
-      ...buildMediaTools(toolBuildContext),
-      ...buildConfigTools(toolBuildContext),
-      ...buildServiceTools(toolBuildContext),
-      ...buildShellTools(toolBuildContext),
-      ...buildFilesystemTools(toolBuildContext),
-      ...buildZigbee2MqttTools(toolBuildContext),
-    ];
-
-    // Merge function-layer agent tools (skip names already produced by legacy builders)
-    const legacyNames = new Set(this.tools.map((t) => t.name));
+    // All tool definitions come from the unified function layer
     const fnResolveServices = () => toolBuildContext;
-    const fnTools = this.functionRegistry.generateAgentTools(
+    this.tools = this.functionRegistry.generateAgentTools(
       fnResolveServices,
       undefined,
       (featureId) => this.featureConfig.isActive(featureId as any),
     );
-    for (const t of fnTools) {
-      if (!legacyNames.has(t.name)) {
-        this.tools.push(t);
-      }
-    }
     assertToolAuthorizationCoverage([
       ...this.tools.map((entry) => entry.name),
       "load_tool_library",
