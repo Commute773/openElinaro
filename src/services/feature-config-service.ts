@@ -28,6 +28,7 @@ export const FEATURE_IDS = [
   "localVoice",
   "media",
   "extensions",
+  "zigbee2mqtt",
 ] as const;
 
 export type FeatureId = (typeof FEATURE_IDS)[number];
@@ -239,6 +240,20 @@ export class FeatureConfigService {
           active: enabled,
           missing: [],
           notes: ["User-installed extension modules."],
+        };
+      }
+      case "zigbee2mqtt": {
+        const enabled = config.zigbee2mqtt.enabled;
+        const configured = Boolean(config.zigbee2mqtt.brokerUrl.trim());
+        const missing: string[] = [];
+        if (!config.zigbee2mqtt.brokerUrl.trim()) missing.push("zigbee2mqtt.brokerUrl");
+        return {
+          featureId,
+          enabled,
+          configured,
+          active: enabled && configured,
+          missing,
+          notes: ["Zigbee2MQTT device control via MQTT broker."],
         };
       }
     }

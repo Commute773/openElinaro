@@ -27,6 +27,7 @@ import type {
 } from "../../services/elinaro-tickets-service";
 import type { RuntimePlatform } from "../../services/runtime-platform";
 import type { PhoneCallBackend } from "../../services/phone-call-backends";
+import type { Zigbee2MqttService } from "../../services/zigbee2mqtt-service";
 
 export type ShellRuntime = Pick<
   ShellService,
@@ -71,6 +72,7 @@ export interface ToolBuildContext {
   telemetryQuery: TelemetryQueryService;
   deploymentVersion: DeploymentVersionService;
   featureConfig: FeatureConfigService;
+  zigbee2mqtt: Zigbee2MqttService;
   runtimePlatform: RuntimePlatform;
   resolvePhoneCallBackend: (requestedBackend?: string) => PhoneCallBackend;
   createWebSearchService: () => WebSearchService | null;

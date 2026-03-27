@@ -15,6 +15,7 @@ import {
   buildShellTools,
   buildMemoryTools,
   buildSystemTools,
+  buildZigbee2MqttTools,
   renderExtendedContextStatus,
   renderShellExecResult,
   formatTokenCount,
@@ -59,6 +60,7 @@ import {
   SecretStoreService,
 } from "../services/secret-store-service";
 import { WebFetchService } from "../services/web-fetch-service";
+import { Zigbee2MqttService } from "../services/zigbee2mqtt-service";
 import { WebSearchService } from "../services/web-search-service";
 import { WorkPlanningService } from "../services/work-planning-service";
 import { GeminiLivePhoneService } from "../services/gemini-live-phone-service";
@@ -908,6 +910,9 @@ function inferToolDomains(name: string) {
   if (name.startsWith("media_")) {
     return ["media", "audio", "devices"];
   }
+  if (name.startsWith("zigbee_")) {
+    return ["zigbee", "devices", "home-automation"];
+  }
   if (name === "telemetry_query") {
     return ["observability", "logs", "tracing"];
   }
@@ -1737,6 +1742,7 @@ export class ToolRegistry {
   private readonly filesystem: FilesystemRuntime;
   private readonly telemetryQuery = new TelemetryQueryService();
   private readonly deploymentVersion = new DeploymentVersionService();
+  private readonly zigbee2mqtt = new Zigbee2MqttService();
   private readonly serviceRestartNotices = new ServiceRestartNoticeService();
   private readonly workPlanning: WorkPlanningService;
   private readonly pendingConversationResets = new Map<string, string>();
@@ -1810,6 +1816,7 @@ export class ToolRegistry {
       get telemetryQuery() { return self.telemetryQuery; },
       get deploymentVersion() { return self.deploymentVersion; },
       get featureConfig() { return self.featureConfig; },
+      get zigbee2mqtt() { return self.zigbee2mqtt; },
       get runtimePlatform() { return self.runtimePlatform; },
       resolvePhoneCallBackend: (requestedBackend) => this.resolvePhoneCallBackend(requestedBackend),
       createWebSearchService: () => this.createWebSearchService(),
@@ -1825,6 +1832,7 @@ export class ToolRegistry {
       ...buildSystemTools(toolBuildContext),
       ...buildShellTools(toolBuildContext),
       ...buildFilesystemTools(toolBuildContext),
+      ...buildZigbee2MqttTools(toolBuildContext),
     ];
     assertToolAuthorizationCoverage([
       ...this.tools.map((entry) => entry.name),
