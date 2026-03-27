@@ -4,6 +4,8 @@ import type {
 } from "../../config/finance-config";
 import type {
   FinanceAccountLiquidityRow,
+} from "./finance-types";
+import type {
   FinanceAnnualTaxProjectionData,
   FinanceCashflowMonthData,
   FinanceForecastCashflowData,
@@ -12,7 +14,7 @@ import type {
   FinanceIncomeProjectionData,
   FinanceMonthlyTaxRateProjectionData,
   FinanceTaxProjectionData,
-} from "../finance-dashboard-types";
+} from "./finance-forecasting-types";
 import type {
   TaxConfig,
   IncomeSourceRecord,

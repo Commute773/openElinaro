@@ -1,10 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type {
   FinanceCategoryAggregateData,
-  FinanceDashboardAlertData,
-  FinanceDashboardCategoryDeltaData,
-  FinanceDashboardReminderData,
-  FinanceOverviewData,
   FinancePayableItemData,
   FinancePayablesData,
   FinanceReceivableItemData,
@@ -12,8 +8,15 @@ import type {
   FinanceRecurringData,
   FinanceTimelineAggregateData,
   FinanceCategoryAggregatesData,
+  PayableRecord,
+  ReceivableRecord,
+} from "./finance-types";
+import type {
+  FinanceDashboardAlertData,
+  FinanceDashboardCategoryDeltaData,
+  FinanceDashboardReminderData,
+  FinanceOverviewData,
 } from "../finance-dashboard-types";
-import type { PayableRecord, ReceivableRecord } from "./finance-types";
 import {
   finiteNumber,
   formatCad,
