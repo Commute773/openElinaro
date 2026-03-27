@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.27.23
+- Released at: 2026-03-27T18:35:19Z
+- Release id: 20260327T183519Z-9c4ca54
+- Previous version: 2026.03.27.22
+- Trigger: ci/release workflow
+
+- refactor: extract inline tools from ToolRegistry into subagent and conversation lifecycle modules (#135)
+- refactor: adopt domain error hierarchy in top services
+
 ## 2026.03.27.22
 - Released at: 2026-03-27T18:14:45Z
 - Release id: 20260327T181445Z-dc7e18a
