@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.22
+- Released at: 2026-03-27T18:14:45Z
+- Release id: 20260327T181445Z-dc7e18a
+- Previous version: 2026.03.27.21
+- Trigger: ci/release workflow
+
+- refactor: unify FilesystemService and SshFilesystemService via strategy pattern
+
 ## 2026.03.27.21
 - Released at: 2026-03-27T18:13:15Z
 - Release id: 20260327T181315Z-6ffd042
