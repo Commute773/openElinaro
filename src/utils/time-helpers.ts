@@ -1,4 +1,4 @@
-import type { Weekday } from "../domain/routines";
+import type { Weekday } from "../domain/calendar";
 
 // ---------------------------------------------------------------------------
 // Timezone helpers

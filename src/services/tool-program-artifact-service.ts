@@ -1,15 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { ToolProgramArtifactRecord } from "../domain/tool-program";
 import { resolveRuntimePath } from "./runtime-root";
 
-const TOOL_PROGRAM_ARTIFACT_ROOT = resolveRuntimePath("tool-program-artifacts");
+export type { ToolProgramArtifactRecord } from "../domain/tool-program";
 
-export interface ToolProgramArtifactRecord {
-  path: string;
-  fileName: string;
-  mediaType: string;
-  byteLength: number;
-}
+const TOOL_PROGRAM_ARTIFACT_ROOT = resolveRuntimePath("tool-program-artifacts");
 
 function sanitizeFileName(value: string) {
   const normalized = value
