@@ -37,6 +37,22 @@ export interface ExtensionAPI {
   getConfig(): Record<string, unknown>;
 }
 
+/** A tool registered by an extension via `ExtensionAPI.registerTool`. */
+export interface RegisteredExtensionTool {
+  extensionId: string;
+  name: string;
+  schema: z.ZodType;
+  handler: (input: unknown) => Promise<unknown>;
+}
+
+/** A tool library grouping registered by an extension. */
+export interface RegisteredToolLibrary {
+  extensionId: string;
+  id: string;
+  description: string;
+  toolNames: string[];
+}
+
 export type ExtensionStatus = "discovered" | "valid" | "invalid" | "loaded" | "error";
 
 /**
