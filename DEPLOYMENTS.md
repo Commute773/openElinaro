@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.39
+- Released at: 2026-03-27T22:05:47Z
+- Release id: 20260327T220547Z-4cd3e25
+- Previous version: 2026.03.27.38
+- Trigger: ci/release workflow
+
+- refactor: thin finance/index.ts from 1814 to 687 lines
+
 ## 2026.03.27.38
 - Released at: 2026-03-27T21:49:06Z
 - Release id: 20260327T214906Z-7f9508f
