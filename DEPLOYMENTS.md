@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.6
+- Released at: 2026-03-27T02:05:27Z
+- Release id: 20260327T020527Z-289648b
+- Previous version: 2026.03.27.5
+- Trigger: ci/release workflow
+
+- fix: rename display name to Elinaro and change "is typing" to "is thinking" (#102)
+
 ## 2026.03.27.5
 - Released at: 2026-03-27T01:19:20Z
 - Release id: 20260327T011920Z-0370336
