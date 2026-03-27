@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.12
+- Released at: 2026-03-27T15:23:06Z
+- Release id: 20260327T152306Z-6c92d73
+- Previous version: 2026.03.27.11
+- Trigger: ci/release workflow
+
+- feat: implement extension module loading with scoped ExtensionAPI
+
 ## 2026.03.27.11
 - Released at: 2026-03-27T15:22:09Z
 - Release id: 20260327T152209Z-1c94ab7
