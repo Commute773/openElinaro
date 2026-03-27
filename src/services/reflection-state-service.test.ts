@@ -1,27 +1,12 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ReflectionStateService } from "./reflection-state-service";
 
-let runtimeRoot = "";
-let previousRootDirEnv: string | undefined;
-
-beforeEach(() => {
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-reflection-state-"));
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-});
-
-afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  runtimeRoot = "";
-});
+const testRoot = createIsolatedRuntimeRoot("openelinaro-reflection-state-");
+beforeEach(() => testRoot.setup());
+afterEach(() => testRoot.teardown());
 
 describe("ReflectionStateService", () => {
   test("returns default empty state when no file exists", () => {
@@ -64,7 +49,7 @@ describe("ReflectionStateService", () => {
   test("returns empty state when file contains invalid JSON", () => {
     const service = new ReflectionStateService();
     service.save({ version: 1, profiles: {} });
-    const statePath = path.join(runtimeRoot, ".openelinarotest", "reflection-state.json");
+    const statePath = path.join(testRoot.path, ".openelinarotest", "reflection-state.json");
     fs.writeFileSync(statePath, "corrupted{{{", "utf8");
 
     const loaded = service.load();

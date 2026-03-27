@@ -1,26 +1,11 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 
-let tempRoot = "";
-let previousRootDirEnv: string | undefined;
+const testRoot = createIsolatedRuntimeRoot("openelinaro-tool-result-store-");
 
 describe("ToolResultStore", () => {
-  beforeEach(() => {
-    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-tool-result-store-"));
-    process.env.OPENELINARO_ROOT_DIR = tempRoot;
-  });
-
-  afterEach(() => {
-    if (previousRootDirEnv === undefined) {
-      delete process.env.OPENELINARO_ROOT_DIR;
-    } else {
-      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-    }
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  });
+  beforeEach(() => testRoot.setup());
+  afterEach(() => testRoot.teardown());
 
   test("persists and reloads stored tool results", async () => {
     const { ToolResultStore } = await import("./tool-result-store");

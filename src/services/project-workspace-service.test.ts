@@ -1,12 +1,11 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ProjectWorkspaceService } from "./project-workspace-service";
 
-let tempRoot = "";
-let previousRootDirEnv: string | undefined;
+const testRoot = createIsolatedRuntimeRoot("openelinaro-project-workspace-");
 
 function initGitRepo(repoRoot: string) {
   fs.mkdirSync(repoRoot, { recursive: true });
@@ -19,25 +18,11 @@ function initGitRepo(repoRoot: string) {
 }
 
 describe("ProjectWorkspaceService", () => {
-  beforeEach(() => {
-    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-project-workspace-"));
-    process.env.OPENELINARO_ROOT_DIR = tempRoot;
-  });
-
-  afterEach(() => {
-    if (previousRootDirEnv === undefined) {
-      delete process.env.OPENELINARO_ROOT_DIR;
-    } else {
-      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-    }
-    if (tempRoot) {
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    }
-  });
+  beforeEach(() => testRoot.setup());
+  afterEach(() => testRoot.teardown());
 
   test("creates an isolated linked worktree and records it in the runtime store", () => {
-    const repoRoot = path.join(tempRoot, "repo");
+    const repoRoot = path.join(testRoot.path, "repo");
     const sourceWorkspace = path.join(repoRoot, "src");
     initGitRepo(repoRoot);
     fs.mkdirSync(sourceWorkspace, { recursive: true });
@@ -61,7 +46,7 @@ describe("ProjectWorkspaceService", () => {
       execFileSync("git", ["-C", workspace!.worktreeRoot, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).trim(),
     ).toBe(workspace!.branch);
 
-    const store = JSON.parse(fs.readFileSync(path.join(tempRoot, ".openelinarotest", "project-workspaces.json"), "utf8")) as {
+    const store = JSON.parse(fs.readFileSync(path.join(testRoot.path, ".openelinarotest", "project-workspaces.json"), "utf8")) as {
       workspaces: Array<{ worktreeRoot: string; workspaceCwd: string }>;
     };
     expect(store.workspaces).toHaveLength(1);
@@ -70,7 +55,7 @@ describe("ProjectWorkspaceService", () => {
   });
 
   test("refuses to fork a dirty local git workspace", () => {
-    const repoRoot = path.join(tempRoot, "repo");
+    const repoRoot = path.join(testRoot.path, "repo");
     initGitRepo(repoRoot);
     fs.writeFileSync(path.join(repoRoot, "README.md"), "# dirty\n", "utf8");
 

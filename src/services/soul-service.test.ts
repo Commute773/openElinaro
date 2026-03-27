@@ -1,15 +1,12 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { MemoryService } from "./memory-service";
 import { ProfileService } from "./profile-service";
 import { RoutinesService } from "./routines-service";
 import { SoulService } from "./soul-service";
 import { resolveAssistantContextPath } from "./runtime-user-content";
-
-let runtimeRoot = "";
-let previousRootDirEnv: string | undefined;
 
 function writeProfileRegistry(rootDir: string) {
   fs.mkdirSync(path.join(rootDir, ".openelinarotest", "profiles"), { recursive: true });
@@ -29,22 +26,12 @@ function writeProfileRegistry(rootDir: string) {
   );
 }
 
+const testRoot = createIsolatedRuntimeRoot("openelinaro-soul-");
 beforeEach(() => {
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-soul-"));
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-  writeProfileRegistry(runtimeRoot);
+  testRoot.setup();
+  writeProfileRegistry(testRoot.path);
 });
-
-afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  runtimeRoot = "";
-});
+afterEach(() => testRoot.teardown());
 
 describe("SoulService", () => {
   test("rewrites SOUL.md from the authored soul prompt and tracks cadence state", async () => {

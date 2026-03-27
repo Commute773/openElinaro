@@ -1,33 +1,23 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import {
   SecretStoreService,
 } from "./secret-store-service";
 
-const tempDirs: string[] = [];
-let previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
 const previousCwd = process.cwd();
+const testRoot = createIsolatedRuntimeRoot("openelinaro-secret-store-");
 
 function withRuntimeRoot() {
-  const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-secret-store-"));
-  tempDirs.push(runtimeRoot);
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-  process.chdir(runtimeRoot);
-  return runtimeRoot;
+  testRoot.setup();
+  process.chdir(testRoot.path);
+  return testRoot.path;
 }
 
 afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
   process.chdir(previousCwd);
-  for (const dir of tempDirs.splice(0)) {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  testRoot.teardown();
 });
 
 describe("SecretStoreService", () => {

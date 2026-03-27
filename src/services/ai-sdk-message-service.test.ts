@@ -1,27 +1,12 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { HumanMessage, ToolMessage } from "@langchain/core/messages";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 
-let tempRoot = "";
-let previousRootDirEnv: string | undefined;
+const testRoot = createIsolatedRuntimeRoot("openelinaro-ai-sdk-message-service-");
 
 describe("ai-sdk message service tool-result refs", () => {
-  beforeEach(() => {
-    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-ai-sdk-message-service-"));
-    process.env.OPENELINARO_ROOT_DIR = tempRoot;
-  });
-
-  afterEach(() => {
-    if (previousRootDirEnv === undefined) {
-      delete process.env.OPENELINARO_ROOT_DIR;
-    } else {
-      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-    }
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  });
+  beforeEach(() => testRoot.setup());
+  afterEach(() => testRoot.teardown());
 
   test("stores longer tool results out of band and keeps only a compact ref in message history", async () => {
     const messageModule = await import("./ai-sdk-message-service");

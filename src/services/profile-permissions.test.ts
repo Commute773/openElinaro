@@ -5,13 +5,13 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { AIMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 
 const repoRoot = process.cwd();
+const testRoot = createIsolatedRuntimeRoot("openelinaro-profile-test-");
 
-let tempRoot = "";
 let previousCwd = "";
-let previousRootDirEnv: string | undefined;
 
 let authStore: typeof import("../auth/store");
 let profilesModule: typeof import("../services/profile-service");
@@ -82,7 +82,7 @@ function writeTestProjectRegistry() {
           jobId: "restricted",
           priority: "high",
           allowedRoles: ["restricted"],
-          workspacePath: path.join(tempRoot, ".openelinarotest", "projects/telecorder/workspace"),
+          workspacePath: path.join(testRoot.path, ".openelinarotest", "projects/telecorder/workspace"),
           summary: "Restricted project.",
           currentState: "Available to restricted.",
           state: "Telecorder should be accessible only to restricted-aware profiles.",
@@ -100,7 +100,7 @@ function writeTestProjectRegistry() {
           status: "active",
           priority: "medium",
           allowedRoles: [],
-          workspacePath: path.join(tempRoot, ".openelinarotest", "projects/root-only/workspace"),
+          workspacePath: path.join(testRoot.path, ".openelinarotest", "projects/root-only/workspace"),
           summary: "Root-only project.",
           currentState: "Restricted.",
           state: "Root-only test project for access control coverage.",
@@ -152,10 +152,8 @@ function initGitRepo(repoRoot: string) {
 
 beforeAll(async () => {
   previousCwd = process.cwd();
-  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-profile-test-"));
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  process.env.OPENELINARO_ROOT_DIR = tempRoot;
-  process.chdir(tempRoot);
+  testRoot.setup();
+  process.chdir(testRoot.path);
 
   writeTestProfileRegistry();
   writeTestProjectRegistry();
@@ -181,12 +179,7 @@ beforeEach(() => {
 
 afterAll(() => {
   process.chdir(previousCwd);
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(tempRoot, { recursive: true, force: true });
+  testRoot.teardown();
 });
 
 describe("profile-scoped auth and permissions", () => {
@@ -226,7 +219,7 @@ describe("profile-scoped auth and permissions", () => {
     expect(fs.readFileSync(rootKeys.publicKeyPath, "utf8")).not.toBe(
       fs.readFileSync(restrictedKeys.publicKeyPath, "utf8"),
     );
-    const secretStoreText = fs.readFileSync(path.join(tempRoot, ".openelinarotest/secret-store.json"), "utf8");
+    const secretStoreText = fs.readFileSync(path.join(testRoot.path, ".openelinarotest/secret-store.json"), "utf8");
     expect(secretStoreText).toContain("profile_ssh_keypair_root");
     expect(secretStoreText).toContain("profile_ssh_keypair_restricted");
 
@@ -274,7 +267,7 @@ describe("profile-scoped auth and permissions", () => {
 
     expect(remoteProfileService.canUseShellTools(remote)).toBe(true);
     expect(access.assertPathAccess("/Users/remote/project")).toBe("/Users/remote/project");
-    expect(() => access.assertPathAccess(path.join(tempRoot, "README.md"))).toThrow(
+    expect(() => access.assertPathAccess(path.join(testRoot.path, "README.md"))).toThrow(
       "outside the allowed workspace roots",
     );
   });
@@ -311,7 +304,7 @@ describe("profile-scoped auth and permissions", () => {
             name: "Telecorder",
             status: "active",
             allowedRoles: ["remote"],
-            workspacePath: path.join(tempRoot, ".openelinarotest", "projects/telecorder/workspace"),
+            workspacePath: path.join(testRoot.path, ".openelinarotest", "projects/telecorder/workspace"),
             workspaceOverrides: {
               remote: "/Users/remote/telecorder",
             },
@@ -346,7 +339,7 @@ describe("profile-scoped auth and permissions", () => {
     const profile = profileService.getActiveProfile();
     const projects = new projectsModule.ProjectsService(profile, profileService);
     const access = new accessModule.AccessControlService(profile, profileService, projects);
-    const workspaceRoot = path.join(tempRoot, ".openelinarotest", "projects/telecorder/workspace");
+    const workspaceRoot = path.join(testRoot.path, ".openelinarotest", "projects/telecorder/workspace");
     initGitRepo(workspaceRoot);
 
     const workspaceService = new workspaceModule.ProjectWorkspaceService();
@@ -376,7 +369,7 @@ describe("profile-scoped auth and permissions", () => {
 
     try {
       expect(access.assertPathAccess("docs/openelinaro-todos.md")).toBe(
-        path.join(tempRoot, "docs/openelinaro-todos.md"),
+        path.join(testRoot.path, "docs/openelinaro-todos.md"),
       );
     } finally {
       process.chdir(previous);
@@ -842,10 +835,10 @@ describe("profile-scoped auth and permissions", () => {
     expect(access.canUseTool("project_list")).toBe(true);
     expect(access.canUseTool("exec_command")).toBe(true);
     expect(() =>
-      access.assertPathAccess(path.join(tempRoot, ".openelinarotest/projects/telecorder/README.md"))
+      access.assertPathAccess(path.join(testRoot.path, ".openelinarotest/projects/telecorder/README.md"))
     ).not.toThrow();
     expect(() =>
-      access.assertPathAccess(path.join(tempRoot, ".openelinarotest/projects/root-only/README.md"))
+      access.assertPathAccess(path.join(testRoot.path, ".openelinarotest/projects/root-only/README.md"))
     ).toThrow(/not accessible|outside the allowed workspace roots/);
     expect(profileService.canReadMemoryPath(restricted, "restricted/note.md")).toBe(true);
     expect(profileService.canReadMemoryPath(restricted, "root/note.md")).toBe(false);

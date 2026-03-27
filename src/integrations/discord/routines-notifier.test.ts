@@ -1,16 +1,13 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { DocsIndexService } from "../../services/docs-index-service";
 import type { DocsIndexStateService } from "../../services/docs-index-state-service";
+import { createIsolatedRuntimeRoot } from "../../test/isolated-runtime-root";
 import { DiscordRoutinesNotifier } from "./routines-notifier";
 
-let runtimeRoot = "";
-let previousRootDirEnv: string | undefined;
-
 function getHeartbeatStatePath() {
-  return path.join(runtimeRoot, ".openelinarotest", "heartbeat-state.json");
+  return path.join(testRoot.path, ".openelinarotest", "heartbeat-state.json");
 }
 
 function readHeartbeatState() {
@@ -195,21 +192,9 @@ function createHarness(options?: {
   };
 }
 
-beforeEach(() => {
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-heartbeat-notifier-"));
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-});
-
-afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  runtimeRoot = "";
-});
+const testRoot = createIsolatedRuntimeRoot("openelinaro-heartbeat-notifier-");
+beforeEach(() => testRoot.setup());
+afterEach(() => testRoot.teardown());
 
 describe("DiscordRoutinesNotifier", () => {
   test("sends the heartbeat reply when it is immediately actionable", async () => {
@@ -494,7 +479,7 @@ describe("DiscordRoutinesNotifier", () => {
             getNextScheduledRunAt: () => new Date("2026-03-18T23:59:00.000Z"),
             sync: () => ({
               generatedAt: now.toISOString(),
-              rootDir: runtimeRoot,
+              rootDir: testRoot.path,
               docs: [],
               orphanDocs: [],
               missingDocTargets: [],
@@ -536,7 +521,7 @@ describe("DiscordRoutinesNotifier", () => {
             syncCalls += 1;
             return {
               generatedAt: new Date().toISOString(),
-              rootDir: runtimeRoot,
+              rootDir: testRoot.path,
               docs: [],
               orphanDocs: [],
               missingDocTargets: [],

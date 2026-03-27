@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
@@ -8,15 +7,15 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ChannelType, MessageFlags, type ChatInputCommandInteraction, type Message } from "discord.js";
 import type { AppProgressEvent, ChatPromptContentBlock } from "../../domain/assistant";
 import { getTestFixturesDir } from "../../test/fixtures";
+import { createIsolatedRuntimeRoot } from "../../test/isolated-runtime-root";
 import { ScriptedProviderConnector, type ScriptedConnectorRequest } from "../../test/scripted-provider-connector";
 
 const repoRoot = process.cwd();
 const machineTestRoot = getTestFixturesDir();
+const testRoot = createIsolatedRuntimeRoot("openelinaro-discord-e2e-");
 
 let previousCwd = "";
-let tempRoot = "";
 let sandboxNoteRelativePath = "";
-let previousRootDirEnv: string | undefined;
 
 let botModule: typeof import("./bot");
 let authSessionManagerModule: typeof import("./auth-session-manager");
@@ -70,7 +69,7 @@ function copyFileIfExists(relativePath: string) {
     return;
   }
 
-  const destination = path.join(tempRoot, ".openelinarotest", relativePath);
+  const destination = path.join(testRoot.path, ".openelinarotest", relativePath);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.copyFileSync(source, destination);
 }
@@ -80,11 +79,11 @@ function copyDirectory(relativePath: string) {
   if (!fs.existsSync(source)) {
     return;
   }
-  fs.cpSync(source, path.join(tempRoot, relativePath), { recursive: true });
+  fs.cpSync(source, path.join(testRoot.path, relativePath), { recursive: true });
 }
 
 function writeAuthStoreFixture() {
-  const authStorePath = path.join(tempRoot, ".openelinarotest", "auth-store.json");
+  const authStorePath = path.join(testRoot.path, ".openelinarotest", "auth-store.json");
   fs.mkdirSync(path.dirname(authStorePath), { recursive: true });
   fs.writeFileSync(
     authStorePath,
@@ -110,7 +109,7 @@ function writeAuthStoreFixture() {
 }
 
 function writeProfileRegistryFixture() {
-  const registryPath = path.join(tempRoot, ".openelinarotest", "profiles", "registry.json");
+  const registryPath = path.join(testRoot.path, ".openelinarotest", "profiles", "registry.json");
   fs.mkdirSync(path.dirname(registryPath), { recursive: true });
   fs.writeFileSync(
     registryPath,
@@ -137,8 +136,8 @@ function writeProfileRegistryFixture() {
 }
 
 function writeProjectRegistryFixture() {
-  const projectDocsDir = path.join(tempRoot, ".openelinarotest", "projects", "discord-sandbox");
-  const projectRegistryPath = path.join(tempRoot, ".openelinarotest", "projects", "registry.json");
+  const projectDocsDir = path.join(testRoot.path, ".openelinarotest", "projects", "discord-sandbox");
+  const projectRegistryPath = path.join(testRoot.path, ".openelinarotest", "projects", "registry.json");
   fs.mkdirSync(projectDocsDir, { recursive: true });
   fs.writeFileSync(path.join(projectDocsDir, "README.md"), "# Discord Sandbox\n", "utf8");
   fs.writeFileSync(
@@ -150,7 +149,7 @@ function writeProjectRegistryFixture() {
           id: "discord-sandbox",
           name: "Discord Sandbox",
           status: "active",
-          workspacePath: path.join(tempRoot, "sandbox"),
+          workspacePath: path.join(testRoot.path, "sandbox"),
           summary: "Temp Discord e2e workspace.",
           currentState: "Available for slash-command tests.",
           state: "Isolated test project registry entry.",
@@ -653,24 +652,22 @@ class FakeDirectMessage {
 if (RUN_CHILD_SUITE) {
   beforeAll(async () => {
     previousCwd = process.cwd();
-    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-discord-e2e-"));
+    testRoot.setup();
     sandboxNoteRelativePath = path.join("sandbox", "discord-note.md");
-    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-    process.env.OPENELINARO_ROOT_DIR = tempRoot;
 
     copyDirectory("system_prompt");
     copyFileIfExists("model-state.json");
 
-    fs.mkdirSync(path.join(tempRoot, "sandbox"), { recursive: true });
+    fs.mkdirSync(path.join(testRoot.path, "sandbox"), { recursive: true });
     writeAuthStoreFixture();
     writeProfileRegistryFixture();
     writeProjectRegistryFixture();
     fs.writeFileSync(
-      path.join(tempRoot, sandboxNoteRelativePath),
+      path.join(testRoot.path, sandboxNoteRelativePath),
       "This file lives only in the temp Discord e2e workspace.\n",
     );
 
-    process.chdir(tempRoot);
+    process.chdir(testRoot.path);
 
     botModule = await importFresh("src/integrations/discord/bot.ts");
     authSessionManagerModule = await importFresh("src/integrations/discord/auth-session-manager.ts");
@@ -690,12 +687,7 @@ if (RUN_CHILD_SUITE) {
 
   afterAll(() => {
     process.chdir(previousCwd);
-    if (previousRootDirEnv === undefined) {
-      delete process.env.OPENELINARO_ROOT_DIR;
-    } else {
-      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-    }
-    fs.rmSync(tempRoot, { recursive: true, force: true });
+    testRoot.teardown();
   });
 
   describe("discord e2e flows", () => {
@@ -758,7 +750,7 @@ if (RUN_CHILD_SUITE) {
       await handlers.handleInteraction(listInteraction as unknown as ChatInputCommandInteraction);
 
       expect(listInteraction.replies.map((reply) => reply.content).join("\n")).toContain("buy oat milk");
-      expect(readOptionalFile(path.join(tempRoot, ".openelinarotest", "routines.json"))).toContain("buy oat milk");
+      expect(readOptionalFile(path.join(testRoot.path, ".openelinarotest", "routines.json"))).toContain("buy oat milk");
       expect(readOptionalFile(path.join(machineTestRoot, "routines.json"))).toBe(liveStateBefore.routines);
     });
 
@@ -775,7 +767,7 @@ if (RUN_CHILD_SUITE) {
       seedMessage.author.id = conversationKey;
       await handlers.handleMessage(seedMessage as unknown as Message);
 
-      const tempPromptPath = path.join(tempRoot, "system_prompt", "40-docs-and-reload.md");
+      const tempPromptPath = path.join(testRoot.path, "system_prompt", "40-docs-and-reload.md");
       const repoPromptPath = path.join(repoRoot, "system_prompt", "40-docs-and-reload.md");
       const tempPromptMarker = "\n\nReload marker from the temp Discord e2e clone.\n";
       fs.writeFileSync(tempPromptPath, `${fs.readFileSync(tempPromptPath, "utf8").trimEnd()}${tempPromptMarker}`);
@@ -955,7 +947,7 @@ if (RUN_CHILD_SUITE) {
 
   test("sends attached files back over Discord when the app response includes them", async () => {
     const authManager = new authSessionManagerModule.DiscordAuthSessionManager();
-    const deliveredFile = path.join(tempRoot, "sandbox", "delivered.txt");
+    const deliveredFile = path.join(testRoot.path, "sandbox", "delivered.txt");
     fs.writeFileSync(deliveredFile, "discord delivery\n", "utf8");
     const handlers = botModule.createDiscordEventHandlers({
       app: {
@@ -1173,7 +1165,7 @@ if (RUN_CHILD_SUITE) {
     await handlers.handleMessage(resetMessage as unknown as Message);
 
     const storedConversation = harness.conversations.get(conversationKey);
-    const tempMemoryRoot = path.join(tempRoot, ".openelinarotest", "memory");
+    const tempMemoryRoot = path.join(testRoot.path, ".openelinarotest", "memory");
     const tempMemoryFiles = listRelativeFiles(tempMemoryRoot);
 
     expect(helloMessage.replies[0]).toContain("Acknowledged: hello from the ablative thread");
@@ -1203,7 +1195,7 @@ if (RUN_CHILD_SUITE) {
     helloMessage.author.id = conversationKey;
     const fastResetInteraction = new FakeInteraction("new_chat", { force: true });
     fastResetInteraction.user.id = conversationKey;
-    const tempMemoryRoot = path.join(tempRoot, ".openelinarotest", "memory");
+    const tempMemoryRoot = path.join(testRoot.path, ".openelinarotest", "memory");
     const memoryFilesBefore = listRelativeFiles(tempMemoryRoot);
 
     await handlers.handleMessage(helloMessage as unknown as Message);

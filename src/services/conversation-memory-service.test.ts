@@ -1,14 +1,11 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { ProfileRecord } from "../domain/profiles";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ConversationMemoryService } from "./conversation-memory-service";
 import type { MemorySearchMatch } from "./memory-service";
 
-let tempRoot = "";
-let previousRootDirEnv: string | undefined;
+const testRoot = createIsolatedRuntimeRoot("openelinaro-memory-test-");
 
 const TEST_PROFILE: ProfileRecord = {
   id: "test-profile",
@@ -72,21 +69,8 @@ function makeMatch(overrides: Partial<MemorySearchMatch> = {}): MemorySearchMatc
 }
 
 describe("ConversationMemoryService", () => {
-  beforeEach(() => {
-    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-memory-test-"));
-    process.env.OPENELINARO_ROOT_DIR = tempRoot;
-  });
-
-  afterEach(() => {
-    if (previousRootDirEnv === undefined) {
-      delete process.env.OPENELINARO_ROOT_DIR;
-    } else {
-      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-    }
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-    tempRoot = "";
-  });
+  beforeEach(() => testRoot.setup());
+  afterEach(() => testRoot.teardown());
 
   describe("buildRecallContext", () => {
     test("returns empty string when no memory matches", async () => {

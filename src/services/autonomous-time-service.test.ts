@@ -1,34 +1,19 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { getRuntimeConfig, saveRuntimeConfig } from "../config/runtime-config";
 import type { ProfileRecord } from "../domain/profiles";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { AutonomousTimeService } from "./autonomous-time-service";
 import { resolveAutonomousTimePromptPath } from "./autonomous-time-prompt-service";
-
-let runtimeRoot = "";
-let previousRootDirEnv: string | undefined;
 
 const profile = {
   id: "root",
 } as ProfileRecord;
 
-beforeEach(() => {
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-autonomous-time-"));
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-});
-
-afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  runtimeRoot = "";
-});
+const testRoot = createIsolatedRuntimeRoot("openelinaro-autonomous-time-");
+beforeEach(() => testRoot.setup());
+afterEach(() => testRoot.teardown());
 
 describe("AutonomousTimeService", () => {
   test("becomes eligible after 4AM local time and only once per local day", () => {
