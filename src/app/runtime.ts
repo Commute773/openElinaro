@@ -474,6 +474,21 @@ export class OpenElinaroApp {
     return this.getScope().routineTools.getToolJsonSchema(name);
   }
 
+  /**
+   * Returns generated API routes from the function layer.
+   * Used by the G2 router to serve function-layer endpoints.
+   */
+  getGeneratedApiRoutes() {
+    const scope = this.getScope();
+    const registry = scope.routineTools.functionRegistry;
+    if (!registry.isBuilt) return [];
+    const toolBuildContext = scope.routineTools.getToolBuildContext();
+    return registry.generateApiRoutes(
+      () => toolBuildContext,
+      (featureId) => scope.routineTools.isFeatureActive(featureId),
+    );
+  }
+
   getActiveModel() {
     return this.getScope().models.getActiveModel();
   }

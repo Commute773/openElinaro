@@ -2,7 +2,6 @@ import type { OpenElinaroApp } from "../../../app/runtime";
 import { CORS_HEADERS } from "./helpers";
 import { homeRoutes } from "./home";
 import { agentRoutes } from "./agents";
-import { routineRoutes } from "./routines";
 import { notificationRoutes } from "./notifications";
 import { chatRoutes } from "./chat";
 import { toolRoutes } from "./tools";
@@ -53,16 +52,34 @@ function compileRoute(def: RouteDefinition): CompiledRoute {
   return { method: def.method, handler: def.handler, regex: def.pattern };
 }
 
-const compiledRoutes: CompiledRoute[] = [
+/**
+ * Static routes from legacy hand-written handlers.
+ * Routine routes have been removed — they're now generated from the function layer.
+ */
+const staticRoutes: RouteDefinition[] = [
   ...homeRoutes,
   ...agentRoutes,
-  ...routineRoutes,
   ...notificationRoutes,
   ...chatRoutes,
   ...toolRoutes,
   ...dataRoutes,
   ...eventRoutes,
-].map(compileRoute);
+];
+const compiledStaticRoutes: CompiledRoute[] = staticRoutes.map(compileRoute);
+
+/** Cache for compiled generated routes (lazily built per-app). */
+let compiledGeneratedRoutes: CompiledRoute[] | null = null;
+let generatedRoutesApp: OpenElinaroApp | null = null;
+
+function getCompiledGeneratedRoutes(app: OpenElinaroApp): CompiledRoute[] {
+  if (compiledGeneratedRoutes && generatedRoutesApp === app) {
+    return compiledGeneratedRoutes;
+  }
+  const generated = app.getGeneratedApiRoutes?.() ?? [];
+  compiledGeneratedRoutes = generated.map(compileRoute);
+  generatedRoutesApp = app;
+  return compiledGeneratedRoutes;
+}
 
 function matchRoute(
   route: CompiledRoute,
@@ -90,6 +107,9 @@ function matchRoute(
 /**
  * Handles G2 API requests.
  * Returns a Response if the request matched a G2 route, or null if it didn't.
+ *
+ * Routes are checked in order: generated (function-layer) first, then static (legacy).
+ * This ensures function-layer routes take priority for migrated endpoints.
  */
 export async function handleG2ApiRequest(
   request: Request,
@@ -100,7 +120,17 @@ export async function handleG2ApiRequest(
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
-  for (const route of compiledRoutes) {
+  // Check generated routes first (from function layer)
+  const generatedRoutes = getCompiledGeneratedRoutes(app);
+  for (const route of generatedRoutes) {
+    if (request.method !== route.method) continue;
+    const params = matchRoute(route, pathname);
+    if (params === null) continue;
+    return route.handler(request, params, app);
+  }
+
+  // Then check static routes (legacy hand-written handlers)
+  for (const route of compiledStaticRoutes) {
     if (request.method !== route.method) continue;
     const params = matchRoute(route, pathname);
     if (params === null) continue;
