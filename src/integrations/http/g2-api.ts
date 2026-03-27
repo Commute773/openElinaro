@@ -306,6 +306,27 @@ export async function handleG2ApiRequest(
     }
   }
 
+  // ── GET /api/g2/health ──
+  if (pathname === "/api/g2/health" && request.method === "GET") {
+    const url = new URL(request.url, "http://localhost");
+    const limit = parseInt(url.searchParams.get("limit") ?? "10", 10);
+    const summary = app.getHealthSummary();
+    const checkins = app.listHealthCheckins(limit);
+    return json({ summary, checkins });
+  }
+
+  // ── GET /api/g2/projects ──
+  if (pathname === "/api/g2/projects" && request.method === "GET") {
+    const projects = app.listProjectSummaries();
+    return json(projects);
+  }
+
+  // ── GET /api/g2/conversations ──
+  if (pathname === "/api/g2/conversations" && request.method === "GET") {
+    const conversations = app.listConversationSummaries();
+    return json(conversations);
+  }
+
   // Not a G2 route
   return null;
 }
