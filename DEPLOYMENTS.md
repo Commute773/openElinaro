@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.18
+- Released at: 2026-03-27T16:55:38Z
+- Release id: 20260327T165538Z-3dca0c6
+- Previous version: 2026.03.27.17
+- Trigger: ci/release workflow
+
+- feat: consolidate remaining refactoring PRs (response helpers, Bun.file migration, auth middleware, tool endpoints, modular router)
+
 ## 2026.03.27.17
 - Released at: 2026-03-27T16:08:18Z
 - Release id: 20260327T160818Z-6174678
