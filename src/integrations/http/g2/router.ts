@@ -53,8 +53,11 @@ function compileRoute(def: RouteDefinition): CompiledRoute {
 }
 
 /**
- * Static routes from legacy hand-written handlers.
- * Routine routes have been removed — they're now generated from the function layer.
+ * App-level routes that require the OpenElinaroApp instance directly.
+ * These are integration-layer concerns (dashboard, agent mgmt, chat,
+ * tool catalog, SSE events) that don't map to the function layer.
+ * Service-level operations (routines, finance, shell, etc.) are
+ * generated from function definitions instead.
  */
 const staticRoutes: RouteDefinition[] = [
   ...homeRoutes,

@@ -6,8 +6,21 @@ export const dataRoutes: RouteDefinition[] = [
   {
     method: "GET",
     pattern: "/api/g2/openapi.json",
-    handler: async () => {
-      return json(getOpenApiSpec());
+    handler: async (_request, _params, app) => {
+      // Merge the static OpenAPI spec (app-level routes) with generated spec
+      // from the function layer (service-level routes)
+      const staticSpec = getOpenApiSpec() as Record<string, any>;
+      const fnRegistry = app.getFunctionRegistry?.();
+      if (fnRegistry) {
+        const generatedSpec = fnRegistry.generateOpenApiSpec(
+          (featureId) => app.isFeatureActive?.(featureId) ?? true,
+        ) as Record<string, any>;
+        // Merge generated paths into static spec
+        if (generatedSpec.paths) {
+          staticSpec.paths = { ...staticSpec.paths, ...generatedSpec.paths };
+        }
+      }
+      return json(staticSpec);
     },
   },
   {

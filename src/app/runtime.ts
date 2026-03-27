@@ -484,6 +484,10 @@ export class OpenElinaroApp {
     return registry.isBuilt ? registry : null;
   }
 
+  isFeatureActive(featureId: string): boolean {
+    return this.getScope().routineTools.isFeatureActive(featureId);
+  }
+
   getGeneratedApiRoutes() {
     const scope = this.getScope();
     const registry = scope.routineTools.functionRegistry;
