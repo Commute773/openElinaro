@@ -4,7 +4,18 @@ Extensions are user-installed modules that add tools, event handlers, and tool l
 
 ## Current Status
 
-This is a scaffold. The extension registry can discover and validate extensions on disk, but dynamic loading and activation are not yet implemented. The `loadAll()` method logs a stub message for each valid extension.
+The extension registry can discover and validate extensions on disk. Dynamic loading and activation via `loadAll()` are stubbed -- the method logs each valid extension but does not yet import or execute entrypoints. The lifecycle below describes the intended flow; steps marked **(stub)** are not yet implemented.
+
+## Loading Lifecycle
+
+On startup, when the `extensions` feature flag is enabled, the `ExtensionRegistryService` runs through these phases:
+
+1. **Scan** -- reads `~/.openelinaro/extensions/` for subdirectories.
+2. **Validate** -- for each subdirectory, checks for `extension.json` and validates it against `ExtensionManifestSchema`. Extensions are classified as `discovered` (no manifest), `valid`, or `invalid`.
+3. **Load** **(stub)** -- for each valid extension, the runtime would import the entrypoint module specified in the manifest.
+4. **Activate** **(stub)** -- the imported module would receive an `ExtensionAPI` instance and use it to register tools, event handlers, and libraries.
+
+Extensions transition through these statuses: `discovered` -> `valid` -> `loaded` (or `invalid` / `error` on failure).
 
 ## Directory Structure
 
@@ -52,12 +63,48 @@ The manifest is validated with a Zod schema (`ExtensionManifestSchema` in `src/d
 
 ## Extension API
 
-When an extension is loaded, its entrypoint receives an `ExtensionAPI` object with these methods:
+When an extension is loaded, its entrypoint receives an `ExtensionAPI` object (defined in [`src/domain/extensions.ts`](../../src/domain/extensions.ts)) with these methods:
 
-- `registerTool(name, schema, handler)` -- Register a tool the agent can invoke. The schema is a Zod type for input validation.
-- `registerToolLibrary(id, description, toolNames)` -- Group previously registered tools into a named library for discovery.
+- `registerTool(name, schema, handler)` -- Register a tool the agent can invoke. `name` is the tool name, `schema` is a Zod type for input validation, and `handler` is an async function that receives the validated input and returns the tool result.
+- `registerToolLibrary(id, description, toolNames)` -- Group previously registered tools into a named library for discovery. The `toolNames` array must reference tools already registered by this extension.
 - `onEvent(eventName, handler)` -- Subscribe to a named runtime event.
-- `getConfig()` -- Read the extension's own config from the runtime config file.
+- `getConfig()` -- Read the extension's own config block from `~/.openelinaro/config.yaml`. Returns a `Record<string, unknown>`.
+
+### Minimal Extension Example
+
+```
+~/.openelinaro/extensions/hello-world/
+  extension.json
+  index.ts
+```
+
+`extension.json`:
+
+```json
+{
+  "id": "hello-world",
+  "name": "Hello World",
+  "version": "1.0.0",
+  "entrypoint": "index.ts"
+}
+```
+
+`index.ts` (illustrative -- activation is stubbed, so this does not run yet):
+
+```ts
+import { z } from "zod";
+// Import path will depend on how the runtime exposes the API to extensions
+import type { ExtensionAPI } from "openelinaro/domain/extensions";
+
+export default function activate(api: ExtensionAPI) {
+  api.registerTool(
+    "hello",
+    z.object({ name: z.string() }),
+    async (input) => ({ greeting: `Hello, ${(input as any).name}!` }),
+  );
+  api.registerToolLibrary("hello-lib", "Greeting tools", ["hello"]);
+}
+```
 
 ## Feature Flag
 
@@ -70,15 +117,10 @@ extensions:
 
 ## Discovery Flow
 
-On startup (when the feature is enabled), the `ExtensionRegistryService`:
-
-1. Reads `~/.openelinaro/extensions/` for subdirectories.
-2. For each subdirectory, checks for `extension.json`.
-3. Validates the manifest against `ExtensionManifestSchema`.
-4. Records each extension as `discovered` (no manifest), `valid`, or `invalid`.
-5. Calls `loadAll()` which is currently a stub.
+See [Loading Lifecycle](#loading-lifecycle) above. The implementation lives in [`src/services/extension-registry-service.ts`](../../src/services/extension-registry-service.ts).
 
 ## Read Next
 
+- G2 API: [api.md](api.md)
 - Configuration and features: [configuration.md](configuration.md)
 - Runtime domain model: [runtime-domain-model.md](runtime-domain-model.md)
