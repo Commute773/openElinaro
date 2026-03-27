@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.34
+- Released at: 2026-03-27T21:24:35Z
+- Release id: 20260327T212435Z-bc3721e
+- Previous version: 2026.03.27.33
+- Trigger: ci/release workflow
+
+- refactor: inject auth, accept SecretStoreService, add service container
+
 ## 2026.03.27.33
 - Released at: 2026-03-27T21:21:59Z
 - Release id: 20260327T212159Z-42a341b
