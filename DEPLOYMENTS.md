@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.36
+- Released at: 2026-03-27T21:38:49Z
+- Release id: 20260327T213849Z-0b09259
+- Previous version: 2026.03.27.35
+- Trigger: ci/release workflow
+
+- refactor: remove all legacy tool group builders, use function layer exclusively
+
 ## 2026.03.27.35
 - Released at: 2026-03-27T21:27:40Z
 - Release id: 20260327T212740Z-c8f9f06

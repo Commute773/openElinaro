@@ -1,8 +1,8 @@
 {
-  "version": "2026.03.27.35",
-  "releasedAt": "2026-03-27T21:27:40Z",
-  "sequence": 35,
-  "previousVersion": "2026.03.27.34",
-  "releaseId": "20260327T212740Z-c8f9f06",
+  "version": "2026.03.27.36",
+  "releasedAt": "2026-03-27T21:38:49Z",
+  "sequence": 36,
+  "previousVersion": "2026.03.27.35",
+  "releaseId": "20260327T213849Z-0b09259",
   "changelogPath": "DEPLOYMENTS.md"
 }
