@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.25
+- Released at: 2026-03-27T19:04:04Z
+- Release id: 20260327T190404Z-3b02885
+- Previous version: 2026.03.27.24
+- Trigger: ci/release workflow
+
+- refactor: unify ShellService and SshShellService via strategy pattern
+
 ## 2026.03.27.24
 - Released at: 2026-03-27T19:00:04Z
 - Release id: 20260327T190004Z-91d5ac5
