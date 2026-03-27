@@ -17,7 +17,6 @@ import {
 import { getOAuthApiKey, type OAuthCredentials } from "@mariozechner/pi-ai/oauth";
 import { approximateTextTokens } from "../utils/text-utils";
 import { z } from "zod";
-import { assertSuccessfulProviderResponse } from "../connectors/provider-response";
 import {
   approximateContentTokens,
   extractTextFromMessage,
@@ -41,6 +40,7 @@ import { resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { timestamp } from "../utils/timestamp";
+import { SecondaryModelDispatch, type ResolvedRuntimeModel } from "./secondary-model-dispatch";
 
 export type { RecordedUsageInspection, RecordedUsageDailyInspection } from "./model-usage-service";
 export { ModelUsageService } from "./model-usage-service";
@@ -166,11 +166,6 @@ interface ProviderModelStub {
   name: string;
 }
 
-interface ResolvedRuntimeModel {
-  selection: ActiveModelSelection;
-  runtimeModel: Model<Api>;
-  apiKey: string;
-}
 
 type RuntimeModelStub = Pick<Model<Api>, "id" | "name">;
 
@@ -197,7 +192,7 @@ const DEFAULT_ACTIVE_MODEL: ActiveModelSelection = {
   updatedAt: new Date(0).toISOString(),
 };
 
-const PROVIDER_RUNTIME_MAP: Record<ModelProviderId, "openai-codex" | "anthropic"> = {
+export const PROVIDER_RUNTIME_MAP: Record<ModelProviderId, "openai-codex" | "anthropic"> = {
   "openai-codex": "openai-codex",
   claude: "anthropic",
 };
@@ -205,16 +200,6 @@ const PROVIDER_RUNTIME_MAP: Record<ModelProviderId, "openai-codex" | "anthropic"
 const PROVIDER_LABELS: Record<ModelProviderId, string> = {
   "openai-codex": "OpenAI Codex",
   claude: "Claude",
-};
-
-const DEFAULT_TOOL_SUMMARIZER_MODEL_IDS: Record<ModelProviderId, string> = {
-  "openai-codex": "gpt-5.1-codex-mini",
-  claude: "claude-haiku-4-5",
-};
-
-const DEFAULT_HEARTBEAT_MODEL_IDS: Record<ModelProviderId, string> = {
-  "openai-codex": "gpt-5.1-codex-mini",
-  claude: "claude-haiku-4-5",
 };
 
 async function ensureStoreDir() {
@@ -263,42 +248,6 @@ function getDefaultActiveModel(
   };
 }
 
-function getDefaultToolSummarizerSelection(profile: ProfileRecord): ToolSummarizerSelection {
-  const providerId = profile.toolSummarizerProvider ??
-    profile.preferredProvider ??
-    DEFAULT_ACTIVE_MODEL.providerId;
-  return {
-    providerId,
-    modelId: profile.toolSummarizerModelId ?? DEFAULT_TOOL_SUMMARIZER_MODEL_IDS[providerId],
-    thinkingLevel: "minimal",
-  };
-}
-
-function getDefaultMemorySelection(profile: ProfileRecord): MemoryModelSelection {
-  const providerId = profile.memoryProvider ??
-    profile.toolSummarizerProvider ??
-    profile.preferredProvider ??
-    DEFAULT_ACTIVE_MODEL.providerId;
-  return {
-    providerId,
-    modelId: profile.memoryModelId ??
-      profile.toolSummarizerModelId ??
-      DEFAULT_TOOL_SUMMARIZER_MODEL_IDS[providerId],
-    thinkingLevel: "minimal",
-  };
-}
-
-function getDefaultHeartbeatSelection(profile: ProfileRecord): HeartbeatModelSelection {
-  const providerId = profile.heartbeatProvider ??
-    profile.preferredProvider ??
-    DEFAULT_ACTIVE_MODEL.providerId;
-  return {
-    providerId,
-    modelId: profile.heartbeatModelId ?? DEFAULT_HEARTBEAT_MODEL_IDS[providerId],
-    thinkingLevel: "low",
-  };
-}
-
 function getStoredActiveModel(
   store: ActiveModelStoreShape,
   profile: ProfileRecord,
@@ -341,7 +290,7 @@ function providerModelKey(providerId: ModelProviderId, modelId: string) {
   return `${providerId}/${modelId}`;
 }
 
-function getExtendedContextWindowOverride(providerId: ModelProviderId, modelId: string) {
+export function getExtendedContextWindowOverride(providerId: ModelProviderId, modelId: string) {
   const key = providerModelKey(providerId, modelId);
   return getRuntimeConfig().models.extendedContext[key]?.extendedContextWindow;
 }
@@ -350,7 +299,7 @@ function supportsExtendedContext(providerId: ModelProviderId, modelId: string) {
   return getExtendedContextWindowOverride(providerId, modelId) !== undefined;
 }
 
-function getSelectedContextWindow(
+export function getSelectedContextWindow(
   profile: Pick<ProfileRecord, "maxContextTokens">,
   selection: Pick<ActiveModelSelection, "providerId" | "modelId" | "extendedContextEnabled">,
   runtimeContextWindow?: number,
@@ -798,7 +747,7 @@ function getRuntimeCatalog(providerId: ModelProviderId) {
   );
 }
 
-async function resolveCodexApiKey(profileId: string): Promise<OAuthCredentials & { apiKey: string }> {
+export async function resolveCodexApiKey(profileId: string): Promise<OAuthCredentials & { apiKey: string }> {
   const credentials = getCodexCredentials(profileId);
   if (!credentials) {
     throw new ConfigurationError("Codex auth is not configured yet. Use `/auth provider:codex` first.");
@@ -818,7 +767,7 @@ async function resolveCodexApiKey(profileId: string): Promise<OAuthCredentials &
   };
 }
 
-function resolveClaudeToken(profileId: string) {
+export function resolveClaudeToken(profileId: string) {
   const token = getClaudeSetupToken(profileId);
   if (!token) {
     throw new ConfigurationError("Claude auth is not configured yet. Use `/auth provider:claude` first.");
@@ -830,6 +779,7 @@ export class ModelService {
   private readonly usageService: ModelUsageService;
   private readonly selectionStoreKey: string;
   private readonly defaultSelectionOverride?: Partial<Pick<ActiveModelSelection, "providerId" | "modelId" | "thinkingLevel">>;
+  readonly secondaryDispatch: SecondaryModelDispatch;
 
   constructor(
     private readonly profile: ProfileRecord,
@@ -842,6 +792,7 @@ export class ModelService {
     });
     this.selectionStoreKey = options?.selectionStoreKey?.trim() || profile.id;
     this.defaultSelectionOverride = options?.defaultSelectionOverride;
+    this.secondaryDispatch = new SecondaryModelDispatch(profile, this);
   }
 
   getSupportedProviders(): ModelProviderId[] {
@@ -853,15 +804,15 @@ export class ModelService {
   }
 
   getToolSummarizerSelection(): ToolSummarizerSelection {
-    return getDefaultToolSummarizerSelection(this.profile);
+    return this.secondaryDispatch.getToolSummarizerSelection();
   }
 
   getMemorySelection(): MemoryModelSelection {
-    return getDefaultMemorySelection(this.profile);
+    return this.secondaryDispatch.getMemorySelection();
   }
 
   getHeartbeatSelection(): HeartbeatModelSelection {
-    return getDefaultHeartbeatSelection(this.profile);
+    return this.secondaryDispatch.getHeartbeatSelection();
   }
 
   async getActiveModel(): Promise<ActiveModelSelection> {
@@ -1007,22 +958,7 @@ export class ModelService {
   }
 
   getInferenceOptions(selection: ActiveModelSelection): ActiveModelInferenceOptions {
-    if (selection.providerId === "claude") {
-      if (selection.thinkingLevel === "minimal") {
-        return {
-          thinkingEnabled: false,
-        };
-      }
-
-      return {
-        thinkingEnabled: true,
-        effort: selection.thinkingLevel === "xhigh" ? "max" : selection.thinkingLevel,
-      };
-    }
-
-    return {
-      reasoningEffort: selection.thinkingLevel,
-    };
+    return this.secondaryDispatch.getInferenceOptions(selection);
   }
 
   async summarizeToolResult(params: {
@@ -1030,75 +966,7 @@ export class ModelService {
     goal: string;
     output: string;
   }) {
-    const selection = this.getToolSummarizerSelection();
-    return traceSpan(
-      "model.summarize_tool_result",
-      async () => {
-        const runtimeSelection: ActiveModelSelection = {
-          ...selection,
-          extendedContextEnabled: false,
-          updatedAt: timestamp(),
-        };
-        const resolved = await this.resolveRuntimeModelForSelection(runtimeSelection);
-        const context: Context = {
-          systemPrompt: [
-            "You compress raw tool output for another agent.",
-            "Answer only the requested summary goal using the provided tool output.",
-            "If the output does not contain enough evidence, return exactly: insufficient evidence",
-            "Return plain text only.",
-            "Be brief.",
-          ].join(" "),
-          messages: [
-            {
-              role: "user",
-              content: [
-                `Tool: ${params.toolName}`,
-                `Goal: ${params.goal.trim()}`,
-                "",
-                "Tool output:",
-                params.output,
-              ].join("\n"),
-              timestamp: Date.now(),
-            } satisfies Message,
-          ],
-        };
-        const sessionId = `tool-summarizer:${this.profile.id}:${Date.now()}`;
-        const responseStream = stream(resolved.runtimeModel, context, {
-          apiKey: resolved.apiKey,
-          sessionId,
-          ...this.getInferenceOptions(resolved.selection),
-        });
-        const response = assertSuccessfulProviderResponse(await responseStream.result(), {
-          connector: "tool-summarizer",
-          sessionId,
-          usagePurpose: "tool_result_summarization",
-        });
-        this.recordUsage({
-          providerId: resolved.selection.providerId,
-          modelId: response.model ?? resolved.selection.modelId,
-          sessionId,
-          purpose: "tool_result_summarization",
-          usage: response.usage,
-          providerReportedUsage: response.usage,
-        });
-        const text = response.content
-          .filter((block) => block.type === "text")
-          .map((block) => block.text)
-          .join("")
-          .trim();
-        return text || "insufficient evidence";
-      },
-      {
-        attributes: {
-          profileId: this.profile.id,
-          providerId: selection.providerId,
-          modelId: selection.modelId,
-          toolName: params.toolName,
-          goalLength: params.goal.length,
-          outputLength: params.output.length,
-        },
-      },
-    );
+    return this.secondaryDispatch.summarizeToolResult(params);
   }
 
   async generateMemoryText(params: {
@@ -1107,112 +975,25 @@ export class ModelService {
     usagePurpose: string;
     sessionIdPrefix?: string;
   }) {
-    const selection = this.getMemorySelection();
-    return traceSpan(
-      "model.generate_memory_text",
-      async () => {
-        const runtimeSelection: ActiveModelSelection = {
-          ...selection,
-          extendedContextEnabled: false,
-          updatedAt: timestamp(),
-        };
-        const resolved = await this.resolveRuntimeModelForSelection(runtimeSelection);
-        const context: Context = {
-          systemPrompt: params.systemPrompt,
-          messages: [{
-            role: "user",
-            content: params.userPrompt,
-            timestamp: Date.now(),
-          } satisfies Message],
-        };
-        const sessionId = `${params.sessionIdPrefix?.trim() || "memory"}:${this.profile.id}:${Date.now()}`;
-        const responseStream = stream(resolved.runtimeModel, context, {
-          apiKey: resolved.apiKey,
-          sessionId,
-          ...this.getInferenceOptions(resolved.selection),
-        });
-        const response = assertSuccessfulProviderResponse(await responseStream.result(), {
-          connector: "memory-model",
-          sessionId,
-          usagePurpose: params.usagePurpose,
-        });
-        this.recordUsage({
-          providerId: resolved.selection.providerId,
-          modelId: response.model ?? resolved.selection.modelId,
-          sessionId,
-          purpose: params.usagePurpose,
-          usage: response.usage,
-          providerReportedUsage: response.usage,
-        });
-        return response.content
-          .filter((block) => block.type === "text")
-          .map((block) => block.text)
-          .join("")
-          .trim();
-      },
-      {
-        attributes: {
-          profileId: this.profile.id,
-          providerId: selection.providerId,
-          modelId: selection.modelId,
-          usagePurpose: params.usagePurpose,
-          userPromptLength: params.userPrompt.length,
-        },
-      },
-    );
+    return this.secondaryDispatch.generateMemoryText(params);
   }
 
   async resolveActiveRuntimeModel(): Promise<ResolvedRuntimeModel> {
-    const selection = await this.getActiveModel();
-    return this.resolveRuntimeModelForSelection(selection);
+    return this.secondaryDispatch.resolveActiveRuntimeModel(() => this.getActiveModel());
   }
 
   async resolveModelForPurpose(purpose?: string): Promise<ResolvedRuntimeModel> {
-    if (purpose?.startsWith("automation_heartbeat")) {
-      const heartbeat = this.getHeartbeatSelection();
-      const selection: ActiveModelSelection = {
-        providerId: heartbeat.providerId,
-        modelId: heartbeat.modelId,
-        thinkingLevel: heartbeat.thinkingLevel,
-        extendedContextEnabled: false,
-        updatedAt: new Date(0).toISOString(),
-      };
-      return this.resolveRuntimeModelForSelection(selection);
-    }
-    return this.resolveActiveRuntimeModel();
+    return this.secondaryDispatch.resolveModelForPurpose(() => this.getActiveModel(), purpose);
   }
 
   private async resolveRuntimeModelForSelection(
     selection: ActiveModelSelection,
   ): Promise<ResolvedRuntimeModel> {
-    const runtimeProvider = PROVIDER_RUNTIME_MAP[selection.providerId];
-    const runtimeModels = getModels(runtimeProvider);
-    const runtimeModel = resolveRuntimeModelIdentifier(selection.modelId, runtimeModels);
-    if (!runtimeModel) {
-      throw new NotFoundError(
-        "Model",
-        `${selection.providerId}/${selection.modelId} is not supported by the runtime`,
-      );
-    }
-
-    return {
-      selection,
-      runtimeModel: {
-        ...runtimeModel,
-        contextWindow: getSelectedContextWindow(this.profile, selection, runtimeModel.contextWindow) ??
-          runtimeModel.contextWindow,
-      },
-      apiKey: await this.resolveApiKeyForProvider(selection.providerId),
-    };
+    return this.secondaryDispatch.resolveRuntimeModelForSelection(selection);
   }
 
   private async resolveApiKeyForProvider(providerId: ModelProviderId) {
-    if (providerId === "claude") {
-      return resolveClaudeToken(this.profile.id);
-    }
-
-    const { apiKey } = await resolveCodexApiKey(this.profile.id);
-    return apiKey;
+    return this.secondaryDispatch.resolveApiKeyForProvider(providerId);
   }
 
   async inspectContextWindowUsage(params: {
