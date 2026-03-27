@@ -1,6 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
-import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
+import { resolveRuntimePath } from "./runtime-root";
+import { JsonStateService } from "./json-state-service";
 
 export interface HeartbeatState {
   lastCompletedAt?: string;
@@ -39,28 +38,13 @@ function normalizeHeartbeatState(raw: unknown): HeartbeatState {
   };
 }
 
-export class HeartbeatStateService {
-  constructor(private readonly filePath = getHeartbeatStateFilePath()) {}
-
-  load(): HeartbeatState {
-    if (!fs.existsSync(this.filePath)) {
-      return {};
-    }
-
-    try {
-      const raw = JSON.parse(fs.readFileSync(this.filePath, "utf8")) as unknown;
-      return normalizeHeartbeatState(raw);
-    } catch {
-      return {};
-    }
+export class HeartbeatStateService extends JsonStateService<HeartbeatState> {
+  constructor(filePath = getHeartbeatStateFilePath()) {
+    super(filePath);
   }
 
-  save(state: HeartbeatState): HeartbeatState {
-    assertTestRuntimeRootIsIsolated("Heartbeat state");
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    const normalized = normalizeHeartbeatState(state);
-    fs.writeFileSync(this.filePath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 });
-    return normalized;
+  protected normalize(raw: unknown): HeartbeatState {
+    return normalizeHeartbeatState(raw);
   }
 }
 
