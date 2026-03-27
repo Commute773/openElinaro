@@ -2,7 +2,6 @@ import { telemetry } from "./services/telemetry";
 import { startHttpServer } from "./integrations/http/server";
 import { startDiscordBot } from "./integrations/discord/bot";
 import { startLocalVoiceSidecarRuntime } from "./services/local-voice-sidecar-runtime";
-import { startZigbeeRuntime } from "./services/zigbee2mqtt-service";
 import { OpenElinaroApp } from "./app/runtime";
 
 process.on("unhandledRejection", (reason) => {
@@ -30,11 +29,9 @@ try {
 }
 
 const localVoiceSidecars = await startLocalVoiceSidecarRuntime();
-const zigbeeRuntime = startZigbeeRuntime();
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     void localVoiceSidecars.stop();
-    void zigbeeRuntime.then((rt) => rt.stop());
   });
 }
