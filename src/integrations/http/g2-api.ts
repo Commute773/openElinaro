@@ -1,13 +1,8 @@
 import type { OpenElinaroApp } from "../../app/runtime";
 import { telemetry } from "../../services/telemetry";
+import { CORS_HEADERS } from "./cors";
 
 const g2Telemetry = telemetry.child({ component: "g2_api" });
-
-const CORS_HEADERS: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status, headers: CORS_HEADERS });

@@ -8,8 +8,9 @@ import {
 import { VonageService, getVonageWebhookPath } from "../../services/vonage-service";
 import type { OpenElinaroApp } from "../../app/runtime";
 import { handleG2ApiRequest } from "./g2-api";
+import { authenticateApiRequest } from "./api-auth";
 
-function normalizePath(pathname: string) {
+export function normalizePath(pathname: string) {
   return pathname.replace(/\/+$/, "") || "/";
 }
 
@@ -18,9 +19,13 @@ export function createHttpRequestHandler(
   geminiLivePhone?: GeminiLivePhoneService,
   app?: OpenElinaroApp,
 ) {
+  const config = getRuntimeConfig();
   return async (request: Request) => {
     const url = new URL(request.url, "http://localhost");
     const pathname = normalizePath(url.pathname);
+
+    const authResponse = authenticateApiRequest(request, pathname, config);
+    if (authResponse) return authResponse;
 
     if (pathname === "/healthz") {
       return Response.json({ ok: true }, { status: 200 });
