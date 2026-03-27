@@ -108,6 +108,13 @@ export const TOOL_AUTH_DECLARATIONS = {
   cancel_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can be cancelled." },
   agent_status: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile are returned." },
   read_agent_terminal: { access: "anyone", behavior: "role-sensitive", note: "Only terminal output for runs visible to the active profile is returned." },
+  zigbee_status: { access: "root", behavior: "uniform", note: "Reads Zigbee2MQTT bridge status and paired device list." },
+  zigbee_device_detail: { access: "root", behavior: "uniform", note: "Reads detailed device info and capabilities from Zigbee2MQTT." },
+  zigbee_device_set: { access: "root", behavior: "uniform", note: "Publishes state changes to a Zigbee device via MQTT." },
+  zigbee_device_get: { access: "root", behavior: "uniform", note: "Requests a fresh state report from a Zigbee device via MQTT." },
+  zigbee_permit_join: { access: "root", behavior: "uniform", note: "Opens the Zigbee network for new device pairing." },
+  zigbee_disable_join: { access: "root", behavior: "uniform", note: "Closes the Zigbee network to prevent new device pairing." },
+  zigbee_device_rename: { access: "root", behavior: "uniform", note: "Renames a paired Zigbee device's friendly name." },
 } as const satisfies Record<string, ToolAuthorizationDeclaration>;
 
 export type ToolName = keyof typeof TOOL_AUTH_DECLARATIONS;

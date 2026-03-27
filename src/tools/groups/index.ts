@@ -7,4 +7,5 @@ export { buildFilesystemTools } from "./filesystem-tools";
 export { buildShellTools, renderShellExecResult } from "./shell-tools";
 export { buildMemoryTools } from "./memory-tools";
 export { buildSystemTools, renderExtendedContextStatus, formatTokenCount } from "./system-tools";
+export { buildZigbee2MqttTools } from "./zigbee2mqtt-tools";
 export type { ToolBuildContext, ShellRuntime, FilesystemRuntime, TicketsRuntime } from "./tool-group-types";

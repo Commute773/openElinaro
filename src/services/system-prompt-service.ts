@@ -174,6 +174,7 @@ const FEATURE_TOOL_LIBRARY: Record<FeatureId, string> = {
   localVoice: "",
   media: "media",
   extensions: "",
+  zigbee2mqtt: "zigbee_devices",
 };
 
 function buildRuntimeOverviewPrompt() {

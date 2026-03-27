@@ -60,7 +60,8 @@ describe("FEATURE_IDS", () => {
     expect(FEATURE_IDS).toContain("localVoice");
     expect(FEATURE_IDS).toContain("media");
     expect(FEATURE_IDS).toContain("extensions");
-    expect(FEATURE_IDS.length).toBe(11);
+    expect(FEATURE_IDS).toContain("zigbee2mqtt");
+    expect(FEATURE_IDS.length).toBe(12);
   });
 });
 
