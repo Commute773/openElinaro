@@ -12,6 +12,8 @@ import type {
   FinanceForecastScenarioData,
   FinanceForecastSummaryData,
   FinanceIncomeProjectionData,
+  FinanceIncomeSourceRowData,
+  FinanceIncomeSourcesData,
   FinanceMonthlyTaxRateProjectionData,
   FinanceTaxProjectionData,
 } from "./finance-forecasting-types";
@@ -740,4 +742,53 @@ export function loadAccountBalances(db: Database) {
     }
   }
   return { liquid, registered, debt };
+}
+
+export function buildIncomeSourcesData(db: Database, defaultSettings: Record<string, string>): FinanceIncomeSourcesData {
+  const fxRate = getFxRate(db, defaultSettings);
+  const sources = loadIncomeSources(db);
+  const conservativeProjection = projectAnnualIncome(sources, fxRate, false);
+  const optimisticProjection = projectAnnualIncome(sources, fxRate, true);
+  const rows: FinanceIncomeSourceRowData[] = sources.map((source) => {
+    const startDate = String(source.start_date ?? '');
+    const start = new Date(`${startDate}T00:00:00Z`);
+    const monthsActive = Number.isFinite(start.getTime()) ? Math.max(0, 12 - start.getUTCMonth()) : 0;
+    const amountPerPeriod = Number(source.amount_per_period ?? 0);
+    const period = String(source.period ?? 'monthly');
+    const monthlyEquivalent = period === 'biweekly' ? amountPerPeriod * 26 / 12 : amountPerPeriod;
+    const confirmed = Number(source.confirmed ?? 1) === 1;
+    const guaranteedMonths = Number(source.guaranteed_months ?? 0);
+    const annualOrigOptimistic = period === 'biweekly'
+      ? amountPerPeriod * Math.floor(26 * monthsActive / 12)
+      : amountPerPeriod * monthsActive;
+    const annualOrigConservative = confirmed ? annualOrigOptimistic : monthlyEquivalent * guaranteedMonths;
+    return {
+      id: Number(source.id ?? 0),
+      name: String(source.name ?? ''),
+      type: String(source.type ?? 'contract'),
+      currency: String(source.currency ?? 'USD').toUpperCase(),
+      amountPerPeriod,
+      period,
+      billing: stringOrNull(source.billing),
+      startDate,
+      endDate: stringOrNull(source.end_date),
+      confirmed,
+      guaranteedMonths,
+      notes: stringOrNull(source.notes),
+      monthlyEquivalent,
+      annualOrigConservative,
+      annualOrigOptimistic,
+      annualCadConservative: toCad(annualOrigConservative, String(source.currency ?? 'USD'), fxRate),
+      annualCadOptimistic: toCad(annualOrigOptimistic, String(source.currency ?? 'USD'), fxRate),
+      includedInConservative: confirmed || guaranteedMonths > 0,
+      includedInOptimistic: true,
+      monthsActive,
+    };
+  });
+  return {
+    fxRate,
+    rows,
+    conservativeProjection,
+    optimisticProjection,
+  };
 }

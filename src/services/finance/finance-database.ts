@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Database } from "bun:sqlite";
 import type { FinanceForecastConfig } from "../../config/finance-config";
 import { DEFAULT_FINANCE_SETTINGS } from "../../config/finance-config";
+import type { FinanceMetadataData } from "../finance-dashboard-types";
 import { timestamp as nowIso } from "../../utils/timestamp";
 import { withSqliteRetry } from "../../utils/sqlite-helpers";
 import type { SqlValue } from "./finance-types";
@@ -330,4 +331,59 @@ export function getFxRate(
   defaultSettings: Record<string, string>,
 ) {
   return getNumericSettingOrDefault(db, "fx.usdcad", defaultSettings);
+}
+
+export function buildMetadataData(
+  db: Database,
+  dbPath: string,
+  forecastConfigPath: string,
+  defaultSettings: Record<string, string>,
+  getSheetInfoFn: () => import("./finance-types").FinanceSheetInfoData,
+  getImportRunsDataFn: (limit: number) => import("./finance-types").FinanceImportRunsData,
+): FinanceMetadataData {
+  const config = loadForecastConfig(forecastConfigPath);
+  const tableNames = ['settings', 'accounts', 'account_balance_snapshots', 'transactions', 'categorization_rules', 'receivables', 'import_runs', 'recurring', 'payables', 'income_sources', 'fx_events'] as const;
+  const tableCounts = tableNames.map((table) => ({
+    table,
+    count: Number(getRow<{ count: number }>(db, `SELECT COUNT(1) AS count FROM ${table}`)?.count ?? 0),
+  }));
+  const transactionSourceCounts = allRows<Record<string, unknown>>(
+    db,
+    'SELECT source, COUNT(1) AS count FROM transactions GROUP BY source ORDER BY source ASC',
+  ).map((row) => ({
+    source: String(row.source ?? ''),
+    count: Number(row.count ?? 0),
+  }));
+  const finalBudgetCountBreakdown = allRows<Record<string, unknown>>(
+    db,
+    `SELECT ${FINAL_COUNTS} AS counts_final, COUNT(1) AS count FROM transactions GROUP BY ${FINAL_COUNTS} ORDER BY counts_final ASC`,
+  ).map((row) => ({
+    countsTowardBudget: Number(row.counts_final ?? 0) === 1,
+    count: Number(row.count ?? 0),
+  }));
+  return {
+    generatedAt: nowIso(),
+    databasePath: dbPath,
+    forecastConfigPath,
+    sheet: getSheetInfoFn(),
+    settings: {
+      timezone: getSettingOrDefault(db, "timezone", defaultSettings),
+      weeklyLimitCad: getNumericSettingOrDefault(db, "budget.weekly_limit_cad", defaultSettings),
+      monthlyLimitCad: getNumericSettingOrDefault(db, "budget.monthly_limit_cad", defaultSettings),
+      weeklyStartDate: getSettingOrDefault(db, "budget.weekly_start_date", defaultSettings),
+      fxUsdCad: getFxRate(db, defaultSettings),
+    },
+    reviewCount: Number(getRow<{ count: number }>(db, 'SELECT COUNT(1) AS count FROM transactions WHERE needs_review = 1')?.count ?? 0),
+    forecastConfig: {
+      version: Number(config.version ?? 0),
+      year: Number(config.year ?? 0),
+      province: String(config.tax.province ?? ''),
+      filingStatus: String(config.tax.filing_status ?? ''),
+      note: String(config.note ?? ''),
+    },
+    tableCounts,
+    transactionSourceCounts,
+    finalBudgetCountBreakdown,
+    latestImportRun: getImportRunsDataFn(1).rows[0] ?? null,
+  };
 }

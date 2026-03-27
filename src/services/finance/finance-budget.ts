@@ -1,11 +1,14 @@
 import type { Database } from "bun:sqlite";
-import type { FinanceBudgetSnapshot } from "./finance-types";
+import type { FinanceBudgetSnapshot, FinanceBudgetHistoryData } from "./finance-types";
+import type { FinanceWhatIfInput, FinanceWhatIfData } from "../finance-dashboard-types";
 import {
   clamp,
   formatCad,
   toIsoDate,
+  dateKey,
   daysBetween,
   addDays,
+  addMonths,
   daysInMonth,
   startEndForMonth,
 } from "./finance-helpers";
@@ -16,6 +19,7 @@ import {
   getNumericSettingOrDefault,
   FINAL_COUNTS,
 } from "./finance-database";
+import { computeRunwayMonths } from "./finance-forecasting";
 
 export function computeSpendStats(db: Database, fromDate: string, toExclusive: string) {
   const row = getRow<Record<string, unknown>>(
@@ -218,4 +222,96 @@ export function describeBudgetPace(snapshot: FinanceBudgetSnapshot) {
     return 'slightly_ahead';
   }
   return 'ahead_red';
+}
+
+export function buildBudgetHistoryData(
+  db: Database,
+  defaultSettings: Record<string, string>,
+  options?: { date?: string; periods?: number },
+): FinanceBudgetHistoryData {
+  const dateIso = options?.date ? toIsoDate(options.date) : dateKey(new Date());
+  const periods = clamp(options?.periods ?? 12, 1, 104);
+  const current = resolveBudgetSnapshot(db, dateIso, defaultSettings);
+  if (current.mode === 'week') {
+    const weeklyStart = toIsoDate(getSettingOrDefault(db, "budget.weekly_start_date", defaultSettings));
+    const rows = [] as FinanceBudgetHistoryData['rows'];
+    for (let offset = periods - 1; offset >= 0; offset -= 1) {
+      const weekDate = addDays(current.weekStart, -7 * offset);
+      if (weekDate < weeklyStart) {
+        continue;
+      }
+      const snapshot = resolveBudgetSnapshot(db, weekDate, defaultSettings);
+      rows.push({
+        snapshot,
+        burnRate: snapshot.mode === 'week' && snapshot.available > 0 ? snapshot.spentCad / snapshot.available : 0,
+      });
+    }
+    return {
+      mode: 'week',
+      periods: rows.length,
+      current,
+      rows,
+    };
+  }
+  const rows = [] as FinanceBudgetHistoryData['rows'];
+  for (let offset = periods - 1; offset >= 0; offset -= 1) {
+    const monthDate = addMonths(`${current.month}-01`, -offset);
+    const snapshot = resolveBudgetSnapshot(db, addDays(startEndForMonth(monthDate.slice(0, 7)).toExclusive, -1), defaultSettings);
+    rows.push({
+      snapshot,
+      burnRate: snapshot.mode === 'month' && snapshot.limitCad > 0 ? snapshot.spentCad / snapshot.limitCad : 0,
+    });
+  }
+  return {
+    mode: 'month',
+    periods: rows.length,
+    current,
+    rows,
+  };
+}
+
+export function buildSimulatePurchaseImpact(
+  db: Database,
+  defaultSettings: Record<string, string>,
+  input: FinanceWhatIfInput,
+  getForecastSummaryDataFn: () => { standing: { netLiquidCad: number; netPositionConfirmedCad: number; netPositionAllCad: number }; scenarios: { conservative: { annualSurplusCad: number; monthlyBurnCad: number; runwayMonths: number | null }; optimistic: { annualSurplusCad: number; monthlyBurnCad: number; runwayMonths: number | null } } },
+): FinanceWhatIfData {
+  if (!Number.isFinite(input.purchaseAmountCad) || input.purchaseAmountCad <= 0) {
+    throw new Error('purchaseAmountCad must be a positive number.');
+  }
+  const referenceDate = input.date ? toIsoDate(input.date) : dateKey(new Date());
+  const countsTowardBudget = input.countsTowardBudget ?? true;
+  const budget = resolveBudgetSnapshot(db, referenceDate, defaultSettings);
+  const summary = getForecastSummaryDataFn();
+  const afterRemainingCad = countsTowardBudget ? budget.remaining - input.purchaseAmountCad : budget.remaining;
+  const afterPaceDeltaCad = countsTowardBudget ? budget.paceDelta + input.purchaseAmountCad : budget.paceDelta;
+  return {
+    referenceDate,
+    purchaseAmountCad: input.purchaseAmountCad,
+    countsTowardBudget,
+    budget: {
+      before: budget,
+      afterRemainingCad,
+      afterPaceDeltaCad,
+      withinBudget: afterRemainingCad >= 0,
+    },
+    liquidity: {
+      netLiquidBeforeCad: summary.standing.netLiquidCad,
+      netLiquidAfterCad: summary.standing.netLiquidCad - input.purchaseAmountCad,
+      netPositionConfirmedBeforeCad: summary.standing.netPositionConfirmedCad,
+      netPositionConfirmedAfterCad: summary.standing.netPositionConfirmedCad - input.purchaseAmountCad,
+      netPositionAllBeforeCad: summary.standing.netPositionAllCad,
+      netPositionAllAfterCad: summary.standing.netPositionAllCad - input.purchaseAmountCad,
+    },
+    forecast: {
+      conservativeAnnualSurplusBeforeCad: summary.scenarios.conservative.annualSurplusCad,
+      conservativeAnnualSurplusAfterCad: summary.scenarios.conservative.annualSurplusCad - input.purchaseAmountCad,
+      optimisticAnnualSurplusBeforeCad: summary.scenarios.optimistic.annualSurplusCad,
+      optimisticAnnualSurplusAfterCad: summary.scenarios.optimistic.annualSurplusCad - input.purchaseAmountCad,
+      conservativeRunwayMonthsBefore: summary.scenarios.conservative.runwayMonths,
+      conservativeRunwayMonthsAfter: computeRunwayMonths(summary.standing.netLiquidCad - input.purchaseAmountCad, summary.scenarios.conservative.monthlyBurnCad),
+      optimisticRunwayMonthsBefore: summary.scenarios.optimistic.runwayMonths,
+      optimisticRunwayMonthsAfter: computeRunwayMonths(summary.standing.netLiquidCad - input.purchaseAmountCad, summary.scenarios.optimistic.monthlyBurnCad),
+    },
+  };
 }
