@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.28
+- Released at: 2026-03-27T20:52:53Z
+- Release id: 20260327T205253Z-256fd14
+- Previous version: 2026.03.27.27
+- Trigger: ci/release workflow
+
+- feat: add unified function layer infrastructure
+
 ## 2026.03.27.27
 - Released at: 2026-03-27T19:21:38Z
 - Release id: 20260327T192138Z-ecba468
