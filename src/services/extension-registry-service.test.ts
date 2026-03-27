@@ -14,10 +14,14 @@ function withIsolatedUserData() {
   return dir;
 }
 
-function writeExtension(base: string, id: string, manifest: Record<string, unknown>) {
+function writeExtension(base: string, id: string, manifest: Record<string, unknown>, entrypointSource?: string) {
   const extDir = path.join(base, "extensions", id);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(path.join(extDir, "extension.json"), JSON.stringify(manifest));
+  if (entrypointSource !== undefined) {
+    const entrypoint = (manifest.entrypoint as string) ?? "index.ts";
+    fs.writeFileSync(path.join(extDir, entrypoint), entrypointSource);
+  }
 }
 
 beforeEach(() => {
@@ -107,19 +111,111 @@ describe("ExtensionRegistryService", () => {
     expect(svc.list().length).toBe(2);
   });
 
-  test("loadAll logs stub message without crashing", () => {
+  test("loadAll loads extension with activate function", async () => {
     const base = withIsolatedUserData();
-    writeExtension(base, "stub", {
-      id: "stub",
-      name: "Stub",
-      version: "1.0.0",
-      entrypoint: "index.ts",
-    });
+    writeExtension(
+      base,
+      "test-ext",
+      { id: "test-ext", name: "Test Extension", version: "1.0.0", entrypoint: "index.ts" },
+      `export function activate(api) { api.registerTool("greet", {}, async () => "hello"); }`,
+    );
 
     const svc = new ExtensionRegistryService();
     svc.scan();
-    // Should not throw
-    svc.loadAll();
+    await svc.loadAll();
+
+    const ext = svc.list().find((e) => e.manifest?.id === "test-ext");
+    expect(ext?.status).toBe("loaded");
+    expect(svc.getRegisteredTools().has("test-ext.greet")).toBe(true);
+  });
+
+  test("loadAll sets error status when entrypoint has no activate", async () => {
+    const base = withIsolatedUserData();
+    writeExtension(
+      base,
+      "no-activate",
+      { id: "no-activate", name: "No Activate", version: "1.0.0", entrypoint: "index.ts" },
+      `export const value = 42;`,
+    );
+
+    const svc = new ExtensionRegistryService();
+    svc.scan();
+    await svc.loadAll();
+
+    const ext = svc.list().find((e) => e.manifest?.id === "no-activate");
+    expect(ext?.status).toBe("error");
+    expect(ext?.error).toContain("activate");
+  });
+
+  test("loadAll continues loading after one extension fails", async () => {
+    const base = withIsolatedUserData();
+    writeExtension(
+      base,
+      "broken",
+      { id: "broken", name: "Broken", version: "1.0.0", entrypoint: "index.ts" },
+      `export function activate() { throw new Error("boom"); }`,
+    );
+    writeExtension(
+      base,
+      "good",
+      { id: "good", name: "Good", version: "1.0.0", entrypoint: "index.ts" },
+      `export function activate(api) { api.registerTool("ping", {}, async () => "pong"); }`,
+    );
+
+    const svc = new ExtensionRegistryService();
+    svc.scan();
+    await svc.loadAll();
+
+    const broken = svc.list().find((e) => e.manifest?.id === "broken");
+    const good = svc.list().find((e) => e.manifest?.id === "good");
+    expect(broken?.status).toBe("error");
+    expect(good?.status).toBe("loaded");
+  });
+
+  test("emitEvent calls subscribed handlers", async () => {
+    const base = withIsolatedUserData();
+    writeExtension(
+      base,
+      "eventer",
+      { id: "eventer", name: "Eventer", version: "1.0.0", entrypoint: "index.ts" },
+      `export const received = [];
+export function activate(api) {
+  api.onEvent("test-event", (...args) => received.push(args));
+}`,
+    );
+
+    const svc = new ExtensionRegistryService();
+    svc.scan();
+    await svc.loadAll();
+
+    svc.emitEvent("test-event", "a", 1);
+    const extDir = path.join(base, "extensions", "eventer");
+    const mod = await import(path.join(extDir, "index.ts"));
+    expect(mod.received.length).toBe(1);
+    expect(mod.received[0]).toEqual(["a", 1]);
+  });
+
+  test("registerToolLibrary stores library registration", async () => {
+    const base = withIsolatedUserData();
+    writeExtension(
+      base,
+      "lib-ext",
+      { id: "lib-ext", name: "Lib Ext", version: "1.0.0", entrypoint: "index.ts" },
+      `export function activate(api) {
+  api.registerTool("foo", {}, async () => "foo");
+  api.registerTool("bar", {}, async () => "bar");
+  api.registerToolLibrary("my-lib", "A test library", ["foo", "bar"]);
+}`,
+    );
+
+    const svc = new ExtensionRegistryService();
+    svc.scan();
+    await svc.loadAll();
+
+    const lib = svc.getRegisteredLibraries().get("my-lib");
+    expect(lib).toBeTruthy();
+    expect(lib!.extensionId).toBe("lib-ext");
+    expect(lib!.toolNames).toEqual(["foo", "bar"]);
   });
 
   test("scan ignores non-directory entries", () => {
