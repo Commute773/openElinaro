@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { PromptDocumentSnapshot } from "../domain/prompt-snapshot";
 import type { HeartbeatReminderSnapshot } from "../domain/routines";
 import { formatLocalTime } from "./local-time-service";
 import { getAssistantContextRoot } from "./runtime-user-content";
@@ -23,12 +24,7 @@ function getHeartbeatFilePath() {
   return path.join(getAssistantContextRoot(), HEARTBEAT_FILE_NAME);
 }
 
-export interface HeartbeatSnapshot {
-  text: string;
-  path: string;
-  loadedAt: string;
-  charCount: number;
-}
+export type HeartbeatSnapshot = PromptDocumentSnapshot;
 
 export class HeartbeatService {
   load(): HeartbeatSnapshot {

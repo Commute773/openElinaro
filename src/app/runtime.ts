@@ -823,6 +823,37 @@ export class OpenElinaroApp {
     return this.routines.assessNow(reference);
   }
 
+  getHealthSummary() {
+    return this.health.summary();
+  }
+
+  listHealthCheckins(limit = 10) {
+    return this.health.listCheckins(limit).map((c) => ({
+      id: c.id,
+      observedAt: c.observedAt,
+      kind: c.kind ?? "checkin",
+      energy: c.energy,
+      mood: c.mood,
+      sleepHours: c.sleepHours,
+      anxiety: c.anxiety,
+    }));
+  }
+
+  listProjectSummaries() {
+    return this.getScope().projects.listProjects({ status: "all" }).map((p) => ({
+      id: p.id,
+      name: p.name,
+      status: p.status,
+      priority: p.priority,
+      summary: p.summary,
+      tags: p.tags,
+    }));
+  }
+
+  listConversationSummaries() {
+    return this.conversations.listSummaries();
+  }
+
   private getScope(
     profileId = this.activeProfile.id,
     options?: {

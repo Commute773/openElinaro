@@ -1,5 +1,22 @@
 # Deployments
 
+## 2026.03.27.9
+- Released at: 2026-03-27T15:19:06Z
+- Release id: 20260327T151906Z-cb84699
+- Previous version: 2026.03.27.8
+- Trigger: ci/release workflow
+
+- refactor: extract JsonStateService<T> base class for all JSON state services
+- refactor: unify prompt document snapshot types into shared PromptDocumentSnapshot
+
+## 2026.03.27.8
+- Released at: 2026-03-27T02:30:47Z
+- Release id: 20260327T023047Z-962bdbd
+- Previous version: 2026.03.27.7
+- Trigger: ci/release workflow
+
+- fix: tools now auto-adopt the running zigbee bridge
+
 ## 2026.03.27.7
 - Released at: 2026-03-27T02:11:29Z
 - Release id: 20260327T021129Z-14132bf

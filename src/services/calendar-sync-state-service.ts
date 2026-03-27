@@ -1,6 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
-import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
+import { resolveRuntimePath } from "./runtime-root";
+import { JsonStateService } from "./json-state-service";
 
 export interface CalendarSyncState {
   lastAttemptAt?: string;
@@ -41,28 +40,13 @@ function normalizeCalendarSyncState(raw: unknown): CalendarSyncState {
   };
 }
 
-export class CalendarSyncStateService {
-  constructor(private readonly filePath = getCalendarSyncStateFilePath()) {}
-
-  load(): CalendarSyncState {
-    if (!fs.existsSync(this.filePath)) {
-      return {};
-    }
-
-    try {
-      const raw = JSON.parse(fs.readFileSync(this.filePath, "utf8")) as unknown;
-      return normalizeCalendarSyncState(raw);
-    } catch {
-      return {};
-    }
+export class CalendarSyncStateService extends JsonStateService<CalendarSyncState> {
+  constructor(filePath = getCalendarSyncStateFilePath()) {
+    super(filePath);
   }
 
-  save(state: CalendarSyncState): CalendarSyncState {
-    assertTestRuntimeRootIsIsolated("Calendar sync state");
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    const normalized = normalizeCalendarSyncState(state);
-    fs.writeFileSync(this.filePath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 });
-    return normalized;
+  protected normalize(raw: unknown): CalendarSyncState {
+    return normalizeCalendarSyncState(raw);
   }
 }
 

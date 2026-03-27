@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { PromptDocumentSnapshot } from "../domain/prompt-snapshot";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveUserDataPath } from "./runtime-root";
 import { timestamp } from "../utils/timestamp";
@@ -13,12 +14,7 @@ const FALLBACK_AUTONOMOUS_TIME_PROMPT = [
   "Exit only when you're genuinely done, not because you ran out of input.",
 ].join("\n");
 
-export interface AutonomousTimePromptSnapshot {
-  text: string;
-  path: string;
-  loadedAt: string;
-  charCount: number;
-}
+export type AutonomousTimePromptSnapshot = PromptDocumentSnapshot;
 
 export function resolveAutonomousTimePromptPath(configuredPath?: string) {
   const trimmed = configuredPath?.trim();

@@ -195,11 +195,15 @@ export class HealthTrackingService {
   }
 
   history(limit = 20) {
-    const checkins = this.getAllCheckins().slice(0, Math.max(1, Math.min(limit, 100)));
+    const checkins = this.listCheckins(limit);
     if (checkins.length === 0) {
       return "(no health check-ins)";
     }
     return checkins.map((checkin) => this.formatCheckin(checkin)).join("\n");
+  }
+
+  listCheckins(limit = 10) {
+    return this.getAllCheckins().slice(0, Math.max(1, Math.min(limit, 100)));
   }
 
   summary() {
