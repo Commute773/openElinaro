@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.27.19
+- Released at: 2026-03-27T18:04:37Z
+- Release id: 20260327T180437Z-3bf9965
+- Previous version: 2026.03.27.18
+- Trigger: ci/release workflow
+
+- docs: add architectural recommendations research note
+- fix: resolve layering violations in domain/utils/services imports
+
 ## 2026.03.27.18
 - Released at: 2026-03-27T16:55:38Z
 - Release id: 20260327T165538Z-3dca0c6
