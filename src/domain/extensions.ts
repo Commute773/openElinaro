@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
 /**
  * Zod schema for an extension manifest (`extension.json`).
  *
@@ -35,6 +37,12 @@ export interface ExtensionAPI {
 
   /** Read the extension's own config block from the runtime config. */
   getConfig(): Record<string, unknown>;
+
+  registerHttpRoute(
+    method: HttpMethod,
+    path: string,
+    handler: (request: Request) => Response | Promise<Response>,
+  ): void;
 }
 
 /** A tool registered by an extension via `ExtensionAPI.registerTool`. */

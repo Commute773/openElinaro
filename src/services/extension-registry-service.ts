@@ -4,6 +4,7 @@ import {
   ExtensionManifestSchema,
   type ExtensionAPI,
   type ExtensionManifest,
+  type HttpMethod,
   type LoadedExtension,
   type RegisteredExtensionTool,
   type RegisteredToolLibrary,
@@ -13,6 +14,13 @@ import { resolveUserDataPath } from "./runtime-root";
 
 const EXTENSIONS_DIR = "extensions";
 const MANIFEST_FILENAME = "extension.json";
+
+export interface RegisteredHttpRoute {
+  method: HttpMethod;
+  path: string;
+  handler: (request: Request) => Response | Promise<Response>;
+  extensionId: string;
+}
 
 function getExtensionsDir() {
   return resolveUserDataPath(EXTENSIONS_DIR);
@@ -36,6 +44,7 @@ export class ExtensionRegistryService {
   private registeredTools = new Map<string, RegisteredExtensionTool>();
   private registeredLibraries = new Map<string, RegisteredToolLibrary>();
   private eventSubscriptions = new Map<string, Array<(...args: unknown[]) => void>>();
+  private httpRoutes = new Map<string, RegisteredHttpRoute>();
 
   /**
    * Scan the extensions directory and validate each extension manifest.
@@ -148,6 +157,9 @@ export class ExtensionRegistryService {
           ? value as Record<string, unknown>
           : {};
       },
+      registerHttpRoute: (method, routePath, handler) => {
+        this.registerHttpRoute(extensionId, method, routePath, handler);
+      },
     };
   }
 
@@ -172,5 +184,29 @@ export class ExtensionRegistryService {
   /** Return all tool libraries registered by extensions. */
   getRegisteredLibraries(): ReadonlyMap<string, RegisteredToolLibrary> {
     return this.registeredLibraries;
+  }
+
+  registerHttpRoute(
+    extensionId: string,
+    method: HttpMethod,
+    routePath: string,
+    handler: (request: Request) => Response | Promise<Response>,
+  ): void {
+    const normalizedPath = routePath.startsWith("/") ? routePath : `/${routePath}`;
+    const fullPath = `/api/ext/${extensionId}${normalizedPath}`;
+    const key = `${method} ${fullPath}`;
+    this.httpRoutes.set(key, { method, path: fullPath, handler, extensionId });
+  }
+
+  getRegisteredHttpRoutes(): RegisteredHttpRoute[] {
+    return Array.from(this.httpRoutes.values());
+  }
+
+  async handleExtensionHttpRequest(request: Request, pathname: string): Promise<Response | null> {
+    const method = request.method.toUpperCase();
+    const key = `${method} ${pathname}`;
+    const route = this.httpRoutes.get(key);
+    if (!route) return null;
+    return route.handler(request);
   }
 }
