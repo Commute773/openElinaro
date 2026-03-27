@@ -45,6 +45,7 @@ import { DiscordRoutinesNotifier } from "./routines-notifier";
 import {
   TOOL_DERIVED_INPUT_BUILDERS,
   getAutoRegisteredToolCommandNameSet,
+  setFunctionLayerDescriptions,
   syncSlashCommands,
 } from "./slash-commands";
 
@@ -453,6 +454,16 @@ export async function startDiscordBot(options?: { app?: OpenElinaroApp }) {
   });
 
   client.once(Events.ClientReady, async (readyClient) => {
+    // Populate function-layer descriptions for richer slash command metadata
+    const fnRegistry = app.getFunctionRegistry?.();
+    if (fnRegistry) {
+      const descriptions = new Map<string, string>();
+      for (const def of fnRegistry.getDefinitions({ surface: "discord" })) {
+        const desc = def.discord?.description ?? def.description;
+        descriptions.set(def.name, desc);
+      }
+      setFunctionLayerDescriptions(descriptions);
+    }
     await syncSlashCommands(readyClient);
     new DiscordRoutinesNotifier(readyClient, app).start();
     discordTelemetry.event("discord.ready", {

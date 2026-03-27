@@ -478,6 +478,12 @@ export class OpenElinaroApp {
    * Returns generated API routes from the function layer.
    * Used by the G2 router to serve function-layer endpoints.
    */
+  /** Returns the FunctionRegistry for use by integration surfaces (Discord, HTTP). */
+  getFunctionRegistry() {
+    const registry = this.getScope().routineTools.functionRegistry;
+    return registry.isBuilt ? registry : null;
+  }
+
   getGeneratedApiRoutes() {
     const scope = this.getScope();
     const registry = scope.routineTools.functionRegistry;
