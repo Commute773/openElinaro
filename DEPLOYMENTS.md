@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.26
+- Released at: 2026-03-27T19:06:39Z
+- Release id: 20260327T190639Z-97d3c8b
+- Previous version: 2026.03.27.25
+- Trigger: ci/release workflow
+
+- refactor: extract secondary model dispatch from ModelService
+
 ## 2026.03.27.25
 - Released at: 2026-03-27T19:04:04Z
 - Release id: 20260327T190404Z-3b02885
