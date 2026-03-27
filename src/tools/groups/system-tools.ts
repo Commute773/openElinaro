@@ -296,7 +296,7 @@ export function renderExtendedContextStatus(status: ActiveExtendedContextStatus)
   ];
 }
 
-function formatDurationMs(durationMs: number | null) {
+export function formatDurationMs(durationMs: number | null) {
   if (durationMs === null) {
     return "n/a";
   }

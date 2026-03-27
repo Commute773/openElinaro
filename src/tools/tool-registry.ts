@@ -1,9 +1,6 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
-import { defineTool } from "./define-tool";
-import { stringify as stringifyYaml } from "yaml";
 import { z } from "zod";
 import {
   buildRoutineTools,
@@ -16,10 +13,11 @@ import {
   buildMemoryTools,
   buildSystemTools,
   buildZigbee2MqttTools,
-  renderExtendedContextStatus,
+  buildSubagentTools,
+  buildConversationLifecycleTools,
   renderShellExecResult,
-  formatTokenCount,
 } from "./groups";
+import type { SubagentController } from "./groups";
 import type { AppProgressEvent, AppProgressUpdate } from "../domain/assistant";
 import { ConversationStore } from "../services/conversation-store";
 import { ConversationStateTransitionService } from "../services/conversation-state-transition-service";
@@ -35,13 +33,7 @@ import { MediaService } from "../services/media-service";
 import { MemoryService } from "../services/memory-service";
 import {
   ModelService,
-  type ActiveExtendedContextStatus,
-  type ContextWindowUsage,
-  type ModelProviderId,
-  type RecordedUsageDailyInspection,
-  type RecordedUsageInspection,
 } from "../services/model-service";
-import { ProfileService } from "../services/profile-service";
 import { ProjectsService } from "../services/projects-service";
 import type { ReflectionService } from "../services/reflection-service";
 import { RoutinesService } from "../services/routines-service";
@@ -71,35 +63,23 @@ import {
 import { VonageService } from "../services/vonage-service";
 import { TelemetryQueryService } from "../services/telemetry-query-service";
 import { telemetry } from "../services/telemetry";
-import { createTraceSpan } from "../utils/telemetry-helpers";
 import { ToolResultStore } from "../services/tool-result-store";
 import { getToolLibraryDefinitions } from "../services/tool-library-service";
 import type { ToolLibraryDefinition } from "../services/tool-library-service";
 import { isRunningInsideManagedService, resolveRuntimePlatform, type RuntimePlatform } from "../services/runtime-platform";
 import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
-import { FeatureConfigService, parseFeatureValue, type FeatureId } from "../services/feature-config-service";
+import { FeatureConfigService } from "../services/feature-config-service";
 import {
   guardUntrustedText,
   type UntrustedContentDescriptor,
   type UntrustedContentSourceType,
 } from "../services/prompt-injection-guard-service";
 import {
-  composeSystemPrompt,
   SystemPromptService,
 } from "../services/system-prompt-service";
 import {
-  formatRuntimeConfigValidationError,
   getRuntimeConfig,
-  getRuntimeConfigPath,
-  getRuntimeConfigValue,
-  hasRuntimeConfigPath,
-  saveRuntimeConfig,
-  setRuntimeConfigValue,
-  unsetRuntimeConfigValue,
-  validateRuntimeConfigFile,
-  validateRuntimeConfigText,
 } from "../config/runtime-config";
-import type { SubagentRun } from "../domain/subagent-run";
 import type { AgentToolScope, ToolCatalogCard } from "../domain/tool-catalog";
 
 type ShellRuntime = Pick<
@@ -116,112 +96,6 @@ type TicketsRuntime = Pick<
 >;
 
 const toolRegistryTelemetry = telemetry.child({ component: "tool" });
-
-const traceSpan = createTraceSpan(toolRegistryTelemetry);
-
-
-const contextModeSchema = z.enum(["brief", "v", "verbose", "full"]);
-const responseFormatSchema = z.enum(["text", "json"]);
-
-const modelContextUsageSchema = z.object({
-  conversationKey: z.string().min(1).optional(),
-  mode: contextModeSchema.optional(),
-});
-
-const usageSummarySchema = z.object({
-  conversationKey: z.string().min(1).optional(),
-  localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  timezone: z.string().min(1).optional(),
-});
-
-const reloadSchema = z.object({
-  conversationKey: z.string().min(1).optional(),
-});
-
-const compactSchema = z.object({
-  conversationKey: z.string().min(1).optional(),
-});
-
-const reflectSchema = z.object({
-  focus: z.string().min(1).optional(),
-});
-
-const newConversationSchema = z.object({
-  conversationKey: z.string().min(1).optional(),
-  force: z.boolean().optional(),
-});
-
-const launchAgentSchema = z.object({
-  goal: z.string().min(12),
-  workspace: z.string().min(1)
-    .describe("Required. The workspace to launch the agent in. Use a project ID for project work, \"openElinaro\" for platform work, or \"root\" for general tasks in the home directory."),
-  profile: z.string().min(1).optional(),
-  provider: z.enum(["claude", "codex"]).optional(),
-  timeoutMs: z.number()
-    .int()
-    .min(1_000)
-    .max(86_400_000)
-    .describe("Optional wall-clock timeout in milliseconds. Defaults to one hour; omit unless overriding.")
-    .optional(),
-});
-
-const resumeAgentSchema = z.object({
-  runId: z.string().min(1),
-  message: z.string().min(1).optional(),
-  timeoutMs: z.number()
-    .int()
-    .min(1_000)
-    .max(86_400_000)
-    .describe("Optional replacement wall-clock timeout in milliseconds.")
-    .optional(),
-});
-
-const steerAgentSchema = z.object({
-  runId: z.string().min(1),
-  message: z.string().min(1),
-});
-
-const cancelAgentSchema = z.object({
-  runId: z.string().min(1),
-});
-
-const agentStatusSchema = z.object({
-  runId: z.string().optional(),
-  limit: z.number().int().min(1).max(10).optional(),
-  capture: z.boolean().optional().describe("When true, include the last N lines of the agent's tmux pane output."),
-  captureLines: z.number().int().min(1).max(200).optional().describe("Number of tmux pane lines to capture. Defaults to 50."),
-  format: responseFormatSchema.optional(),
-});
-
-const loadToolLibrarySchema = z.object({
-  library: z.string().min(1).optional(),
-  scope: z.enum(["chat", "coding-planner", "coding-worker", "direct"]).optional(),
-  format: responseFormatSchema.optional(),
-});
-
-const toolResultReadSchema = z.object({
-  ref: z.string().min(1),
-  mode: z.enum(["partial", "full", "summary"]).optional(),
-  startLine: z.number().int().min(1).optional(),
-  lineCount: z.number().int().min(1).max(400).optional(),
-  goal: z.string().min(1).optional(),
-}).superRefine((value, ctx) => {
-  if (value.mode === "summary" && !value.goal?.trim()) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "goal is required when mode=summary.",
-      path: ["goal"],
-    });
-  }
-});
-
-const runToolProgramSchema = z.object({
-  objective: z.string().min(8),
-  code: z.string().min(1),
-  scope: z.enum(["chat", "coding-planner", "coding-worker", "direct"]).optional(),
-  allowedTools: z.array(z.string().min(1)).max(24).optional(),
-  timeoutMs: z.number().int().min(1_000).max(180_000).optional(),
-});
 
 export const ROUTINE_TOOL_NAMES = [
   "load_tool_library",
@@ -499,41 +373,10 @@ export type ToolContext = {
   subagentDepth?: number;
 };
 
-type SubagentController = {
-  launchAgent: (params: {
-    goal: string;
-    cwd?: string;
-    profileId?: string;
-    provider?: "claude" | "codex";
-    originConversationKey?: string;
-    requestedBy?: string;
-    timeoutMs?: number;
-    subagentDepth?: number;
-  }) => Promise<SubagentRun>;
-  resumeAgent: (params: {
-    runId: string;
-    message?: string;
-    timeoutMs?: number;
-  }) => Promise<SubagentRun>;
-  steerAgent: (params: {
-    runId: string;
-    message: string;
-  }) => Promise<SubagentRun>;
-  cancelAgent: (params: {
-    runId: string;
-  }) => Promise<SubagentRun>;
-  getAgentRun: (runId: string) => SubagentRun | undefined;
-  listAgentRuns: () => SubagentRun[];
-  captureAgentPane: (runId: string, lines?: number) => Promise<string>;
-  readAgentTerminal: (runId: string) => Promise<string>;
-  listAvailableProviders: (profileId?: string) => Array<{ provider: "claude" | "codex"; path: string; description?: string }>;
-};
-
 const TOOL_SUMMARY_KEY_LIMIT = 4;
 const TOOL_SUMMARY_LIST_LIMIT = 2;
 const TOOL_SUMMARY_TEXT_LIMIT = 40;
 const TOOL_OUTPUT_CHAR_LIMIT = 10_000;
-const TOOL_RESULT_SUMMARY_INPUT_CHAR_LIMIT = 10_000;
 const TOOL_CALL_BEHAVIOR_SCHEMA = z.object({
   silent: z.boolean().optional(),
 });
@@ -1522,24 +1365,8 @@ function stripToolControlInput(input: unknown) {
   return rest;
 }
 
-function formatDurationMs(durationMs: number | null) {
-  if (durationMs === null) {
-    return "n/a";
-  }
-  if (durationMs >= 1_000) {
-    return `${(durationMs / 1_000).toFixed(2)}s`;
-  }
-  return `${durationMs.toFixed(2)}ms`;
-}
-
-// getWorkflowElapsedMs removed — elapsed time now computed inline in agent_status tool
-
 function shellQuote(value: string) {
   return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
-function buildShellCommand(args: string[]) {
-  return args.map((arg) => shellQuote(arg)).join(" ");
 }
 
 function buildServiceRestartCommand(runtimePlatform: RuntimePlatform) {
@@ -1576,148 +1403,6 @@ function truncateToolOutput(text: string, limit = TOOL_OUTPUT_CHAR_LIMIT) {
   const notice = `\n...[tool output truncated: showing ${limit} of ${text.length} chars]`;
   const budget = Math.max(0, limit - notice.length);
   return `${text.slice(0, budget)}${notice}`;
-}
-
-function formatRatio(value: number | null) {
-  return value === null ? "n/a" : `${value}:1`;
-}
-
-function formatPercent(value: number | null | undefined) {
-  return value === null || value === undefined ? "n/a" : `${value}%`;
-}
-
-function formatUsd(value: number | undefined) {
-  if (value === undefined) {
-    return "n/a";
-  }
-
-  const abs = Math.abs(value);
-  const maximumFractionDigits = abs >= 1 ? 2 : abs >= 0.01 ? 4 : 6;
-  const minimumFractionDigits = abs === 0 || abs >= 1 ? 2 : Math.min(4, maximumFractionDigits);
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits,
-    maximumFractionDigits,
-  }).format(value);
-}
-
-function renderCostBreakdownLine(label: string, total: number, cost: { input: number; output: number; cacheRead: number; cacheWrite: number }) {
-  return `${label}: ${formatUsd(total)} (input ${formatUsd(cost.input)}, output ${formatUsd(cost.output)}, cache read ${formatUsd(cost.cacheRead)}, cache write ${formatUsd(cost.cacheWrite)})`;
-}
-
-function normalizeContextMode(mode: z.infer<typeof contextModeSchema> | undefined) {
-  if (!mode || mode === "brief") {
-    return "brief" as const;
-  }
-  if (mode === "v") {
-    return "verbose" as const;
-  }
-  return mode;
-}
-
-function renderContextSummary(params: {
-  usage: ContextWindowUsage;
-  recorded: RecordedUsageInspection;
-  extendedContext: ActiveExtendedContextStatus;
-  runtimeContext: string;
-  promptVersion: string;
-  systemPromptCharCount: number;
-}) {
-  const { usage, recorded, extendedContext, runtimeContext, promptVersion, systemPromptCharCount } = params;
-  const sharedSections = [
-    `Conversation: ${usage.conversationKey}`,
-    `Model: ${usage.providerId}/${usage.modelId}`,
-    ...renderExtendedContextStatus(extendedContext),
-    `Prompt version: ${promptVersion}`,
-    `System prompt: ${usage.breakdown.systemPromptTokens} tokens (${systemPromptCharCount} chars)`,
-    `Used: ${usage.usedTokens} / ${usage.maxContextTokens} tokens (${usage.utilizationPercent}%)`,
-    `Remaining context: ${usage.remainingTokens} tokens`,
-    `Remaining reply budget: ${formatTokenCount(usage.remainingReplyBudgetTokens)} tokens`,
-    `Method: ${usage.method}`,
-    `Breakdown method: ${usage.breakdownMethod}`,
-    "Breakdown:",
-    `- User messages: ${usage.breakdown.userMessageTokens}`,
-    `- Assistant replies: ${usage.breakdown.assistantReplyTokens}`,
-    `- Tool call input: ${usage.breakdown.toolCallInputTokens}`,
-    `- Tool responses: ${usage.breakdown.toolResponseTokens}`,
-    `- Tool definitions: ${usage.breakdown.toolDefinitionTokens}`,
-    `- Breakdown total: ${usage.breakdown.estimatedTotalTokens}`,
-    "Recorded usage:",
-    `- Conversation requests: ${formatTokenCount(recorded.conversation.requestCount)}`,
-    `- Conversation input/output: ${formatTokenCount(recorded.conversation.inputTokens)} / ${formatTokenCount(recorded.conversation.outputTokens)} (${formatRatio(recorded.conversation.inputToOutputRatio)})`,
-    `- Conversation cost: ${formatUsd(recorded.conversation.cost.total)}`,
-    `- Conversation non-cached input: ${formatTokenCount(recorded.conversation.nonCachedInputTokens)}`,
-    `- Conversation cache read: ${formatTokenCount(recorded.conversation.cacheReadTokens)} (${formatPercent(recorded.conversation.cacheReadPercentOfInput)} of input)`,
-    `- Conversation cache write: ${formatTokenCount(recorded.conversation.cacheWriteTokens)}`,
-    `- Last conversation completion: ${recorded.latestConversationRecord
-      ? `${recorded.latestConversationRecord.createdAt} input=${formatTokenCount(recorded.latestConversationRecord.inputTokens)} output=${formatTokenCount(recorded.latestConversationRecord.outputTokens)} cache_read=${formatTokenCount(recorded.latestConversationRecord.cacheReadTokens)}`
-      : "none recorded"}`,
-    `- Active model tracked requests: ${formatTokenCount(recorded.model.requestCount)}`,
-    `- Active model input/output: ${formatTokenCount(recorded.model.inputTokens)} / ${formatTokenCount(recorded.model.outputTokens)} (${formatRatio(recorded.model.inputToOutputRatio)})`,
-    `- Active model cost: ${formatUsd(recorded.model.cost.total)}`,
-    `- Active model cache read: ${formatTokenCount(recorded.model.cacheReadTokens)} (${formatPercent(recorded.model.cacheReadPercentOfInput)} of input)`,
-    `- Provider/model budget remaining: ${recorded.providerBudgetRemaining === null
-      ? "unavailable"
-      : `${formatTokenCount(recorded.providerBudgetRemaining)} (${recorded.providerBudgetSource ?? "provider"})`}`,
-  ];
-
-  return {
-    brief: `Used: ${formatTokenCount(usage.usedTokens)} / ${formatTokenCount(usage.maxContextTokens)} tokens (${usage.utilizationPercent}%).`,
-    verbose: sharedSections.join("\n"),
-    full: [
-      ...sharedSections,
-      runtimeContext
-        ? ["Live runtime context (not auto-injected into the chat prompt):", runtimeContext].join("\n")
-        : "Live runtime context: none.",
-    ].join("\n"),
-  };
-}
-
-function resolveLocalDateKey(reference: Date, timezone: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(reference);
-}
-
-function renderUsageSummary(params: {
-  conversationKey?: string;
-  providerId: ModelProviderId;
-  modelId: string;
-  recorded: RecordedUsageInspection;
-  daily: RecordedUsageDailyInspection;
-}) {
-  const { conversationKey, providerId, modelId, recorded, daily } = params;
-  const lines = [
-    `Model usage summary for ${providerId}/${modelId}`,
-    `Local day: ${daily.localDate} (${daily.timezone})`,
-  ];
-
-  if (conversationKey) {
-    lines.push(`Conversation: ${conversationKey}`);
-    lines.push(`Conversation total requests: ${formatTokenCount(recorded.conversation.requestCount)}`);
-    lines.push(renderCostBreakdownLine("Conversation total cost", recorded.conversation.cost.total, recorded.conversation.cost));
-    lines.push(`Conversation today requests: ${formatTokenCount(daily.conversation.requestCount)}`);
-    lines.push(renderCostBreakdownLine("Conversation today cost", daily.conversation.cost.total, daily.conversation.cost));
-    lines.push(`Last conversation completion today: ${daily.latestConversationRecord?.createdAt ?? "none recorded"}`);
-  }
-
-  lines.push(`Profile today requests: ${formatTokenCount(daily.profileDay.requestCount)}`);
-  lines.push(renderCostBreakdownLine("Profile today cost", daily.profileDay.cost.total, daily.profileDay.cost));
-  lines.push(`Active model total requests: ${formatTokenCount(recorded.model.requestCount)}`);
-  lines.push(renderCostBreakdownLine("Active model total cost", recorded.model.cost.total, recorded.model.cost));
-  lines.push(`Active model today requests: ${formatTokenCount(daily.modelDay.requestCount)}`);
-  lines.push(renderCostBreakdownLine("Active model today cost", daily.modelDay.cost.total, daily.modelDay.cost));
-  lines.push(`Last model completion today: ${daily.latestModelDayRecord?.createdAt ?? "none recorded"}`);
-  lines.push(`Last profile completion today: ${daily.latestProfileDayRecord?.createdAt ?? "none recorded"}`);
-  lines.push(`Provider/model budget remaining: ${daily.providerBudgetRemaining === null
-    ? "unavailable"
-    : `${formatTokenCount(daily.providerBudgetRemaining)} (${daily.providerBudgetSource ?? "provider"})`}`);
-
-  return lines.join("\n");
 }
 
 export class ToolRegistry {
@@ -2064,60 +1749,22 @@ export class ToolRegistry {
   }
 
   private resolveToolEntry(name: string, context?: ToolContext) {
-    return name === "context" || name === "model_context_usage"
-      ? this.createContextTool(
-          context,
-          name === "model_context_usage" ? "model_context_usage" : "context",
-        )
-      : name === "usage_summary"
-        ? this.createUsageSummaryTool(context)
-      : name === "compact"
-        ? this.createCompactTool(context)
-      : name === "run_tool_program"
-        ? this.createRunToolProgramTool(context)
-      : name === "reflect"
-        ? this.createReflectTool(context)
-      : name === "reload"
-        ? this.createReloadTool(context)
-        : name === "new_chat"
-          ? this.createNewChatTool(context)
-            : name === "launch_agent"
-              ? this.createLaunchAgentTool(context)
-              : name === "resume_agent"
-                ? this.createResumeAgentTool(context)
-                : name === "steer_agent"
-                ? this.createSteerAgentTool(context)
-                  : name === "cancel_agent"
-                    ? this.createCancelAgentTool(context)
-                : name === "agent_status"
-                  ? this.createAgentStatusTool(context)
-                  : name === "read_agent_terminal"
-                    ? this.createReadAgentTerminalTool(context)
-                  : name === "load_tool_library"
-                  ? this.createLoadToolLibraryTool(context)
-                  : name === "tool_result_read"
-                    ? this.createToolResultReadTool(context)
-                  : this.toolsByName.get(name);
+    const dynamicTools = this.buildDynamicTools(context);
+    const dynamicMatch = dynamicTools.find((entry) => entry.name === name);
+    if (dynamicMatch) {
+      return dynamicMatch;
+    }
+    if (name === "model_context_usage") {
+      const contextTool = dynamicTools.find((entry) => entry.name === "context");
+      return contextTool;
+    }
+    return this.toolsByName.get(name);
   }
 
   private getRawTools(context?: ToolContext): StructuredToolInterface[] {
     return [
       ...this.tools,
-      this.createLoadToolLibraryTool(context),
-      this.createToolResultReadTool(context),
-      this.createRunToolProgramTool(context),
-      this.createReflectTool(context),
-      this.createContextTool(context),
-      this.createUsageSummaryTool(context),
-      this.createCompactTool(context),
-      this.createReloadTool(context),
-      this.createNewChatTool(context),
-      this.createLaunchAgentTool(context),
-      this.createResumeAgentTool(context),
-      this.createSteerAgentTool(context),
-      this.createCancelAgentTool(context),
-      this.createAgentStatusTool(context),
-      this.createReadAgentTerminalTool(context),
+      ...this.buildDynamicTools(context),
     ].filter((entry) => this.access.canUseTool(entry.name));
   }
 
@@ -2409,856 +2056,36 @@ export class ToolRegistry {
       : this.conversations.ensureSystemPrompt(latest.key, await this.systemPrompts.load());
   }
 
-  private resolveWorkspacePath(workspace: string): string {
-    if (workspace === "root") {
-      return os.homedir();
-    }
-    if (workspace === "openElinaro") {
-      return process.cwd();
-    }
-    // Look up as a project ID
-    const project = this.projects.getProject(workspace);
-    if (project) {
-      return this.projects.resolveWorkspacePath(project);
-    }
-    throw new Error(
-      `Unknown workspace "${workspace}". Use "root", "openElinaro", or a valid project ID.`,
-    );
-  }
-
-  private buildWorkspaceHints(): string {
-    const projectList = this.projects
-      .listProjects({ status: "active" })
-      .map((p) => `- "${p.id}": ${p.name} — ${p.workspacePath}`);
+  private buildDynamicTools(context?: ToolContext): StructuredToolInterface[] {
+    const self = this;
     return [
-      "\n\nAvailable workspaces (workspace parameter is required):",
-      '- "openElinaro": the openElinaro platform repo (use for platform features, bugs, and infra)',
-      '- "root": home directory (use for general tasks not tied to a specific project)',
-      ...projectList,
-    ].join("\n");
-  }
-
-  private createLaunchAgentTool(context?: ToolContext) {
-    const availableProviders = this.subagents.listAvailableProviders();
-    const providerHints = availableProviders.length > 1
-      ? "\n\nAvailable providers for this profile:\n" + availableProviders
-          .map((p) => `- ${p.provider}${p.description ? `: ${p.description}` : ""}`)
-          .join("\n")
-        + "\n\nChoose the provider that best fits the task. Pass provider explicitly when multiple are available."
-      : "";
-
-    const workspaceHints = this.buildWorkspaceHints();
-
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.launch_agent",
-          async () => {
-            // If provider not specified and multiple available, include guidance
-            if (!input.provider && availableProviders.length > 1) {
-              return [
-                "Multiple agent providers are available. Please specify which provider to use:",
-                ...availableProviders.map((p) =>
-                  `- provider: "${p.provider}"${p.description ? ` — ${p.description}` : ""}`
-                ),
-                "",
-                "Re-call launch_agent with provider set to your choice.",
-              ].join("\n");
-            }
-
-            const resolvedCwd = this.resolveWorkspacePath(input.workspace);
-
-            const run = await this.subagents.launchAgent({
-              goal: input.goal,
-              cwd: resolvedCwd,
-              profileId: input.profile,
-              provider: input.provider,
-              originConversationKey: context?.conversationKey,
-              requestedBy: context?.conversationKey ? "chat-tool" : "direct-tool",
-              timeoutMs: input.timeoutMs,
-              subagentDepth: context?.subagentDepth ?? 0,
-            });
-            return [
-              `Background ${run.provider} agent launched.`,
-              `Run id: ${run.id}`,
-              `Goal: ${run.goal}`,
-              `Profile: ${run.profileId}`,
-              `Provider: ${run.provider}`,
-              `Subagent depth: ${run.launchDepth}`,
-              `Timeout: ${run.timeoutMs}ms`,
-              `Workspace: ${input.workspace} → ${run.workspaceCwd}`,
-              "Completion updates are pushed back automatically.",
-              "Use agent_status only for occasional manual spot checks.",
-            ].join("\n");
-          },
-          { attributes: input },
-        ),
+      ...buildSubagentTools(
+        { subagents: this.subagents, projects: this.projects },
+        context,
+      ),
+      ...buildConversationLifecycleTools(
         {
-          name: "launch_agent",
-          description:
-          `Launch a background agent (Claude Code or Codex) in a named workspace. You MUST specify a workspace — choose the one that matches where the work should happen. The agent runs in its own tmux window with an isolated worktree. Completion updates are pushed back automatically. Omit timeoutMs to use the default (one hour).${workspaceHints}${providerHints}`,
-          schema: launchAgentSchema,
+          get models() { return self.models; },
+          get routines() { return self.routines; },
+          get conversations() { return self.conversations; },
+          get systemPrompts() { return self.systemPrompts; },
+          get transitions() { return self.transitions; },
+          get reflection() { return self.reflection; },
+          get toolResults() { return self.toolResults; },
+          get toolPrograms() { return self.toolPrograms; },
+          get access() { return self.access; },
+          pendingConversationResets: this.pendingConversationResets,
+          resolveConversationKey: (input, ctx) => self.resolveConversationKey(input, ctx),
+          getConversationForTool: (input, ctx) => self.getConversationForTool(input, ctx),
+          buildRuntimeContext: () => self.buildRuntimeContext(),
+          reportProgress: (ctx, summary, input) => self.reportProgress(ctx, summary, input),
+          getTools: (ctx) => self.getTools(ctx),
+          getToolLibraries: (ctx, scope) => self.getToolLibraries(ctx, scope),
+          getAgentDefaultVisibleToolNames: (scope) => self.getAgentDefaultVisibleToolNames(scope),
         },
-    );
-  }
-
-  private createResumeAgentTool(_context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.resume_agent",
-          async () => {
-            const run = await this.subagents.resumeAgent({
-              runId: input.runId,
-              message: input.message,
-              timeoutMs: input.timeoutMs,
-            });
-            return [
-              `Background ${run.provider} agent resumed.`,
-              `Run id: ${run.id}`,
-              `Goal: ${run.goal}`,
-              `Profile: ${run.profileId}`,
-              input.message ? `Instruction: ${input.message}` : "Instruction: continue from the current run state.",
-              `Timeout: ${run.timeoutMs}ms`,
-              `Workspace: ${run.workspaceCwd}`,
-              "Completion updates are pushed back automatically.",
-            ].join("\n");
-          },
-          { attributes: input },
-        ),
-        {
-          name: "resume_agent",
-          description:
-          "Resume a completed or failed background agent run. Spawns a fresh agent process in the same worktree with optional follow-up instructions. Completion updates are pushed back automatically.",
-          schema: resumeAgentSchema,
-        },
-    );
-  }
-
-  private createSteerAgentTool(_context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.steer_agent",
-          async () => {
-            const run = await this.subagents.steerAgent({
-              runId: input.runId,
-              message: input.message,
-            });
-            return [
-              "Background agent steered.",
-              `Run id: ${run.id}`,
-              `Status: ${run.status}`,
-              `Instruction: ${input.message}`,
-              "The message was sent to the agent's tmux window via stdin.",
-            ].join("\n");
-          },
-          { attributes: input },
-        ),
-      {
-        name: "steer_agent",
-        description:
-          "Send a new instruction to a running background agent. The message is injected into the agent's stdin via tmux send-keys.",
-        schema: steerAgentSchema,
-      },
-    );
-  }
-
-  private createCancelAgentTool(_context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.cancel_agent",
-          async () => {
-            const run = await this.subagents.cancelAgent({
-              runId: input.runId,
-            });
-            return [
-              "Background agent cancelled.",
-              `Run id: ${run.id}`,
-              `Status: ${run.status}`,
-            ].join("\n");
-          },
-          { attributes: input },
-        ),
-        {
-          name: "cancel_agent",
-          description:
-          "Cancel a running background agent. Kills the tmux window and marks the run as cancelled.",
-          schema: cancelAgentSchema,
-        },
-    );
-  }
-
-  private createAgentStatusTool(_context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.agent_status",
-          async () => {
-            const selectedRuns = input.runId
-              ? [this.subagents.getAgentRun(input.runId)].filter(
-                  (run): run is SubagentRun => run !== undefined,
-                )
-              : this.subagents.listAgentRuns().slice(-(input.limit ?? 3));
-            if (selectedRuns.length === 0) {
-              if (input.format === "json") {
-                return {
-                  runs: [],
-                  count: 0,
-                  message: input.runId
-                    ? `No agent run found for ${input.runId}.`
-                    : "No agent runs have been recorded yet.",
-                };
-              }
-              return input.runId
-                ? `No agent run found for ${input.runId}.`
-                : "No agent runs have been recorded yet.";
-            }
-
-            const wantCapture = input.capture === true;
-            const captureLines = input.captureLines ?? 50;
-
-            const runs = await Promise.all(selectedRuns.map(async (run) => {
-              const elapsedMs = run.startedAt
-                ? Date.now() - Date.parse(run.startedAt)
-                : undefined;
-              const paneOutput = wantCapture
-                ? await this.subagents.captureAgentPane(run.id, captureLines)
-                : undefined;
-              return {
-                id: run.id,
-                provider: run.provider,
-                status: run.status,
-                goal: run.goal,
-                profileId: run.profileId,
-                launchDepth: run.launchDepth,
-                timeoutMs: run.timeoutMs,
-                workspace: run.workspaceCwd,
-                elapsedMs,
-                canResume: run.status === "completed" || run.status === "failed",
-                summary: run.resultSummary || undefined,
-                error: run.error || undefined,
-                eventCount: run.eventLog.length,
-                paneOutput,
-              };
-            }));
-
-            if (input.format === "json") {
-              return { runs, count: runs.length };
-            }
-
-            return runs.map((run) =>
-              [
-                `Run: ${run.id}`,
-                `Provider: ${run.provider}`,
-                `Status: ${run.status}`,
-                `Goal: ${run.goal}`,
-                `Profile: ${run.profileId}`,
-                `Subagent depth: ${run.launchDepth}`,
-                `Timeout: ${run.timeoutMs}ms`,
-                run.workspace ? `Workspace: ${run.workspace}` : "",
-                run.elapsedMs !== undefined ? `Elapsed: ${formatDurationMs(run.elapsedMs)}` : "",
-                run.canResume ? "Resume ready: yes" : "",
-                run.summary ? `Summary: ${run.summary}` : "",
-                run.error ? `Error: ${run.error}` : "",
-                `Events: ${run.eventCount}`,
-                run.paneOutput ? `\n--- tmux pane (last ${captureLines} lines) ---\n${run.paneOutput}` : "",
-              ]
-                .filter(Boolean)
-                .join("\n"))
-              .join("\n\n");
-          },
-          { attributes: input },
-        ),
-        {
-          name: "agent_status",
-          description:
-          "Inspect one agent run by id or list the most recent background agent runs. Set capture=true to include what the agent's tmux pane is currently displaying. Use this for occasional manual spot checks, not tight polling.",
-          schema: agentStatusSchema,
-        },
-    );
-  }
-
-  private createReadAgentTerminalTool(_context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.read_agent_terminal",
-          async () => {
-            const output = await this.subagents.readAgentTerminal(input.runId);
-            return output || "(empty terminal buffer)";
-          },
-          { attributes: input },
-        ),
-        {
-          name: "read_agent_terminal",
-          description:
-          "Read the full terminal buffer (scrollback + visible area) for a running or recently exited agent. Returns the raw text content of the tmux pane. Useful for debugging what an agent is doing or why it failed.",
-          schema: z.object({
-            runId: z.string().min(1).describe("The run ID of the agent whose terminal to read."),
-          }),
-        },
-    );
-  }
-
-  private createLoadToolLibraryTool(context?: ToolContext): StructuredToolInterface {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.load_tool_library",
-          async () => {
-            const scope = (input.scope as AgentToolScope | undefined) ?? "chat";
-            const libraries = this.getToolLibraries(context, scope);
-            const visibleBefore = uniqueStrings([
-              ...this.getAgentDefaultVisibleToolNames(scope),
-              ...(context?.getActiveToolNames?.() ?? []),
-            ]);
-            const requestedLibraryId = input.library?.trim();
-
-            if (!requestedLibraryId) {
-              const renderedLibraries = libraries.map((library) => {
-                const alreadyVisible = library.toolNames.filter((name) => visibleBefore.includes(name));
-                return {
-                  id: library.id,
-                  description: library.description,
-                  toolNames: [...library.toolNames],
-                  alreadyVisible,
-                  hiddenToolCount: library.toolNames.length - alreadyVisible.length,
-                };
-              });
-              if (input.format === "json") {
-                return {
-                  scope,
-                  libraries: renderedLibraries,
-                  visibleBefore,
-                };
-              }
-              return [
-                `Scope: ${scope}`,
-                `Visible tool count: ${visibleBefore.length}`,
-                "",
-                ...renderedLibraries.map((library) => [
-                  `Library: ${library.id}`,
-                  `Description: ${library.description}`,
-                  `Tools: ${library.toolNames.join(", ")}`,
-                  library.alreadyVisible.length > 0
-                    ? `Already visible: ${library.alreadyVisible.join(", ")}`
-                    : "Already visible: (none)",
-                  `Hidden tools: ${library.hiddenToolCount}`,
-                ].join("\n")),
-              ].join("\n");
-            }
-
-            const library = libraries.find((entry) => entry.id === requestedLibraryId);
-            if (!library) {
-              const availableIds = libraries.map((entry) => entry.id);
-              if (input.format === "json") {
-                return {
-                  scope,
-                  library: requestedLibraryId,
-                  availableLibraries: availableIds,
-                  message: `Unknown tool library "${requestedLibraryId}" for scope ${scope}.`,
-                };
-              }
-              return `Unknown tool library "${requestedLibraryId}" for scope ${scope}. Available libraries: ${availableIds.join(", ") || "(none)"}.`;
-            }
-
-            const visibleBeforeSet = new Set(visibleBefore);
-            const newlyActivated = library.toolNames.filter((name) => !visibleBeforeSet.has(name));
-            const alreadyVisible = library.toolNames.filter((name) => visibleBeforeSet.has(name));
-
-            if (newlyActivated.length > 0) {
-              context?.activateToolNames?.(newlyActivated);
-            }
-
-            const visibleAfter = uniqueStrings([...visibleBefore, ...newlyActivated]);
-
-            if (input.format === "json") {
-              return {
-                scope,
-                library: library.id,
-                description: library.description,
-                toolNames: [...library.toolNames],
-                newlyActivated,
-                alreadyVisible,
-                visibleAfter,
-              };
-            }
-
-            return [
-              `Scope: ${scope}`,
-              `Library: ${library.id}`,
-              `Description: ${library.description}`,
-              `Tools: ${library.toolNames.join(", ")}`,
-              `Newly activated: ${newlyActivated.length > 0 ? newlyActivated.join(", ") : "(none)"}`,
-              `Already visible: ${alreadyVisible.length > 0 ? alreadyVisible.join(", ") : "(none)"}`,
-              `Visible tool count after load: ${visibleAfter.length}`,
-            ].join("\n");
-          },
-          { attributes: input },
-        ),
-      {
-        name: "load_tool_library",
-        description:
-          "List available tool libraries for a scope or load one named library into the current run. Use this when the needed tool family is not already visible. Supports format=json for structured output.",
-        schema: loadToolLibrarySchema,
-      },
-    );
-  }
-
-  private createToolResultReadTool(context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.tool_result_read",
-          async () => {
-            const record = await this.toolResults.get(input.ref);
-            if (!record) {
-              throw new Error(`Unknown tool result ref: ${input.ref}`);
-            }
-
-            if (
-              context?.conversationKey
-              && record.namespace !== context.conversationKey
-              && !this.access.isRoot()
-            ) {
-              throw new Error(
-                `Tool result ref ${input.ref} belongs to ${record.namespace}, not the active session ${context.conversationKey}.`,
-              );
-            }
-
-            const mode = input.mode ?? "partial";
-            if (mode === "full") {
-              return [
-                `[tool_result_full ref=${record.ref} tool=${record.toolName} status=${record.status} lines=${record.lineCount} chars=${record.charLength}]`,
-                record.content,
-              ]
-                .filter(Boolean)
-                .join("\n");
-            }
-
-            if (mode === "summary") {
-              const goal = input.goal?.trim();
-              if (!goal) {
-                throw new Error("tool_result_read summary mode requires a non-empty goal.");
-              }
-
-              const output = record.content.slice(0, TOOL_RESULT_SUMMARY_INPUT_CHAR_LIMIT);
-              try {
-                const summarized = await this.models.summarizeToolResult({
-                  toolName: record.toolName,
-                  goal,
-                  output,
-                });
-                return [
-                  `[tool_result_summary ref=${record.ref} tool=${record.toolName} status=${record.status} source_chars=${record.charLength} used_chars=${output.length}]`,
-                  summarized,
-                ]
-                  .filter(Boolean)
-                  .join("\n");
-              } catch (error) {
-                toolRegistryTelemetry.event(
-                  "tool.tool_result_read.summary_failed",
-                  {
-                    ref: record.ref,
-                    toolName: record.toolName,
-                    providerId: this.models.getToolSummarizerSelection().providerId,
-                    modelId: this.models.getToolSummarizerSelection().modelId,
-                    error: error instanceof Error ? error.message : String(error),
-                  },
-                  { level: "warn", outcome: "error" },
-                );
-                throw error;
-              }
-            }
-
-            const startLine = input.startLine ?? 1;
-            const lineCount = input.lineCount ?? 200;
-            const lines = record.content.split(/\r?\n/);
-            const sliceStart = Math.max(0, startLine - 1);
-            const sliceEnd = Math.min(lines.length, sliceStart + lineCount);
-            const slice = lines.slice(sliceStart, sliceEnd).join("\n");
-
-            return [
-              `[tool_result_slice ref=${record.ref} tool=${record.toolName} status=${record.status} lines=${sliceStart + 1}-${Math.max(sliceStart + 1, sliceEnd)}/${Math.max(lines.length, 1)} chars=${record.charLength}]`,
-              slice,
-            ]
-              .filter(Boolean)
-              .join("\n");
-          },
-          { attributes: input },
-        ),
-      {
-        name: "tool_result_read",
-        description:
-          "Reopen a stored tool-result reference as a bounded line slice, the full stored payload, or a summarizer-backed extraction. Prefer mode=summary when you only need specific facts from a large ref instead of the full raw content.",
-        schema: toolResultReadSchema,
-      },
-    );
-  }
-
-  private createRunToolProgramTool(context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.run_tool_program",
-          async () => {
-            const result = await this.toolPrograms.run({
-              objective: input.objective,
-              code: input.code,
-              scope: input.scope,
-              allowedTools: input.allowedTools,
-              timeoutMs: input.timeoutMs,
-              context,
-            });
-
-            return [
-              `Tool program completed: ${result.runId}`,
-              `Scope: ${result.scope}`,
-              `Summary: ${result.summary}`,
-              result.allowedTools.length > 0
-                ? `Allowed tools: ${result.allowedTools.join(", ")}`
-                : "Allowed tools: (none)",
-              result.toolCalls.length > 0
-                ? `Tool calls:\n${result.toolCalls.map((entry) =>
-                    `- ${entry.name}${entry.artifactPath ? ` -> ${entry.artifactPath}` : ""}: ${entry.preview}`).join("\n")}`
-                : "Tool calls: (none)",
-              result.artifacts.length > 0
-                ? `Artifacts:\n${result.artifacts.map((artifact) =>
-                    `- ${artifact.path} (${artifact.mediaType}, ${artifact.byteLength} bytes)`).join("\n")}`
-                : "Artifacts: (none)",
-              `Manifest: ${result.manifestPath}`,
-            ].join("\n");
-          },
-          { attributes: { scope: input.scope, timeoutMs: input.timeoutMs } },
-        ),
-      {
-        name: "run_tool_program",
-        description:
-          "Execute JavaScript that orchestrates many tool calls internally and returns only a compact summary plus artifact paths. Use tools.invokeTool(name, input) inside the code and return an object with a summary field. Prefer this for loops, filtering, aggregation, repeated searches/reads, or large intermediate results.",
-        schema: runToolProgramSchema,
-      },
-    );
-  }
-
-  private createContextTool(context?: ToolContext, toolName = "context") {
-    return tool(
-      async (input) =>
-        traceSpan(
-          "tool.context",
-          async () => {
-            const conversation = await this.getConversationForTool(input, context);
-            const systemPrompt = composeSystemPrompt(
-              conversation.systemPrompt?.text ?? (await this.systemPrompts.load()).text,
-            );
-            const mode = normalizeContextMode(input.mode);
-            const usage = await this.models.inspectContextWindowUsage({
-              conversationKey: conversation.key,
-              systemPrompt: systemPrompt.text,
-              messages: conversation.messages,
-              tools: this.getTools(context),
-            });
-            const recorded = this.models.inspectRecordedUsage({
-              conversationKey: usage.conversationKey,
-              providerId: usage.providerId,
-              modelId: usage.modelId,
-            });
-            const extendedContext = await this.models.getActiveExtendedContextStatus();
-            const runtimeContext = await this.buildRuntimeContext();
-            const rendered = renderContextSummary({
-              usage,
-              recorded,
-              extendedContext,
-              runtimeContext,
-              promptVersion: conversation.systemPrompt?.version ?? "unknown",
-              systemPromptCharCount: systemPrompt.charCount,
-            });
-            return rendered[mode];
-          },
-          {
-            attributes: {
-              conversationKey: this.resolveConversationKey(input, context),
-              mode: normalizeContextMode(input.mode),
-            },
-          },
-        ),
-      {
-        name: toolName,
-        description:
-          "Inspect context-window usage for a saved conversation. Default mode is brief; set mode to v or verbose for token breakdown and cache stats, or full for the existing full dump including live runtime context.",
-        schema: modelContextUsageSchema,
-      },
-    );
-  }
-
-  private createUsageSummaryTool(context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.usage_summary",
-          async () => {
-            const conversationKey = this.resolveConversationKey(input, context);
-            const active = await this.models.getActiveModel();
-            const timezone = input.timezone?.trim() || this.routines.loadData().settings.timezone;
-            const localDate = input.localDate?.trim() || resolveLocalDateKey(new Date(), timezone);
-            const recorded = this.models.inspectRecordedUsage({
-              conversationKey,
-              providerId: active.providerId,
-              modelId: active.modelId,
-            });
-            const daily = this.models.inspectRecordedUsageByLocalDate({
-              conversationKey,
-              providerId: active.providerId,
-              modelId: active.modelId,
-              localDate,
-              timezone,
-            });
-
-            return renderUsageSummary({
-              conversationKey,
-              providerId: active.providerId,
-              modelId: active.modelId,
-              recorded,
-              daily,
-            });
-          },
-          {
-            attributes: {
-              conversationKey: this.resolveConversationKey(input, context),
-              localDate: input.localDate,
-              timezone: input.timezone,
-            },
-          },
-        ),
-      {
-        name: "usage_summary",
-        description:
-          "Show provider-reported LLM usage and USD cost for the active thread plus the current local day, scoped to the active profile.",
-        schema: usageSummarySchema,
-      },
-    );
-  }
-
-  private createCompactTool(context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.compact",
-          async () => {
-            const conversationKey = this.resolveConversationKey(input, context);
-            if (!conversationKey) {
-              throw new Error(
-                "compact needs a conversationKey unless it is called from an active chat thread.",
-              );
-            }
-
-            const compacted = await this.transitions.compactForContinuation({
-              conversationKey,
-              onProgress: async (message) => this.reportProgress(context, message, input),
-            });
-
-            return [
-              `Compacted conversation ${conversationKey}.`,
-              compacted.memoryFilePath
-                ? `Memory flushed to ${compacted.memoryFilePath}.`
-                : "No durable memory was extracted.",
-              `Summary: ${compacted.summary}`,
-            ].join("\n");
-          },
-          {
-            attributes: {
-              conversationKey: this.resolveConversationKey(input, context),
-            },
-          },
-        ),
-      {
-        name: "compact",
-        description:
-          "Compact the active conversation into a continuation summary and optional durable memory without starting a fresh thread.",
-        schema: compactSchema,
-      },
-    );
-  }
-
-  private createReloadTool(context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.reload",
-          async () => {
-            const conversationKey = this.resolveConversationKey(input, context);
-            if (!conversationKey) {
-              throw new Error(
-                "reload needs a conversationKey unless it is called from an active chat thread.",
-              );
-            }
-
-            const snapshot = await this.systemPrompts.load();
-            const conversation = await this.conversations.replaceSystemPrompt(conversationKey, snapshot);
-
-            return [
-              `Reloaded system prompt for ${conversation.key}.`,
-              `Version: ${conversation.systemPrompt?.version ?? snapshot.version}`,
-              `Files: ${(conversation.systemPrompt?.files ?? snapshot.files).join(", ") || "(none)"}`,
-              `Loaded at: ${conversation.systemPrompt?.loadedAt ?? snapshot.loadedAt}`,
-            ].join("\n");
-          },
-          {
-            attributes: {
-              conversationKey: this.resolveConversationKey(input, context),
-            },
-          },
-        ),
-      {
-        name: "reload",
-        description:
-          "Reload the active thread's system prompt snapshot from local system_prompt markdown files.",
-        schema: reloadSchema,
-      },
-    );
-  }
-
-  private createReflectTool(_context?: ToolContext) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          "tool.reflect",
-          async () => {
-            if (!this.reflection) {
-              throw new Error("Reflection service is not available in this runtime.");
-            }
-            const result = await this.reflection.runExplicitReflection({
-              focus: input.focus,
-            });
-            if (!result) {
-              return "No reflection entry was written.";
-            }
-            return [
-              `Wrote a private reflection entry to ${result.filePath}.`,
-              `Mood: ${result.entry.mood}`,
-              result.entry.bringUpNextTime
-                ? `Bring up next time: ${result.entry.bringUpNextTime}`
-                : "",
-              "",
-              result.entry.body,
-            ].filter(Boolean).join("\n");
-          },
-          {
-            attributes: {
-              focus: input.focus,
-            },
-          },
-        ),
-      {
-        name: "reflect",
-        description:
-          "Write a private introspective journal entry about recent experience and store it in the active profile's durable reflection journal.",
-        schema: reflectSchema,
-      },
-    );
-  }
-
-  private createNewChatTool(context?: ToolContext) {
-    return this.createFreshConversationTool(
-      {
-        name: "new_chat",
-        spanName: "tool.new_chat",
-        errorLabel: "new_chat",
-        description:
-          "Start a fresh conversation. By default this flushes durable memory from the active thread first; set force=true to skip the durable-memory flush and reset immediately. The current thread keeps its existing system-prompt snapshot; use reload explicitly if you want a new prompt snapshot.",
-        preparingProgress: "Preparing a fresh conversation for {conversationKey}.",
-        successProgressWithMemory:
-          "Fresh conversation is ready. Memory flushed to {memoryFilePath}.",
-        successProgressWithoutMemory:
-          "Fresh conversation is ready. No durable memory needed to be saved.",
-        forceSuccessProgress:
-          "Fresh conversation is ready. Durable memory flush was intentionally skipped.",
-      },
-      context,
-    );
-  }
-
-  private createFreshConversationTool(
-    config: {
-      name: "new_chat";
-      spanName: "tool.new_chat";
-      errorLabel: "new_chat";
-      description: string;
-      preparingProgress: string;
-      successProgressWithMemory: string;
-      successProgressWithoutMemory: string;
-      forceSuccessProgress: string;
-    },
-    context?: ToolContext,
-  ) {
-    return defineTool(
-      async (input) =>
-        traceSpan(
-          config.spanName,
-          async () => {
-            const conversationKey = this.resolveConversationKey(input, context);
-            if (!conversationKey) {
-              throw new Error(
-                `${config.errorLabel} needs a conversationKey unless it is called from an active chat thread.`,
-              );
-            }
-
-            await this.reportProgress(
-              context,
-              config.preparingProgress.replace("{conversationKey}", conversationKey),
-              input,
-            );
-
-            const flushMemory = input.force !== true;
-            const freshConversation = await this.transitions.startFreshConversation({
-              conversationKey,
-              flushMemory,
-              onProgress: async (message) => this.reportProgress(context, message, input),
-            });
-
-            const resultMessage = [
-              `Started a new conversation for ${conversationKey}.`,
-              `Assistant: ${freshConversation.openingLine}`,
-              `System prompt version: ${freshConversation.systemPrompt.version}.`,
-              input.force === true || freshConversation.memoryFlushSkipped
-                ? "Durable memory flush was intentionally skipped."
-                : freshConversation.memoryFilePath
-                ? `Memory flushed to ${freshConversation.memoryFilePath}.`
-                : "No durable memory was flushed.",
-            ].join("\n");
-
-            if (context?.invocationSource === "chat") {
-              this.pendingConversationResets.set(conversationKey, resultMessage);
-            }
-
-            await this.reportProgress(
-              context,
-              input.force === true
-                ? config.forceSuccessProgress
-                : freshConversation.memoryFilePath
-                ? config.successProgressWithMemory.replace(
-                    "{memoryFilePath}",
-                    freshConversation.memoryFilePath,
-                  )
-                : config.successProgressWithoutMemory,
-              input,
-            );
-
-            return resultMessage;
-          },
-          {
-            attributes: {
-              conversationKey: this.resolveConversationKey(input, context),
-            },
-          },
-        ),
-      {
-        name: config.name,
-        description: config.description,
-        schema: newConversationSchema,
-      },
-    );
+        context,
+      ),
+    ];
   }
 
   consumePendingConversationReset(conversationKey: string) {
