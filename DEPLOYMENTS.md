@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.20
+- Released at: 2026-03-27T18:09:18Z
+- Release id: 20260327T180918Z-4c51c7c
+- Previous version: 2026.03.27.19
+- Trigger: ci/release workflow
+
+- refactor: extract usage tracking from ModelService into ModelUsageService
+
 ## 2026.03.27.19
 - Released at: 2026-03-27T18:04:37Z
 - Release id: 20260327T180437Z-3bf9965
