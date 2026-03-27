@@ -52,6 +52,35 @@ export function detectZigbeeRadio(): string | null {
   return null;
 }
 
+// ---------- Adapter type detection ----------
+
+function detectAdapterType(serialPort: string): string {
+  // Try to identify adapter from USB device metadata via a synchronous probe.
+  try {
+    const { execSync } = require("node:child_process");
+    // macOS: system_profiler can identify USB devices.
+    if (process.platform === "darwin") {
+      const output = execSync("system_profiler SPUSBDataType -detailLevel mini 2>/dev/null", { encoding: "utf8", timeout: 5000 });
+      // Sonoff dongles (Itead / SONOFF) typically use ember firmware.
+      if (output.includes("Itead") || output.includes("SONOFF") || output.includes("Sonoff")) {
+        return "ember";
+      }
+      // Nabu Casa SkyConnect / HA Connect ZBT-1
+      if (output.includes("Nabu Casa") || output.includes("SkyConnect")) {
+        return "ember";
+      }
+      // TI CC2652/CC2538 based (ConBee, etc.)
+      if (output.includes("ConBee") || output.includes("dresden")) {
+        return "deconz";
+      }
+    }
+  } catch {
+    // Detection failed, fall through.
+  }
+  // Default to zstack as the most common/compatible adapter type.
+  return "zstack";
+}
+
 // ---------- Friendly name persistence ----------
 
 type FriendlyNameMap = Record<string, string>; // IEEE address → friendly name
@@ -110,6 +139,8 @@ export class Zigbee2MqttService {
       fs.mkdirSync(zigbeeDir(), { recursive: true });
       this.friendlyNames = loadFriendlyNames();
 
+      const adapterType = config.adapterType.trim() || detectAdapterType(serialPort);
+
       this.controller = new Controller({
         network: {
           panID: 0x1a62,
@@ -117,6 +148,7 @@ export class Zigbee2MqttService {
         },
         serialPort: {
           path: serialPort,
+          adapter: adapterType as any,
         },
         databasePath: databasePath(),
         databaseBackupPath: path.join(zigbeeDir(), "database.db.backup"),
@@ -127,6 +159,8 @@ export class Zigbee2MqttService {
           return true;
         },
       });
+
+      log.event("zigbee.controller_config", { serialPort, adapterType, channel: config.channel });
 
       this.controller.on("message", (data) => this.onMessage(data));
       this.controller.on("deviceJoined", (data) => this.onDeviceJoined(data));
