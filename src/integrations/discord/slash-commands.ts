@@ -104,7 +104,22 @@ export function getAutoRegisteredToolCommandNameSet() {
   return new Set<string>(getAutoRegisteredToolCommandNames());
 }
 
+/** Optional function-layer descriptions keyed by tool name. */
+let functionLayerDescriptions: Map<string, string> | null = null;
+
+/**
+ * Set function-layer descriptions for use in auto-registered slash commands.
+ * Called once during Discord bot initialization with descriptions from the FunctionRegistry.
+ */
+export function setFunctionLayerDescriptions(descriptions: Map<string, string>) {
+  functionLayerDescriptions = descriptions;
+}
+
 function buildAutoRegisteredToolDescription(toolName: string) {
+  // Check function layer first (richer descriptions from defineFunction)
+  const fnDesc = functionLayerDescriptions?.get(toolName);
+  if (fnDesc) return fnDesc.slice(0, 100);
+
   switch (toolName) {
     case "agent_status":
       return "Inspect recent background agent runs";
