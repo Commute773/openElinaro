@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.37
+- Released at: 2026-03-27T21:41:01Z
+- Release id: 20260327T214101Z-b42e61f
+- Previous version: 2026.03.27.36
+- Trigger: ci/release workflow
+
+- refactor: clarify G2 route architecture, merge generated OpenAPI spec
+
 ## 2026.03.27.36
 - Released at: 2026-03-27T21:38:49Z
 - Release id: 20260327T213849Z-0b09259
