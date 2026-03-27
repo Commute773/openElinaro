@@ -30,11 +30,11 @@ try {
 }
 
 const localVoiceSidecars = await startLocalVoiceSidecarRuntime();
-const zigbeeRuntime = await startZigbeeRuntime();
+const zigbeeRuntime = startZigbeeRuntime();
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     void localVoiceSidecars.stop();
-    void zigbeeRuntime.stop();
+    void zigbeeRuntime.then((rt) => rt.stop());
   });
 }
