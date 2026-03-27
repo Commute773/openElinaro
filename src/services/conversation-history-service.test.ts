@@ -1,33 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ConversationHistoryService } from "./conversation-history-service";
 
-let tempRoot = "";
-let previousRootDirEnv: string | undefined;
+const testRoot = createIsolatedRuntimeRoot("openelinaro-history-test-");
 
 function stubEmbedTexts(texts: string[]): Promise<number[][]> {
   return Promise.resolve(texts.map(() => [0, 0, 0]));
 }
 
 describe("ConversationHistoryService", () => {
-  beforeEach(() => {
-    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-history-test-"));
-    process.env.OPENELINARO_ROOT_DIR = tempRoot;
-  });
-
-  afterEach(() => {
-    if (previousRootDirEnv === undefined) {
-      delete process.env.OPENELINARO_ROOT_DIR;
-    } else {
-      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-    }
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-    tempRoot = "";
-  });
+  beforeEach(() => testRoot.setup());
+  afterEach(() => testRoot.teardown());
 
   function makeService(profileId = "test-profile") {
     return new ConversationHistoryService({
@@ -37,7 +23,7 @@ describe("ConversationHistoryService", () => {
   }
 
   function getJournalPath(profileId = "test-profile") {
-    return path.join(tempRoot, ".openelinarotest", "conversation-history", `events.${profileId}.jsonl`);
+    return path.join(testRoot.path, ".openelinarotest", "conversation-history", `events.${profileId}.jsonl`);
   }
 
   describe("recordAppendedMessages", () => {

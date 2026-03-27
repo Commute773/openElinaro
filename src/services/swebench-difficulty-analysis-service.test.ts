@@ -1,13 +1,11 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 
 const repoRoot = process.cwd();
-
-let tempRoot = "";
-let previousRootDir = "";
+const testRoot = createIsolatedRuntimeRoot("swebench-difficulty-analysis-");
 
 async function importFresh<T>(relativePath: string): Promise<T> {
   const absolutePath = path.join(repoRoot, relativePath);
@@ -30,31 +28,19 @@ function writeSubmission(root: string, submissionId: string, resolved: string[],
   fs.writeFileSync(path.join(submissionRoot, "README.md"), `# ${submissionId}\n`, "utf8");
 }
 
-beforeEach(() => {
-  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "swebench-difficulty-analysis-"));
-  previousRootDir = process.env.OPENELINARO_ROOT_DIR ?? "";
-  process.env.OPENELINARO_ROOT_DIR = tempRoot;
-});
-
-afterEach(() => {
-  if (previousRootDir) {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDir;
-  } else {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  }
-  fs.rmSync(tempRoot, { recursive: true, force: true });
-});
+beforeEach(() => testRoot.setup());
+afterEach(() => testRoot.teardown());
 
 describe("SweBenchDifficultyAnalysisService", () => {
   test("computes task difficulty and failure frontiers from published submission outcomes", async () => {
-    writeSubmission(tempRoot, "20260101_combo_alpha", ["task-a", "task-b"], ["task-c", "task-d"]);
-    writeSubmission(tempRoot, "20260101_combo_beta", ["task-a", "task-b", "task-c"], ["task-d"]);
-    writeSubmission(tempRoot, "20260101_combo_gamma", ["task-a"], ["task-b", "task-c", "task-d"]);
+    writeSubmission(testRoot.path, "20260101_combo_alpha", ["task-a", "task-b"], ["task-c", "task-d"]);
+    writeSubmission(testRoot.path, "20260101_combo_beta", ["task-a", "task-b", "task-c"], ["task-d"]);
+    writeSubmission(testRoot.path, "20260101_combo_gamma", ["task-a"], ["task-b", "task-c", "task-d"]);
 
     const { SweBenchDifficultyAnalysisService } = await importFresh<typeof import("./swebench-difficulty-analysis-service")>(
       "src/services/swebench-difficulty-analysis-service.ts",
     );
-    const service = new SweBenchDifficultyAnalysisService(tempRoot);
+    const service = new SweBenchDifficultyAnalysisService(testRoot.path);
     const result = await service.run({
       split: "verified",
       minSubmissionCoverage: 0,

@@ -2,8 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { HumanMessage } from "@langchain/core/messages";
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { ProfileRecord } from "../domain/profiles";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import type { ActiveModelSelection } from "./model-service";
 import { ModelService, resolveListedModelIdentifier, resolveRuntimeModelIdentifier } from "./model-service";
 import { UsageTrackingService } from "./usage-tracking-service";
@@ -385,12 +386,11 @@ describe("ModelService.inspectContextWindowUsage", () => {
 });
 
 describe("ModelService recorded usage inspection", () => {
-  test("scopes model usage inspection to the active profile", () => {
-    const previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-usage-inspection-"));
-    process.env.OPENELINARO_ROOT_DIR = tempRoot;
+  const usageTestRoot = createIsolatedRuntimeRoot("openelinaro-model-usage-");
+  beforeEach(() => usageTestRoot.setup());
+  afterEach(() => usageTestRoot.teardown());
 
-    try {
+  test("scopes model usage inspection to the active profile", () => {
       const usageTracking = new UsageTrackingService();
       usageTracking.record({
         profileId: TEST_PROFILE.id,
@@ -448,22 +448,9 @@ describe("ModelService recorded usage inspection", () => {
       expect(inspection.model.requestCount).toBe(1);
       expect(inspection.model.totalTokens).toBe(140);
       expect(inspection.model.cost.total).toBe(0.0315);
-    } finally {
-      if (previousRootDirEnv === undefined) {
-        delete process.env.OPENELINARO_ROOT_DIR;
-      } else {
-        process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-      }
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    }
   });
 
   test("summarizes local-day usage for the active profile and conversation", () => {
-    const previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-usage-day-"));
-    process.env.OPENELINARO_ROOT_DIR = tempRoot;
-
-    try {
       const usageTracking = new UsageTrackingService();
       usageTracking.record({
         id: "root-day-1",
@@ -558,14 +545,6 @@ describe("ModelService recorded usage inspection", () => {
       expect(inspection.latestModelDayRecord?.id).toBe("root-day-2");
       expect(inspection.providerBudgetRemaining).toBe(750_000);
       expect(inspection.providerBudgetSource).toBe("provider");
-    } finally {
-      if (previousRootDirEnv === undefined) {
-        delete process.env.OPENELINARO_ROOT_DIR;
-      } else {
-        process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-      }
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    }
   });
 });
 

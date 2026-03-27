@@ -1,13 +1,12 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { CalendarSyncService, parseCalendarOccurrences } from "./calendar-sync-service";
 import { ProfileService } from "./profile-service";
 import { RoutinesService } from "./routines-service";
 
-let runtimeRoot = "";
-let previousRootDirEnv: string | undefined;
+const testRoot = createIsolatedRuntimeRoot("openelinaro-calendar-");
 
 function writeProfileRegistry(rootDir: string) {
   fs.mkdirSync(path.join(rootDir, ".openelinarotest", "profiles"), { recursive: true });
@@ -49,21 +48,10 @@ const SAMPLE_ICS = [
 ].join("\r\n");
 
 beforeEach(() => {
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-calendar-"));
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-  writeProfileRegistry(runtimeRoot);
+  testRoot.setup();
+  writeProfileRegistry(testRoot.path);
 });
-
-afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  runtimeRoot = "";
-});
+afterEach(() => testRoot.teardown());
 
 describe("CalendarSyncService", () => {
   test("parses direct and recurring ICS events with transit inference", () => {

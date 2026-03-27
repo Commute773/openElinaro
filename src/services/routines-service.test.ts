@@ -1,14 +1,11 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
 import { ProfileService } from "./profile-service";
 import { ProjectsService } from "./projects-service";
 import { RoutinesService } from "./routines-service";
-
-let runtimeRoot = "";
-let previousRootDirEnv: string | undefined;
 
 function writeProfileRegistry(rootDir: string) {
   fs.mkdirSync(path.join(rootDir, ".openelinarotest", "profiles"), { recursive: true });
@@ -98,22 +95,12 @@ function writeProjectsRegistry(rootDir: string) {
   );
 }
 
+const testRoot = createIsolatedRuntimeRoot("openelinaro-routines-");
 beforeEach(() => {
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-routines-"));
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-  writeProfileRegistry(runtimeRoot);
+  testRoot.setup();
+  writeProfileRegistry(testRoot.path);
 });
-
-afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  runtimeRoot = "";
-});
+afterEach(() => testRoot.teardown());
 
 describe("RoutinesService", () => {
   test("marks todos as completed instead of tracking streaks and excludes them by default", () => {
@@ -199,7 +186,7 @@ describe("RoutinesService", () => {
   });
 
   test("validates and filters work-scoped routine links", () => {
-    writeProjectsRegistry(runtimeRoot);
+    writeProjectsRegistry(testRoot.path);
     const profiles = new ProfileService("root");
     const profile = profiles.getActiveProfile();
     const projects = new ProjectsService(profile, profiles);
@@ -241,7 +228,7 @@ describe("RoutinesService", () => {
   });
 
   test("limits non-root profiles to their own routine items", () => {
-    writeProjectsRegistry(runtimeRoot);
+    writeProjectsRegistry(testRoot.path);
 
     const rootProfiles = new ProfileService("root");
     const rootProjects = new ProjectsService(rootProfiles.getActiveProfile(), rootProfiles);
@@ -318,7 +305,7 @@ describe("RoutinesService", () => {
   });
 
   test("listItems all=true ignores list filters but still excludes completed items", () => {
-    writeProjectsRegistry(runtimeRoot);
+    writeProjectsRegistry(testRoot.path);
     const profiles = new ProfileService("root");
     const projects = new ProjectsService(profiles.getActiveProfile(), profiles);
     const service = new RoutinesService(projects);

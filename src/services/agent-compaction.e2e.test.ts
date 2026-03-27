@@ -1,22 +1,21 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 
 const repoRoot = process.cwd();
+const testRoot = createIsolatedRuntimeRoot("agent-compaction-e2e-");
 
 let previousCwd = "";
-let previousRootDirEnv: string | undefined;
-let tempRoot = "";
 
 function copyDirectory(relativePath: string) {
   const source = path.join(repoRoot, relativePath);
   if (!fs.existsSync(source)) {
     return;
   }
-  fs.cpSync(source, path.join(tempRoot, relativePath), { recursive: true });
+  fs.cpSync(source, path.join(testRoot.path, relativePath), { recursive: true });
 }
 
 function copyFile(relativePath: string) {
@@ -24,7 +23,7 @@ function copyFile(relativePath: string) {
   if (!fs.existsSync(source)) {
     return;
   }
-  const destination = path.join(tempRoot, relativePath);
+  const destination = path.join(testRoot.path, relativePath);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.copyFileSync(source, destination);
 }
@@ -182,10 +181,8 @@ function extractText(message: BaseMessage) {
 
 beforeAll(() => {
   previousCwd = process.cwd();
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agent-compaction-e2e-"));
-  process.env.OPENELINARO_ROOT_DIR = tempRoot;
-  process.chdir(tempRoot);
+  testRoot.setup();
+  process.chdir(testRoot.path);
 
   copyDirectory("system_prompt");
   copyFile("profiles/registry.json");
@@ -193,14 +190,7 @@ beforeAll(() => {
 
 afterAll(() => {
   process.chdir(previousCwd);
-  if (previousRootDirEnv) {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  } else {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  }
-  if (tempRoot) {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
+  testRoot.teardown();
 });
 
 describe("agent compaction e2e", () => {
@@ -244,7 +234,7 @@ describe("agent compaction e2e", () => {
     expect(messages.at(-2)).toContain("Newest message after compaction.");
     expect(messages.at(-1)).toContain("Reply after compaction.");
 
-    const memoryPath = path.join(tempRoot, ".openelinarotest", "memory/documents/root/core/MEMORY.md");
+    const memoryPath = path.join(testRoot.path, ".openelinarotest", "memory/documents/root/core/MEMORY.md");
     expect(fs.existsSync(memoryPath)).toBe(true);
     expect(fs.readFileSync(memoryPath, "utf8")).toContain("User prefers terse replies.");
 

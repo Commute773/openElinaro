@@ -1,35 +1,25 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { DynamicStructuredTool } from "@langchain/core/tools";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 import { AgentChatService } from "./agent-chat-service";
 import { ConversationStore } from "./conversation-store";
 import { SystemPromptService } from "./system-prompt-service";
 
 let previousCwd = "";
-let previousRootDir = "";
-let tempRoot = "";
 
+const testRoot = createIsolatedRuntimeRoot("agent-chat-service-");
 beforeEach(() => {
   previousCwd = process.cwd();
-  previousRootDir = process.env.OPENELINARO_ROOT_DIR ?? "";
-  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agent-chat-service-"));
-  process.env.OPENELINARO_ROOT_DIR = tempRoot;
-  process.chdir(tempRoot);
+  testRoot.setup();
+  process.chdir(testRoot.path);
 });
 
 afterEach(() => {
   process.chdir(previousCwd);
-  if (previousRootDir) {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDir;
-  } else {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  }
-  fs.rmSync(tempRoot, { recursive: true, force: true });
+  testRoot.teardown();
 });
 
 function createService(options?: {

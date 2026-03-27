@@ -1,27 +1,10 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { AlarmService } from "./alarm-service";
 
-let runtimeRoot = "";
-let previousRootDirEnv: string | undefined;
-
-beforeEach(() => {
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-alarms-"));
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-});
-
-afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  runtimeRoot = "";
-});
+const testRoot = createIsolatedRuntimeRoot("openelinaro-alarms-");
+beforeEach(() => testRoot.setup());
+afterEach(() => testRoot.teardown());
 
 describe("AlarmService", () => {
   test("stores timers, lists due items, marks delivery, and cancels alarms", () => {

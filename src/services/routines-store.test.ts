@@ -1,12 +1,9 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { RoutineStoreData } from "../domain/routines";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { RoutinesStore } from "./routines-store";
-
-let runtimeRoot = "";
-let previousRootDirEnv: string | undefined;
 
 function writeProfileRegistry(rootDir: string) {
   fs.mkdirSync(path.join(rootDir, ".openelinarotest", "profiles"), { recursive: true });
@@ -26,22 +23,12 @@ function writeProfileRegistry(rootDir: string) {
   );
 }
 
+const testRoot = createIsolatedRuntimeRoot("openelinaro-routines-store-");
 beforeEach(() => {
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-routines-store-"));
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-  writeProfileRegistry(runtimeRoot);
+  testRoot.setup();
+  writeProfileRegistry(testRoot.path);
 });
-
-afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  runtimeRoot = "";
-});
+afterEach(() => testRoot.teardown());
 
 describe("RoutinesStore", () => {
   test("load returns empty store when no file exists", () => {
@@ -132,7 +119,7 @@ describe("RoutinesStore", () => {
   });
 
   test("load normalizes items with missing state fields", () => {
-    const storePath = path.join(runtimeRoot, ".openelinarotest", "routines.json");
+    const storePath = path.join(testRoot.path, ".openelinarotest", "routines.json");
     fs.mkdirSync(path.dirname(storePath), { recursive: true });
     fs.writeFileSync(
       storePath,
@@ -166,7 +153,7 @@ describe("RoutinesStore", () => {
   });
 
   test("load normalizes paused items as disabled", () => {
-    const storePath = path.join(runtimeRoot, ".openelinarotest", "routines.json");
+    const storePath = path.join(testRoot.path, ".openelinarotest", "routines.json");
     fs.mkdirSync(path.dirname(storePath), { recursive: true });
     fs.writeFileSync(
       storePath,
@@ -196,7 +183,7 @@ describe("RoutinesStore", () => {
   });
 
   test("load fills missing settings fields with defaults", () => {
-    const storePath = path.join(runtimeRoot, ".openelinarotest", "routines.json");
+    const storePath = path.join(testRoot.path, ".openelinarotest", "routines.json");
     fs.mkdirSync(path.dirname(storePath), { recursive: true });
     fs.writeFileSync(
       storePath,
@@ -225,14 +212,14 @@ describe("RoutinesStore", () => {
   test("saved file has restricted permissions (mode 0o600)", () => {
     const store = new RoutinesStore();
     store.save(store.load());
-    const storePath = path.join(runtimeRoot, ".openelinarotest", "routines.json");
+    const storePath = path.join(testRoot.path, ".openelinarotest", "routines.json");
     const stats = fs.statSync(storePath);
     const mode = stats.mode & 0o777;
     expect(mode).toBe(0o600);
   });
 
   test("load preserves calendar events", () => {
-    const storePath = path.join(runtimeRoot, ".openelinarotest", "routines.json");
+    const storePath = path.join(testRoot.path, ".openelinarotest", "routines.json");
     fs.mkdirSync(path.dirname(storePath), { recursive: true });
     fs.writeFileSync(
       storePath,

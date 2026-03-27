@@ -1,21 +1,20 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ConversationHistoryService } from "./conversation-history-service";
 import { ConversationStore } from "./conversation-store";
 import { SystemPromptService } from "./system-prompt-service";
 
-let tempRoot = "";
-let previousRootDirEnv: string | undefined;
+const testRoot = createIsolatedRuntimeRoot("openelinaro-conversation-store-");
 
 function getStorePath() {
-  return path.join(tempRoot, ".openelinarotest", "conversations.json");
+  return path.join(testRoot.path, ".openelinarotest", "conversations.json");
 }
 
 function getHistoryDir() {
-  return path.join(tempRoot, ".openelinarotest", "conversation-history");
+  return path.join(testRoot.path, ".openelinarotest", "conversation-history");
 }
 
 describe("ConversationStore", () => {
@@ -35,22 +34,12 @@ describe("ConversationStore", () => {
   const systemPrompts = new SystemPromptService();
 
   beforeEach(() => {
-    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-conversation-store-"));
-    process.env.OPENELINARO_ROOT_DIR = tempRoot;
+    testRoot.setup();
     fs.rmSync(getStorePath(), { force: true });
     fs.rmSync(getHistoryDir(), { recursive: true, force: true });
   });
 
-  afterEach(() => {
-    if (previousRootDirEnv === undefined) {
-      delete process.env.OPENELINARO_ROOT_DIR;
-    } else {
-      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-    }
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-    tempRoot = "";
-  });
+  afterEach(() => testRoot.teardown());
 
   test("supports append-only writes", () => {
     store.appendMessages("thread-1", [new HumanMessage("hello")], {

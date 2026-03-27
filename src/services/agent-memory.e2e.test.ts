@@ -1,11 +1,11 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 import { AIMessage, HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { getTestFixturesDir } from "../test/fixtures";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 
 const repoRoot = process.cwd();
@@ -21,9 +21,9 @@ const HEARTBEAT_PROMPT = [
   "Triggered at: 2026-03-17T22:16:07.965Z",
 ].join("\n");
 
+const testRoot = createIsolatedRuntimeRoot("agent-memory-e2e-");
+
 let previousCwd = "";
-let previousRootDirEnv: string | undefined;
-let tempRoot = "";
 
 let agentChatModule: typeof import("./agent-chat-service");
 let conversationMemoryModule: typeof import("./conversation-memory-service");
@@ -49,7 +49,7 @@ function copyDirectory(relativePath: string) {
   if (!fs.existsSync(source)) {
     return;
   }
-  fs.cpSync(source, path.join(tempRoot, relativePath), { recursive: true });
+  fs.cpSync(source, path.join(testRoot.path, relativePath), { recursive: true });
 }
 
 function copyFile(relativePath: string) {
@@ -57,7 +57,7 @@ function copyFile(relativePath: string) {
   if (!fs.existsSync(source)) {
     return;
   }
-  const destination = path.join(tempRoot, relativePath);
+  const destination = path.join(testRoot.path, relativePath);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.copyFileSync(source, destination);
 }
@@ -67,7 +67,7 @@ function copyMachineTestFile(relativePath: string) {
   if (!fs.existsSync(source)) {
     return;
   }
-  const destination = path.join(tempRoot, ".openelinarotest", relativePath);
+  const destination = path.join(testRoot.path, ".openelinarotest", relativePath);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.copyFileSync(source, destination);
 }
@@ -77,7 +77,7 @@ function copyMachineTestDirectory(relativePath: string) {
   if (!fs.existsSync(source)) {
     return;
   }
-  fs.cpSync(source, path.join(tempRoot, ".openelinarotest", relativePath), { recursive: true });
+  fs.cpSync(source, path.join(testRoot.path, ".openelinarotest", relativePath), { recursive: true });
 }
 
 async function importFresh<T>(relativePath: string): Promise<T> {
@@ -261,10 +261,8 @@ async function benchmarkRecall(
 
 beforeAll(async () => {
   previousCwd = process.cwd();
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agent-memory-e2e-"));
-  process.env.OPENELINARO_ROOT_DIR = tempRoot;
-  process.chdir(tempRoot);
+  testRoot.setup();
+  process.chdir(testRoot.path);
 
   copyDirectory("system_prompt");
   copyFile("profiles/registry.json");
@@ -281,14 +279,7 @@ beforeAll(async () => {
 
 afterAll(() => {
   process.chdir(previousCwd);
-  if (previousRootDirEnv) {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  } else {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  }
-  if (tempRoot) {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
+  testRoot.teardown();
 });
 
 describe("real-corpus memory recall", () => {

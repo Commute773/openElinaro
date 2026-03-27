@@ -1,36 +1,29 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
 import { DEFAULT_AGENT_PROMPTS, SystemPromptService } from "./system-prompt-service";
 
 let previousCwd = "";
-let previousRootDirEnv: string | undefined;
-let tempRoot = "";
+
+const testRoot = createIsolatedRuntimeRoot("openelinaro-system-prompt-");
 
 function writeFile(relativePath: string, content: string) {
-  const absolutePath = path.join(tempRoot, relativePath);
+  const absolutePath = path.join(testRoot.path, relativePath);
   fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
   fs.writeFileSync(absolutePath, content, "utf8");
 }
 
 beforeEach(() => {
   previousCwd = process.cwd();
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-system-prompt-"));
-  process.env.OPENELINARO_ROOT_DIR = tempRoot;
-  process.chdir(tempRoot);
+  testRoot.setup();
+  process.chdir(testRoot.path);
 });
 
 afterEach(() => {
   process.chdir(previousCwd);
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(tempRoot, { recursive: true, force: true });
+  testRoot.teardown();
 });
 
 describe("SystemPromptService", () => {
@@ -71,7 +64,7 @@ describe("SystemPromptService", () => {
 
   test("includes universal and operator prompts together, sorted by filename", () => {
     writeFile("system_prompt/universal/10-operating-model.md", "Universal operating model.");
-    const userDir = path.join(tempRoot, ".openelinarotest", "system_prompt");
+    const userDir = path.join(testRoot.path, ".openelinarotest", "system_prompt");
     fs.mkdirSync(userDir, { recursive: true });
     fs.writeFileSync(path.join(userDir, "00-foundation.md"), "Agent foundation.", "utf8");
     fs.writeFileSync(path.join(userDir, "20-user.md"), "Agent user profile.", "utf8");
@@ -91,7 +84,7 @@ describe("SystemPromptService", () => {
 
   test("operator files cannot override universal files with the same filename", () => {
     writeFile("system_prompt/universal/10-operating-model.md", "Universal version.");
-    const userDir = path.join(tempRoot, ".openelinarotest", "system_prompt");
+    const userDir = path.join(testRoot.path, ".openelinarotest", "system_prompt");
     fs.mkdirSync(userDir, { recursive: true });
     fs.writeFileSync(path.join(userDir, "10-operating-model.md"), "Operator override attempt.", "utf8");
     fs.writeFileSync(path.join(userDir, "20-identity.md"), "Agent identity.", "utf8");
@@ -118,7 +111,7 @@ describe("SystemPromptService", () => {
 
   test("does not include defaults when operator has their own prompts", () => {
     writeFile("system_prompt/universal/10-operating-model.md", "Universal operating model.");
-    const userDir = path.join(tempRoot, ".openelinarotest", "system_prompt");
+    const userDir = path.join(testRoot.path, ".openelinarotest", "system_prompt");
     fs.mkdirSync(userDir, { recursive: true });
     fs.writeFileSync(path.join(userDir, "00-custom-foundation.md"), "Custom foundation.", "utf8");
 

@@ -1,29 +1,13 @@
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import type { ScheduledAlarm } from "./alarm-service";
 import { AlarmNotificationService } from "./alarm-notification-service";
 import { resolveAssistantContextPath } from "./runtime-user-content";
 
-let runtimeRoot = "";
-let previousRootDirEnv: string | undefined;
-
-beforeEach(() => {
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-alarm-notification-"));
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-});
-
-afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  runtimeRoot = "";
-});
+const testRoot = createIsolatedRuntimeRoot("openelinaro-alarm-notification-");
+beforeEach(() => testRoot.setup());
+afterEach(() => testRoot.teardown());
 
 function makeAlarm(overrides: Partial<ScheduledAlarm> = {}): ScheduledAlarm {
   return {

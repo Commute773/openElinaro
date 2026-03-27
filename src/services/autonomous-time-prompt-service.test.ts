@@ -1,31 +1,16 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import {
   AutonomousTimePromptService,
   AUTONOMOUS_TIME_PROMPT_DEFAULT_PATH,
   resolveAutonomousTimePromptPath,
 } from "./autonomous-time-prompt-service";
 
-let runtimeRoot = "";
-let previousRootDirEnv: string | undefined;
-
-beforeEach(() => {
-  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-autonomous-time-prompt-"));
-  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
-});
-
-afterEach(() => {
-  if (previousRootDirEnv === undefined) {
-    delete process.env.OPENELINARO_ROOT_DIR;
-  } else {
-    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
-  }
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  runtimeRoot = "";
-});
+const testRoot = createIsolatedRuntimeRoot("openelinaro-autonomous-time-prompt-");
+beforeEach(() => testRoot.setup());
+afterEach(() => testRoot.teardown());
 
 describe("AutonomousTimePromptService", () => {
   test("returns the fallback prompt when the configured file does not exist", () => {
