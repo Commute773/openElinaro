@@ -243,6 +243,7 @@ export class Zigbee2MqttService {
   // ---------- Render ----------
 
   async renderStatus(): Promise<string> {
+    await this.ensureStarted();
     const lines: string[] = [];
     lines.push(`Zigbee bridge: ${this.started ? "running" : "stopped"}`);
 
