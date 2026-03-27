@@ -466,6 +466,14 @@ export class OpenElinaroApp {
     return this.getScope().routineTools.getToolNames();
   }
 
+  getToolCatalog() {
+    return this.getScope().routineTools.getToolCatalog();
+  }
+
+  getToolJsonSchema(name: string) {
+    return this.getScope().routineTools.getToolJsonSchema(name);
+  }
+
   getActiveModel() {
     return this.getScope().models.getActiveModel();
   }

@@ -1886,6 +1886,16 @@ export class ToolRegistry {
     return this.getRawTools(context).map((entry) => buildToolCatalogCard(entry));
   }
 
+  getToolJsonSchema(name: string): Record<string, unknown> | null {
+    if (!this.access.canUseTool(name)) return null;
+    const entry = this.resolveToolEntry(name);
+    if (!entry) return null;
+    if (entry.schema instanceof z.ZodObject) {
+      return z.toJSONSchema(entry.schema) as Record<string, unknown>;
+    }
+    return null;
+  }
+
   getToolLibraries(context?: ToolContext, scope?: AgentToolScope): ToolLibraryDefinition[] {
     const availableToolNames = new Set(
       this.getToolCatalog(context)
