@@ -6,7 +6,7 @@ import type { SubagentRun } from "../../domain/subagent-run";
 import type { ProjectsService } from "../../services/projects-service";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { telemetry } from "../../services/telemetry";
-import { formatDurationMs } from "./system-tools";
+import { formatDurationMs } from "./service-tools";
 import type { ToolContext } from "../tool-registry";
 
 const toolTelemetry = telemetry.child({ component: "tool" });

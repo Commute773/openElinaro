@@ -9,6 +9,8 @@ import { ConversationMemoryService } from "../services/conversation-memory-servi
 import { ConversationStateTransitionService } from "../services/conversation-state-transition-service";
 import type { ConversationStore } from "../services/conversation-store";
 import { FilesystemService } from "../services/filesystem-service";
+import { LocalFilesystemBackend } from "../services/filesystem-backend-local";
+import { SshFilesystemBackend } from "../services/filesystem-backend-ssh";
 import type { FinanceService } from "../services/finance-service";
 import type { HealthTrackingService } from "../services/health-tracking-service";
 import { MemoryService } from "../services/memory-service";
@@ -19,7 +21,6 @@ import { ReflectionService } from "../services/reflection-service";
 import type { RoutinesService } from "../services/routines-service";
 import { ShellService } from "../services/shell-service";
 import { SoulService } from "../services/soul-service";
-import { SshFilesystemService } from "../services/ssh-filesystem-service";
 import { SshShellService } from "../services/ssh-shell-service";
 import type { SystemPromptService } from "../services/system-prompt-service";
 import { ToolResolutionService } from "../services/tool-resolution-service";
@@ -166,9 +167,10 @@ export function createRuntimeScope(ctx: {
   const shell: ShellRuntime = profiles.isSshExecutionProfile(profile)
     ? new SshShellService(profile, access, shellEnvironment)
     : new ShellService(access, shellEnvironment);
-  const filesystem: FilesystemRuntime = profiles.isSshExecutionProfile(profile)
-    ? new SshFilesystemService(profile, shell as SshShellService, access)
-    : new FilesystemService(access);
+  const filesystemBackend = profiles.isSshExecutionProfile(profile)
+    ? new SshFilesystemBackend(profile, shell as SshShellService)
+    : new LocalFilesystemBackend();
+  const filesystem: FilesystemRuntime = new FilesystemService(filesystemBackend, access);
   const transitions = appTelemetry.instrumentMethods(
     new ConversationStateTransitionService(
       connector,

@@ -1,8 +1,7 @@
-import { execFile } from "node:child_process";
-import fs from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import { AccessControlService } from "./access-control-service";
+import type { FilesystemBackend } from "./filesystem-backend";
+import { LocalFilesystemBackend } from "./filesystem-backend-local";
 import {
   applyStructuredUpdate,
   buildAddedFileContent,
@@ -11,8 +10,6 @@ import {
 import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 
-const execFileAsync = promisify(execFile);
-const DEFAULT_ROOT = process.cwd();
 import {
   FS_DEFAULT_READ_LIMIT as DEFAULT_READ_LIMIT,
   FS_DEFAULT_LIST_LIMIT as DEFAULT_LIST_LIMIT,
@@ -22,7 +19,6 @@ import {
   FS_MAX_READ_BYTES as MAX_READ_BYTES,
   FS_MAX_READ_BYTES_LABEL as MAX_READ_BYTES_LABEL,
 } from "../config/service-constants";
-const DEFAULT_SAMPLE_BYTES = 8_192;
 const filesystemTelemetry = telemetry.child({ component: "filesystem" });
 
 type ResolvedPathInput = {
@@ -96,27 +92,8 @@ type DeleteParams = ResolvedPathInput & {
   recursive?: boolean;
 };
 
-function resolveCwd(cwd?: string) {
-  if (!cwd) {
-    return DEFAULT_ROOT;
-  }
-  return path.isAbsolute(cwd) ? cwd : path.resolve(DEFAULT_ROOT, cwd);
-}
-
 function getRequestedPath(input: ResolvedPathInput) {
   return input.path ?? input.filePath;
-}
-
-function resolveToolPath(input: ResolvedPathInput) {
-  const requestedPath = getRequestedPath(input);
-  if (!requestedPath) {
-    throw new Error("path is required");
-  }
-  const cwd = resolveCwd(input.cwd);
-  const resolved = path.isAbsolute(requestedPath)
-    ? path.normalize(requestedPath)
-    : path.resolve(cwd, requestedPath);
-  return { cwd, requestedPath, resolved };
 }
 
 function detectLineEnding(text: string): "\n" | "\r\n" {
@@ -150,65 +127,6 @@ function truncateLine(text: string) {
     return text;
   }
   return `${text.slice(0, MAX_LINE_LENGTH)}... (line truncated to ${MAX_LINE_LENGTH} chars)`;
-}
-
-async function statSafe(targetPath: string) {
-  try {
-    return await fs.stat(targetPath);
-  } catch {
-    return null;
-  }
-}
-
-async function getPathSuggestions(targetPath: string) {
-  const parent = path.dirname(targetPath);
-  const basename = path.basename(targetPath).toLowerCase();
-  try {
-    const entries = await fs.readdir(parent);
-    return entries
-      .filter((entry) => {
-        const candidate = entry.toLowerCase();
-        return candidate.includes(basename) || basename.includes(candidate);
-      })
-      .slice(0, 5)
-      .map((entry) => path.join(parent, entry));
-  } catch {
-    return [] as string[];
-  }
-}
-
-async function throwPathNotFound(targetPath: string, label = "Path") {
-  const suggestions = await getPathSuggestions(targetPath);
-  if (suggestions.length > 0) {
-    throw new Error(`${label} not found: ${targetPath}\nDid you mean:\n${suggestions.join("\n")}`);
-  }
-  throw new Error(`${label} not found: ${targetPath}`);
-}
-
-async function isProbablyBinary(filePath: string) {
-  const handle = await fs.open(filePath, "r");
-  try {
-    const buffer = Buffer.alloc(DEFAULT_SAMPLE_BYTES);
-    const { bytesRead } = await handle.read(buffer, 0, DEFAULT_SAMPLE_BYTES, 0);
-    if (bytesRead === 0) {
-      return false;
-    }
-
-    let suspiciousBytes = 0;
-    for (let index = 0; index < bytesRead; index += 1) {
-      const value = buffer[index] ?? 0;
-      if (value === 0) {
-        return true;
-      }
-      if (value < 7 || (value > 14 && value < 32)) {
-        suspiciousBytes += 1;
-      }
-    }
-
-    return suspiciousBytes / bytesRead > 0.3;
-  } finally {
-    await handle.close();
-  }
 }
 
 function formatDirectoryEntries(entries: string[], offset: number, limit: number, resolvedPath: string) {
@@ -369,25 +287,40 @@ function applyOneEdit(
   };
 }
 
-async function ensurePathExists(targetPath: string, label = "Path"): Promise<Awaited<ReturnType<typeof fs.stat>>> {
-  const stat = await statSafe(targetPath);
-  if (!stat) {
-    const suggestions = await getPathSuggestions(targetPath);
-    if (suggestions.length > 0) {
-      throw new Error(`${label} not found: ${targetPath}\nDid you mean:\n${suggestions.join("\n")}`);
-    }
-    throw new Error(`${label} not found: ${targetPath}`);
-  }
-  return stat;
-}
-
 const traceSpan = createTraceSpan(filesystemTelemetry);
 
+function isFilesystemBackend(value: unknown): value is FilesystemBackend {
+  return typeof value === "object" && value !== null && "resolveCwd" in value;
+}
+
 export class FilesystemService {
-  constructor(private readonly access?: AccessControlService) {}
+  private readonly backend: FilesystemBackend;
+  private readonly access?: AccessControlService;
+
+  constructor(backendOrAccess?: FilesystemBackend | AccessControlService, access?: AccessControlService) {
+    if (!backendOrAccess) {
+      this.backend = new LocalFilesystemBackend();
+    } else if (isFilesystemBackend(backendOrAccess)) {
+      this.backend = backendOrAccess;
+      this.access = access;
+    } else {
+      this.backend = new LocalFilesystemBackend();
+      this.access = backendOrAccess;
+    }
+  }
 
   private authorizePath(targetPath: string) {
     return this.access ? this.access.assertPathAccess(targetPath) : targetPath;
+  }
+
+  private resolveToolPath(input: ResolvedPathInput) {
+    const requestedPath = getRequestedPath(input);
+    if (!requestedPath) {
+      throw new Error("path is required");
+    }
+    const cwd = this.backend.resolveCwd(input.cwd);
+    const resolved = this.backend.resolvePath(requestedPath, cwd);
+    return { cwd, requestedPath, resolved };
   }
 
   async read(params: ReadParams) {
@@ -403,14 +336,14 @@ export class FilesystemService {
           throw new Error("limit must be greater than or equal to 1");
         }
 
-        const { resolved } = resolveToolPath(params);
+        const { resolved } = this.resolveToolPath(params);
         this.authorizePath(resolved);
-        const stat = await ensurePathExists(resolved, "Path");
+        await this.backend.statOrThrow(resolved);
+        const result = await this.backend.readFileOrDir(resolved);
 
-        if (stat.isDirectory()) {
-          const dirents = await fs.readdir(resolved, { withFileTypes: true });
-          const entries = dirents
-            .map((entry) => `${entry.name}${entry.isDirectory() ? "/" : ""}`)
+        if (result.type === "directory") {
+          const entries = result.entries
+            .map((entry) => `${entry.name}${entry.isDirectory ? "/" : ""}`)
             .sort((left, right) => left.localeCompare(right));
           if (entries.length > 0 && offset > entries.length) {
             throw new Error(`Offset ${offset} is out of range for this directory (${entries.length} entries)`);
@@ -418,12 +351,7 @@ export class FilesystemService {
           return formatDirectoryEntries(entries, offset, limit, resolved);
         }
 
-        if (await isProbablyBinary(resolved)) {
-          throw new Error(`Cannot read binary file: ${resolved}`);
-        }
-
-        const text = await fs.readFile(resolved, "utf8");
-        const lines = splitFileLines(text);
+        const lines = splitFileLines(result.content);
         if (offset > lines.length && !(lines.length === 0 && offset === 1)) {
           throw new Error(`Offset ${offset} is out of range for this file (${lines.length} lines)`);
         }
@@ -481,20 +409,14 @@ export class FilesystemService {
     return traceSpan(
       "tool.write_file",
       async () => {
-        const { resolved } = resolveToolPath(params);
+        const { resolved } = this.resolveToolPath(params);
         this.authorizePath(resolved);
-        const existing = await statSafe(resolved);
-        if (existing?.isDirectory()) {
+        const existing = await this.backend.stat(resolved);
+        if (existing?.type === "directory") {
           throw new Error(`Path is a directory, not a file: ${resolved}`);
         }
-        await fs.mkdir(path.dirname(resolved), { recursive: true });
-        if (params.append) {
-          await fs.appendFile(resolved, params.content, "utf8");
-        } else {
-          await fs.writeFile(resolved, params.content, "utf8");
-        }
-        const stat = await fs.stat(resolved);
-        return `${params.append ? "Appended" : "Wrote"} ${Buffer.byteLength(params.content, "utf8")} bytes to ${resolved}. File size is now ${stat.size} bytes.`;
+        const result = await this.backend.writeFile(resolved, params.content, params.append === true);
+        return `${params.append ? "Appended" : "Wrote"} ${Buffer.byteLength(params.content, "utf8")} bytes to ${resolved}. File size is now ${result.sizeBytes} bytes.`;
       },
       {
         attributes: {
@@ -510,14 +432,15 @@ export class FilesystemService {
     return traceSpan(
       "tool.edit_file",
       async () => {
-        const { resolved } = resolveToolPath(params);
+        const { resolved } = this.resolveToolPath(params);
         this.authorizePath(resolved);
-        const stat = await ensurePathExists(resolved, "File");
-        if (stat.isDirectory()) {
+        await this.backend.statOrThrow(resolved);
+        const readResult = await this.backend.readFileOrDir(resolved);
+        if (readResult.type !== "file") {
           throw new Error(`Path is a directory, not a file: ${resolved}`);
         }
 
-        const originalContent = await fs.readFile(resolved, "utf8");
+        const originalContent = readResult.content;
         const ending = detectLineEnding(originalContent);
         const next = normalizeEditStrings(params);
         const oldString = convertToLineEnding(normalizeLineEndings(next.oldString), ending);
@@ -527,7 +450,7 @@ export class FilesystemService {
           { oldString, newString, replaceAll: params.replaceAll },
           resolved,
         );
-        await fs.writeFile(resolved, result.content, "utf8");
+        await this.backend.writeFile(resolved, result.content, false);
         return `Edit applied successfully to ${resolved}. ${result.message}`;
       },
       {
@@ -547,57 +470,56 @@ export class FilesystemService {
         const summaries: string[] = [];
 
         for (const operation of operations) {
-          const resolvedPath = resolveToolPath({ path: operation.path, cwd: params.cwd }).resolved;
+          const resolvedPath = this.resolveToolPath({ path: operation.path, cwd: params.cwd }).resolved;
           this.authorizePath(resolvedPath);
 
           if (operation.type === "add") {
-            const existing = await statSafe(resolvedPath);
+            const existing = await this.backend.stat(resolvedPath);
             if (existing) {
               throw new Error(`Add File target already exists: ${resolvedPath}`);
             }
-            await fs.mkdir(path.dirname(resolvedPath), { recursive: true });
-            await fs.writeFile(resolvedPath, buildAddedFileContent(operation.lines), "utf8");
+            await this.backend.writeFile(resolvedPath, buildAddedFileContent(operation.lines), false);
             summaries.push(`A ${resolvedPath}`);
             continue;
           }
 
-          const current = await ensurePathExists(resolvedPath, "File");
-          if (current.isDirectory()) {
+          await this.backend.statOrThrow(resolvedPath);
+          const readResult = await this.backend.readFileOrDir(resolvedPath);
+          if (readResult.type !== "file") {
             throw new Error(`Path is a directory, not a file: ${resolvedPath}`);
           }
 
           if (operation.type === "delete") {
-            await fs.rm(resolvedPath, { force: false });
+            await this.backend.deletePath(resolvedPath, false);
             summaries.push(`D ${resolvedPath}`);
             continue;
           }
 
-          const originalContent = await fs.readFile(resolvedPath, "utf8");
+          const originalContent = readResult.content;
           const ending = detectLineEnding(originalContent);
           const nextContent = convertToLineEnding(
             applyStructuredUpdate(originalContent, operation.chunks),
             ending,
           );
           const moveTarget = operation.moveTo
-            ? resolveToolPath({ path: operation.moveTo, cwd: params.cwd }).resolved
+            ? this.resolveToolPath({ path: operation.moveTo, cwd: params.cwd }).resolved
             : undefined;
           if (moveTarget) {
             this.authorizePath(moveTarget);
           }
 
           if (moveTarget && moveTarget !== resolvedPath) {
-            const existingTarget = await statSafe(moveTarget);
+            const existingTarget = await this.backend.stat(moveTarget);
             if (existingTarget) {
               throw new Error(`Move target already exists: ${moveTarget}`);
             }
-            await fs.mkdir(path.dirname(moveTarget), { recursive: true });
-            await fs.writeFile(moveTarget, nextContent, "utf8");
-            await fs.rm(resolvedPath, { force: false });
+            await this.backend.writeFile(moveTarget, nextContent, false);
+            await this.backend.deletePath(resolvedPath, false);
             summaries.push(`M ${resolvedPath} -> ${moveTarget}`);
             continue;
           }
 
-          await fs.writeFile(resolvedPath, nextContent, "utf8");
+          await this.backend.writeFile(resolvedPath, nextContent, false);
           summaries.push(`M ${resolvedPath}`);
         }
 
@@ -624,59 +546,21 @@ export class FilesystemService {
           throw new Error("limit must be greater than or equal to 1");
         }
 
-        const { resolved } = resolveToolPath({ ...params, path: params.path ?? "." });
+        const { resolved } = this.resolveToolPath({ ...params, path: params.path ?? "." });
         this.authorizePath(resolved);
-        const stat = await ensurePathExists(resolved, "Path");
-        if (!stat.isDirectory()) {
+        const stat = await this.backend.statOrThrow(resolved);
+        if (stat.type !== "directory") {
           throw new Error(`Path is not a directory: ${resolved}`);
         }
 
-        if (!params.recursive) {
-          const dirents = await fs.readdir(resolved, { withFileTypes: true });
-          const entries = dirents
-            .map((entry) => `${entry.name}${entry.isDirectory() ? "/" : ""}`)
-            .sort((left, right) => left.localeCompare(right))
-            .slice(0, limit);
-          return buildListDirResult({
-            resolvedPath: resolved,
-            entries,
-            limit,
-            recursive: false,
-            totalEntries: dirents.length,
-            truncated: dirents.length > limit,
-            format: params.format,
-          });
-        }
-
-        const entries: string[] = [];
-        const walk = async (currentPath: string, prefix = ""): Promise<void> => {
-          if (entries.length >= limit) {
-            return;
-          }
-          const dirents = await fs.readdir(currentPath, { withFileTypes: true });
-          dirents.sort((left, right) => left.name.localeCompare(right.name));
-          for (const entry of dirents) {
-            if (entries.length >= limit) {
-              return;
-            }
-            const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
-            const rendered = `${relative}${entry.isDirectory() ? "/" : ""}`;
-            entries.push(rendered);
-            if (entry.isDirectory()) {
-              await walk(path.join(currentPath, entry.name), relative);
-            }
-          }
-        };
-
-        await walk(resolved);
-        const truncated = entries.length >= limit;
+        const result = await this.backend.listDir(resolved, params.recursive === true, limit);
         return buildListDirResult({
           resolvedPath: resolved,
-          entries,
+          entries: result.entries,
           limit,
-          recursive: true,
-          totalEntries: truncated ? null : entries.length,
-          truncated,
+          recursive: params.recursive === true,
+          totalEntries: result.totalEntries,
+          truncated: result.truncated,
           format: params.format,
         });
       },
@@ -698,31 +582,23 @@ export class FilesystemService {
         if (limit < 1) {
           throw new Error("limit must be greater than or equal to 1");
         }
-        const { resolved } = resolveToolPath({ ...params, path: params.path ?? "." });
+        const { resolved } = this.resolveToolPath({ ...params, path: params.path ?? "." });
         this.authorizePath(resolved);
-        const stat = await ensurePathExists(resolved, "Path");
-        if (!stat.isDirectory()) {
+        const stat = await this.backend.statOrThrow(resolved);
+        if (stat.type !== "directory") {
           throw new Error(`Path is not a directory: ${resolved}`);
         }
 
-        const glob = new Bun.Glob(params.pattern);
-        const matches: string[] = [];
-        for await (const match of glob.scan({ cwd: resolved, absolute: true, onlyFiles: false })) {
-          matches.push(match);
-          if (matches.length >= limit) {
-            break;
-          }
-        }
-        matches.sort((left, right) => left.localeCompare(right));
-        if (matches.length === 0) {
+        const result = await this.backend.glob(resolved, params.pattern, limit);
+        if (result.matches.length === 0) {
           return `No paths matched pattern ${params.pattern} under ${resolved}.`;
         }
         return [
           `Pattern: ${params.pattern}`,
           `Path: ${resolved}`,
           "Matches:",
-          matches.join("\n"),
-          matches.length >= limit ? `(Results truncated at ${limit} matches.)` : `(Total ${matches.length} matches)`,
+          result.matches.join("\n"),
+          result.truncated ? `(Results truncated at ${limit} matches.)` : `(Total ${result.matches.length} matches)`,
         ].join("\n");
       },
       {
@@ -743,73 +619,40 @@ export class FilesystemService {
         if (limit < 1) {
           throw new Error("limit must be greater than or equal to 1");
         }
-        const { resolved } = resolveToolPath({ ...params, path: params.path ?? "." });
+        const { resolved } = this.resolveToolPath({ ...params, path: params.path ?? "." });
         this.authorizePath(resolved);
-        const stat = await ensurePathExists(resolved, "Path");
-        const searchRoot = stat.isDirectory() ? resolved : path.dirname(resolved);
-        const include = !stat.isDirectory()
+        const stat = await this.backend.statOrThrow(resolved);
+        const searchRoot = stat.type === "directory" ? resolved : path.dirname(resolved);
+        const include = stat.type !== "directory"
           ? path.basename(resolved)
           : params.include;
 
-        const args = ["-nH", "--hidden", "--no-messages", "--color=never"];
-        if (params.literal) {
-          args.push("-F");
-        }
-        if (!params.caseSensitive) {
-          args.push("-i");
-        }
-        if (include) {
-          args.push("--glob", include);
-        }
-        args.push(params.pattern, searchRoot);
+        const result = await this.backend.grep(
+          searchRoot,
+          params.pattern,
+          include,
+          limit,
+          params.literal === true,
+          params.caseSensitive === true,
+        );
 
-        try {
-          const { stdout, stderr } = await execFileAsync("rg", args, {
-            cwd: searchRoot,
-            maxBuffer: 1024 * 1024 * 4,
-          });
-          const lines = stdout.trim() ? stdout.trim().split(/\r?\n/) : [];
-          if (lines.length === 0) {
-            return `No matches found for pattern ${params.pattern}.`;
-          }
-          const sliced = lines.slice(0, limit);
-          const output = sliced
-            .map((line) => {
-              const firstSeparator = line.indexOf(":");
-              const secondSeparator = line.indexOf(":", firstSeparator + 1);
-              if (firstSeparator === -1 || secondSeparator === -1) {
-                return line;
-              }
-              const filePath = line.slice(0, firstSeparator);
-              const lineNumber = line.slice(firstSeparator + 1, secondSeparator);
-              const text = truncateLine(line.slice(secondSeparator + 1));
-              return `${filePath}:${lineNumber}: ${text}`;
-            })
-            .join("\n");
-          return [
-            `Pattern: ${params.pattern}`,
-            `Path: ${resolved}`,
-            "Matches:",
-            output,
-            lines.length > limit ? `(Results truncated: showing ${limit} of ${lines.length} matches.)` : `(Total ${lines.length} matches)`,
-            stderr.trim() ? `Notes:\n${stderr.trim()}` : "",
-          ]
-            .filter(Boolean)
-            .join("\n");
-        } catch (error) {
-          const execError = error as NodeJS.ErrnoException & {
-            code?: string | number;
-            stdout?: string;
-            stderr?: string;
-          };
-          if (String(execError.code ?? "") === "1") {
-            return `No matches found for pattern ${params.pattern}.`;
-          }
-          if (execError.code === "ENOENT") {
-            throw new Error("ripgrep (rg) is required for grep but is not installed.");
-          }
-          throw new Error(execError.stderr?.trim() || execError.message || "grep failed");
+        if (result.matches.length === 0) {
+          return `No matches found for pattern ${params.pattern}.`;
         }
+        const output = result.matches
+          .map((entry) => `${entry.path}:${entry.lineNumber}: ${entry.text}`)
+          .join("\n");
+        return [
+          `Pattern: ${params.pattern}`,
+          `Path: ${resolved}`,
+          "Matches:",
+          output,
+          result.truncated
+            ? result.totalMatchCount !== null
+              ? `(Results truncated: showing ${limit} of ${result.totalMatchCount} matches.)`
+              : `(Results truncated: showing ${result.matches.length} of at least ${result.matches.length} matches.)`
+            : `(Total ${result.matches.length} matches)`,
+        ].join("\n");
       },
       {
         attributes: {
@@ -828,15 +671,15 @@ export class FilesystemService {
     return traceSpan(
       "tool.stat_path",
       async () => {
-        const { resolved } = resolveToolPath(params);
+        const { resolved } = this.resolveToolPath(params);
         this.authorizePath(resolved);
-        const stat = await ensurePathExists(resolved, "Path");
+        const stat = await this.backend.statOrThrow(resolved);
         return buildStatPathResult({
           resolvedPath: resolved,
-          type: stat.isDirectory() ? "directory" : stat.isFile() ? "file" : "other",
-          sizeBytes: stat.size,
-          modifiedAt: stat.mtime.toISOString(),
-          createdAt: stat.birthtime.toISOString(),
+          type: stat.type,
+          sizeBytes: stat.sizeBytes,
+          modifiedAt: stat.modifiedAt,
+          createdAt: stat.createdAt,
           format: params.format,
         });
       },
@@ -852,9 +695,9 @@ export class FilesystemService {
     return traceSpan(
       "tool.mkdir",
       async () => {
-        const { resolved } = resolveToolPath(params);
+        const { resolved } = this.resolveToolPath(params);
         this.authorizePath(resolved);
-        await fs.mkdir(resolved, { recursive: params.recursive ?? true });
+        await this.backend.mkdir(resolved, params.recursive ?? true);
         return `Created directory ${resolved}.`;
       },
       {
@@ -875,13 +718,12 @@ export class FilesystemService {
         if (!source || !destination) {
           throw new Error("source and destination are required");
         }
-        const resolvedSource = resolveToolPath({ path: source, cwd: params.cwd }).resolved;
-        const resolvedDestination = resolveToolPath({ path: destination, cwd: params.cwd }).resolved;
+        const resolvedSource = this.resolveToolPath({ path: source, cwd: params.cwd }).resolved;
+        const resolvedDestination = this.resolveToolPath({ path: destination, cwd: params.cwd }).resolved;
         this.authorizePath(resolvedSource);
         this.authorizePath(resolvedDestination);
-        await ensurePathExists(resolvedSource, "Source path");
-        await fs.mkdir(path.dirname(resolvedDestination), { recursive: true });
-        await fs.rename(resolvedSource, resolvedDestination);
+        await this.backend.statOrThrow(resolvedSource);
+        await this.backend.movePath(resolvedSource, resolvedDestination);
         return `Moved ${resolvedSource} to ${resolvedDestination}.`;
       },
       {
@@ -902,20 +744,12 @@ export class FilesystemService {
         if (!source || !destination) {
           throw new Error("source and destination are required");
         }
-        const resolvedSource = resolveToolPath({ path: source, cwd: params.cwd }).resolved;
-        const resolvedDestination = resolveToolPath({ path: destination, cwd: params.cwd }).resolved;
+        const resolvedSource = this.resolveToolPath({ path: source, cwd: params.cwd }).resolved;
+        const resolvedDestination = this.resolveToolPath({ path: destination, cwd: params.cwd }).resolved;
         this.authorizePath(resolvedSource);
         this.authorizePath(resolvedDestination);
-        const stat = await ensurePathExists(resolvedSource, "Source path");
-        if (stat.isDirectory() && !params.recursive) {
-          throw new Error(`Source path is a directory. Set recursive=true to copy it: ${resolvedSource}`);
-        }
-        await fs.mkdir(path.dirname(resolvedDestination), { recursive: true });
-        if (stat.isDirectory()) {
-          await fs.cp(resolvedSource, resolvedDestination, { recursive: true });
-        } else {
-          await fs.copyFile(resolvedSource, resolvedDestination);
-        }
+        await this.backend.statOrThrow(resolvedSource);
+        await this.backend.copyPath(resolvedSource, resolvedDestination, params.recursive === true);
         return `Copied ${resolvedSource} to ${resolvedDestination}.`;
       },
       {
@@ -932,13 +766,10 @@ export class FilesystemService {
     return traceSpan(
       "tool.delete_path",
       async () => {
-        const { resolved } = resolveToolPath(params);
+        const { resolved } = this.resolveToolPath(params);
         this.authorizePath(resolved);
-        const stat = await ensurePathExists(resolved, "Path");
-        if (stat.isDirectory() && !params.recursive) {
-          throw new Error(`Path is a directory. Set recursive=true to delete it: ${resolved}`);
-        }
-        await fs.rm(resolved, { recursive: params.recursive === true, force: false });
+        await this.backend.statOrThrow(resolved);
+        await this.backend.deletePath(resolved, params.recursive === true);
         return `Deleted ${resolved}.`;
       },
       {

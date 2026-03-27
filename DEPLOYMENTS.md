@@ -1,5 +1,38 @@
 # Deployments
 
+## 2026.03.27.22
+- Released at: 2026-03-27T18:14:45Z
+- Release id: 20260327T181445Z-dc7e18a
+- Previous version: 2026.03.27.21
+- Trigger: ci/release workflow
+
+- refactor: unify FilesystemService and SshFilesystemService via strategy pattern
+
+## 2026.03.27.21
+- Released at: 2026-03-27T18:13:15Z
+- Release id: 20260327T181315Z-6ffd042
+- Previous version: 2026.03.27.20
+- Trigger: ci/release workflow
+
+- refactor: split system-tools.ts into focused tool groups
+
+## 2026.03.27.20
+- Released at: 2026-03-27T18:09:18Z
+- Release id: 20260327T180918Z-4c51c7c
+- Previous version: 2026.03.27.19
+- Trigger: ci/release workflow
+
+- refactor: extract usage tracking from ModelService into ModelUsageService
+
+## 2026.03.27.19
+- Released at: 2026-03-27T18:04:37Z
+- Release id: 20260327T180437Z-3bf9965
+- Previous version: 2026.03.27.18
+- Trigger: ci/release workflow
+
+- docs: add architectural recommendations research note
+- fix: resolve layering violations in domain/utils/services imports
+
 ## 2026.03.27.18
 - Released at: 2026-03-27T16:55:38Z
 - Release id: 20260327T165538Z-3dca0c6

@@ -1,3 +1,6 @@
+export type { Weekday } from "./calendar";
+import type { Weekday } from "./calendar";
+
 export type RoutineItemKind =
   | "todo"
   | "routine"
@@ -9,8 +12,6 @@ export type RoutineItemKind =
 export type RoutinePriority = "low" | "medium" | "high" | "urgent";
 
 export type RoutineStatus = "active" | "paused" | "archived" | "completed";
-
-export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
 export type RoutineSchedule =
   | { kind: "manual" }
