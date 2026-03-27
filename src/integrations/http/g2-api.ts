@@ -1,5 +1,6 @@
 import type { OpenElinaroApp } from "../../app/runtime";
 import { telemetry } from "../../services/telemetry";
+import { getOpenApiSpec } from "./openapi";
 
 const g2Telemetry = telemetry.child({ component: "g2_api" });
 
@@ -207,6 +208,11 @@ export async function handleG2ApiRequest(
   // CORS preflight
   if (request.method === "OPTIONS" && pathname.startsWith("/api/g2")) {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
+  // ── GET /api/g2/openapi.json (no auth required) ──
+  if (pathname === "/api/g2/openapi.json" && request.method === "GET") {
+    return json(getOpenApiSpec());
   }
 
   // ── GET /api/g2/home ──
