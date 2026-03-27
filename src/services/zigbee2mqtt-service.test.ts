@@ -12,22 +12,11 @@ describe("Zigbee2MqttService", () => {
     expect(svc.listDevices()).toEqual([]);
   });
 
-  test("getDevice returns undefined for unknown device", () => {
+  test("renderStatus shows stopped state", async () => {
     const svc = new Zigbee2MqttService();
-    expect(svc.getDevice("nonexistent")).toBeUndefined();
-  });
-
-  test("getDeviceState returns undefined for unknown device", () => {
-    const svc = new Zigbee2MqttService();
-    expect(svc.getDeviceState("nonexistent")).toBeUndefined();
-  });
-
-  test("renderStatus shows stopped state", () => {
-    const svc = new Zigbee2MqttService();
-    const status = svc.renderStatus();
-    expect(status).toContain("Zigbee radio: stopped");
-    expect(status).toContain("Devices: 0 paired");
-    expect(status).toContain("No devices paired yet");
+    const status = await svc.renderStatus();
+    expect(status).toContain("Zigbee bridge: stopped");
+    expect(status).toContain("bridge not running");
   });
 
   test("stop is safe when not started", async () => {
