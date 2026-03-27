@@ -7,6 +7,7 @@ import {
 } from "../../services/gemini-live-phone-service";
 import { VonageService, getVonageWebhookPath } from "../../services/vonage-service";
 import type { OpenElinaroApp } from "../../app/runtime";
+import type { ExtensionRegistryService } from "../../services/extension-registry-service";
 import { handleG2ApiRequest } from "./g2-api";
 
 function normalizePath(pathname: string) {
@@ -17,6 +18,7 @@ export function createHttpRequestHandler(
   vonage = new VonageService(),
   geminiLivePhone?: GeminiLivePhoneService,
   app?: OpenElinaroApp,
+  extensionRegistry?: ExtensionRegistryService,
 ) {
   return async (request: Request) => {
     const url = new URL(request.url, "http://localhost");
@@ -30,6 +32,11 @@ export function createHttpRequestHandler(
     if (app && pathname.startsWith("/api/g2")) {
       const g2Response = await handleG2ApiRequest(request, pathname, app);
       if (g2Response) return g2Response;
+    }
+
+    if (extensionRegistry && pathname.startsWith("/api/ext/")) {
+      const extResponse = await extensionRegistry.handleExtensionHttpRequest(request, pathname);
+      if (extResponse) return extResponse;
     }
     if (pathname === normalizePath(`${getVonageWebhookPath("voice.answer").replace(/\/answer$/, "")}/test-answer`)) {
       return Response.json([
@@ -101,11 +108,12 @@ export function startHttpServer(
   vonage = new VonageService(),
   geminiLivePhone = new GeminiLivePhoneService({ vonage }),
   app?: OpenElinaroApp,
+  extensionRegistry?: ExtensionRegistryService,
 ) {
   const config = getRuntimeConfig();
   const port = config.core.http.port || 3000;
   const hostname = config.core.http.host || "0.0.0.0";
-  const handler = createHttpRequestHandler(vonage, geminiLivePhone, app);
+  const handler = createHttpRequestHandler(vonage, geminiLivePhone, app, extensionRegistry);
 
   const server = Bun.serve<GeminiLivePhoneSocketData>({
     port,
