@@ -176,6 +176,20 @@ export const TOOL_LIBRARY_DEFINITIONS: readonly ToolLibraryDefinition[] = [
       "agent_status",
     ],
   },
+  {
+    id: "lights",
+    description: "Smart light control: status, color, temperature, brightness, on/off, pairing, and renaming.",
+    toolNames: [
+      "lights_status",
+      "lights_inspect",
+      "lights_set",
+      "lights_read",
+      "lights_on",
+      "lights_off",
+      "lights_pair",
+      "lights_rename",
+    ],
+  },
 ] as const;
 
 export function getToolLibraryDefinitions() {
