@@ -5,7 +5,7 @@ const g2Telemetry = telemetry.child({ component: "g2_api" });
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
@@ -185,6 +185,66 @@ export async function handleG2ApiRequest(
     }
   }
 
+  // ── POST /api/g2/routines — Create a new routine ──
+  if (pathname === "/api/g2/routines" && request.method === "POST") {
+    try {
+      const body = (await request.json()) as Record<string, unknown>;
+      if (!body.title || typeof body.title !== "string") {
+        return error("title is required");
+      }
+      const item = app.addRoutineItem({
+        title: body.title,
+        kind: (body.kind as any) ?? "routine",
+        priority: body.priority as any,
+        description: body.description as any,
+        schedule: (body.schedule as any) ?? { kind: "manual" },
+        labels: body.labels as any,
+        dose: body.dose as any,
+        alarm: body.alarm as any,
+        jobId: body.jobId as any,
+        projectId: body.projectId as any,
+        blockedBy: body.blockedBy as any,
+      });
+      return json(item, 201);
+    } catch (err: any) {
+      return error(err.message ?? "Failed to create routine", 500);
+    }
+  }
+
+  // ── PATCH | DELETE /api/g2/routines/:id ──
+  const routineIdMatch = pathname.match(/^\/api\/g2\/routines\/([^/]+)$/);
+  if (routineIdMatch?.[1]) {
+    const id = routineIdMatch[1];
+    if (request.method === "PATCH") {
+      try {
+        const body = (await request.json()) as Record<string, unknown>;
+        const item = app.updateRoutineItem(id, {
+          title: body.title as any,
+          description: body.description as any,
+          priority: body.priority as any,
+          kind: body.kind as any,
+          labels: body.labels as any,
+          schedule: body.schedule as any,
+          alarm: body.alarm as any,
+          jobId: body.jobId as any,
+          projectId: body.projectId as any,
+          blockedBy: body.blockedBy as any,
+        });
+        return json(item);
+      } catch (err: any) {
+        return error(err.message ?? "Failed to update routine", 500);
+      }
+    }
+    if (request.method === "DELETE") {
+      try {
+        app.deleteRoutineItem(id);
+        return json({ ok: true });
+      } catch (err: any) {
+        return error(err.message ?? "Failed to delete routine", 500);
+      }
+    }
+  }
+
   // ── GET /api/g2/todos ──
   if (pathname === "/api/g2/todos" && request.method === "GET") {
     const todos = app.listRoutineItems({ kind: "todo", status: "active" });
@@ -207,6 +267,62 @@ export async function handleG2ApiRequest(
       return json({ ok: true });
     } catch (err: any) {
       return error(err.message ?? "Failed to mark todo done", 500);
+    }
+  }
+
+  // ── POST /api/g2/todos — Create a new todo ──
+  if (pathname === "/api/g2/todos" && request.method === "POST") {
+    try {
+      const body = (await request.json()) as Record<string, unknown>;
+      if (!body.title || typeof body.title !== "string") {
+        return error("title is required");
+      }
+      const item = app.addRoutineItem({
+        title: body.title,
+        kind: "todo",
+        priority: body.priority as any,
+        description: body.description as any,
+        schedule: (body.schedule as any) ?? { kind: "once", dueAt: new Date().toISOString() },
+        labels: body.labels as any,
+        jobId: body.jobId as any,
+        projectId: body.projectId as any,
+        blockedBy: body.blockedBy as any,
+      });
+      return json(item, 201);
+    } catch (err: any) {
+      return error(err.message ?? "Failed to create todo", 500);
+    }
+  }
+
+  // ── PATCH | DELETE /api/g2/todos/:id ──
+  const todoIdMatch = pathname.match(/^\/api\/g2\/todos\/([^/]+)$/);
+  if (todoIdMatch?.[1]) {
+    const id = todoIdMatch[1];
+    if (request.method === "PATCH") {
+      try {
+        const body = (await request.json()) as Record<string, unknown>;
+        const item = app.updateRoutineItem(id, {
+          title: body.title as any,
+          description: body.description as any,
+          priority: body.priority as any,
+          labels: body.labels as any,
+          schedule: body.schedule as any,
+          jobId: body.jobId as any,
+          projectId: body.projectId as any,
+          blockedBy: body.blockedBy as any,
+        });
+        return json(item);
+      } catch (err: any) {
+        return error(err.message ?? "Failed to update todo", 500);
+      }
+    }
+    if (request.method === "DELETE") {
+      try {
+        app.deleteRoutineItem(id);
+        return json({ ok: true });
+      } catch (err: any) {
+        return error(err.message ?? "Failed to delete todo", 500);
+      }
     }
   }
 
