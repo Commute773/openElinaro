@@ -26,9 +26,20 @@ import { ToolResolutionService } from "../services/tool-resolution-service";
 import { ToolRegistry } from "../tools/tool-registry";
 import { telemetry } from "../services/telemetry";
 import { getRuntimeConfig } from "../config/runtime-config";
-import type { ShellRuntime as BaseShellRuntime, FilesystemRuntime } from "../tools/groups/tool-group-types";
 
-type ShellRuntime = BaseShellRuntime & Pick<ShellService, "execVerification">;
+type ShellRuntime = Pick<
+  ShellService,
+  | "consumeConversationNotifications"
+  | "exec"
+  | "execVerification"
+  | "launchBackground"
+  | "listBackgroundJobs"
+  | "readBackgroundOutput"
+>;
+type FilesystemRuntime = Pick<
+  FilesystemService,
+  "applyPatch" | "copyPath" | "deletePath" | "edit" | "glob" | "grep" | "listDir" | "mkdir" | "movePath" | "read" | "statPath" | "write"
+>;
 
 export type RuntimeScope = {
   profile: ProfileRecord;

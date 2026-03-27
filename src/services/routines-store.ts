@@ -1,3 +1,7 @@
+// TODO: Migrate from node:fs to Bun.file() per CLAUDE.md conventions.
+// Kept as node:fs for now because RoutinesStore.load()/save() are called synchronously
+// from 40+ methods in RoutinesService and cascading callers across 20+ files.
+// Converting to async Bun.file() requires making every caller async first.
 import fs from "node:fs";
 import path from "node:path";
 import type { RoutineItem, RoutineStoreData } from "../domain/routines";

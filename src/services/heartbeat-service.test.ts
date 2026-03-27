@@ -1,20 +1,33 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { HeartbeatService } from "./heartbeat-service";
 import { resolveAssistantContextPath } from "./runtime-user-content";
 
-const testRoot = createIsolatedRuntimeRoot("openelinaro-heartbeat-service-");
+let runtimeRoot = "";
+let previousRootDirEnv: string | undefined;
+
 beforeEach(() => {
-  testRoot.setup();
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-heartbeat-service-"));
+  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
   fs.mkdirSync(path.dirname(resolveAssistantContextPath("heartbeat.md")), { recursive: true });
   fs.writeFileSync(
     resolveAssistantContextPath("heartbeat.md"),
     "# Heartbeat\n\n- Test heartbeat instructions.\n",
   );
 });
-afterEach(() => testRoot.teardown());
+
+afterEach(() => {
+  if (previousRootDirEnv === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  }
+  fs.rmSync(runtimeRoot, { recursive: true, force: true });
+  runtimeRoot = "";
+});
 
 describe("HeartbeatService", () => {
   test("fallback heartbeat instructions require an email check", () => {

@@ -1,11 +1,14 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { ProfileRecord } from "../domain/profiles";
 import type { JobRecord, ProjectRecord } from "../domain/projects";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ProfileService } from "./profile-service";
 import { ProjectsService } from "./projects-service";
+
+let runtimeRoot = "";
+let previousRootDirEnv: string | undefined;
 
 function makeProfile(overrides: Partial<ProfileRecord> = {}): ProfileRecord {
   return {
@@ -102,13 +105,23 @@ function writeProjectsRegistry(rootDir: string, projects?: ProjectRecord[], jobs
   );
 }
 
-const testRoot = createIsolatedRuntimeRoot("openelinaro-projects-test-");
 beforeEach(() => {
-  testRoot.setup();
-  writeProfileRegistry(testRoot.path);
-  writeProjectsRegistry(testRoot.path);
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-projects-test-"));
+  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
+  writeProfileRegistry(runtimeRoot);
+  writeProjectsRegistry(runtimeRoot);
 });
-afterEach(() => testRoot.teardown());
+
+afterEach(() => {
+  if (previousRootDirEnv === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  }
+  fs.rmSync(runtimeRoot, { recursive: true, force: true });
+  runtimeRoot = "";
+});
 
 describe("ProjectsService", () => {
   test("loadRegistry returns projects and jobs", () => {
@@ -120,7 +133,7 @@ describe("ProjectsService", () => {
   });
 
   test("loadRegistry returns empty when no registry file exists", () => {
-    fs.rmSync(path.join(testRoot.path, ".openelinarotest", "projects"), { recursive: true, force: true });
+    fs.rmSync(path.join(runtimeRoot, ".openelinarotest", "projects"), { recursive: true, force: true });
     const profiles = new ProfileService("root");
     const service = new ProjectsService(profiles.getActiveProfile(), profiles);
     const registry = service.loadRegistry();
@@ -244,11 +257,11 @@ describe("ProjectsService", () => {
 
   test("resolveWorkspacePath returns override when present", () => {
     const profile = makeProfile({ id: "custom" });
-    writeProfileRegistry(testRoot.path, [
+    writeProfileRegistry(runtimeRoot, [
       makeProfile(),
       profile,
     ]);
-    writeProjectsRegistry(testRoot.path, [
+    writeProjectsRegistry(runtimeRoot, [
       {
         id: "proj",
         name: "Project",
@@ -313,7 +326,7 @@ describe("ProjectsService", () => {
   });
 
   test("buildAssistantContext reports no projects when empty", () => {
-    fs.rmSync(path.join(testRoot.path, ".openelinarotest", "projects"), { recursive: true, force: true });
+    fs.rmSync(path.join(runtimeRoot, ".openelinarotest", "projects"), { recursive: true, force: true });
     const profiles = new ProfileService("root");
     const service = new ProjectsService(profiles.getActiveProfile(), profiles);
     const context = service.buildAssistantContext();
@@ -342,7 +355,7 @@ describe("ProjectsService", () => {
   });
 
   test("loadRegistry skips invalid project entries and returns valid ones", () => {
-    const registryPath = path.join(testRoot.path, ".openelinarotest", "projects", "registry.json");
+    const registryPath = path.join(runtimeRoot, ".openelinarotest", "projects", "registry.json");
     const raw = JSON.parse(fs.readFileSync(registryPath, "utf8"));
     // Insert an invalid project (missing required fields like state, future)
     raw.projects.push({ id: "broken", name: "Broken" });
@@ -357,7 +370,7 @@ describe("ProjectsService", () => {
   });
 
   test("loadRegistry skips invalid job entries and returns valid ones", () => {
-    const registryPath = path.join(testRoot.path, ".openelinarotest", "projects", "registry.json");
+    const registryPath = path.join(runtimeRoot, ".openelinarotest", "projects", "registry.json");
     const raw = JSON.parse(fs.readFileSync(registryPath, "utf8"));
     raw.jobs.push({ id: "bad-job" });
     fs.writeFileSync(registryPath, JSON.stringify(raw, null, 2));
@@ -370,7 +383,7 @@ describe("ProjectsService", () => {
   });
 
   test("loadRegistry returns empty arrays when all entries are invalid", () => {
-    const registryPath = path.join(testRoot.path, ".openelinarotest", "projects", "registry.json");
+    const registryPath = path.join(runtimeRoot, ".openelinarotest", "projects", "registry.json");
     fs.writeFileSync(registryPath, JSON.stringify({
       version: 1,
       jobs: [{}],
@@ -385,7 +398,7 @@ describe("ProjectsService", () => {
   });
 
   test("loadRegistry still throws on corrupted envelope", () => {
-    const registryPath = path.join(testRoot.path, ".openelinarotest", "projects", "registry.json");
+    const registryPath = path.join(runtimeRoot, ".openelinarotest", "projects", "registry.json");
     fs.writeFileSync(registryPath, JSON.stringify({ version: "not-a-number" }));
 
     const profiles = new ProfileService("root");

@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { PromptDocumentSnapshot } from "../domain/prompt-snapshot";
 import type { ScheduledAlarm } from "./alarm-service";
 import { formatLocalTime } from "./local-time-service";
 import { getAssistantContextRoot } from "./runtime-user-content";
@@ -21,7 +20,12 @@ function getAlarmFilePath() {
   return path.join(getAssistantContextRoot(), ALARM_FILE_NAME);
 }
 
-export type AlarmNotificationSnapshot = PromptDocumentSnapshot;
+export interface AlarmNotificationSnapshot {
+  text: string;
+  path: string;
+  loadedAt: string;
+  charCount: number;
+}
 
 export class AlarmNotificationService {
   load(): AlarmNotificationSnapshot {

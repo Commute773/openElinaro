@@ -1,16 +1,17 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
 import { SecretStoreService } from "../services/secret-store-service";
 
 const repoRoot = process.cwd();
 
 let previousCwd = "";
+let previousRootDirEnv: string | undefined;
 let previousUserDataDirEnv: string | undefined;
-const testRoot = createIsolatedRuntimeRoot("openelinaro-active-model-connector-");
+let tempRoot = "";
 const transportAttempts: string[] = [];
 
 async function importFresh<T>(relativePath: string): Promise<T> {
@@ -20,9 +21,9 @@ async function importFresh<T>(relativePath: string): Promise<T> {
 }
 
 function writeProfileRegistry() {
-  fs.mkdirSync(path.join(testRoot.path, ".openelinarotest", "profiles"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "profiles"), { recursive: true });
   fs.writeFileSync(
-    path.join(testRoot.path, ".openelinarotest", "profiles/registry.json"),
+    path.join(tempRoot, ".openelinarotest", "profiles/registry.json"),
     `${JSON.stringify({
       version: 1,
       profiles: [
@@ -84,10 +85,12 @@ function buildProviderResponse(overrides?: Record<string, unknown>) {
 describe("ActiveModelConnector", () => {
   beforeAll(() => {
     previousCwd = process.cwd();
+    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
     previousUserDataDirEnv = process.env.OPENELINARO_USER_DATA_DIR;
-    testRoot.setup();
+    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-active-model-connector-"));
+    process.env.OPENELINARO_ROOT_DIR = tempRoot;
     delete process.env.OPENELINARO_USER_DATA_DIR;
-    process.chdir(testRoot.path);
+    process.chdir(tempRoot);
     writeProfileRegistry();
     writeCodexAuthStore();
 
@@ -140,11 +143,18 @@ describe("ActiveModelConnector", () => {
   afterAll(() => {
     mock.restore();
     process.chdir(previousCwd);
-    testRoot.teardown();
+    if (previousRootDirEnv === undefined) {
+      delete process.env.OPENELINARO_ROOT_DIR;
+    } else {
+      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+    }
     if (previousUserDataDirEnv === undefined) {
       delete process.env.OPENELINARO_USER_DATA_DIR;
     } else {
       process.env.OPENELINARO_USER_DATA_DIR = previousUserDataDirEnv;
+    }
+    if (tempRoot) {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
     }
   });
 
@@ -442,7 +452,7 @@ describe("ActiveModelConnector", () => {
       },
     } as never);
 
-    const ledgerPath = path.join(testRoot.path, ".openelinarotest", "model-usage.jsonl");
+    const ledgerPath = path.join(tempRoot, ".openelinarotest", "model-usage.jsonl");
     const records = fs.readFileSync(ledgerPath, "utf8")
       .trim()
       .split("\n")

@@ -1,14 +1,17 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { HumanMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ConversationStore } from "./conversation-store";
 import { MemoryService } from "./memory-service";
 import { ProfileService } from "./profile-service";
 import { ReflectionService } from "./reflection-service";
 import { RoutinesService } from "./routines-service";
 import { resolveAssistantContextPath } from "./runtime-user-content";
+
+let runtimeRoot = "";
+let previousRootDirEnv: string | undefined;
 
 function writeProfileRegistry(rootDir: string) {
   fs.mkdirSync(path.join(rootDir, ".openelinarotest", "profiles"), { recursive: true });
@@ -39,12 +42,22 @@ async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 
   throw new Error(`Timed out after ${timeoutMs}ms waiting for condition.`);
 }
 
-const testRoot = createIsolatedRuntimeRoot("openelinaro-reflection-");
 beforeEach(() => {
-  testRoot.setup();
-  writeProfileRegistry(testRoot.path);
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-reflection-"));
+  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
+  writeProfileRegistry(runtimeRoot);
 });
-afterEach(() => testRoot.teardown());
+
+afterEach(() => {
+  if (previousRootDirEnv === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  }
+  fs.rmSync(runtimeRoot, { recursive: true, force: true });
+  runtimeRoot = "";
+});
 
 describe("ReflectionService", () => {
   test("loads authored reflection prompt files from assistant_context", async () => {
@@ -103,7 +116,7 @@ describe("ReflectionService", () => {
     const profile = profiles.getActiveProfile();
     const routines = new RoutinesService();
     const conversations = new ConversationStore();
-    conversations.appendMessages("dm-1", [new HumanMessage("We should clean up the finance onboarding.")]);
+    await conversations.appendMessages("dm-1", [new HumanMessage("We should clean up the finance onboarding.")]);
     const memory = new MemoryService(profile, profiles);
     const reflection = new ReflectionService(
       profile,
@@ -142,7 +155,7 @@ describe("ReflectionService", () => {
     const profile = profiles.getActiveProfile();
     const routines = new RoutinesService();
     const conversations = new ConversationStore();
-    conversations.appendMessages("dm-2", [new HumanMessage("The reminder system still feels too passive.")]);
+    await conversations.appendMessages("dm-2", [new HumanMessage("The reminder system still feels too passive.")]);
     const memory = new MemoryService(profile, profiles);
     const reflection = new ReflectionService(
       profile,

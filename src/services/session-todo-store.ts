@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { mkdir, chmod } from "node:fs/promises";
 import path from "node:path";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 
@@ -40,51 +40,51 @@ function normalizeTodo(item: SessionTodoItem): SessionTodoItem {
 export class SessionTodoStore {
   constructor(private readonly storePath = resolveRuntimePath("session-todos.json")) {}
 
-  get(conversationKey: string): SessionTodoItem[] {
-    const store = this.readStore();
+  async get(conversationKey: string): Promise<SessionTodoItem[]> {
+    const store = await this.readStore();
     return (store.conversations[conversationKey] ?? []).map(normalizeTodo);
   }
 
-  update(conversationKey: string, todos: SessionTodoItem[]) {
+  async update(conversationKey: string, todos: SessionTodoItem[]) {
     const normalized = todos.map(normalizeTodo);
     const inProgressCount = normalized.filter((item) => item.status === "in_progress").length;
     if (inProgressCount > 1) {
       throw new Error("Only one todo item can be in_progress at a time.");
     }
 
-    const store = this.readStore();
+    const store = await this.readStore();
     if (normalized.length === 0) {
       delete store.conversations[conversationKey];
     } else {
       store.conversations[conversationKey] = normalized;
     }
-    this.writeStore(store);
+    await this.writeStore(store);
     return normalized;
   }
 
-  clear(conversationKey: string) {
-    const store = this.readStore();
+  async clear(conversationKey: string) {
+    const store = await this.readStore();
     if (!(conversationKey in store.conversations)) {
       return;
     }
     delete store.conversations[conversationKey];
-    this.writeStore(store);
+    await this.writeStore(store);
   }
 
-  private ensureStoreDir() {
-    fs.mkdirSync(path.dirname(this.storePath), { recursive: true });
+  private async ensureStoreDir() {
+    await mkdir(path.dirname(this.storePath), { recursive: true });
   }
 
-  private readStore(): SessionTodoStoreShape {
-    this.ensureStoreDir();
-    if (!fs.existsSync(this.storePath)) {
+  private async readStore(): Promise<SessionTodoStoreShape> {
+    await this.ensureStoreDir();
+    if (!(await Bun.file(this.storePath).exists())) {
       return {
         version: 1,
         conversations: {},
       };
     }
 
-    const parsed = JSON.parse(fs.readFileSync(this.storePath, "utf8")) as Partial<SessionTodoStoreShape>;
+    const parsed = JSON.parse(await Bun.file(this.storePath).text()) as Partial<SessionTodoStoreShape>;
     return {
       version: 1,
       conversations: Object.fromEntries(
@@ -96,9 +96,10 @@ export class SessionTodoStore {
     };
   }
 
-  private writeStore(store: SessionTodoStoreShape) {
+  private async writeStore(store: SessionTodoStoreShape) {
     assertTestRuntimeRootIsIsolated("Session todo store");
-    this.ensureStoreDir();
-    fs.writeFileSync(this.storePath, `${JSON.stringify(store, null, 2)}\n`, { mode: 0o600 });
+    await this.ensureStoreDir();
+    await Bun.write(this.storePath, `${JSON.stringify(store, null, 2)}\n`);
+    await chmod(this.storePath, 0o600);
   }
 }

@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { mkdir, chmod } from "node:fs/promises";
 import path from "node:path";
 import {
   AIMessage,
@@ -73,24 +73,26 @@ function getStorePath() {
   return resolveRuntimePath("conversations.json");
 }
 
-function ensureStoreDir() {
-  fs.mkdirSync(path.dirname(getStorePath()), { recursive: true });
+async function ensureStoreDir() {
+  await mkdir(path.dirname(getStorePath()), { recursive: true });
 }
 
-function readStore(): ConversationStoreShape {
-  ensureStoreDir();
+async function readStore(): Promise<ConversationStoreShape> {
+  await ensureStoreDir();
   const storePath = getStorePath();
-  if (!fs.existsSync(storePath)) {
+  if (!(await Bun.file(storePath).exists())) {
     return { conversations: {} };
   }
 
-  return JSON.parse(fs.readFileSync(storePath, "utf8")) as ConversationStoreShape;
+  return JSON.parse(await Bun.file(storePath).text()) as ConversationStoreShape;
 }
 
-function writeStore(store: ConversationStoreShape) {
+async function writeStore(store: ConversationStoreShape) {
   assertTestRuntimeRootIsIsolated("Conversation store");
-  ensureStoreDir();
-  fs.writeFileSync(getStorePath(), `${JSON.stringify(store, null, 2)}\n`, { mode: 0o600 });
+  await ensureStoreDir();
+  const storePath = getStorePath();
+  await Bun.write(storePath, `${JSON.stringify(store, null, 2)}\n`);
+  await chmod(storePath, 0o600);
 }
 
 function encodeMessages(messages: BaseMessage[]) {
@@ -201,8 +203,8 @@ export class ConversationStore {
     this.history = options?.history ?? new ConversationHistoryService();
   }
 
-  list(): ConversationState[] {
-    const store = readStore();
+  async list(): Promise<ConversationState[]> {
+    const store = await readStore();
     return Object.values(store.conversations)
       .map((entry) => ({
         key: entry.key,
@@ -213,23 +215,12 @@ export class ConversationStore {
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
-  listSummaries(): Array<{ key: string; messageCount: number; updatedAt: string }> {
-    const store = readStore();
-    return Object.values(store.conversations)
-      .map((entry) => ({
-        key: entry.key,
-        messageCount: entry.messages.length,
-        updatedAt: entry.updatedAt,
-      }))
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  async getLatest(): Promise<ConversationState | undefined> {
+    return (await this.list()).at(0);
   }
 
-  getLatest(): ConversationState | undefined {
-    return this.list().at(0);
-  }
-
-  get(key: string): ConversationState {
-    const store = readStore();
+  async get(key: string): Promise<ConversationState> {
+    const store = await readStore();
     const existing = store.conversations[key];
     if (!existing) {
       return {
@@ -248,7 +239,7 @@ export class ConversationStore {
       systemPrompt: existing.systemPrompt,
     };
     store.conversations[key] = normalized;
-    writeStore(store);
+    await writeStore(store);
 
     return {
       key,
@@ -258,8 +249,8 @@ export class ConversationStore {
     };
   }
 
-  private save(state: ConversationState): ConversationState {
-    const store = readStore();
+  private async save(state: ConversationState): Promise<ConversationState> {
+    const store = await readStore();
     const existing = store.conversations[state.key];
     const nextMessages = encodeMessages(state.messages);
     let currentMessages: StoredMessage[] = [];
@@ -284,7 +275,7 @@ export class ConversationStore {
       systemPrompt: state.systemPrompt ?? existing?.systemPrompt,
     };
     store.conversations[state.key] = nextState;
-    writeStore(store);
+    await writeStore(store);
 
     try {
       if (isStoredMessagePrefix(currentMessages, nextMessages) && nextMessages.length > currentMessages.length) {
@@ -321,13 +312,13 @@ export class ConversationStore {
     };
   }
 
-  appendMessages(
+  async appendMessages(
     key: string,
     messages: BaseMessage[],
     options?: { systemPrompt?: SystemPromptSnapshot },
-  ) {
+  ): Promise<ConversationState> {
     if (messages.length === 0) {
-      const conversation = this.get(key);
+      const conversation = await this.get(key);
       if (options?.systemPrompt) {
         return this.save({
           ...conversation,
@@ -337,7 +328,7 @@ export class ConversationStore {
       return conversation;
     }
 
-    const conversation = this.get(key);
+    const conversation = await this.get(key);
     return this.save({
       ...conversation,
       messages: conversation.messages.concat(messages),
@@ -345,12 +336,12 @@ export class ConversationStore {
     });
   }
 
-  rollbackMessages(
+  async rollbackMessages(
     key: string,
     count: number,
     options?: { systemPrompt?: SystemPromptSnapshot },
-  ) {
-    const conversation = this.get(key);
+  ): Promise<ConversationState> {
+    const conversation = await this.get(key);
     const safeCount = Math.max(0, Math.floor(count));
     return this.save({
       ...conversation,
@@ -359,13 +350,13 @@ export class ConversationStore {
     });
   }
 
-  rollbackAndAppend(
+  async rollbackAndAppend(
     key: string,
     rollbackCount: number,
     messages: BaseMessage[],
     options?: { systemPrompt?: SystemPromptSnapshot },
-  ) {
-    const rolledBack = this.rollbackMessages(key, rollbackCount, options);
+  ): Promise<ConversationState> {
+    const rolledBack = await this.rollbackMessages(key, rollbackCount, options);
     if (messages.length === 0) {
       return rolledBack;
     }
@@ -374,8 +365,8 @@ export class ConversationStore {
     });
   }
 
-  ensureSystemPrompt(key: string, snapshot: SystemPromptSnapshot): ConversationState {
-    const conversation = this.get(key);
+  async ensureSystemPrompt(key: string, snapshot: SystemPromptSnapshot): Promise<ConversationState> {
+    const conversation = await this.get(key);
     if (conversation.systemPrompt) {
       return conversation;
     }
@@ -386,8 +377,8 @@ export class ConversationStore {
     });
   }
 
-  replaceSystemPrompt(key: string, snapshot: SystemPromptSnapshot): ConversationState {
-    const conversation = this.get(key);
+  async replaceSystemPrompt(key: string, snapshot: SystemPromptSnapshot): Promise<ConversationState> {
+    const conversation = await this.get(key);
     return this.save({
       ...conversation,
       systemPrompt: snapshot,

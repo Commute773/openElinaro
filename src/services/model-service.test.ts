@@ -2,9 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { HumanMessage } from "@langchain/core/messages";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { ProfileRecord } from "../domain/profiles";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import type { ActiveModelSelection } from "./model-service";
 import { ModelService, resolveListedModelIdentifier, resolveRuntimeModelIdentifier } from "./model-service";
 import { UsageTrackingService } from "./usage-tracking-service";
@@ -67,7 +66,7 @@ describe("ModelService.getInferenceOptions", () => {
 });
 
 describe("ModelService.getActiveModel", () => {
-  test("uses the profile default thinking level when no stored selection exists", () => {
+  test("uses the profile default thinking level when no stored selection exists", async () => {
     const previousCwd = process.cwd();
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-service-"));
     process.chdir(tempRoot);
@@ -78,7 +77,7 @@ describe("ModelService.getActiveModel", () => {
         defaultThinkingLevel: "high",
       });
 
-      expect(service.getActiveModel()).toMatchObject({
+      expect(await service.getActiveModel()).toMatchObject({
         providerId: "openai-codex",
         modelId: "gpt-5.4",
         thinkingLevel: "high",
@@ -89,7 +88,7 @@ describe("ModelService.getActiveModel", () => {
     }
   });
 
-  test("supports a separate subagent default model selection scope", () => {
+  test("supports a separate subagent default model selection scope", async () => {
     const previousCwd = process.cwd();
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-service-"));
     process.chdir(tempRoot);
@@ -116,11 +115,11 @@ describe("ModelService.getActiveModel", () => {
         },
       });
 
-      expect(interactive.getActiveModel()).toMatchObject({
+      expect(await interactive.getActiveModel()).toMatchObject({
         providerId: "claude",
         modelId: "claude-opus-4-6-20260301",
       });
-      expect(subagent.getActiveModel()).toMatchObject({
+      expect(await subagent.getActiveModel()).toMatchObject({
         providerId: "openai-codex",
         modelId: "gpt-5.4",
       });
@@ -130,7 +129,7 @@ describe("ModelService.getActiveModel", () => {
     }
   });
 
-  test("supports a separate subagent default thinking level override", () => {
+  test("supports a separate subagent default thinking level override", async () => {
     const previousCwd = process.cwd();
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-service-"));
     process.chdir(tempRoot);
@@ -146,7 +145,7 @@ describe("ModelService.getActiveModel", () => {
         },
       });
 
-      expect(subagent.getActiveModel()).toMatchObject({
+      expect(await subagent.getActiveModel()).toMatchObject({
         thinkingLevel: "high",
       });
     } finally {
@@ -155,7 +154,7 @@ describe("ModelService.getActiveModel", () => {
     }
   });
 
-  test("caps the active context window when the profile defines an artificial max", () => {
+  test("caps the active context window when the profile defines an artificial max", async () => {
     const service = new ModelService({
       ...TEST_PROFILE,
       maxContextTokens: 200_000,
@@ -163,7 +162,7 @@ describe("ModelService.getActiveModel", () => {
       defaultModelId: "gpt-5.4",
     });
 
-    expect(service.getActiveExtendedContextStatus()).toMatchObject({
+    expect(await service.getActiveExtendedContextStatus()).toMatchObject({
       activeContextWindow: 200_000,
     });
   });
@@ -386,11 +385,12 @@ describe("ModelService.inspectContextWindowUsage", () => {
 });
 
 describe("ModelService recorded usage inspection", () => {
-  const usageTestRoot = createIsolatedRuntimeRoot("openelinaro-model-usage-");
-  beforeEach(() => usageTestRoot.setup());
-  afterEach(() => usageTestRoot.teardown());
-
   test("scopes model usage inspection to the active profile", () => {
+    const previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-usage-inspection-"));
+    process.env.OPENELINARO_ROOT_DIR = tempRoot;
+
+    try {
       const usageTracking = new UsageTrackingService();
       usageTracking.record({
         profileId: TEST_PROFILE.id,
@@ -448,9 +448,22 @@ describe("ModelService recorded usage inspection", () => {
       expect(inspection.model.requestCount).toBe(1);
       expect(inspection.model.totalTokens).toBe(140);
       expect(inspection.model.cost.total).toBe(0.0315);
+    } finally {
+      if (previousRootDirEnv === undefined) {
+        delete process.env.OPENELINARO_ROOT_DIR;
+      } else {
+        process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+      }
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test("summarizes local-day usage for the active profile and conversation", () => {
+    const previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-usage-day-"));
+    process.env.OPENELINARO_ROOT_DIR = tempRoot;
+
+    try {
       const usageTracking = new UsageTrackingService();
       usageTracking.record({
         id: "root-day-1",
@@ -545,6 +558,14 @@ describe("ModelService recorded usage inspection", () => {
       expect(inspection.latestModelDayRecord?.id).toBe("root-day-2");
       expect(inspection.providerBudgetRemaining).toBe(750_000);
       expect(inspection.providerBudgetSource).toBe("provider");
+    } finally {
+      if (previousRootDirEnv === undefined) {
+        delete process.env.OPENELINARO_ROOT_DIR;
+      } else {
+        process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+      }
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 });
 

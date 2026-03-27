@@ -1,5 +1,6 @@
-import { resolveRuntimePath } from "./runtime-root";
-import { JsonStateService } from "./json-state-service";
+import fs from "node:fs";
+import path from "node:path";
+import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 
 export interface DocsIndexState {
   lastCompletedAt?: string;
@@ -38,13 +39,28 @@ function normalizeDocsIndexState(raw: unknown): DocsIndexState {
   };
 }
 
-export class DocsIndexStateService extends JsonStateService<DocsIndexState> {
-  constructor(filePath = getDocsIndexStateFilePath()) {
-    super(filePath);
+export class DocsIndexStateService {
+  constructor(private readonly filePath = getDocsIndexStateFilePath()) {}
+
+  load(): DocsIndexState {
+    if (!fs.existsSync(this.filePath)) {
+      return {};
+    }
+
+    try {
+      const raw = JSON.parse(fs.readFileSync(this.filePath, "utf8")) as unknown;
+      return normalizeDocsIndexState(raw);
+    } catch {
+      return {};
+    }
   }
 
-  protected normalize(raw: unknown): DocsIndexState {
-    return normalizeDocsIndexState(raw);
+  save(state: DocsIndexState): DocsIndexState {
+    assertTestRuntimeRootIsIsolated("Docs index state");
+    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+    const normalized = normalizeDocsIndexState(state);
+    fs.writeFileSync(this.filePath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 });
+    return normalized;
   }
 }
 

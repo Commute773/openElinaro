@@ -1,9 +1,9 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { ProfileRecord } from "../domain/profiles";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 import { ConversationCompactionService } from "./conversation-compaction-service";
 import { MemoryService } from "./memory-service";
@@ -17,18 +17,26 @@ const ROOT_PROFILE: ProfileRecord = {
 };
 
 let previousCwd = "";
+let previousRootDir = "";
+let tempRoot = "";
 
-const testRoot = createIsolatedRuntimeRoot("conversation-compaction-");
 beforeEach(() => {
   previousCwd = process.cwd();
-  testRoot.setup();
-  process.chdir(testRoot.path);
-  fs.mkdirSync(path.join(testRoot.path, ".openelinarotest", "memory", "documents", "root"), { recursive: true });
+  previousRootDir = process.env.OPENELINARO_ROOT_DIR ?? "";
+  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "conversation-compaction-"));
+  process.env.OPENELINARO_ROOT_DIR = tempRoot;
+  process.chdir(tempRoot);
+  fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "memory", "documents", "root"), { recursive: true });
 });
 
 afterEach(() => {
   process.chdir(previousCwd);
-  testRoot.teardown();
+  if (previousRootDir) {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDir;
+  } else {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  }
+  fs.rmSync(tempRoot, { recursive: true, force: true });
 });
 
 describe("ConversationCompactionService", () => {

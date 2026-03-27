@@ -418,7 +418,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         traceSpan(
           "tool.model",
           async () => {
-            const active = ctx.models.getActiveModel();
+            const active = await ctx.models.getActiveModel();
             const action = input.action
               ?? (input.modelId ? "select" : input.thinkingLevel ? "set_thinking" : input.enabled !== undefined ? "set_extended_context" : "status");
 
@@ -426,7 +426,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
               return [
                 `Active model: ${active.providerId}/${active.modelId}`,
                 `Thinking: ${active.thinkingLevel}`,
-                ...renderExtendedContextStatus(ctx.models.getActiveExtendedContextStatus()),
+                ...renderExtendedContextStatus(await ctx.models.getActiveExtendedContextStatus()),
                 "Actions: status, list, select, set_thinking, set_extended_context",
               ].join("\n");
             }
@@ -442,7 +442,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
                 `Provider: ${ctx.models.getProviderLabel(provider)}`,
                 provider === active.providerId ? `Thinking: ${active.thinkingLevel}` : "",
                 provider === active.providerId
-                  ? renderExtendedContextStatus(ctx.models.getActiveExtendedContextStatus()).join("\n")
+                  ? renderExtendedContextStatus(await ctx.models.getActiveExtendedContextStatus()).join("\n")
                   : "",
                 ...models.map((model) =>
                   [
@@ -467,8 +467,8 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
               const selected = await ctx.models.selectActiveModel(provider, input.modelId.trim());
               return [
                 `Active model set to ${selected.providerId}/${selected.modelId}.`,
-                `Thinking: ${ctx.models.getActiveModel().thinkingLevel}.`,
-                ...renderExtendedContextStatus(ctx.models.getActiveExtendedContextStatus()),
+                `Thinking: ${(await ctx.models.getActiveModel()).thinkingLevel}.`,
+                ...renderExtendedContextStatus(await ctx.models.getActiveExtendedContextStatus()),
                 selected.contextWindow ? `Context window: ${selected.contextWindow} tokens.` : "",
                 selected.maxOutputTokens ? `Max output: ${selected.maxOutputTokens} tokens.` : "",
               ]
@@ -480,21 +480,21 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
               if (!input.thinkingLevel) {
                 throw new Error("thinkingLevel is required for action=set_thinking.");
               }
-              const updated = ctx.models.setThinkingLevel(input.thinkingLevel);
+              const updated = await ctx.models.setThinkingLevel(input.thinkingLevel);
               return [
                 `Thinking level set to ${updated.thinkingLevel}.`,
                 `Active model: ${updated.providerId}/${updated.modelId}`,
-                ...renderExtendedContextStatus(ctx.models.getActiveExtendedContextStatus()),
+                ...renderExtendedContextStatus(await ctx.models.getActiveExtendedContextStatus()),
               ].join("\n");
             }
 
             if (input.enabled === undefined) {
               throw new Error("enabled is required for action=set_extended_context.");
             }
-            const updated = ctx.models.setExtendedContextEnabled(input.enabled);
+            const updated = await ctx.models.setExtendedContextEnabled(input.enabled);
             return [
               `Extended context ${updated.extendedContextEnabled ? "enabled" : "disabled"}.`,
-              ...renderExtendedContextStatus(ctx.models.getActiveExtendedContextStatus()),
+              ...renderExtendedContextStatus(await ctx.models.getActiveExtendedContextStatus()),
             ].join("\n");
           },
           { attributes: input },
@@ -1020,7 +1020,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
               "Benchmark results:",
               "",
               `Active model: ${modelBenchmark.providerId}/${modelBenchmark.modelId}`,
-              `Thinking: ${ctx.models.getActiveModel().thinkingLevel}`,
+              `Thinking: ${(await ctx.models.getActiveModel()).thinkingLevel}`,
               `TTFT: ${formatDurationMs(modelBenchmark.ttftMs)}`,
               `TPS: ${modelBenchmark.tokensPerSecond?.toFixed(2) ?? "n/a"} output tok/s`,
               `Output tokens: ${modelBenchmark.outputTokens} (${modelBenchmark.outputTokenSource})`,
@@ -1071,7 +1071,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
         });
         const latestTagVersion = tagResult.stdout?.trim() ?? "";
         try {
-          return ctx.deploymentVersion.formatAvailableUpdate(latestTagVersion);
+          return await ctx.deploymentVersion.formatAvailableUpdate(latestTagVersion);
         } catch (error) {
           const detail = error instanceof Error ? error.message : String(error);
           return [
@@ -1101,8 +1101,8 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
           timeoutMs: 10_000,
         });
         const latestTagVersion = tagResult.exitCode === 0 ? tagResult.stdout?.trim() ?? "" : "";
-        if (!ctx.deploymentVersion.hasPreparedUpdate()) {
-          return ctx.deploymentVersion.formatPreparedUpdate(latestTagVersion);
+        if (!await ctx.deploymentVersion.hasPreparedUpdate()) {
+          return await ctx.deploymentVersion.formatPreparedUpdate(latestTagVersion);
         }
         const result = await ctx.shell.exec({
           command: buildServiceCommand("update", timeoutMs, {
@@ -1121,7 +1121,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
       async () =>
         traceSpan(
           "tool.service_version",
-          async () => ctx.deploymentVersion.formatSummary(),
+          async () => await ctx.deploymentVersion.formatSummary(),
         ),
       {
         name: "service_version",
@@ -1134,7 +1134,7 @@ export function buildSystemTools(ctx: ToolBuildContext): StructuredToolInterface
       async (input) =>
         traceSpan(
           "tool.service_changelog_since_version",
-          async () => ctx.deploymentVersion.formatChangelogSinceVersion(
+          async () => await ctx.deploymentVersion.formatChangelogSinceVersion(
             input.sinceVersion ?? input.version ?? "",
             { limit: input.limit },
           ),

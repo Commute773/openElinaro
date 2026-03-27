@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { mkdir, chmod, rm } from "node:fs/promises";
 import path from "node:path";
 import { resolveUserDataPath } from "./runtime-root";
 import { timestamp } from "../utils/timestamp";
@@ -19,33 +19,34 @@ export class ServiceRestartNoticeService {
     private readonly storePath = resolveUserDataPath("service-restart-notice.json"),
   ) {}
 
-  recordPendingNotice(params?: { message?: string; source?: string }) {
+  async recordPendingNotice(params?: { message?: string; source?: string }) {
     const notice: StoredServiceRestartNotice = {
       message: params?.message?.trim() || DEFAULT_SERVICE_RESTART_CONTINUATION_MESSAGE,
       requestedAt: timestamp(),
       source: params?.source?.trim() || undefined,
     };
-    fs.mkdirSync(path.dirname(this.storePath), { recursive: true });
-    fs.writeFileSync(this.storePath, `${JSON.stringify(notice, null, 2)}\n`, { mode: 0o600 });
+    await mkdir(path.dirname(this.storePath), { recursive: true });
+    await Bun.write(this.storePath, `${JSON.stringify(notice, null, 2)}\n`);
+    await chmod(this.storePath, 0o600);
     return notice;
   }
 
-  clearPendingNotice() {
-    if (!fs.existsSync(this.storePath)) {
+  async clearPendingNotice() {
+    if (!(await Bun.file(this.storePath).exists())) {
       return;
     }
-    fs.rmSync(this.storePath, { force: true });
+    await rm(this.storePath, { force: true });
   }
 
-  consumePendingNotice(): PendingServiceRestartNotice | undefined {
-    if (!fs.existsSync(this.storePath)) {
+  async consumePendingNotice(): Promise<PendingServiceRestartNotice | undefined> {
+    if (!(await Bun.file(this.storePath).exists())) {
       return undefined;
     }
 
     try {
-      const parsed = JSON.parse(fs.readFileSync(this.storePath, "utf8")) as Partial<StoredServiceRestartNotice>;
+      const parsed = JSON.parse(await Bun.file(this.storePath).text()) as Partial<StoredServiceRestartNotice>;
       if (!parsed.message || typeof parsed.message !== "string") {
-        this.clearPendingNotice();
+        await this.clearPendingNotice();
         return undefined;
       }
       const notice: PendingServiceRestartNotice = {
@@ -55,10 +56,10 @@ export class ServiceRestartNoticeService {
           : timestamp(),
         source: typeof parsed.source === "string" && parsed.source.trim() ? parsed.source : undefined,
       };
-      this.clearPendingNotice();
+      await this.clearPendingNotice();
       return notice;
     } catch {
-      this.clearPendingNotice();
+      await this.clearPendingNotice();
       return undefined;
     }
   }

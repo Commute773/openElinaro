@@ -14,14 +14,10 @@ function withIsolatedUserData() {
   return dir;
 }
 
-function writeExtension(base: string, id: string, manifest: Record<string, unknown>, entrypointSource?: string) {
+function writeExtension(base: string, id: string, manifest: Record<string, unknown>) {
   const extDir = path.join(base, "extensions", id);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(path.join(extDir, "extension.json"), JSON.stringify(manifest));
-  if (entrypointSource !== undefined) {
-    const entrypoint = (manifest.entrypoint as string) ?? "index.ts";
-    fs.writeFileSync(path.join(extDir, entrypoint), entrypointSource);
-  }
 }
 
 beforeEach(() => {
@@ -40,14 +36,14 @@ afterEach(() => {
 });
 
 describe("ExtensionRegistryService", () => {
-  test("scan returns empty when extensions dir does not exist", () => {
+  test("scan returns empty when extensions dir does not exist", async () => {
     withIsolatedUserData();
     const svc = new ExtensionRegistryService();
-    const result = svc.scan();
+    const result = await svc.scan();
     expect(result).toEqual([]);
   });
 
-  test("scan discovers a valid extension", () => {
+  test("scan discovers a valid extension", async () => {
     const base = withIsolatedUserData();
     writeExtension(base, "hello-world", {
       id: "hello-world",
@@ -59,7 +55,7 @@ describe("ExtensionRegistryService", () => {
     });
 
     const svc = new ExtensionRegistryService();
-    const result = svc.scan();
+    const result = await svc.scan();
     expect(result.length).toBe(1);
     const ext = result[0]!;
     expect(ext.status).toBe("valid");
@@ -68,13 +64,13 @@ describe("ExtensionRegistryService", () => {
     expect(ext.error).toBeNull();
   });
 
-  test("scan marks extension as discovered when manifest is missing", () => {
+  test("scan marks extension as discovered when manifest is missing", async () => {
     const base = withIsolatedUserData();
     const extDir = path.join(base, "extensions", "no-manifest");
     fs.mkdirSync(extDir, { recursive: true });
 
     const svc = new ExtensionRegistryService();
-    const result = svc.scan();
+    const result = await svc.scan();
     expect(result.length).toBe(1);
     const ext = result[0]!;
     expect(ext.status).toBe("discovered");
@@ -82,12 +78,12 @@ describe("ExtensionRegistryService", () => {
     expect(ext.error).toContain("Missing extension.json");
   });
 
-  test("scan marks extension as invalid when manifest fails validation", () => {
+  test("scan marks extension as invalid when manifest fails validation", async () => {
     const base = withIsolatedUserData();
     writeExtension(base, "bad-ext", { id: "BAD ID!", version: "1.0.0" });
 
     const svc = new ExtensionRegistryService();
-    const result = svc.scan();
+    const result = await svc.scan();
     expect(result.length).toBe(1);
     const ext = result[0]!;
     expect(ext.status).toBe("invalid");
@@ -95,7 +91,7 @@ describe("ExtensionRegistryService", () => {
     expect(ext.error).toBeTruthy();
   });
 
-  test("listValid returns only valid extensions", () => {
+  test("listValid returns only valid extensions", async () => {
     const base = withIsolatedUserData();
     writeExtension(base, "good", {
       id: "good",
@@ -106,126 +102,34 @@ describe("ExtensionRegistryService", () => {
     writeExtension(base, "bad", { id: "BAD!", version: "nope" });
 
     const svc = new ExtensionRegistryService();
-    svc.scan();
+    await svc.scan();
     expect(svc.listValid().length).toBe(1);
     expect(svc.list().length).toBe(2);
   });
 
-  test("loadAll loads extension with activate function", async () => {
+  test("loadAll logs stub message without crashing", async () => {
     const base = withIsolatedUserData();
-    writeExtension(
-      base,
-      "test-ext",
-      { id: "test-ext", name: "Test Extension", version: "1.0.0", entrypoint: "index.ts" },
-      `export function activate(api) { api.registerTool("greet", {}, async () => "hello"); }`,
-    );
+    writeExtension(base, "stub", {
+      id: "stub",
+      name: "Stub",
+      version: "1.0.0",
+      entrypoint: "index.ts",
+    });
 
     const svc = new ExtensionRegistryService();
-    svc.scan();
-    await svc.loadAll();
-
-    const ext = svc.list().find((e) => e.manifest?.id === "test-ext");
-    expect(ext?.status).toBe("loaded");
-    expect(svc.getRegisteredTools().has("test-ext.greet")).toBe(true);
+    await svc.scan();
+    // Should not throw
+    svc.loadAll();
   });
 
-  test("loadAll sets error status when entrypoint has no activate", async () => {
-    const base = withIsolatedUserData();
-    writeExtension(
-      base,
-      "no-activate",
-      { id: "no-activate", name: "No Activate", version: "1.0.0", entrypoint: "index.ts" },
-      `export const value = 42;`,
-    );
-
-    const svc = new ExtensionRegistryService();
-    svc.scan();
-    await svc.loadAll();
-
-    const ext = svc.list().find((e) => e.manifest?.id === "no-activate");
-    expect(ext?.status).toBe("error");
-    expect(ext?.error).toContain("activate");
-  });
-
-  test("loadAll continues loading after one extension fails", async () => {
-    const base = withIsolatedUserData();
-    writeExtension(
-      base,
-      "broken",
-      { id: "broken", name: "Broken", version: "1.0.0", entrypoint: "index.ts" },
-      `export function activate() { throw new Error("boom"); }`,
-    );
-    writeExtension(
-      base,
-      "good",
-      { id: "good", name: "Good", version: "1.0.0", entrypoint: "index.ts" },
-      `export function activate(api) { api.registerTool("ping", {}, async () => "pong"); }`,
-    );
-
-    const svc = new ExtensionRegistryService();
-    svc.scan();
-    await svc.loadAll();
-
-    const broken = svc.list().find((e) => e.manifest?.id === "broken");
-    const good = svc.list().find((e) => e.manifest?.id === "good");
-    expect(broken?.status).toBe("error");
-    expect(good?.status).toBe("loaded");
-  });
-
-  test("emitEvent calls subscribed handlers", async () => {
-    const base = withIsolatedUserData();
-    writeExtension(
-      base,
-      "eventer",
-      { id: "eventer", name: "Eventer", version: "1.0.0", entrypoint: "index.ts" },
-      `export const received = [];
-export function activate(api) {
-  api.onEvent("test-event", (...args) => received.push(args));
-}`,
-    );
-
-    const svc = new ExtensionRegistryService();
-    svc.scan();
-    await svc.loadAll();
-
-    svc.emitEvent("test-event", "a", 1);
-    const extDir = path.join(base, "extensions", "eventer");
-    const mod = await import(path.join(extDir, "index.ts"));
-    expect(mod.received.length).toBe(1);
-    expect(mod.received[0]).toEqual(["a", 1]);
-  });
-
-  test("registerToolLibrary stores library registration", async () => {
-    const base = withIsolatedUserData();
-    writeExtension(
-      base,
-      "lib-ext",
-      { id: "lib-ext", name: "Lib Ext", version: "1.0.0", entrypoint: "index.ts" },
-      `export function activate(api) {
-  api.registerTool("foo", {}, async () => "foo");
-  api.registerTool("bar", {}, async () => "bar");
-  api.registerToolLibrary("my-lib", "A test library", ["foo", "bar"]);
-}`,
-    );
-
-    const svc = new ExtensionRegistryService();
-    svc.scan();
-    await svc.loadAll();
-
-    const lib = svc.getRegisteredLibraries().get("my-lib");
-    expect(lib).toBeTruthy();
-    expect(lib!.extensionId).toBe("lib-ext");
-    expect(lib!.toolNames).toEqual(["foo", "bar"]);
-  });
-
-  test("scan ignores non-directory entries", () => {
+  test("scan ignores non-directory entries", async () => {
     const base = withIsolatedUserData();
     const extDir = path.join(base, "extensions");
     fs.mkdirSync(extDir, { recursive: true });
     fs.writeFileSync(path.join(extDir, "stray-file.txt"), "not a directory");
 
     const svc = new ExtensionRegistryService();
-    const result = svc.scan();
+    const result = await svc.scan();
     expect(result.length).toBe(0);
   });
 });

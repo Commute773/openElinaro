@@ -26,7 +26,7 @@ describe("deployment version service", () => {
     tempRoot = "";
   });
 
-  test("reads VERSION.json from the active service root", () => {
+  test("reads VERSION.json from the active service root", async () => {
     const resolvedRoot = path.resolve(tempRoot);
     fs.writeFileSync(
       path.join(tempRoot, "VERSION.json"),
@@ -42,7 +42,7 @@ describe("deployment version service", () => {
 
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
 
-    expect(new DeploymentVersionService().load()).toEqual({
+    expect(await new DeploymentVersionService().load()).toEqual({
       version: "2026.03.15.2",
       releasedAt: "2026-03-15T10:30:00Z",
       previousVersion: "2026.03.15",
@@ -54,7 +54,7 @@ describe("deployment version service", () => {
     });
   });
 
-  test("prefers release.json when running from a managed-service release root", () => {
+  test("prefers release.json when running from a managed-service release root", async () => {
     fs.writeFileSync(
       path.join(tempRoot, "VERSION.json"),
       `${JSON.stringify({
@@ -80,7 +80,7 @@ describe("deployment version service", () => {
 
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
 
-    expect(new DeploymentVersionService().load()).toEqual({
+    expect(await new DeploymentVersionService().load()).toEqual({
       version: "2026.03.15.3",
       releasedAt: "2026-03-15T12:00:00Z",
       previousVersion: "2026.03.15.2",
@@ -92,11 +92,11 @@ describe("deployment version service", () => {
     });
   });
 
-  test("returns an explicit unversioned fallback when metadata is missing", () => {
+  test("returns an explicit unversioned fallback when metadata is missing", async () => {
     const resolvedRoot = path.resolve(tempRoot);
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
 
-    expect(new DeploymentVersionService().load()).toEqual({
+    expect(await new DeploymentVersionService().load()).toEqual({
       version: "unversioned",
       releasedAt: null,
       previousVersion: null,
@@ -108,7 +108,7 @@ describe("deployment version service", () => {
     });
   });
 
-  test("formats deployment changelog entries newer than a requested version", () => {
+  test("formats deployment changelog entries newer than a requested version", async () => {
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
     fs.writeFileSync(
       path.join(tempRoot, "VERSION.json"),
@@ -142,7 +142,7 @@ describe("deployment version service", () => {
       "utf8",
     );
 
-    const result = new DeploymentVersionService().formatChangelogSinceVersion("2026.03.15");
+    const result = await new DeploymentVersionService().formatChangelogSinceVersion("2026.03.15");
 
     expect(result).toContain("Deployments since 2026.03.15: 2 entries. Current version: 2026.03.16.2.");
     expect(result).toContain("Version format: YYYY.MM.DD[.N] where .N resets each UTC day.");
@@ -154,7 +154,7 @@ describe("deployment version service", () => {
     expect(result).not.toContain("## 2026.03.15");
   });
 
-  test("accepts a requested version that is not present in the changelog and compares numerically", () => {
+  test("accepts a requested version that is not present in the changelog and compares numerically", async () => {
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
     fs.writeFileSync(
       path.join(tempRoot, "VERSION.json"),
@@ -182,7 +182,7 @@ describe("deployment version service", () => {
       "utf8",
     );
 
-    const result = new DeploymentVersionService().formatChangelogSinceVersion("0.0.0.0");
+    const result = await new DeploymentVersionService().formatChangelogSinceVersion("0.0.0.0");
 
     expect(result).toContain("Deployments since 0.0.0.0: 3 entries. Current version: 2026.03.18.3.");
     expect(result).toContain("## 2026.03.18.3");
@@ -190,7 +190,7 @@ describe("deployment version service", () => {
     expect(result).toContain("## 2026.03.17.9");
   });
 
-  test("treats missing version segments as zero during comparison", () => {
+  test("treats missing version segments as zero during comparison", async () => {
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
     fs.writeFileSync(
       path.join(tempRoot, "VERSION.json"),
@@ -218,7 +218,7 @@ describe("deployment version service", () => {
       "utf8",
     );
 
-    const result = new DeploymentVersionService().formatChangelogSinceVersion("2026.3.18.0");
+    const result = await new DeploymentVersionService().formatChangelogSinceVersion("2026.3.18.0");
     const resultLines = result.split("\n");
 
     expect(result).toContain("Deployments since 2026.3.18.0: 1 entry. Current version: 2026.03.18.3.");
@@ -227,7 +227,7 @@ describe("deployment version service", () => {
     expect(resultLines).not.toContain("## 2026.03.17.9");
   });
 
-  test("returns an explicit message when no deployments were recorded after the requested version", () => {
+  test("returns an explicit message when no deployments were recorded after the requested version", async () => {
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
     fs.writeFileSync(
       path.join(tempRoot, "VERSION.json"),
@@ -249,12 +249,12 @@ describe("deployment version service", () => {
       "utf8",
     );
 
-    const result = new DeploymentVersionService().formatChangelogSinceVersion("2026.03.16.2");
+    const result = await new DeploymentVersionService().formatChangelogSinceVersion("2026.03.16.2");
 
     expect(result).toBe("No deployments were recorded after 2026.03.16.2. Current version: 2026.03.16.2.");
   });
 
-  test("formats a prepared update newer than the running service version", () => {
+  test("formats a prepared update newer than the running service version", async () => {
     const sourceRoot = path.join(tempRoot, "source");
     fs.mkdirSync(sourceRoot, { recursive: true });
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
@@ -305,7 +305,7 @@ describe("deployment version service", () => {
       "utf8",
     );
 
-    const result = new DeploymentVersionService().formatPreparedUpdate();
+    const result = await new DeploymentVersionService().formatPreparedUpdate();
 
     expect(result).toContain("Deployed version: 2026.03.16.");
     expect(result).toContain("Pulled source version: 2026.03.16.2.");
@@ -318,7 +318,7 @@ describe("deployment version service", () => {
     expect(result).toContain("- Tighten deploy metadata handling");
   });
 
-  test("reports when no prepared update is newer than the running service", () => {
+  test("reports when no prepared update is newer than the running service", async () => {
     const sourceRoot = path.join(tempRoot, "source");
     fs.mkdirSync(sourceRoot, { recursive: true });
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
@@ -346,7 +346,7 @@ describe("deployment version service", () => {
       "utf8",
     );
 
-    const result = new DeploymentVersionService().formatPreparedUpdate();
+    const result = await new DeploymentVersionService().formatPreparedUpdate();
 
     expect(result).toContain("Deployed version: 2026.03.16.2.");
     expect(result).toContain("Pulled source version: 2026.03.16.2.");
@@ -354,7 +354,7 @@ describe("deployment version service", () => {
     expect(result).toContain("Nothing to deploy.");
   });
 
-  test("formats update preview with separate remote, source, and deployed versions", () => {
+  test("formats update preview with separate remote, source, and deployed versions", async () => {
     const sourceRoot = path.join(tempRoot, "source");
     fs.mkdirSync(sourceRoot, { recursive: true });
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
@@ -400,7 +400,7 @@ describe("deployment version service", () => {
       "utf8",
     );
 
-    const result = new DeploymentVersionService().formatAvailableUpdate("2026.03.16.2");
+    const result = await new DeploymentVersionService().formatAvailableUpdate("2026.03.16.2");
 
     expect(result).toContain("Deployed version: 2026.03.16.");
     expect(result).toContain("Pulled source version: 2026.03.16.2.");
@@ -412,7 +412,7 @@ describe("deployment version service", () => {
     expect(result).toContain("## 2026.03.16.1");
   });
 
-  test("reports when the deployed service already matches the pulled source version", () => {
+  test("reports when the deployed service already matches the pulled source version", async () => {
     const sourceRoot = path.join(tempRoot, "source");
     fs.mkdirSync(sourceRoot, { recursive: true });
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
@@ -440,17 +440,17 @@ describe("deployment version service", () => {
       "utf8",
     );
 
-    const result = new DeploymentVersionService().formatAvailableUpdate("2026.03.16.2");
+    const result = await new DeploymentVersionService().formatAvailableUpdate("2026.03.16.2");
 
     expect(result).toContain("Deployed version: 2026.03.16.2.");
     expect(result).toContain("Pulled source version: 2026.03.16.2.");
     expect(result).toContain("Latest remote tag version: 2026.03.16.2.");
     expect(result).toContain("Source checkout is up to date with the latest remote tag.");
     expect(result).toContain("Update skipped: the deployed service is already at version 2026.03.16.2, which matches the pulled source version. No deploy needed.");
-    expect(new DeploymentVersionService().hasPreparedUpdate()).toBe(false);
+    expect(await new DeploymentVersionService().hasPreparedUpdate()).toBe(false);
   });
 
-  test("treats an unversioned deployed service as behind a valid pulled source version", () => {
+  test("treats an unversioned deployed service as behind a valid pulled source version", async () => {
     const sourceRoot = path.join(tempRoot, "source");
     fs.mkdirSync(sourceRoot, { recursive: true });
     process.env.OPENELINARO_SERVICE_ROOT_DIR = tempRoot;
@@ -477,11 +477,11 @@ describe("deployment version service", () => {
       "utf8",
     );
 
-    const result = new DeploymentVersionService().formatAvailableUpdate("2026.03.16.2");
+    const result = await new DeploymentVersionService().formatAvailableUpdate("2026.03.16.2");
 
     expect(result).toContain("Deployed version: unversioned.");
     expect(result).toContain("Pulled source version: 2026.03.16.2.");
     expect(result).toContain("Deployment available: unversioned -> 2026.03.16.2.");
-    expect(new DeploymentVersionService().hasPreparedUpdate()).toBe(true);
+    expect(await new DeploymentVersionService().hasPreparedUpdate()).toBe(true);
   });
 });

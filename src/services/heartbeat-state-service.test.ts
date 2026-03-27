@@ -1,12 +1,27 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { HeartbeatStateService } from "./heartbeat-state-service";
 
-const testRoot = createIsolatedRuntimeRoot("openelinaro-heartbeat-state-");
-beforeEach(() => testRoot.setup());
-afterEach(() => testRoot.teardown());
+let runtimeRoot = "";
+let previousRootDirEnv: string | undefined;
+
+beforeEach(() => {
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-heartbeat-state-"));
+  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
+});
+
+afterEach(() => {
+  if (previousRootDirEnv === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  }
+  fs.rmSync(runtimeRoot, { recursive: true, force: true });
+  runtimeRoot = "";
+});
 
 describe("HeartbeatStateService", () => {
   test("returns empty state when no file exists", () => {
@@ -62,7 +77,7 @@ describe("HeartbeatStateService", () => {
     const service = new HeartbeatStateService();
     // Save first to create directory structure, then corrupt the file
     service.save({ lastCompletedAt: "2026-03-20T10:00:00.000Z" });
-    const statePath = path.join(testRoot.path, ".openelinarotest", "heartbeat-state.json");
+    const statePath = path.join(runtimeRoot, ".openelinarotest", "heartbeat-state.json");
     fs.writeFileSync(statePath, "not-valid-json{{{", "utf8");
 
     const loaded = service.load();
@@ -89,7 +104,7 @@ describe("HeartbeatStateService", () => {
     const service = new HeartbeatStateService();
     // Write a non-object JSON value directly
     service.save({ lastCompletedAt: "2026-03-20T10:00:00.000Z" });
-    const statePath = path.join(testRoot.path, ".openelinarotest", "heartbeat-state.json");
+    const statePath = path.join(runtimeRoot, ".openelinarotest", "heartbeat-state.json");
     fs.writeFileSync(statePath, '"just a string"', "utf8");
 
     const loaded = service.load();
