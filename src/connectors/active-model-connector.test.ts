@@ -232,7 +232,7 @@ describe("ActiveModelConnector", () => {
       },
     } as never);
 
-    expect(messages).toEqual(["Llvind is typing..."]);
+    expect(messages).toEqual(["Llvind is thinking..."]);
   });
 
   test("converts AI SDK v3 file-type image parts to pi-ai image blocks", async () => {

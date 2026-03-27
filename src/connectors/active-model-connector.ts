@@ -516,7 +516,7 @@ export class ActiveModelConnector implements ProviderConnector {
             }
 
             thinkingReported = true;
-            void Promise.resolve(thinkingCallback(`${getAssistantDisplayName()} is typing...`)).catch((error) => {
+            void Promise.resolve(thinkingCallback(`${getAssistantDisplayName()} is thinking...`)).catch((error) => {
               connectorTelemetry.event(
                 "connector.active_model.thinking_callback.error",
                 {
