@@ -6,8 +6,9 @@ import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../services
 import { type ProviderAuthSecret, SecretStoreService } from "../services/secret-store-service";
 import { telemetry } from "../services/telemetry";
 import { timestamp } from "../utils/timestamp";
+import type { ProviderId } from "../domain/providers";
 
-export type ProviderId = "openai-codex" | "claude";
+export type { ProviderId } from "../domain/providers";
 
 export type ProviderAuthStatus = {
   profileId: string;

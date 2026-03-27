@@ -19,6 +19,9 @@ import {
   renderExtendedContextStatus,
   renderShellExecResult,
   formatTokenCount,
+  type ShellRuntime,
+  type FilesystemRuntime,
+  type TicketsRuntime,
 } from "./groups";
 import type { AppProgressEvent, AppProgressUpdate } from "../domain/assistant";
 import { ConversationStore } from "../services/conversation-store";
@@ -101,19 +104,6 @@ import {
 } from "../config/runtime-config";
 import type { SubagentRun } from "../domain/subagent-run";
 import type { AgentToolScope, ToolCatalogCard } from "../domain/tool-catalog";
-
-type ShellRuntime = Pick<
-  ShellService,
-  "consumeConversationNotifications" | "exec" | "launchBackground" | "listBackgroundJobs" | "readBackgroundOutput"
->;
-type FilesystemRuntime = Pick<
-  FilesystemService,
-  "applyPatch" | "copyPath" | "deletePath" | "edit" | "glob" | "grep" | "listDir" | "mkdir" | "movePath" | "read" | "statPath" | "write"
->;
-type TicketsRuntime = Pick<
-  ElinaroTicketsService,
-  "isConfigured" | "getConfigurationError" | "listTickets" | "getTicket" | "createTicket" | "updateTicket"
->;
 
 const toolRegistryTelemetry = telemetry.child({ component: "tool" });
 

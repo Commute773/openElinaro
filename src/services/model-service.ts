@@ -37,8 +37,10 @@ import { resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { timestamp } from "../utils/timestamp";
+import type { ProviderId } from "../domain/providers";
 
-export type ModelProviderId = "openai-codex" | "claude";
+/** @deprecated Use `ProviderId` from `src/domain/providers` directly. */
+export type ModelProviderId = ProviderId;
 const modelTelemetry = telemetry.child({ component: "model" });
 const MAX_ANTHROPIC_BASE64_BYTES = 5 * 1024 * 1024;
 
