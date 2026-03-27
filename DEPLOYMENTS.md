@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.3
+- Released at: 2026-03-27T01:09:20Z
+- Release id: 20260327T010920Z-b0aca3a
+- Previous version: 2026.03.27.2
+- Trigger: ci/release workflow
+
+- fix: explicit adapter type for zigbee-herdsman USB discovery
+
 ## 2026.03.27.2
 - Released at: 2026-03-27T00:58:31Z
 - Release id: 20260327T005831Z-636b99d
