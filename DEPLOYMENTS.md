@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.11
+- Released at: 2026-03-27T15:22:09Z
+- Release id: 20260327T152209Z-1c94ab7
+- Previous version: 2026.03.27.10
+- Trigger: ci/release workflow
+
+- feat: add SSE event stream endpoint for real-time push updates
+
 ## 2026.03.27.10
 - Released at: 2026-03-27T15:20:25Z
 - Release id: 20260327T152025Z-63a1925
