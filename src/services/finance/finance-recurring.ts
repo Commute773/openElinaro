@@ -3,6 +3,8 @@ import type {
   FinanceRecurringCandidateData,
   FinanceRecurringItemData,
   FinanceImportRunRowData,
+  FinanceAddRecurringInput,
+  FinanceSetRecurringInput,
 } from "./finance-types";
 import type { RecurringRecord } from "./finance-types";
 import {
@@ -22,6 +24,7 @@ import {
 } from "./finance-helpers";
 import {
   allRows,
+  getRow,
   run,
 } from "./finance-database";
 import { timestamp as nowIso } from "../../utils/timestamp";
@@ -493,3 +496,120 @@ export function sumRecurringOutflowsWithinHorizon(
   return total;
 }
 
+export function addRecurringRule(db: Database, input: FinanceAddRecurringInput) {
+  assertRecurringInput({
+    name: input.name,
+    match_kind: input.matchKind ?? "description",
+    match_value: input.matchValue,
+    interval_kind: input.intervalKind ?? "monthly",
+    interval_days: input.intervalDays,
+    amount_cad: input.amountCad,
+    amount_tolerance_cad: input.amountToleranceCad ?? 0,
+    currency: input.currency ?? "CAD",
+    grace_days: input.graceDays ?? defaultGraceDays(input.intervalKind ?? "monthly"),
+  });
+  const result = run(
+    db,
+    `INSERT INTO recurring(
+       name, match_kind, match_value, interval_kind, interval_days,
+       amount_cad, amount_tolerance_cad, currency, next_expected_date, last_seen_date, status, grace_days,
+       notes, created_at, updated_at
+     ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    input.name,
+    input.matchKind ?? "description",
+    input.matchValue,
+    input.intervalKind ?? "monthly",
+    input.intervalDays ?? null,
+    input.amountCad,
+    input.amountToleranceCad ?? 0,
+    (input.currency ?? "CAD").toUpperCase(),
+    input.nextExpectedDate ? toIsoDate(input.nextExpectedDate) : null,
+    input.lastSeenDate ? toIsoDate(input.lastSeenDate) : null,
+    input.status ?? "active",
+    input.graceDays ?? defaultGraceDays(input.intervalKind ?? "monthly"),
+    input.notes ?? null,
+    nowIso(),
+    nowIso(),
+  );
+  return { status: "added" as const, id: Number(result.lastInsertRowid ?? 0) };
+}
+
+export function setRecurringRule(db: Database, input: FinanceSetRecurringInput) {
+  if (input.id != null) {
+    const existing = getRow<RecurringRecord>(db, "SELECT * FROM recurring WHERE id = ?", input.id);
+    if (!existing) {
+      throw new Error(`Recurring rule ${input.id} not found.`);
+    }
+    const intervalKind = input.intervalKind ?? String(existing.interval_kind ?? "monthly");
+    const graceDays = input.graceDays ?? Number(existing.grace_days ?? defaultGraceDays(intervalKind));
+    const updated = {
+      name: input.name ?? String(existing.name ?? ""),
+      matchKind: input.matchKind ?? String(existing.match_kind ?? ""),
+      matchValue: input.matchValue ?? String(existing.match_value ?? ""),
+      intervalKind,
+      intervalDays: input.intervalDays ?? numberOrNull(existing.interval_days),
+      amountCad: input.amountCad ?? Number(existing.amount_cad ?? 0),
+      amountToleranceCad: input.amountToleranceCad ?? Number(existing.amount_tolerance_cad ?? 0),
+      currency: (input.currency ?? String(existing.currency ?? "CAD")).toUpperCase(),
+      nextExpectedDate: input.nextExpectedDate === undefined
+        ? stringOrNull(existing.next_expected_date)
+        : (input.nextExpectedDate ? toIsoDate(input.nextExpectedDate) : null),
+      lastSeenDate: input.lastSeenDate === undefined
+        ? stringOrNull(existing.last_seen_date)
+        : (input.lastSeenDate ? toIsoDate(input.lastSeenDate) : null),
+      status: input.status ?? String(existing.status ?? "active"),
+      graceDays,
+      notes: input.notes === undefined ? stringOrNull(existing.notes) : input.notes,
+    };
+    assertRecurringInput({
+      name: updated.name,
+      match_kind: updated.matchKind,
+      match_value: updated.matchValue,
+      interval_kind: updated.intervalKind,
+      interval_days: updated.intervalDays,
+      amount_cad: updated.amountCad,
+      amount_tolerance_cad: updated.amountToleranceCad,
+      currency: updated.currency,
+      grace_days: updated.graceDays,
+    });
+    run(
+      db,
+      `UPDATE recurring
+        SET name = ?, match_kind = ?, match_value = ?, interval_kind = ?, interval_days = ?,
+            amount_cad = ?, amount_tolerance_cad = ?, currency = ?, next_expected_date = ?, last_seen_date = ?,
+            status = ?, grace_days = ?, notes = ?, updated_at = ?
+        WHERE id = ?`,
+      updated.name,
+      updated.matchKind,
+      updated.matchValue,
+      updated.intervalKind,
+      updated.intervalDays,
+      updated.amountCad,
+      updated.amountToleranceCad,
+      updated.currency,
+      updated.nextExpectedDate,
+      updated.lastSeenDate,
+      updated.status,
+      updated.graceDays,
+      updated.notes,
+      nowIso(),
+      input.id,
+    );
+    return { status: "updated" as const, id: input.id };
+  }
+  return addRecurringRule(db, {
+    name: input.name!,
+    matchKind: input.matchKind,
+    matchValue: input.matchValue!,
+    intervalKind: input.intervalKind,
+    intervalDays: input.intervalDays,
+    amountCad: input.amountCad!,
+    amountToleranceCad: input.amountToleranceCad,
+    currency: input.currency,
+    graceDays: input.graceDays,
+    nextExpectedDate: input.nextExpectedDate,
+    lastSeenDate: input.lastSeenDate,
+    status: input.status,
+    notes: input.notes,
+  });
+}

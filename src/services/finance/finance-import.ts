@@ -1,7 +1,13 @@
 import crypto from "node:crypto";
 import type { Database } from "bun:sqlite";
-import type { FinanceSyntheticIncomeInput, FinanceUpsertAccountOptions } from "./finance-types";
+import type {
+  FinanceSyntheticIncomeInput,
+  FinanceUpsertAccountOptions,
+  FinanceImportOptions,
+  FinanceImportRunsData,
+} from "./finance-types";
 import {
+  clamp,
   normText,
   formatCad,
   dateKey,
@@ -12,8 +18,12 @@ import {
   allRows,
   getRow,
   run,
+  getSettingOrDefault,
+  FINAL_COUNTS,
+  FINAL_CATEGORY,
 } from "./finance-database";
 import { classifyTransaction, parseJson } from "./finance-ledger";
+import { mapImportRunRow } from "./finance-recurring";
 import { timestamp as nowIso } from "../../utils/timestamp";
 
 const INFERRED_ACCOUNT_INCOME_MIN_DELTA_CAD = 1000;
@@ -463,4 +473,136 @@ export function upsertTransaction(db: Database, row: Record<string, string>, sou
     externalId,
   );
   return { inserted: false, updated: true };
+}
+
+export async function executeImportTransactions(
+  db: Database,
+  defaultSettings: Record<string, string>,
+  options: FinanceImportOptions = {},
+  markReceivableReceivedFn: (id: number, opts?: { receivedDate?: string; note?: string }) => void,
+) {
+  const source = options.source ?? "fintable_gsheet";
+  const dryRun = options.dryRun === true;
+  const importRun = run(
+    db,
+    "INSERT INTO import_runs(source, started_at, rows_seen, rows_inserted, rows_updated) VALUES(?, ?, 0, 0, 0)",
+    source,
+    nowIso(),
+  );
+  const runId = Number(importRun.lastInsertRowid ?? getRow<{ id: number }>(db, "SELECT last_insert_rowid() AS id")?.id ?? 0);
+  let rowsSeen = 0;
+  let rowsInserted = 0;
+  let rowsUpdated = 0;
+
+  try {
+    if (source === "fintable_gsheet") {
+      const spreadsheetId = options.spreadsheetId ?? getSettingOrDefault(db, "import.fintable.spreadsheet_id", defaultSettings);
+      const accountsGid = options.accountsGid ?? getSettingOrDefault(db, "import.fintable.accounts_gid", defaultSettings);
+      const transactionsGid = options.transactionsGid ?? getSettingOrDefault(db, "import.fintable.transactions_gid", defaultSettings);
+      if (!spreadsheetId || !accountsGid || !transactionsGid) {
+        throw new Error("Missing Fintable sheet settings.");
+      }
+      const [accountsCsv, transactionsCsv] = await Promise.all([
+        fetchText(sheetCsvUrl(spreadsheetId, accountsGid)),
+        fetchText(sheetCsvUrl(spreadsheetId, transactionsGid)),
+      ]);
+      const accounts = parseCsvText(accountsCsv);
+      const transactions = parseCsvText(transactionsCsv);
+      rowsSeen = transactions.length;
+      if (!dryRun) {
+        for (const account of accounts) {
+          upsertAccount(db, account, { importRunId: runId, source }, markReceivableReceivedFn);
+        }
+        for (const row of transactions) {
+          const result = upsertTransaction(db, row, "fintable_gsheet");
+          if (result.inserted) {
+            rowsInserted += 1;
+          }
+          if (result.updated) {
+            rowsUpdated += 1;
+          }
+        }
+      }
+    } else {
+      const csvText = options.csvText ?? "";
+      if (!csvText.trim()) {
+        throw new Error("csvText is required for source=csv.");
+      }
+      const rows = parseCsvText(csvText);
+      rowsSeen = rows.length;
+      if (!dryRun) {
+        for (const row of rows) {
+          const result = upsertTransaction(db, row, "csv_upload");
+          if (result.inserted) {
+            rowsInserted += 1;
+          }
+          if (result.updated) {
+            rowsUpdated += 1;
+          }
+        }
+      }
+    }
+
+    run(
+      db,
+      "UPDATE import_runs SET finished_at = ?, rows_seen = ?, rows_inserted = ?, rows_updated = ? WHERE id = ?",
+      nowIso(),
+      rowsSeen,
+      rowsInserted,
+      rowsUpdated,
+      runId,
+    );
+    const reviewTop = allRows<Record<string, unknown>>(
+      db,
+      `SELECT id, posted_date, amount, currency, amount_cad, COALESCE(merchant_name, '') AS merchant,
+          ${FINAL_CATEGORY} AS category, ${FINAL_COUNTS} AS counts, review_reason
+        FROM transactions WHERE needs_review = 1
+        ORDER BY posted_date DESC, id DESC LIMIT 10`,
+    );
+    return {
+      source,
+      dryRun,
+      rowsSeen,
+      rowsInserted,
+      rowsUpdated,
+      needsReviewTop: reviewTop,
+    };
+  } catch (error) {
+    run(
+      db,
+      "UPDATE import_runs SET finished_at = ?, error = ? WHERE id = ?",
+      nowIso(),
+      error instanceof Error ? error.message : String(error),
+      runId,
+    );
+    throw error;
+  }
+}
+
+export function buildImportRunsData(db: Database, limit = 20): FinanceImportRunsData {
+  const clampedLimit = clamp(limit, 1, 100);
+  const rows = allRows<Record<string, unknown>>(
+    db,
+    'SELECT * FROM import_runs ORDER BY started_at DESC, id DESC LIMIT ?',
+    clampedLimit,
+  ).map((row) => mapImportRunRow(row));
+  const bySource = allRows<Record<string, unknown>>(
+    db,
+    `SELECT source, COUNT(1) AS run_count, COALESCE(SUM(rows_seen), 0) AS rows_seen,
+        COALESCE(SUM(rows_inserted), 0) AS rows_inserted, COALESCE(SUM(rows_updated), 0) AS rows_updated,
+        COALESCE(SUM(CASE WHEN error IS NOT NULL AND error <> '' THEN 1 ELSE 0 END), 0) AS error_count
+      FROM import_runs GROUP BY source ORDER BY source ASC`,
+  ).map((row) => ({
+    source: String(row.source ?? ''),
+    runCount: Number(row.run_count ?? 0),
+    rowsSeen: Number(row.rows_seen ?? 0),
+    rowsInserted: Number(row.rows_inserted ?? 0),
+    rowsUpdated: Number(row.rows_updated ?? 0),
+    errorCount: Number(row.error_count ?? 0),
+  }));
+  return {
+    limit: clampedLimit,
+    rows,
+    bySource,
+  };
 }
