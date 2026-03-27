@@ -1,5 +1,11 @@
 import type { AgentToolScope } from "./tool-catalog";
-import type { ToolProgramArtifactRecord } from "../services/tool-program-artifact-service";
+
+export interface ToolProgramArtifactRecord {
+  path: string;
+  fileName: string;
+  mediaType: string;
+  byteLength: number;
+}
 
 export interface ToolProgramAvailableTool {
   name: string;
