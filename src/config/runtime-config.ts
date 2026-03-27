@@ -31,7 +31,7 @@ const DEFAULT_CORE_APP = {
   cacheMissMonitor: DEFAULT_CORE_CACHE_MISS,
   subagent: DEFAULT_CORE_SUBAGENT,
 };
-const DEFAULT_CORE_HTTP = { host: "0.0.0.0", port: 3000 };
+const DEFAULT_CORE_HTTP = { host: "0.0.0.0", port: 3000, apiKey: "" };
 const DEFAULT_CORE = {
   profile: DEFAULT_CORE_PROFILE,
   assistant: DEFAULT_CORE_ASSISTANT,
@@ -146,6 +146,7 @@ export const RuntimeConfigSchema = z.object({
     http: z.object({
       host: z.string().min(1).default("0.0.0.0"),
       port: z.number().int().positive().default(3000),
+      apiKey: z.string().default(""),
     }).default(DEFAULT_CORE_HTTP),
   }).default(DEFAULT_CORE),
   calendar: z.object({

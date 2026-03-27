@@ -312,16 +312,17 @@ export function fromAssistantMessage(
   });
 }
 
-function fromToolMessage(
+async function fromToolMessage(
   message: Extract<ModelMessage, { role: "tool" }>,
   options?: {
     toolResultStore?: ToolResultStore;
     toolResultNamespace?: string;
   },
-) {
-  return message.content.flatMap((part) => {
+): Promise<ToolMessage[]> {
+  const results: ToolMessage[] = [];
+  for (const part of message.content) {
     if (part.type !== "tool-result") {
-      return [];
+      continue;
     }
 
     const rawContent = stringifyToolResultOutput(part.output);
@@ -336,14 +337,14 @@ function fromToolMessage(
       && TOOL_RESULT_REFERENCE_ELIGIBLE_TOOLS.has(toolName);
 
     if (shouldStoreReference) {
-      const stored = options!.toolResultStore!.save({
+      const stored = await options!.toolResultStore!.save({
         namespace: options!.toolResultNamespace!,
         toolCallId: part.toolCallId,
         toolName,
         status,
         content: rawContent,
       });
-      return [
+      results.push(
         new ToolMessage({
           content: formatStoredToolResultMessage({
             ref: stored.ref,
@@ -360,38 +361,44 @@ function fromToolMessage(
             openelinaroToolResultNamespace: stored.namespace,
           },
         }),
-      ];
+      );
+      continue;
     }
 
-    return [
+    results.push(
       new ToolMessage({
         content: rawContent,
         tool_call_id: part.toolCallId,
         name: toolName,
         status,
       }),
-    ];
-  });
+    );
+  }
+  return results;
 }
 
-export function fromModelMessages(messages: ModelMessage[]): BaseMessage[] {
-  return messages.flatMap((message): BaseMessage[] => {
+export async function fromModelMessages(messages: ModelMessage[]): Promise<BaseMessage[]> {
+  const results: BaseMessage[] = [];
+  for (const message of messages) {
     switch (message.role) {
       case "system":
-        return [new SystemMessage(message.content)];
+        results.push(new SystemMessage(message.content));
+        break;
       case "user":
-        return [fromUserMessage(message)];
+        results.push(fromUserMessage(message));
+        break;
       case "assistant":
-        return [fromAssistantMessage(message)];
+        results.push(fromAssistantMessage(message));
+        break;
       case "tool":
-        return fromToolMessage(message);
-      default:
-        return [];
+        results.push(...await fromToolMessage(message));
+        break;
     }
-  });
+  }
+  return results;
 }
 
-export function appendResponseMessages(
+export async function appendResponseMessages(
   baseMessages: BaseMessage[],
   responseMessages: ModelMessage[],
   options?: {
@@ -403,28 +410,29 @@ export function appendResponseMessages(
     toolResultStore?: ToolResultStore;
     toolResultNamespace?: string;
   },
-) {
+): Promise<BaseMessage[]> {
   const nextMessages = [...baseMessages];
-  responseMessages.forEach((message, index) => {
+  for (let index = 0; index < responseMessages.length; index += 1) {
+    const message = responseMessages[index]!;
     if (message.role === "assistant") {
       nextMessages.push(
         fromAssistantMessage(message, index === responseMessages.length - 1 ? options : undefined),
       );
-      return;
+      continue;
     }
 
     if (message.role === "tool") {
-      nextMessages.push(...fromToolMessage(message, options));
-      return;
+      nextMessages.push(...await fromToolMessage(message, options));
+      continue;
     }
 
     if (message.role === "user") {
       nextMessages.push(fromUserMessage(message));
-      return;
+      continue;
     }
 
     nextMessages.push(new SystemMessage(message.content));
-  });
+  }
   return nextMessages;
 }
 

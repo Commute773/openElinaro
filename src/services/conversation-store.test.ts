@@ -1,20 +1,21 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ConversationHistoryService } from "./conversation-history-service";
 import { ConversationStore } from "./conversation-store";
 import { SystemPromptService } from "./system-prompt-service";
 
-const testRoot = createIsolatedRuntimeRoot("openelinaro-conversation-store-");
+let tempRoot = "";
+let previousRootDirEnv: string | undefined;
 
 function getStorePath() {
-  return path.join(testRoot.path, ".openelinarotest", "conversations.json");
+  return path.join(tempRoot, ".openelinarotest", "conversations.json");
 }
 
 function getHistoryDir() {
-  return path.join(testRoot.path, ".openelinarotest", "conversation-history");
+  return path.join(tempRoot, ".openelinarotest", "conversation-history");
 }
 
 describe("ConversationStore", () => {
@@ -34,54 +35,64 @@ describe("ConversationStore", () => {
   const systemPrompts = new SystemPromptService();
 
   beforeEach(() => {
-    testRoot.setup();
+    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-conversation-store-"));
+    process.env.OPENELINARO_ROOT_DIR = tempRoot;
     fs.rmSync(getStorePath(), { force: true });
     fs.rmSync(getHistoryDir(), { recursive: true, force: true });
   });
 
-  afterEach(() => testRoot.teardown());
+  afterEach(() => {
+    if (previousRootDirEnv === undefined) {
+      delete process.env.OPENELINARO_ROOT_DIR;
+    } else {
+      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+    }
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+    tempRoot = "";
+  });
 
-  test("supports append-only writes", () => {
-    store.appendMessages("thread-1", [new HumanMessage("hello")], {
-      systemPrompt: systemPrompts.load(),
+  test("supports append-only writes", async () => {
+    await store.appendMessages("thread-1", [new HumanMessage("hello")], {
+      systemPrompt: await systemPrompts.load(),
     });
 
-    const conversation = store.appendMessages("thread-1", [new AIMessage("world")]);
+    const conversation = await store.appendMessages("thread-1", [new AIMessage("world")]);
 
     expect(conversation.messages).toHaveLength(2);
     expect(conversation.messages[1]).toBeInstanceOf(AIMessage);
   });
 
-  test("supports explicit rollback plus append", () => {
-    store.appendMessages("thread-1", [
+  test("supports explicit rollback plus append", async () => {
+    await store.appendMessages("thread-1", [
       new HumanMessage("first"),
       new AIMessage("second"),
       new HumanMessage("third"),
-    ], { systemPrompt: systemPrompts.load() });
+    ], { systemPrompt: await systemPrompts.load() });
 
-    const conversation = store.rollbackAndAppend("thread-1", 2, [new AIMessage("replacement")]);
+    const conversation = await store.rollbackAndAppend("thread-1", 2, [new AIMessage("replacement")]);
 
     expect(conversation.messages).toHaveLength(2);
     expect((conversation.messages[0] as HumanMessage).content).toBe("first");
     expect((conversation.messages[1] as AIMessage).content).toBe("replacement");
   });
 
-  test("preserves image mime types across store round-trips", () => {
-    store.appendMessages("thread-1", [new HumanMessage([
+  test("preserves image mime types across store round-trips", async () => {
+    await store.appendMessages("thread-1", [new HumanMessage([
       { type: "text", text: "what is this?" },
       { type: "image", data: "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=", mimeType: "image/webp" },
-    ])], { systemPrompt: systemPrompts.load() });
+    ])], { systemPrompt: await systemPrompts.load() });
 
-    const conversation = store.get("thread-1");
+    const conversation = await store.get("thread-1");
     const message = conversation.messages[0] as HumanMessage;
     const blocks = message.content as Array<{ type: string; mimeType?: string }>;
 
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/webp")).toBe(true);
   });
 
-  test("journals appended conversation messages to JSONL as they are saved", () => {
-    store.appendMessages("thread-1", [new HumanMessage("hello graph cache"), new AIMessage("world")], {
-      systemPrompt: systemPrompts.load(),
+  test("journals appended conversation messages to JSONL as they are saved", async () => {
+    await store.appendMessages("thread-1", [new HumanMessage("hello graph cache"), new AIMessage("world")], {
+      systemPrompt: await systemPrompts.load(),
     });
 
     const journalPath = path.join(getHistoryDir(), "events.root.jsonl");
@@ -107,11 +118,11 @@ describe("ConversationStore", () => {
   });
 
   test("searches archived conversation history with hybrid ranking and recency output", async () => {
-    store.appendMessages("thread-1", [new HumanMessage("We need to fix the cache miss issue in graph search.")], {
-      systemPrompt: systemPrompts.load(),
+    await store.appendMessages("thread-1", [new HumanMessage("We need to fix the cache miss issue in graph search.")], {
+      systemPrompt: await systemPrompts.load(),
     });
-    store.appendMessages("thread-2", [new HumanMessage("Graph compaction is still weird but cache is fine.")], {
-      systemPrompt: systemPrompts.load(),
+    await store.appendMessages("thread-2", [new HumanMessage("Graph compaction is still weird but cache is fine.")], {
+      systemPrompt: await systemPrompts.load(),
     });
 
     const result = await store.searchHistory({
@@ -141,11 +152,11 @@ describe("ConversationStore", () => {
     });
 
     for (let index = 0; index < 40; index += 1) {
-      boundedStore.appendMessages(`thread-${index + 1}`, [
+      await boundedStore.appendMessages(`thread-${index + 1}`, [
         new HumanMessage(
           index === 39 ? "Newest cache graph regression note." : `Background note ${index + 1}.`,
         ),
-      ], { systemPrompt: systemPrompts.load() });
+      ], { systemPrompt: await systemPrompts.load() });
     }
 
     const result = await boundedStore.searchHistory({

@@ -466,6 +466,14 @@ export class OpenElinaroApp {
     return this.getScope().routineTools.getToolNames();
   }
 
+  getToolCatalog() {
+    return this.getScope().routineTools.getToolCatalog();
+  }
+
+  getToolJsonSchema(name: string) {
+    return this.getScope().routineTools.getToolJsonSchema(name);
+  }
+
   getActiveModel() {
     return this.getScope().models.getActiveModel();
   }
@@ -710,7 +718,7 @@ export class OpenElinaroApp {
     }
 
     const requestId = `autonomous-time-${Date.now()}`;
-    const { text } = scope.autonomousTime.buildInjectedMessage(reference);
+    const { text } = await scope.autonomousTime.buildInjectedMessage(reference);
     const localDate = scope.autonomousTime.getTriggerLocalDate(reference);
     const conversationKey = buildAutomationSessionKey(`autonomous-time-${localDate}`, scope.profile.id);
     const response = await this.handleRequest(
@@ -850,8 +858,13 @@ export class OpenElinaroApp {
     }));
   }
 
-  listConversationSummaries() {
-    return this.conversations.listSummaries();
+  async listConversationSummaries() {
+    const conversations = await this.conversations.list();
+    return conversations.map((c) => ({
+      key: c.key,
+      messageCount: c.messages.length,
+      updatedAt: c.updatedAt,
+    }));
   }
 
   private getScope(

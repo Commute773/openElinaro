@@ -13,11 +13,11 @@ import {
   validateRuntimeConfigFile,
   validateRuntimeConfigText,
 } from "../config/runtime-config";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { assertSharedPythonRuntimeReady, getSharedPythonRuntimeStatus } from "./python-runtime";
 
-const testRoot = createIsolatedRuntimeRoot("openelinaro-python-runtime-");
+let runtimeRoot = "";
 let serviceRoot = "";
+let previousRootDir: string | undefined;
 let previousServiceRootDir: string | undefined;
 
 function getPythonBinPath(venvPath: string) {
@@ -27,9 +27,11 @@ function getPythonBinPath(venvPath: string) {
 }
 
 beforeEach(() => {
-  testRoot.setup();
+  previousRootDir = process.env.OPENELINARO_ROOT_DIR;
   previousServiceRootDir = process.env.OPENELINARO_SERVICE_ROOT_DIR;
+  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-python-runtime-"));
   serviceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-python-service-"));
+  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
   process.env.OPENELINARO_SERVICE_ROOT_DIR = serviceRoot;
   ensureRuntimeConfigFile();
 
@@ -43,12 +45,17 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  testRoot.teardown();
+  if (previousRootDir === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDir;
+  }
   if (previousServiceRootDir === undefined) {
     delete process.env.OPENELINARO_SERVICE_ROOT_DIR;
   } else {
     process.env.OPENELINARO_SERVICE_ROOT_DIR = previousServiceRootDir;
   }
+  fs.rmSync(runtimeRoot, { recursive: true, force: true });
   fs.rmSync(serviceRoot, { recursive: true, force: true });
 });
 
@@ -56,8 +63,8 @@ describe("python-runtime", () => {
   test("resolves the shared venv under runtime state and the requirements file under service code", () => {
     const status = getSharedPythonRuntimeStatus();
 
-    expect(status.venvPath).toBe(path.join(testRoot.path, ".venvs", "shared"));
-    expect(status.pythonBin).toBe(getPythonBinPath(path.join(testRoot.path, ".venvs", "shared")));
+    expect(status.venvPath).toBe(path.join(runtimeRoot, ".venvs", "shared"));
+    expect(status.pythonBin).toBe(getPythonBinPath(path.join(runtimeRoot, ".venvs", "shared")));
     expect(status.requirementsPath).toBe(path.join(serviceRoot, "python", "custom.txt"));
     expect(status.ready).toBe(false);
     expect(status.interpreterReady).toBe(false);

@@ -1,14 +1,15 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 
 const repoRoot = process.cwd();
-const testRoot = createIsolatedRuntimeRoot("openelinaro-recent-context-");
 
 let previousCwd = "";
+let tempRoot = "";
+let previousRootDirEnv: string | undefined;
 let profileServiceModule: typeof import("./profile-service");
 let projectsServiceModule: typeof import("./projects-service");
 let recentContextModule: typeof import("./recent-thread-context-service");
@@ -20,7 +21,7 @@ async function importFresh<T>(relativePath: string): Promise<T> {
 }
 
 function writeFile(relativePath: string, content: string, modifiedAt: Date) {
-  const absolutePath = path.join(testRoot.path, relativePath);
+  const absolutePath = path.join(tempRoot, relativePath);
   fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
   fs.writeFileSync(absolutePath, content, "utf8");
   fs.utimesSync(absolutePath, modifiedAt, modifiedAt);
@@ -28,8 +29,10 @@ function writeFile(relativePath: string, content: string, modifiedAt: Date) {
 
 beforeAll(async () => {
   previousCwd = process.cwd();
-  testRoot.setup();
-  process.chdir(testRoot.path);
+  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-recent-context-"));
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  process.env.OPENELINARO_ROOT_DIR = tempRoot;
+  process.chdir(tempRoot);
 
   fs.mkdirSync(".openelinarotest/profiles", { recursive: true });
   fs.writeFileSync(
@@ -65,7 +68,7 @@ beforeAll(async () => {
           name: "Sample",
           status: "active",
           allowedRoles: ["restricted"],
-          workspacePath: path.join(testRoot.path, ".openelinarotest", "projects/sample/workspace"),
+          workspacePath: path.join(tempRoot, ".openelinarotest", "projects/sample/workspace"),
           summary: "Sample project.",
           currentState: "Recent changes landed.",
           state: "The sample project moved its long-form state into the registry.",
@@ -82,7 +85,7 @@ beforeAll(async () => {
           name: "Root Only",
           status: "active",
           allowedRoles: [],
-          workspacePath: path.join(testRoot.path, ".openelinarotest", "projects/root-only/workspace"),
+          workspacePath: path.join(tempRoot, ".openelinarotest", "projects/root-only/workspace"),
           summary: "Root-only project.",
           currentState: "Hidden from restricted.",
           state: "Root-only registry state.",
@@ -142,7 +145,12 @@ beforeAll(async () => {
 
 afterAll(() => {
   process.chdir(previousCwd);
-  testRoot.teardown();
+  if (previousRootDirEnv === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  }
+  fs.rmSync(tempRoot, { recursive: true, force: true });
 });
 
 describe("RecentThreadContextService", () => {

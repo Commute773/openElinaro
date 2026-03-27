@@ -7,10 +7,10 @@ import {
 } from "../../services/gemini-live-phone-service";
 import { VonageService, getVonageWebhookPath } from "../../services/vonage-service";
 import type { OpenElinaroApp } from "../../app/runtime";
-import type { ExtensionRegistryService } from "../../services/extension-registry-service";
 import { handleG2ApiRequest } from "./g2-api";
+import { authenticateApiRequest } from "./api-auth";
 
-function normalizePath(pathname: string) {
+export function normalizePath(pathname: string) {
   return pathname.replace(/\/+$/, "") || "/";
 }
 
@@ -18,11 +18,14 @@ export function createHttpRequestHandler(
   vonage = new VonageService(),
   geminiLivePhone?: GeminiLivePhoneService,
   app?: OpenElinaroApp,
-  extensionRegistry?: ExtensionRegistryService,
 ) {
+  const config = getRuntimeConfig();
   return async (request: Request) => {
     const url = new URL(request.url, "http://localhost");
     const pathname = normalizePath(url.pathname);
+
+    const authResponse = authenticateApiRequest(request, pathname, config);
+    if (authResponse) return authResponse;
 
     if (pathname === "/healthz") {
       return Response.json({ ok: true }, { status: 200 });
@@ -34,10 +37,6 @@ export function createHttpRequestHandler(
       if (g2Response) return g2Response;
     }
 
-    if (extensionRegistry && pathname.startsWith("/api/ext/")) {
-      const extResponse = await extensionRegistry.handleExtensionHttpRequest(request, pathname);
-      if (extResponse) return extResponse;
-    }
     if (pathname === normalizePath(`${getVonageWebhookPath("voice.answer").replace(/\/answer$/, "")}/test-answer`)) {
       return Response.json([
         {
@@ -108,12 +107,11 @@ export function startHttpServer(
   vonage = new VonageService(),
   geminiLivePhone = new GeminiLivePhoneService({ vonage }),
   app?: OpenElinaroApp,
-  extensionRegistry?: ExtensionRegistryService,
 ) {
   const config = getRuntimeConfig();
   const port = config.core.http.port || 3000;
   const hostname = config.core.http.host || "0.0.0.0";
-  const handler = createHttpRequestHandler(vonage, geminiLivePhone, app, extensionRegistry);
+  const handler = createHttpRequestHandler(vonage, geminiLivePhone, app);
 
   const server = Bun.serve<GeminiLivePhoneSocketData>({
     port,

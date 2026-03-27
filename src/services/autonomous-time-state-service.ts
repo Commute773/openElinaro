@@ -1,6 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { ProfileRecord } from "../domain/profiles";
-import { resolveRuntimePath } from "./runtime-root";
-import { JsonStateService } from "./json-state-service";
+import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 
 type AutonomousTimeProfileState = {
   lastTriggeredLocalDate?: string;
@@ -44,13 +45,27 @@ function normalizeState(raw: unknown): AutonomousTimeStateShape {
   };
 }
 
-export class AutonomousTimeStateService extends JsonStateService<AutonomousTimeStateShape> {
-  constructor(filePath = getStatePath()) {
-    super(filePath);
+export class AutonomousTimeStateService {
+  constructor(private readonly filePath = getStatePath()) {}
+
+  load() {
+    if (!fs.existsSync(this.filePath)) {
+      return normalizeState(undefined);
+    }
+
+    try {
+      return normalizeState(JSON.parse(fs.readFileSync(this.filePath, "utf8")) as unknown);
+    } catch {
+      return normalizeState(undefined);
+    }
   }
 
-  protected normalize(raw: unknown): AutonomousTimeStateShape {
-    return normalizeState(raw);
+  save(state: AutonomousTimeStateShape) {
+    assertTestRuntimeRootIsIsolated("Autonomous-time state");
+    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+    const normalized = normalizeState(state);
+    fs.writeFileSync(this.filePath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 });
+    return normalized;
   }
 
   getProfileState(profile: Pick<ProfileRecord, "id"> | string) {

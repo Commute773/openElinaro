@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { mkdir, chmod } from "node:fs/promises";
 import path from "node:path";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 import { timestamp } from "../utils/timestamp";
@@ -39,15 +39,15 @@ function nextRef(namespace: string, toolCallId: string) {
 export class ToolResultStore {
   constructor(private readonly rootDir = resolveRuntimePath("tool-results")) {}
 
-  save(params: {
+  async save(params: {
     namespace: string;
     toolCallId: string;
     toolName: string;
     status: "success" | "error";
     content: string;
-  }): StoredToolResultRecord {
+  }): Promise<StoredToolResultRecord> {
     assertTestRuntimeRootIsIsolated("Tool result store");
-    fs.mkdirSync(this.rootDir, { recursive: true });
+    await mkdir(this.rootDir, { recursive: true });
     const ref = nextRef(params.namespace, params.toolCallId);
     const record: StoredToolResultRecord = {
       ref,
@@ -60,19 +60,17 @@ export class ToolResultStore {
       lineCount: countLines(params.content),
       createdAt: timestamp(),
     };
-    fs.writeFileSync(
-      path.join(this.rootDir, `${ref}.json`),
-      `${JSON.stringify(record, null, 2)}\n`,
-      { mode: 0o600 },
-    );
+    const filePath = path.join(this.rootDir, `${ref}.json`);
+    await Bun.write(filePath, `${JSON.stringify(record, null, 2)}\n`);
+    await chmod(filePath, 0o600);
     return record;
   }
 
-  get(ref: string): StoredToolResultRecord | undefined {
+  async get(ref: string): Promise<StoredToolResultRecord | undefined> {
     const recordPath = path.join(this.rootDir, `${ref}.json`);
-    if (!fs.existsSync(recordPath)) {
+    if (!(await Bun.file(recordPath).exists())) {
       return undefined;
     }
-    return JSON.parse(fs.readFileSync(recordPath, "utf8")) as StoredToolResultRecord;
+    return JSON.parse(await Bun.file(recordPath).text()) as StoredToolResultRecord;
   }
 }

@@ -194,16 +194,16 @@ export class HealthTrackingService {
     return checkin;
   }
 
+  listCheckins(limit = 10): HealthCheckinRecord[] {
+    return this.getAllCheckins().slice(0, Math.max(1, Math.min(limit, 100)));
+  }
+
   history(limit = 20) {
-    const checkins = this.listCheckins(limit);
+    const checkins = this.getAllCheckins().slice(0, Math.max(1, Math.min(limit, 100)));
     if (checkins.length === 0) {
       return "(no health check-ins)";
     }
     return checkins.map((checkin) => this.formatCheckin(checkin)).join("\n");
-  }
-
-  listCheckins(limit = 10) {
-    return this.getAllCheckins().slice(0, Math.max(1, Math.min(limit, 100)));
   }
 
   summary() {

@@ -1,17 +1,32 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 
-const testRoot = createIsolatedRuntimeRoot("openelinaro-tool-result-store-");
+let tempRoot = "";
+let previousRootDirEnv: string | undefined;
 
 describe("ToolResultStore", () => {
-  beforeEach(() => testRoot.setup());
-  afterEach(() => testRoot.teardown());
+  beforeEach(() => {
+    previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-tool-result-store-"));
+    process.env.OPENELINARO_ROOT_DIR = tempRoot;
+  });
+
+  afterEach(() => {
+    if (previousRootDirEnv === undefined) {
+      delete process.env.OPENELINARO_ROOT_DIR;
+    } else {
+      process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+    }
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
 
   test("persists and reloads stored tool results", async () => {
     const { ToolResultStore } = await import("./tool-result-store");
     const store = new ToolResultStore();
 
-    const saved = store.save({
+    const saved = await store.save({
       namespace: "conversation:test",
       toolCallId: "call-1",
       toolName: "read_file",
@@ -23,7 +38,7 @@ describe("ToolResultStore", () => {
     expect(saved.lineCount).toBe(3);
     expect(saved.charLength).toBe("line 1\nline 2\nline 3".length);
 
-    const loaded = store.get(saved.ref);
+    const loaded = await store.get(saved.ref);
     expect(loaded).toBeTruthy();
     expect(loaded?.namespace).toBe("conversation:test");
     expect(loaded?.toolName).toBe("read_file");

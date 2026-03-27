@@ -31,7 +31,7 @@ export async function buildThreadStartSystemContext(
   conversations: ConversationStore,
   profiles: ProfileService,
 ) {
-  const conversation = conversations.get(conversationKey);
+  const conversation = await conversations.get(conversationKey);
   if (!shouldIncludeRecentThreadContext(conversation.messages)) {
     return undefined;
   }

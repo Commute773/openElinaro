@@ -1,9 +1,12 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { ProfileRecord } from "../domain/profiles";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ProfileService, getDefaultProfileId } from "./profile-service";
+
+let runtimeRoot = "";
+let previousRootDirEnv: string | undefined;
 
 function writeProfileRegistry(rootDir: string, profiles?: ProfileRecord[]) {
   const registryDir = path.join(rootDir, ".openelinarotest", "profiles");
@@ -52,12 +55,22 @@ function writeProfileRegistry(rootDir: string, profiles?: ProfileRecord[]) {
   );
 }
 
-const testRoot = createIsolatedRuntimeRoot("openelinaro-profile-test-");
 beforeEach(() => {
-  testRoot.setup();
-  writeProfileRegistry(testRoot.path);
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-profile-test-"));
+  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
+  writeProfileRegistry(runtimeRoot);
 });
-afterEach(() => testRoot.teardown());
+
+afterEach(() => {
+  if (previousRootDirEnv === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  }
+  fs.rmSync(runtimeRoot, { recursive: true, force: true });
+  runtimeRoot = "";
+});
 
 describe("ProfileService", () => {
   test("loadRegistry returns all profiles", () => {

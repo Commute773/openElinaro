@@ -1,25 +1,35 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { DynamicStructuredTool } from "@langchain/core/tools";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 import { AgentChatService } from "./agent-chat-service";
 import { ConversationStore } from "./conversation-store";
 import { SystemPromptService } from "./system-prompt-service";
 
 let previousCwd = "";
+let previousRootDir = "";
+let tempRoot = "";
 
-const testRoot = createIsolatedRuntimeRoot("agent-chat-service-");
 beforeEach(() => {
   previousCwd = process.cwd();
-  testRoot.setup();
-  process.chdir(testRoot.path);
+  previousRootDir = process.env.OPENELINARO_ROOT_DIR ?? "";
+  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agent-chat-service-"));
+  process.env.OPENELINARO_ROOT_DIR = tempRoot;
+  process.chdir(tempRoot);
 });
 
 afterEach(() => {
   process.chdir(previousCwd);
-  testRoot.teardown();
+  if (previousRootDir) {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDir;
+  } else {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  }
+  fs.rmSync(tempRoot, { recursive: true, force: true });
 });
 
 function createService(options?: {
@@ -75,7 +85,7 @@ function createService(options?: {
       async compactForContinuation() {
         await options?.onCompact?.();
         return {
-          conversation: conversations.get("conversation-1"),
+          conversation: await conversations.get("conversation-1"),
           summary: "Compacted for continuation.",
           memoryFilePath: null,
         };
@@ -212,8 +222,8 @@ describe("AgentChatService", () => {
       },
     });
 
-    conversations.ensureSystemPrompt("conversation-1", new SystemPromptService().load());
-    conversations.appendMessages("conversation-1", [new HumanMessage("Existing context.")]);
+    await conversations.ensureSystemPrompt("conversation-1", await new SystemPromptService().load());
+    await conversations.appendMessages("conversation-1", [new HumanMessage("Existing context.")]);
 
     const session = (service as any).getSession("conversation-1");
     session.pendingSteeringMessages.push({
@@ -281,7 +291,7 @@ describe("AgentChatService", () => {
     const injectedMessage = requests[0]?.humanMessages[0] ?? "";
     expect(injectedMessage.indexOf("<recalled_memory>"))
       .toBeLessThan(injectedMessage.indexOf("How should you answer me?"));
-    const savedConversation = conversations.get("conversation-1");
+    const savedConversation = await conversations.get("conversation-1");
     const savedHumanMessage = savedConversation.messages.findLast((message) => message instanceof HumanMessage);
     expect(savedHumanMessage).toBeInstanceOf(HumanMessage);
     expect(typeof savedHumanMessage?.content === "string" ? savedHumanMessage.content : JSON.stringify(savedHumanMessage?.content))
@@ -413,7 +423,7 @@ describe("AgentChatService", () => {
     expect(toolInvocations).toContain("exec:ls");
     expect(toolInvocations).toContain("exec:pwd");
 
-    const conversation = conversations.get("conversation-1");
+    const conversation = await conversations.get("conversation-1");
     const aiMessages = conversation.messages.filter(
       (message): message is AIMessage => message instanceof AIMessage,
     );
@@ -510,7 +520,7 @@ describe("AgentChatService", () => {
     });
 
     // The stop should have been caught, but messages should be persisted
-    const conversation = conversations.get("conversation-1");
+    const conversation = await conversations.get("conversation-1");
     const allToolCalls = conversation.messages
       .filter((message): message is AIMessage => message instanceof AIMessage)
       .flatMap((message) => message.tool_calls ?? []);

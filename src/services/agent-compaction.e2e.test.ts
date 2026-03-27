@@ -1,21 +1,22 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 
 const repoRoot = process.cwd();
-const testRoot = createIsolatedRuntimeRoot("agent-compaction-e2e-");
 
 let previousCwd = "";
+let previousRootDirEnv: string | undefined;
+let tempRoot = "";
 
 function copyDirectory(relativePath: string) {
   const source = path.join(repoRoot, relativePath);
   if (!fs.existsSync(source)) {
     return;
   }
-  fs.cpSync(source, path.join(testRoot.path, relativePath), { recursive: true });
+  fs.cpSync(source, path.join(tempRoot, relativePath), { recursive: true });
 }
 
 function copyFile(relativePath: string) {
@@ -23,7 +24,7 @@ function copyFile(relativePath: string) {
   if (!fs.existsSync(source)) {
     return;
   }
-  const destination = path.join(testRoot.path, relativePath);
+  const destination = path.join(tempRoot, relativePath);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.copyFileSync(source, destination);
 }
@@ -181,8 +182,10 @@ function extractText(message: BaseMessage) {
 
 beforeAll(() => {
   previousCwd = process.cwd();
-  testRoot.setup();
-  process.chdir(testRoot.path);
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agent-compaction-e2e-"));
+  process.env.OPENELINARO_ROOT_DIR = tempRoot;
+  process.chdir(tempRoot);
 
   copyDirectory("system_prompt");
   copyFile("profiles/registry.json");
@@ -190,7 +193,14 @@ beforeAll(() => {
 
 afterAll(() => {
   process.chdir(previousCwd);
-  testRoot.teardown();
+  if (previousRootDirEnv) {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  } else {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  }
+  if (tempRoot) {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 describe("agent compaction e2e", () => {
@@ -198,8 +208,8 @@ describe("agent compaction e2e", () => {
     const harness = await createHarness();
     const progress: string[] = [];
     const conversationKey = "conversation-success";
-    harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
-    harness.conversations.appendMessages(conversationKey, [
+    await harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
+    await harness.conversations.appendMessages(conversationKey, [
       new HumanMessage("Earlier user request."),
       new AIMessage("Earlier assistant reply."),
       new ToolMessage({
@@ -226,7 +236,7 @@ describe("agent compaction e2e", () => {
     expect(progress).toContain("Merging durable memory into core memory.");
     expect(progress).toContain("Compaction complete.");
 
-    const conversation = harness.conversations.get(conversationKey);
+    const conversation = await harness.conversations.get(conversationKey);
     expect(conversation).toBeTruthy();
     const messages = conversation.messages.map(extractText);
     expect(messages[0]).toContain("Context summary (generated automatically during compaction");
@@ -234,7 +244,7 @@ describe("agent compaction e2e", () => {
     expect(messages.at(-2)).toContain("Newest message after compaction.");
     expect(messages.at(-1)).toContain("Reply after compaction.");
 
-    const memoryPath = path.join(testRoot.path, ".openelinarotest", "memory/documents/root/core/MEMORY.md");
+    const memoryPath = path.join(tempRoot, ".openelinarotest", "memory/documents/root/core/MEMORY.md");
     expect(fs.existsSync(memoryPath)).toBe(true);
     expect(fs.readFileSync(memoryPath, "utf8")).toContain("User prefers terse replies.");
 
@@ -250,8 +260,8 @@ describe("agent compaction e2e", () => {
     });
     const progress: string[] = [];
     const conversationKey = "conversation-abort";
-    harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
-    harness.conversations.appendMessages(conversationKey, [
+    await harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
+    await harness.conversations.appendMessages(conversationKey, [
       new HumanMessage("Earlier user request."),
       new AIMessage("Earlier assistant reply."),
     ]);
@@ -268,7 +278,7 @@ describe("agent compaction e2e", () => {
     expect(result.message).toBe("Reply despite compaction failure.");
     expect(progress).toContain("Compaction failed. Continuing without compaction for this turn.");
 
-    const conversation = harness.conversations.get(conversationKey);
+    const conversation = await harness.conversations.get(conversationKey);
     expect(conversation).toBeTruthy();
     const messages = conversation.messages.map(extractText);
     expect(messages[0]).not.toContain("Context summary (generated automatically during compaction");

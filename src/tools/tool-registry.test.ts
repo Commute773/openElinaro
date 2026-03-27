@@ -21,7 +21,6 @@ import type { ShellService } from "../services/shell-service";
 import { SystemPromptService } from "../services/system-prompt-service";
 import { ToolResolutionService } from "../services/tool-resolution-service";
 import { resolveRuntimePlatform, type RuntimePlatform } from "../services/runtime-platform";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
 import { getRuntimeConfig } from "../config/runtime-config";
@@ -32,6 +31,8 @@ import {
 } from "./tool-registry";
 
 const repoRoot = process.cwd();
+let runtimeRoot = "";
+let previousRootDirEnv: string | undefined;
 
 function createPersistentOpenBrowserRunnerStub() {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "routine-tool-openbrowser-runner-"));
@@ -386,12 +387,13 @@ function createRegistry() {
   return createHarness().registry;
 }
 
-const testRoot = createIsolatedRuntimeRoot("openelinaro-tool-registry-");
 beforeEach(() => {
-  testRoot.setup();
-  writeTestProfileRegistry(testRoot.path);
-  writeTestProjectRegistry(testRoot.path);
-  writeSharedPythonFixture(testRoot.path);
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-tool-registry-"));
+  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
+  writeTestProfileRegistry(runtimeRoot);
+  writeTestProjectRegistry(runtimeRoot);
+  writeSharedPythonFixture(runtimeRoot);
   updateTestRuntimeConfig((config) => {
     config.webSearch.enabled = true;
     config.webSearch.braveApiKeySecretRef = "brave.apiKey";
@@ -431,7 +433,15 @@ beforeEach(() => {
   secrets.saveSecret({ name: "tickets", fields: { apiToken: "tickets-api-token" } });
 });
 
-afterEach(() => testRoot.teardown());
+afterEach(() => {
+  if (previousRootDirEnv === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  }
+  fs.rmSync(runtimeRoot, { recursive: true, force: true });
+  runtimeRoot = "";
+});
 
 describe("ToolRegistry tool catalog", () => {
   test("hides finance tools when the finance feature is disabled", () => {
@@ -591,8 +601,8 @@ describe("ToolRegistry tool catalog", () => {
   });
 
   test("tool_result_read returns a partial slice by default", async () => {
-    const toolResults = new ToolResultStore(path.join(testRoot.path, ".openelinarotest", "tool-results"));
-    const saved = toolResults.save({
+    const toolResults = new ToolResultStore(path.join(runtimeRoot, ".openelinarotest", "tool-results"));
+    const saved = await toolResults.save({
       namespace: "conversation:test",
       toolCallId: "call-partial",
       toolName: "exec_command",
@@ -617,8 +627,8 @@ describe("ToolRegistry tool catalog", () => {
   });
 
   test("tool_result_read returns the full stored payload when mode=full", async () => {
-    const toolResults = new ToolResultStore(path.join(testRoot.path, ".openelinarotest", "tool-results"));
-    const saved = toolResults.save({
+    const toolResults = new ToolResultStore(path.join(runtimeRoot, ".openelinarotest", "tool-results"));
+    const saved = await toolResults.save({
       namespace: "conversation:test",
       toolCallId: "call-full",
       toolName: "read_file",
@@ -643,7 +653,7 @@ describe("ToolRegistry tool catalog", () => {
 
   test("local filesystem tool output is not wrapped as untrusted content", async () => {
     const harness = createHarness();
-    const samplePath = path.join(testRoot.path, "sample.txt");
+    const samplePath = path.join(runtimeRoot, "sample.txt");
     fs.writeFileSync(samplePath, "alpha\nbeta\ngamma\n", "utf8");
 
     const result = await harness.registry.invoke("read_file", {
@@ -656,8 +666,8 @@ describe("ToolRegistry tool catalog", () => {
   });
 
   test("tool_result_read uses the tool summarizer when mode=summary", async () => {
-    const toolResults = new ToolResultStore(path.join(testRoot.path, ".openelinarotest", "tool-results"));
-    const saved = toolResults.save({
+    const toolResults = new ToolResultStore(path.join(runtimeRoot, ".openelinarotest", "tool-results"));
+    const saved = await toolResults.save({
       namespace: "conversation:test",
       toolCallId: "call-summary",
       toolName: "exec_command",
@@ -697,15 +707,15 @@ describe("ToolRegistry tool catalog", () => {
   test("new_chat force=true starts a brand new chat without flushing durable memory", async () => {
     const harness = createHarness();
     const conversationKey = "force-reset-test-thread";
-    harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
-    harness.conversations.rollbackAndAppend(
+    await harness.conversations.ensureSystemPrompt(conversationKey, await harness.systemPrompts.load());
+    await harness.conversations.rollbackAndAppend(
       conversationKey,
-      harness.conversations.get(conversationKey).messages.length,
+      (await harness.conversations.get(conversationKey)).messages.length,
       [new HumanMessage("hello before reset")],
     );
 
     const result = await harness.registry.invoke("new_chat", { conversationKey, force: true });
-    const storedConversation = harness.conversations.get(conversationKey);
+    const storedConversation = await harness.conversations.get(conversationKey);
 
     expect(result).toContain(`Started a new conversation for ${conversationKey}.`);
     expect(result).toContain("Durable memory flush was intentionally skipped.");
@@ -726,8 +736,8 @@ describe("ToolRegistry tool catalog", () => {
           }),
       }),
     });
-    conversations.appendMessages("thread-1", [new HumanMessage("cache graph regression")]);
-    conversations.appendMessages("thread-2", [new HumanMessage("older note about graph memory")]);
+    await conversations.appendMessages("thread-1", [new HumanMessage("cache graph regression")]);
+    await conversations.appendMessages("thread-2", [new HumanMessage("older note about graph memory")]);
 
     const harness = createHarnessWithOptions({ conversations });
     const result = await harness.registry.invoke("conversation_search", {
@@ -802,9 +812,9 @@ describe("ToolRegistry tool catalog", () => {
 
   test("reads stamped deploy metadata through service_version", async () => {
     const previousServiceRoot = process.env.OPENELINARO_SERVICE_ROOT_DIR;
-    process.env.OPENELINARO_SERVICE_ROOT_DIR = testRoot.path;
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = runtimeRoot;
     fs.writeFileSync(
-      path.join(testRoot.path, "VERSION.json"),
+      path.join(runtimeRoot, "VERSION.json"),
       `${JSON.stringify({
         version: "2026.03.15.2",
         releasedAt: "2026-03-15T11:22:33Z",
@@ -820,7 +830,7 @@ describe("ToolRegistry tool catalog", () => {
 
       expect(result).toContain("Version: 2026.03.15.2");
       expect(result).toContain("Previous version: 2026.03.15");
-      expect(result).toContain(`Service root: ${testRoot.path}`);
+      expect(result).toContain(`Service root: ${runtimeRoot}`);
     } finally {
       if (previousServiceRoot === undefined) {
         delete process.env.OPENELINARO_SERVICE_ROOT_DIR;
@@ -832,9 +842,9 @@ describe("ToolRegistry tool catalog", () => {
 
   test("reads deployment changelog entries newer than a requested version", async () => {
     const previousServiceRoot = process.env.OPENELINARO_SERVICE_ROOT_DIR;
-    process.env.OPENELINARO_SERVICE_ROOT_DIR = testRoot.path;
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = runtimeRoot;
     fs.writeFileSync(
-      path.join(testRoot.path, "VERSION.json"),
+      path.join(runtimeRoot, "VERSION.json"),
       `${JSON.stringify({
         version: "2026.03.16.2",
         releasedAt: "2026-03-16T15:48:00Z",
@@ -845,7 +855,7 @@ describe("ToolRegistry tool catalog", () => {
       "utf8",
     );
     fs.writeFileSync(
-      path.join(testRoot.path, "DEPLOYMENTS.md"),
+      path.join(runtimeRoot, "DEPLOYMENTS.md"),
       [
         "# Deployments",
         "",
@@ -886,9 +896,9 @@ describe("ToolRegistry tool catalog", () => {
 
   test("compares requested changelog versions numerically even when the exact version is absent", async () => {
     const previousServiceRoot = process.env.OPENELINARO_SERVICE_ROOT_DIR;
-    process.env.OPENELINARO_SERVICE_ROOT_DIR = testRoot.path;
+    process.env.OPENELINARO_SERVICE_ROOT_DIR = runtimeRoot;
     fs.writeFileSync(
-      path.join(testRoot.path, "VERSION.json"),
+      path.join(runtimeRoot, "VERSION.json"),
       `${JSON.stringify({
         version: "2026.03.18.3",
         releasedAt: "2026-03-18T15:48:00Z",
@@ -899,7 +909,7 @@ describe("ToolRegistry tool catalog", () => {
       "utf8",
     );
     fs.writeFileSync(
-      path.join(testRoot.path, "DEPLOYMENTS.md"),
+      path.join(runtimeRoot, "DEPLOYMENTS.md"),
       [
         "# Deployments",
         "",
@@ -969,7 +979,7 @@ describe("ToolRegistry tool catalog", () => {
       consumeConversationNotifications: () => [],
     };
     const previous = process.env.OPENELINARO_SERVICE_ROOT_DIR;
-    const serviceRoot = path.join(testRoot.path, "service-release");
+    const serviceRoot = path.join(runtimeRoot, "service-release");
     fs.mkdirSync(serviceRoot, { recursive: true });
     process.env.OPENELINARO_SERVICE_ROOT_DIR = serviceRoot;
     fs.writeFileSync(
@@ -984,7 +994,7 @@ describe("ToolRegistry tool catalog", () => {
       "utf8",
     );
     fs.writeFileSync(
-      path.join(testRoot.path, "VERSION.json"),
+      path.join(runtimeRoot, "VERSION.json"),
       `${JSON.stringify({
         version: "2026.03.21.35",
         releasedAt: "2026-03-21T23:55:00Z",
@@ -995,7 +1005,7 @@ describe("ToolRegistry tool catalog", () => {
       "utf8",
     );
     fs.writeFileSync(
-      path.join(testRoot.path, "DEPLOYMENTS.md"),
+      path.join(runtimeRoot, "DEPLOYMENTS.md"),
       [
         "# Deployments",
         "",
@@ -1018,8 +1028,8 @@ describe("ToolRegistry tool catalog", () => {
     const previousSystemdUnitPath = process.env.OPENELINARO_SYSTEMD_UNIT_PATH;
     try {
       const harness = createHarnessWithOptions({ shell: shellStub });
-      process.env.OPENELINARO_ROOT_DIR = testRoot.path;
-      process.env.OPENELINARO_USER_DATA_DIR = path.join(testRoot.path, ".openelinaro");
+      process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
+      process.env.OPENELINARO_USER_DATA_DIR = path.join(runtimeRoot, ".openelinaro");
       process.env.OPENELINARO_SERVICE_USER = "root";
       process.env.OPENELINARO_SERVICE_GROUP = "root";
       process.env.OPENELINARO_SERVICE_LABEL = "openelinaro.service";
@@ -1042,9 +1052,9 @@ describe("ToolRegistry tool catalog", () => {
       expect(commands[3]).toContain("'git' '-C'");
       expect(commands[3]).toContain("'tag' '-l'");
       expect(commands[4]).toContain("OPENELINARO_AGENT_SERVICE_CONTROL='1'");
-      expect(commands[4]).toContain(`OPENELINARO_ROOT_DIR='${testRoot.path}'`);
+      expect(commands[4]).toContain(`OPENELINARO_ROOT_DIR='${runtimeRoot}'`);
       expect(commands[4]).toContain(`OPENELINARO_SERVICE_ROOT_DIR='${serviceRoot}'`);
-      expect(commands[4]).toContain(`OPENELINARO_USER_DATA_DIR='${path.join(testRoot.path, ".openelinaro")}'`);
+      expect(commands[4]).toContain(`OPENELINARO_USER_DATA_DIR='${path.join(runtimeRoot, ".openelinaro")}'`);
       expect(commands[4]).toContain("OPENELINARO_SERVICE_USER='root'");
       expect(commands[4]).toContain("OPENELINARO_SERVICE_GROUP='root'");
       expect(commands[4]).toContain("OPENELINARO_SERVICE_LABEL='openelinaro.service'");
@@ -1173,7 +1183,7 @@ describe("ToolRegistry tool catalog", () => {
       consumeConversationNotifications: () => [],
     };
     const previous = process.env.OPENELINARO_SERVICE_ROOT_DIR;
-    const serviceRoot = path.join(testRoot.path, "service-release-same-version");
+    const serviceRoot = path.join(runtimeRoot, "service-release-same-version");
     fs.mkdirSync(serviceRoot, { recursive: true });
     process.env.OPENELINARO_SERVICE_ROOT_DIR = serviceRoot;
     fs.writeFileSync(
@@ -1181,7 +1191,7 @@ describe("ToolRegistry tool catalog", () => {
       `${JSON.stringify({
         id: "20260321T235500Z-live",
         createdAt: "2026-03-21T23:55:00Z",
-        sourceRoot: testRoot.path,
+        sourceRoot: runtimeRoot,
         version: "2026.03.21.35",
         releasedAt: "2026-03-21T23:55:00Z",
         previousVersion: "2026.03.21.34",
@@ -1190,7 +1200,7 @@ describe("ToolRegistry tool catalog", () => {
       "utf8",
     );
     fs.writeFileSync(
-      path.join(testRoot.path, "VERSION.json"),
+      path.join(runtimeRoot, "VERSION.json"),
       `${JSON.stringify({
         version: "2026.03.21.35",
         releasedAt: "2026-03-21T23:55:00Z",
@@ -1346,7 +1356,7 @@ describe("ToolRegistry tool catalog", () => {
     const previousServiceRoot = process.env.OPENELINARO_SERVICE_ROOT_DIR;
 
     try {
-      process.env.OPENELINARO_SERVICE_ROOT_DIR = path.join(testRoot.path, "service-release");
+      process.env.OPENELINARO_SERVICE_ROOT_DIR = path.join(runtimeRoot, "service-release");
       fs.mkdirSync(process.env.OPENELINARO_SERVICE_ROOT_DIR, { recursive: true });
       const harness = createHarnessWithOptions({
         shell: shellStub,
@@ -1371,7 +1381,7 @@ describe("ToolRegistry tool catalog", () => {
       expect(getRuntimeConfig().media.enabled).toBe(true);
       expect(getRuntimeConfig().media.roots).toEqual(["/tmp/media"]);
 
-      const noticePath = path.join(testRoot.path, ".openelinarotest", "service-restart-notice.json");
+      const noticePath = path.join(runtimeRoot, ".openelinarotest", "service-restart-notice.json");
       expect(fs.existsSync(noticePath)).toBe(true);
       const notice = JSON.parse(fs.readFileSync(noticePath, "utf8")) as { source?: string; message?: string };
       expect(notice.source).toBe("feature_manage");
@@ -1412,7 +1422,7 @@ describe("ToolRegistry tool catalog", () => {
     };
     const previousServiceRoot = process.env.OPENELINARO_SERVICE_ROOT_DIR;
     try {
-      process.env.OPENELINARO_SERVICE_ROOT_DIR = path.join(testRoot.path, "service-release");
+      process.env.OPENELINARO_SERVICE_ROOT_DIR = path.join(runtimeRoot, "service-release");
       fs.mkdirSync(process.env.OPENELINARO_SERVICE_ROOT_DIR, { recursive: true });
       const harness = createHarnessWithOptions({
         shell: shellStub,
@@ -1474,7 +1484,7 @@ describe("ToolRegistry tool catalog", () => {
     };
     const previousServiceRoot = process.env.OPENELINARO_SERVICE_ROOT_DIR;
     try {
-      process.env.OPENELINARO_SERVICE_ROOT_DIR = path.join(testRoot.path, "service-release");
+      process.env.OPENELINARO_SERVICE_ROOT_DIR = path.join(runtimeRoot, "service-release");
       fs.mkdirSync(process.env.OPENELINARO_SERVICE_ROOT_DIR, { recursive: true });
       const harness = createHarnessWithOptions({
         shell: shellStub,
@@ -1592,18 +1602,18 @@ describe("ToolRegistry tool catalog", () => {
 
   test("apply_patch supports add, update, move, and delete operations", async () => {
     const harness = createHarness();
-    const targetPath = path.join(testRoot.path, "patch-target.txt");
-    const moveSourcePath = path.join(testRoot.path, "move-me.txt");
-    const movedPath = path.join(testRoot.path, "moved.txt");
-    const deleteTargetPath = path.join(testRoot.path, "delete-me.txt");
-    const addedPath = path.join(testRoot.path, "added.txt");
+    const targetPath = path.join(runtimeRoot, "patch-target.txt");
+    const moveSourcePath = path.join(runtimeRoot, "move-me.txt");
+    const movedPath = path.join(runtimeRoot, "moved.txt");
+    const deleteTargetPath = path.join(runtimeRoot, "delete-me.txt");
+    const addedPath = path.join(runtimeRoot, "added.txt");
 
     fs.writeFileSync(targetPath, "alpha\nbeta\ngamma\n", "utf8");
     fs.writeFileSync(moveSourcePath, "before move\n", "utf8");
     fs.writeFileSync(deleteTargetPath, "remove me\n", "utf8");
 
     const result = await harness.registry.invoke("apply_patch", {
-      cwd: testRoot.path,
+      cwd: runtimeRoot,
       patchText: [
         "*** Begin Patch",
         "*** Add File: added.txt",
@@ -1775,7 +1785,7 @@ describe("ToolRegistry tool catalog", () => {
 
   test("supports brief, verbose, and full context usage modes", async () => {
     const conversations = new ConversationStore();
-    conversations.appendMessages("chat-1", [new HumanMessage("How full is this conversation?")]);
+    await conversations.appendMessages("chat-1", [new HumanMessage("How full is this conversation?")]);
     const models = {
       async inspectContextWindowUsage() {
         return {
@@ -1883,7 +1893,7 @@ describe("ToolRegistry tool catalog", () => {
 
   test("reports conversation and local-day usage costs", async () => {
     const conversations = new ConversationStore();
-    conversations.appendMessages("chat-1", [new HumanMessage("How much has this thread cost today?")]);
+    await conversations.appendMessages("chat-1", [new HumanMessage("How much has this thread cost today?")]);
     const models = {
       getActiveModel() {
         return {

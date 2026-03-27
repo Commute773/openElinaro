@@ -1,13 +1,14 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 
 const repoRoot = process.cwd();
-const testRoot = createIsolatedRuntimeRoot("openelinaro-ssh-profile-e2e-");
 
 let previousCwd = "";
+let previousRootDirEnv: string | undefined;
+let tempRoot = "";
 
 let appRuntimeModule: typeof import("./runtime");
 let memoryServiceModule: typeof import("../services/memory-service");
@@ -27,11 +28,11 @@ function copyDirectory(relativePath: string) {
   if (!fs.existsSync(source)) {
     return;
   }
-  fs.cpSync(source, path.join(testRoot.path, relativePath), { recursive: true });
+  fs.cpSync(source, path.join(tempRoot, relativePath), { recursive: true });
 }
 
 function writeAssistantContextFixture() {
-  const assistantContextRoot = path.join(testRoot.path, ".openelinarotest", "assistant_context");
+  const assistantContextRoot = path.join(tempRoot, ".openelinarotest", "assistant_context");
   fs.mkdirSync(assistantContextRoot, { recursive: true });
   fs.writeFileSync(
     path.join(assistantContextRoot, "heartbeat.md"),
@@ -41,9 +42,9 @@ function writeAssistantContextFixture() {
 }
 
 function writeTestProfileRegistry() {
-  fs.mkdirSync(path.join(testRoot.path, ".openelinarotest", "profiles"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "profiles"), { recursive: true });
   fs.writeFileSync(
-    path.join(testRoot.path, ".openelinarotest", "profiles/registry.json"),
+    path.join(tempRoot, ".openelinarotest", "profiles/registry.json"),
     `${JSON.stringify({
       version: 1,
       profiles: [
@@ -77,11 +78,11 @@ function writeTestProfileRegistry() {
 }
 
 function writeTestProjectRegistry() {
-  fs.mkdirSync(path.join(testRoot.path, ".openelinarotest", "projects/link-coach"), { recursive: true });
-  fs.mkdirSync(path.join(testRoot.path, ".openelinarotest", "projects/link-coach/workspace"), { recursive: true });
-  fs.writeFileSync(path.join(testRoot.path, ".openelinarotest", "projects/link-coach/README.md"), "# Link Coach\n", "utf8");
+  fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "projects/link-coach"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "projects/link-coach/workspace"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, ".openelinarotest", "projects/link-coach/README.md"), "# Link Coach\n", "utf8");
   fs.writeFileSync(
-    path.join(testRoot.path, ".openelinarotest", "projects/registry.json"),
+    path.join(tempRoot, ".openelinarotest", "projects/registry.json"),
     `${JSON.stringify({
       version: 1,
       jobs: [
@@ -101,7 +102,7 @@ function writeTestProjectRegistry() {
           jobId: "remote",
           priority: "medium",
           allowedRoles: ["remote"],
-          workspacePath: path.join(testRoot.path, ".openelinarotest", "projects/link-coach/workspace"),
+          workspacePath: path.join(tempRoot, ".openelinarotest", "projects/link-coach/workspace"),
           workspaceOverrides: {
             remote: "/Users/remote/link-coach",
           },
@@ -122,10 +123,10 @@ function writeTestProjectRegistry() {
 }
 
 function writeWorkspaceFixture() {
-  fs.mkdirSync(path.join(testRoot.path, ".openelinarotest", "memory/documents/root"), { recursive: true });
-  fs.mkdirSync(path.join(testRoot.path, ".openelinarotest", "memory/documents/remote"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "memory/documents/root"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "memory/documents/remote"), { recursive: true });
   fs.writeFileSync(
-    path.join(testRoot.path, "package.json"),
+    path.join(tempRoot, "package.json"),
     JSON.stringify({ name: "ssh-profile-e2e-fixture", type: "module" }, null, 2),
     "utf8",
   );
@@ -141,8 +142,10 @@ function decodeFilesystemRequest(command: string) {
 
 beforeAll(async () => {
   previousCwd = process.cwd();
-  testRoot.setup();
-  process.chdir(testRoot.path);
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-ssh-profile-e2e-"));
+  process.env.OPENELINARO_ROOT_DIR = tempRoot;
+  process.chdir(tempRoot);
 
   copyDirectory("src");
   copyDirectory("system_prompt");
@@ -164,8 +167,8 @@ beforeAll(async () => {
       version: 1,
       builtAt: new Date().toISOString(),
       modelId: "stub",
-      sourceRoot: path.join(testRoot.path, ".openelinarotest", "memory/documents"),
-      documentRoot: path.join(testRoot.path, ".openelinarotest", "memory/documents"),
+      sourceRoot: path.join(tempRoot, ".openelinarotest", "memory/documents"),
+      documentRoot: path.join(tempRoot, ".openelinarotest", "memory/documents"),
       documents: [],
       chunks: [],
       documentFrequencies: {},
@@ -201,7 +204,12 @@ afterAll(() => {
   memoryServiceModule.MemoryService.prototype.ensureReady = originalEnsureReady;
   sshShellServiceModule.SshShellService.prototype.exec = originalSshExec;
   process.chdir(previousCwd);
-  testRoot.teardown();
+  if (previousRootDirEnv === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  }
+  fs.rmSync(tempRoot, { recursive: true, force: true });
 });
 
 describe("OpenElinaro SSH profile e2e", () => {

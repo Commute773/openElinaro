@@ -27,7 +27,7 @@ function extractProviderMeta(options: LanguageModelV3CallOptions) {
   };
 }
 
-export function buildScriptedConnectorRequest(options: LanguageModelV3CallOptions): ScriptedConnectorRequest {
+export async function buildScriptedConnectorRequest(options: LanguageModelV3CallOptions): Promise<ScriptedConnectorRequest> {
   const meta = extractProviderMeta(options);
   return {
     ...meta,
@@ -35,7 +35,7 @@ export function buildScriptedConnectorRequest(options: LanguageModelV3CallOption
       .filter((message) => message.role === "system")
       .map((message) => message.content)
       .join("\n\n"),
-    messages: fromModelMessages(options.prompt.filter((message) => message.role !== "system")),
+    messages: await fromModelMessages(options.prompt.filter((message) => message.role !== "system")),
   };
 }
 
@@ -108,7 +108,7 @@ export class ScriptedProviderConnector implements ProviderConnector {
   }
 
   async doGenerate(options: LanguageModelV3CallOptions): Promise<LanguageModelV3GenerateResult> {
-    const response = await this.handler(buildScriptedConnectorRequest(options));
+    const response = await this.handler(await buildScriptedConnectorRequest(options));
     return toGenerateResultFromAIMessage(response, this.providerId, this.modelId);
   }
 

@@ -19,9 +19,6 @@ import {
   renderExtendedContextStatus,
   renderShellExecResult,
   formatTokenCount,
-  type ShellRuntime,
-  type FilesystemRuntime,
-  type TicketsRuntime,
 } from "./groups";
 import type { AppProgressEvent, AppProgressUpdate } from "../domain/assistant";
 import { ConversationStore } from "../services/conversation-store";
@@ -104,6 +101,19 @@ import {
 } from "../config/runtime-config";
 import type { SubagentRun } from "../domain/subagent-run";
 import type { AgentToolScope, ToolCatalogCard } from "../domain/tool-catalog";
+
+type ShellRuntime = Pick<
+  ShellService,
+  "consumeConversationNotifications" | "exec" | "launchBackground" | "listBackgroundJobs" | "readBackgroundOutput"
+>;
+type FilesystemRuntime = Pick<
+  FilesystemService,
+  "applyPatch" | "copyPath" | "deletePath" | "edit" | "glob" | "grep" | "listDir" | "mkdir" | "movePath" | "read" | "statPath" | "write"
+>;
+type TicketsRuntime = Pick<
+  ElinaroTicketsService,
+  "isConfigured" | "getConfigurationError" | "listTickets" | "getTicket" | "createTicket" | "updateTicket"
+>;
 
 const toolRegistryTelemetry = telemetry.child({ component: "tool" });
 
@@ -1861,7 +1871,7 @@ export class ToolRegistry {
             await this.notifyToolResultProgress(context, entry.name, result, input);
             return await this.finalizeToolResult(result, entry.name, input);
           } catch (error) {
-            return this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
+            return await this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
           }
         },
         {
@@ -1874,6 +1884,16 @@ export class ToolRegistry {
 
   getToolCatalog(context?: ToolContext): ToolCatalogCard[] {
     return this.getRawTools(context).map((entry) => buildToolCatalogCard(entry));
+  }
+
+  getToolJsonSchema(name: string): Record<string, unknown> | null {
+    if (!this.access.canUseTool(name)) return null;
+    const entry = this.resolveToolEntry(name);
+    if (!entry) return null;
+    if (entry.schema instanceof z.ZodObject) {
+      return z.toJSONSchema(entry.schema) as Record<string, unknown>;
+    }
+    return null;
   }
 
   getToolLibraries(context?: ToolContext, scope?: AgentToolScope): ToolLibraryDefinition[] {
@@ -1922,7 +1942,7 @@ export class ToolRegistry {
                 await this.notifyToolResultProgress(context, entry.name, result, input);
                 return await this.finalizeToolResult(result, entry.name, input);
               } catch (error) {
-                return this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
+                return await this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
               }
             },
             {
@@ -1968,9 +1988,9 @@ export class ToolRegistry {
     }
   }
 
-  private buildRuntimeContext() {
+  private async buildRuntimeContext() {
     const profile = this.access.getProfile();
-    const deployment = this.deploymentVersion.load();
+    const deployment = await this.deploymentVersion.load();
     const profileSection = [
       `Profile: ${profile.id}`,
       `Roles: ${profile.roles.join(", ")}`,
@@ -2106,7 +2126,7 @@ export class ToolRegistry {
       const result = await this.invokeRaw(name, input, context);
       return await this.finalizeToolResult(result, name, input);
     } catch (error) {
-      return this.normalizeToolResult(this.normalizeToolFailure(name, error));
+      return await this.normalizeToolResult(this.normalizeToolFailure(name, error));
     }
   }
 
@@ -2172,7 +2192,7 @@ export class ToolRegistry {
           );
           return await this.finalizeToolResult(result, entry.name, input);
         } catch (error) {
-          return this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
+          return await this.normalizeToolResult(this.normalizeToolFailure(entry.name, error));
         }
       },
       {
@@ -2215,9 +2235,9 @@ export class ToolRegistry {
     return { ...(input as Record<string, unknown>), conversationKey: context.conversationKey };
   }
 
-  private normalizeToolResult(result: unknown, toolName?: string, input?: unknown) {
+  private async normalizeToolResult(result: unknown, toolName?: string, input?: unknown) {
     const text = truncateToolOutput(stringifyToolResult(result));
-    const descriptor = toolName ? this.getUntrustedToolDescriptor(toolName, input) : undefined;
+    const descriptor = toolName ? await this.getUntrustedToolDescriptor(toolName, input) : undefined;
     return descriptor ? guardUntrustedText(text, descriptor) : text;
   }
 
@@ -2232,8 +2252,8 @@ export class ToolRegistry {
     return buildToolErrorEnvelope(name, error);
   }
 
-  private getUntrustedToolDescriptor(toolName: string, input?: unknown): UntrustedContentDescriptor | undefined {
-    const resolvedToolName = this.resolveGuardedToolName(toolName, input);
+  private async getUntrustedToolDescriptor(toolName: string, input?: unknown): Promise<UntrustedContentDescriptor | undefined> {
+    const resolvedToolName = await this.resolveGuardedToolName(toolName, input);
     const descriptor = resolvedToolName ? UNTRUSTED_TOOL_DESCRIPTOR_MAP[resolvedToolName] : undefined;
     if (!descriptor) {
       return undefined;
@@ -2247,14 +2267,14 @@ export class ToolRegistry {
     };
   }
 
-  private resolveGuardedToolName(toolName: string, input?: unknown) {
+  private async resolveGuardedToolName(toolName: string, input?: unknown) {
     if (toolName !== "tool_result_read") {
       return toolName;
     }
     if (!input || typeof input !== "object" || Array.isArray(input) || typeof (input as { ref?: unknown }).ref !== "string") {
       return toolName;
     }
-    const record = this.toolResults.get((input as { ref: string }).ref);
+    const record = await this.toolResults.get((input as { ref: string }).ref);
     return record?.toolName ?? toolName;
   }
 
@@ -2369,24 +2389,24 @@ export class ToolRegistry {
         renderShellExecResult(result),
       ].join("\n"));
     }
-    this.serviceRestartNotices.recordPendingNotice({ source });
+    await this.serviceRestartNotices.recordPendingNotice({ source });
     return "Service restart requested. Reconnect after the bot comes back. Running background agents will resume automatically after restart.";
   }
 
-  private getConversationForTool(input: { conversationKey?: string }, context?: ToolContext) {
+  private async getConversationForTool(input: { conversationKey?: string }, context?: ToolContext) {
     const conversationKey = this.resolveConversationKey(input, context);
     if (conversationKey) {
-      return this.conversations.ensureSystemPrompt(conversationKey, this.systemPrompts.load());
+      return this.conversations.ensureSystemPrompt(conversationKey, await this.systemPrompts.load());
     }
 
-    const latest = this.conversations.getLatest();
+    const latest = await this.conversations.getLatest();
     if (!latest) {
       throw new Error("No saved conversation is available yet.");
     }
 
     return latest.systemPrompt
       ? latest
-      : this.conversations.ensureSystemPrompt(latest.key, this.systemPrompts.load());
+      : this.conversations.ensureSystemPrompt(latest.key, await this.systemPrompts.load());
   }
 
   private resolveWorkspacePath(workspace: string): string {
@@ -2793,7 +2813,7 @@ export class ToolRegistry {
         traceSpan(
           "tool.tool_result_read",
           async () => {
-            const record = this.toolResults.get(input.ref);
+            const record = await this.toolResults.get(input.ref);
             if (!record) {
               throw new Error(`Unknown tool result ref: ${input.ref}`);
             }
@@ -2928,9 +2948,9 @@ export class ToolRegistry {
         traceSpan(
           "tool.context",
           async () => {
-            const conversation = this.getConversationForTool(input, context);
+            const conversation = await this.getConversationForTool(input, context);
             const systemPrompt = composeSystemPrompt(
-              conversation.systemPrompt?.text ?? this.systemPrompts.load().text,
+              conversation.systemPrompt?.text ?? (await this.systemPrompts.load()).text,
             );
             const mode = normalizeContextMode(input.mode);
             const usage = await this.models.inspectContextWindowUsage({
@@ -2944,8 +2964,8 @@ export class ToolRegistry {
               providerId: usage.providerId,
               modelId: usage.modelId,
             });
-            const extendedContext = this.models.getActiveExtendedContextStatus();
-            const runtimeContext = this.buildRuntimeContext();
+            const extendedContext = await this.models.getActiveExtendedContextStatus();
+            const runtimeContext = await this.buildRuntimeContext();
             const rendered = renderContextSummary({
               usage,
               recorded,
@@ -2979,7 +2999,7 @@ export class ToolRegistry {
           "tool.usage_summary",
           async () => {
             const conversationKey = this.resolveConversationKey(input, context);
-            const active = this.models.getActiveModel();
+            const active = await this.models.getActiveModel();
             const timezone = input.timezone?.trim() || this.routines.loadData().settings.timezone;
             const localDate = input.localDate?.trim() || resolveLocalDateKey(new Date(), timezone);
             const recorded = this.models.inspectRecordedUsage({
@@ -3074,8 +3094,8 @@ export class ToolRegistry {
               );
             }
 
-            const snapshot = this.systemPrompts.load();
-            const conversation = this.conversations.replaceSystemPrompt(conversationKey, snapshot);
+            const snapshot = await this.systemPrompts.load();
+            const conversation = await this.conversations.replaceSystemPrompt(conversationKey, snapshot);
 
             return [
               `Reloaded system prompt for ${conversation.key}.`,

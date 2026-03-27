@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
@@ -37,10 +37,8 @@ import { resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { timestamp } from "../utils/timestamp";
-import type { ProviderId } from "../domain/providers";
 
-/** @deprecated Use `ProviderId` from `src/domain/providers` directly. */
-export type ModelProviderId = ProviderId;
+export type ModelProviderId = "openai-codex" | "claude";
 const modelTelemetry = telemetry.child({ component: "model" });
 const MAX_ANTHROPIC_BASE64_BYTES = 5 * 1024 * 1024;
 
@@ -270,18 +268,19 @@ const DEFAULT_HEARTBEAT_MODEL_IDS: Record<ModelProviderId, string> = {
   claude: "claude-haiku-4-5",
 };
 
-function ensureStoreDir() {
-  fs.mkdirSync(path.dirname(getStorePath()), { recursive: true });
+async function ensureStoreDir() {
+  await mkdir(path.dirname(getStorePath()), { recursive: true });
 }
 
-function readStore(): ActiveModelStoreShape {
-  ensureStoreDir();
+async function readStore(): Promise<ActiveModelStoreShape> {
+  await ensureStoreDir();
   const storePath = getStorePath();
-  if (!fs.existsSync(storePath)) {
+  const file = Bun.file(storePath);
+  if (!await file.exists()) {
     return { version: 2, activeModels: {} };
   }
 
-  const parsed = JSON.parse(fs.readFileSync(storePath, "utf8")) as ActiveModelStoreShape;
+  const parsed = JSON.parse(await file.text()) as ActiveModelStoreShape;
   if (parsed.activeModels) {
     return {
       version: 2,
@@ -295,9 +294,9 @@ function readStore(): ActiveModelStoreShape {
   };
 }
 
-function writeStore(store: ActiveModelStoreShape) {
-  ensureStoreDir();
-  fs.writeFileSync(getStorePath(), `${JSON.stringify(store, null, 2)}\n`, { mode: 0o600 });
+async function writeStore(store: ActiveModelStoreShape) {
+  await ensureStoreDir();
+  await Bun.write(getStorePath(), `${JSON.stringify(store, null, 2)}\n`);
 }
 
 function getDefaultActiveModel(
@@ -364,12 +363,12 @@ function getStoredActiveModel(
   return getDefaultActiveModel(profile, override);
 }
 
-function writeStoredActiveModel(selectionStoreKey: string, selection: ActiveModelSelection) {
-  const store = readStore();
+async function writeStoredActiveModel(selectionStoreKey: string, selection: ActiveModelSelection) {
+  const store = await readStore();
   store.version = 2;
   store.activeModels ??= {};
   store.activeModels[selectionStoreKey] = selection;
-  writeStore(store);
+  await writeStore(store);
 }
 
 function normalizeThinkingLevel(value: unknown): ThinkingLevel {
@@ -916,8 +915,8 @@ export class ModelService {
     return getDefaultHeartbeatSelection(this.profile);
   }
 
-  getActiveModel(): ActiveModelSelection {
-    const store = readStore();
+  async getActiveModel(): Promise<ActiveModelSelection> {
+    const store = await readStore();
     const activeModel = getStoredActiveModel(
       store,
       this.profile,
@@ -933,8 +932,8 @@ export class ModelService {
     };
   }
 
-  getActiveExtendedContextStatus(): ActiveExtendedContextStatus {
-    const active = this.getActiveModel();
+  async getActiveExtendedContextStatus(): Promise<ActiveExtendedContextStatus> {
+    const active = await this.getActiveModel();
     const runtimeCatalog = getRuntimeCatalog(active.providerId);
     const runtimeModel = resolveRuntimeModelIdentifier(active.modelId, [...runtimeCatalog.values()]);
     const runtimeContextWindow = runtimeModel?.contextWindow;
@@ -954,7 +953,7 @@ export class ModelService {
 
   async listProviderModels(providerId: ModelProviderId): Promise<ListedProviderModel[]> {
     const runtimeCatalog = getRuntimeCatalog(providerId);
-    const active = this.getActiveModel();
+    const active = await this.getActiveModel();
     const discovered = providerId === "claude"
       ? await this.fetchAnthropicModels()
       : await this.fetchCodexModels();
@@ -998,49 +997,51 @@ export class ModelService {
       );
     }
 
+    const current = await this.getActiveModel();
     const nextSelection: ActiveModelSelection = {
       providerId,
       modelId: selected.modelId,
-      thinkingLevel: this.getActiveModel().thinkingLevel,
+      thinkingLevel: current.thinkingLevel,
       extendedContextEnabled:
         supportsExtendedContext(providerId, selected.modelId) &&
-        this.getActiveModel().extendedContextEnabled,
+        current.extendedContextEnabled,
       updatedAt: timestamp(),
     };
-    writeStoredActiveModel(this.selectionStoreKey, nextSelection);
+    await writeStoredActiveModel(this.selectionStoreKey, nextSelection);
     return {
       ...selected,
       active: true,
     };
   }
 
-  setThinkingLevel(thinkingLevel: ThinkingLevel) {
+  async setThinkingLevel(thinkingLevel: ThinkingLevel) {
     const nextSelection: ActiveModelSelection = {
-      ...this.getActiveModel(),
+      ...await this.getActiveModel(),
       thinkingLevel,
       updatedAt: timestamp(),
     };
-    writeStoredActiveModel(this.selectionStoreKey, nextSelection);
+    await writeStoredActiveModel(this.selectionStoreKey, nextSelection);
     return nextSelection;
   }
 
-  setStoredSelectionDefaults(selection: Partial<Pick<
+  async setStoredSelectionDefaults(selection: Partial<Pick<
     ActiveModelSelection,
     "providerId" | "modelId" | "thinkingLevel" | "extendedContextEnabled"
   >>) {
+    const current = await this.getActiveModel();
     const nextSelection: ActiveModelSelection = {
-      ...this.getActiveModel(),
+      ...current,
       ...selection,
-      thinkingLevel: normalizeThinkingLevel(selection.thinkingLevel ?? this.getActiveModel().thinkingLevel),
-      extendedContextEnabled: selection.extendedContextEnabled ?? this.getActiveModel().extendedContextEnabled,
+      thinkingLevel: normalizeThinkingLevel(selection.thinkingLevel ?? current.thinkingLevel),
+      extendedContextEnabled: selection.extendedContextEnabled ?? current.extendedContextEnabled,
       updatedAt: timestamp(),
     };
-    writeStoredActiveModel(this.selectionStoreKey, nextSelection);
+    await writeStoredActiveModel(this.selectionStoreKey, nextSelection);
     return nextSelection;
   }
 
-  setExtendedContextEnabled(enabled: boolean) {
-    const active = this.getActiveModel();
+  async setExtendedContextEnabled(enabled: boolean) {
+    const active = await this.getActiveModel();
     if (enabled && !supportsExtendedContext(active.providerId, active.modelId)) {
       throw new Error(
         `Extended context is not available for ${active.providerId}/${active.modelId}.`,
@@ -1052,7 +1053,7 @@ export class ModelService {
       extendedContextEnabled: enabled && supportsExtendedContext(active.providerId, active.modelId),
       updatedAt: timestamp(),
     };
-    writeStoredActiveModel(this.selectionStoreKey, nextSelection);
+    await writeStoredActiveModel(this.selectionStoreKey, nextSelection);
     return nextSelection;
   }
 
@@ -1213,7 +1214,7 @@ export class ModelService {
   }
 
   async resolveActiveRuntimeModel(): Promise<ResolvedRuntimeModel> {
-    const selection = this.getActiveModel();
+    const selection = await this.getActiveModel();
     return this.resolveRuntimeModelForSelection(selection);
   }
 

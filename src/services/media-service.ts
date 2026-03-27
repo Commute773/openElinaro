@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -220,11 +220,11 @@ function defaultSignalProcess(pid: number, signal: NodeJS.Signals) {
 }
 
 function readJsonFile<T>(filePath: string): T | null {
-  if (!fs.existsSync(filePath)) {
+  if (!existsSync(filePath)) {
     return null;
   }
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
+    return JSON.parse(readFileSync(filePath, "utf8")) as T;
   } catch (error) {
     telemetry.event("media.invalid_json", {
       filePath,
@@ -238,10 +238,10 @@ function readJsonFile<T>(filePath: string): T | null {
 }
 
 function resolveSpeakerConfigPath(): string {
-  if (fs.existsSync(DEFAULT_SPEAKER_CONFIG_PATH)) {
+  if (existsSync(DEFAULT_SPEAKER_CONFIG_PATH)) {
     return DEFAULT_SPEAKER_CONFIG_PATH;
   }
-  if (fs.existsSync(LEGACY_SPEAKER_CONFIG_PATH)) {
+  if (existsSync(LEGACY_SPEAKER_CONFIG_PATH)) {
     telemetry.event("media.legacy_speaker_config", {
       legacyPath: LEGACY_SPEAKER_CONFIG_PATH,
       expectedPath: DEFAULT_SPEAKER_CONFIG_PATH,
@@ -326,17 +326,17 @@ async function defaultSpawnDetached(params: {
   stdoutPath: string;
   stderrPath: string;
 }): Promise<{ pid: number }> {
-  fs.mkdirSync(path.dirname(params.stdoutPath), { recursive: true });
-  fs.mkdirSync(path.dirname(params.stderrPath), { recursive: true });
-  const stdoutFd = fs.openSync(params.stdoutPath, "a");
-  const stderrFd = fs.openSync(params.stderrPath, "a");
+  mkdirSync(path.dirname(params.stdoutPath), { recursive: true });
+  mkdirSync(path.dirname(params.stderrPath), { recursive: true });
+  const stdoutFd = openSync(params.stdoutPath, "a");
+  const stderrFd = openSync(params.stderrPath, "a");
   const child = spawn(params.file, params.args ?? [], {
     detached: true,
     stdio: ["ignore", stdoutFd, stderrFd],
   });
   child.unref();
-  fs.closeSync(stdoutFd);
-  fs.closeSync(stderrFd);
+  closeSync(stdoutFd);
+  closeSync(stderrFd);
   return { pid: child.pid ?? 0 };
 }
 
@@ -407,9 +407,9 @@ export class MediaService {
     this.playerReadyTimeoutMs = Math.max(0, options?.playerReadyTimeoutMs ?? DEFAULT_PLAYER_READY_TIMEOUT_MS);
     this.playerStopTimeoutMs = Math.max(0, options?.playerStopTimeoutMs ?? DEFAULT_PLAYER_STOP_TIMEOUT_MS);
     this.eofPollIntervalMs = Math.max(500, options?.eofPollIntervalMs ?? EOF_POLL_INTERVAL_MS);
-    fs.mkdirSync(this.socketsRoot, { recursive: true });
-    fs.mkdirSync(this.metadataRoot, { recursive: true });
-    fs.mkdirSync(this.logsRoot, { recursive: true });
+    mkdirSync(this.socketsRoot, { recursive: true });
+    mkdirSync(this.metadataRoot, { recursive: true });
+    mkdirSync(this.logsRoot, { recursive: true });
   }
 
   async listSpeakers() {
@@ -517,7 +517,7 @@ export class MediaService {
     await this.stopSpeaker(speaker.id);
 
     const socketPath = this.getSocketPath(speaker.id);
-    fs.rmSync(socketPath, { force: true });
+    rmSync(socketPath, { force: true });
     const stdoutPath = path.join(this.logsRoot, `mpv-${speaker.id}.stdout.log`);
     const stderrPath = path.join(this.logsRoot, `mpv-${speaker.id}.stderr.log`);
     const spawnResult = await this.spawnDetachedImpl({
@@ -539,7 +539,7 @@ export class MediaService {
     const ready = await this.waitForPlayerSocket(socketPath, spawnResult.pid, this.playerReadyTimeoutMs);
     if (!ready) {
       await this.forceStopProcess(spawnResult.pid);
-      fs.rmSync(socketPath, { force: true });
+      rmSync(socketPath, { force: true });
       throw new Error(
         `mpv failed to initialize control socket for speaker ${speaker.name}.`,
       );
@@ -602,7 +602,7 @@ export class MediaService {
     const speaker = await this.resolveStatusSpeaker(speakerQuery);
     const metadata = this.readPlayerMetadata(speaker.id);
     const socketPath = this.getSocketPath(speaker.id);
-    if (!fs.existsSync(socketPath)) {
+    if (!existsSync(socketPath)) {
       await this.cleanupBrokenPlayer(metadata);
       this.deletePlayerMetadata(speaker.id);
       return {
@@ -695,7 +695,7 @@ export class MediaService {
 
   private async checkEof(speakerId: string, title: string) {
     const socketPath = this.getSocketPath(speakerId);
-    if (!fs.existsSync(socketPath)) {
+    if (!existsSync(socketPath)) {
       this.stopEofWatcher(speakerId);
       this.emitPlaybackEnd({ speakerId, title, reason: "eof" });
       return;
@@ -728,7 +728,7 @@ export class MediaService {
     }
 
     for (const root of this.mediaRoots) {
-      if (!fs.existsSync(root)) {
+      if (!existsSync(root)) {
         continue;
       }
       for (const filePath of this.walkMediaFiles(root)) {
@@ -761,7 +761,7 @@ export class MediaService {
       }
       const trackFile = track.file.trim();
       const absolutePath = path.resolve(catalogRoot, trackFile);
-      if (!fs.existsSync(absolutePath)) {
+      if (!existsSync(absolutePath)) {
         continue;
       }
       const ext = path.extname(absolutePath).toLowerCase();
@@ -790,10 +790,10 @@ export class MediaService {
     const files: string[] = [];
     while (pending.length > 0) {
       const current = pending.pop();
-      if (!current || !fs.existsSync(current)) {
+      if (!current || !existsSync(current)) {
         continue;
       }
-      const entries = fs.readdirSync(current, { withFileTypes: true });
+      const entries = readdirSync(current, { withFileTypes: true });
       for (const entry of entries) {
         const target = path.join(current, entry.name);
         if (entry.isDirectory()) {
@@ -936,7 +936,7 @@ export class MediaService {
 
   private resolveMediaItem(query: string, kind?: MediaKind) {
     const directPath = query.startsWith("/") ? path.resolve(query) : "";
-    if (directPath && fs.existsSync(directPath) && SUPPORTED_MEDIA_EXTENSIONS.has(path.extname(directPath).toLowerCase())) {
+    if (directPath && existsSync(directPath) && SUPPORTED_MEDIA_EXTENSIONS.has(path.extname(directPath).toLowerCase())) {
       return this.buildSyntheticMediaItem(directPath, path.dirname(directPath));
     }
 
@@ -1075,7 +1075,7 @@ export class MediaService {
 
   private async getActiveStatuses() {
     const statuses: MediaStatus[] = [];
-    for (const entry of fs.readdirSync(this.metadataRoot, { withFileTypes: true })) {
+    for (const entry of readdirSync(this.metadataRoot, { withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith(".json")) {
         continue;
       }
@@ -1118,7 +1118,7 @@ export class MediaService {
   }
 
   private async stopAllPlayers(options?: { exceptSpeakerId?: string }) {
-    for (const entry of fs.readdirSync(this.metadataRoot, { withFileTypes: true })) {
+    for (const entry of readdirSync(this.metadataRoot, { withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith(".json")) {
         continue;
       }
@@ -1134,7 +1134,7 @@ export class MediaService {
     this.stopEofWatcher(speakerId);
     const metadata = this.readPlayerMetadata(speakerId);
     const socketPath = this.getSocketPath(speakerId);
-    if (fs.existsSync(socketPath)) {
+    if (existsSync(socketPath)) {
       await this.sendPlayerCommand(speakerId, {
         command: ["quit"],
       });
@@ -1143,7 +1143,7 @@ export class MediaService {
       }
     }
     await this.forceStopProcess(metadata?.pid);
-    fs.rmSync(socketPath, { force: true });
+    rmSync(socketPath, { force: true });
     this.deletePlayerMetadata(speakerId);
   }
 
@@ -1160,16 +1160,16 @@ export class MediaService {
   }
 
   private writePlayerMetadata(metadata: MediaPlayerMetadata) {
-    fs.writeFileSync(this.getMetadataPath(metadata.speakerId), `${JSON.stringify(metadata, null, 2)}\n`);
+    writeFileSync(this.getMetadataPath(metadata.speakerId), `${JSON.stringify(metadata, null, 2)}\n`);
   }
 
   private deletePlayerMetadata(speakerId: string) {
-    fs.rmSync(this.getMetadataPath(speakerId), { force: true });
+    rmSync(this.getMetadataPath(speakerId), { force: true });
   }
 
   private async sendPlayerCommand(speakerId: string, payload: Record<string, unknown>) {
     const socketPath = this.getSocketPath(speakerId);
-    if (!fs.existsSync(socketPath)) {
+    if (!existsSync(socketPath)) {
       throw new Error(`No active player socket for ${speakerId}.`);
     }
     await this.runCommandImpl({
@@ -1203,7 +1203,7 @@ export class MediaService {
   private async waitForPlayerSocket(socketPath: string, pid: number, timeoutMs: number) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() <= deadline) {
-      if (fs.existsSync(socketPath) && await this.isPlayerSocketResponsive(socketPath, pid)) {
+      if (existsSync(socketPath) && await this.isPlayerSocketResponsive(socketPath, pid)) {
         return true;
       }
       if (!this.processIsAliveImpl(pid)) {
@@ -1211,7 +1211,7 @@ export class MediaService {
       }
       await sleep(PLAYER_WAIT_POLL_MS);
     }
-    return fs.existsSync(socketPath) && await this.isPlayerSocketResponsive(socketPath, pid);
+    return existsSync(socketPath) && await this.isPlayerSocketResponsive(socketPath, pid);
   }
 
   private async isPlayerSocketResponsive(socketPath: string, expectedPid: number) {

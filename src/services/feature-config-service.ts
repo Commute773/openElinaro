@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { existsSync } from "node:fs";
 import { parse } from "yaml";
 import {
   getRuntimeConfig,
@@ -148,7 +148,7 @@ export class FeatureConfigService {
         const python = getSharedPythonReadiness(getWebFetchPythonModules());
         const missing = [...python.missing];
         const runnerScript = resolvePythonScriptPath(config.webFetch.runnerScript, "scripts/crawl4ai_fetch_runner.py");
-        if (!fs.existsSync(runnerScript)) missing.push(`webFetch.runnerScript -> ${runnerScript}`);
+        if (!existsSync(runnerScript)) missing.push(`webFetch.runnerScript -> ${runnerScript}`);
         const configured = missing.length === 0;
         return {
           featureId,
@@ -164,7 +164,7 @@ export class FeatureConfigService {
         const python = getSharedPythonReadiness(getOpenBrowserPythonModules());
         const missing = [...python.missing];
         const runnerScript = resolvePythonScriptPath(config.openbrowser.runnerScript, "scripts/openbrowser_runner.py");
-        if (!fs.existsSync(runnerScript)) missing.push(`openbrowser.runnerScript -> ${runnerScript}`);
+        if (!existsSync(runnerScript)) missing.push(`openbrowser.runnerScript -> ${runnerScript}`);
         const configured = missing.length === 0;
         return {
           featureId,
@@ -207,8 +207,8 @@ export class FeatureConfigService {
         const missing = [...python.missing];
         const llmScript = resolvePythonScriptPath(undefined, "scripts/mlx_cache_server.py");
         const kokoroScript = resolvePythonScriptPath(undefined, "scripts/kokoro_server.py");
-        if (!fs.existsSync(llmScript)) missing.push(`localVoice.localLlm.script -> ${llmScript}`);
-        if (!fs.existsSync(kokoroScript)) missing.push(`localVoice.kokoro.script -> ${kokoroScript}`);
+        if (!existsSync(llmScript)) missing.push(`localVoice.localLlm.script -> ${llmScript}`);
+        if (!existsSync(kokoroScript)) missing.push(`localVoice.kokoro.script -> ${kokoroScript}`);
         if (process.platform !== "darwin") missing.push("localVoice requires a Darwin host for MLX sidecars");
         const configured = missing.length === 0;
         return {

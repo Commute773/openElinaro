@@ -1,10 +1,10 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import type { LanguageModelV3CallOptions, LanguageModelV3GenerateResult } from "@ai-sdk/provider";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import {
   buildScriptedConnectorRequest,
   toGenerateResultFromAIMessage,
@@ -13,9 +13,10 @@ import {
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
 
 const repoRoot = process.cwd();
-const testRoot = createIsolatedRuntimeRoot("openelinaro-runtime-memory-");
+const previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
 
 let previousCwd = "";
+let tempRoot = "";
 
 let runtimeModule: typeof import("./runtime");
 let activeConnectorModule: typeof import("../connectors/active-model-connector");
@@ -33,9 +34,9 @@ async function importFresh<T>(relativePath: string): Promise<T> {
 }
 
 function writeRuntimeFixture() {
-  fs.mkdirSync(path.join(testRoot.path, ".openelinarotest", "profiles"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "profiles"), { recursive: true });
   fs.writeFileSync(
-    path.join(testRoot.path, ".openelinarotest", "profiles/registry.json"),
+    path.join(tempRoot, ".openelinarotest", "profiles/registry.json"),
     `${JSON.stringify({
       version: 1,
       profiles: [
@@ -51,13 +52,13 @@ function writeRuntimeFixture() {
     }, null, 2)}\n`,
     "utf8",
   );
-  fs.mkdirSync(path.join(testRoot.path, ".openelinarotest", "projects"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "projects"), { recursive: true });
   fs.writeFileSync(
-    path.join(testRoot.path, ".openelinarotest", "projects/registry.json"),
+    path.join(tempRoot, ".openelinarotest", "projects/registry.json"),
     `${JSON.stringify({ version: 1, projects: [] }, null, 2)}\n`,
     "utf8",
   );
-  fs.mkdirSync(path.join(testRoot.path, ".openelinarotest", "memory/documents/root"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "memory/documents/root"), { recursive: true });
 }
 
 function latestHumanText(request: ScriptedConnectorRequest) {
@@ -92,7 +93,7 @@ beforeAll(async () => {
   activeConnectorModule.ActiveModelConnector.prototype.doGenerate = async function doGenerate(
     options: LanguageModelV3CallOptions,
   ): Promise<LanguageModelV3GenerateResult> {
-    const request = buildScriptedConnectorRequest(options);
+    const request = await buildScriptedConnectorRequest(options);
     return toGenerateResultFromAIMessage(
       new AIMessage(`Acknowledged: ${latestHumanText(request)}`),
       "active-model-router",
@@ -105,12 +106,19 @@ afterAll(() => {
   activeConnectorModule.ActiveModelConnector.prototype.doGenerate = originalDoGenerate;
   memoryServiceModule.MemoryService.prototype.ensureReady = originalEnsureReady;
   conversationMemoryModule.ConversationMemoryService.prototype.buildRecallContext = originalBuildRecallContext;
+
+  if (previousRootDirEnv === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  }
 });
 
 beforeEach(() => {
   previousCwd = process.cwd();
-  testRoot.setup();
-  process.chdir(testRoot.path);
+  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-runtime-memory-"));
+  process.chdir(tempRoot);
+  process.env.OPENELINARO_ROOT_DIR = tempRoot;
   writeRuntimeFixture();
   updateTestRuntimeConfig((config) => {
     config.core.app.automaticConversationMemoryEnabled = true;
@@ -119,7 +127,7 @@ beforeEach(() => {
 
 afterEach(() => {
   process.chdir(previousCwd);
-  testRoot.teardown();
+  fs.rmSync(tempRoot, { recursive: true, force: true });
 });
 
 describe("OpenElinaroApp automatic memory recall", () => {

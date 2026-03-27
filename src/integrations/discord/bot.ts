@@ -225,7 +225,7 @@ export interface DiscordAppRuntime {
       onToolUse?: (event: AppProgressEvent) => Promise<void>;
     },
   ): Promise<string>;
-  getActiveModel(): { providerId: ModelProviderId };
+  getActiveModel(): Promise<{ providerId: ModelProviderId }> | { providerId: ModelProviderId };
   getActiveProfile(): { id: string };
   getAgentRun(runId: string): ReturnType<OpenElinaroApp["getAgentRun"]>;
   listAgentRuns(): ReturnType<OpenElinaroApp["listAgentRuns"]>;
@@ -1014,7 +1014,7 @@ async function handleSlashCommand(params: {
     return;
   }
 
-  const activeModel = app.getActiveModel();
+  const activeModel = await app.getActiveModel();
   if (!hasProviderAuth(activeModel.providerId, profileId)) {
     await replyWithChunks(
       interaction,

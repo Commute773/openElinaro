@@ -1,12 +1,28 @@
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createIsolatedRuntimeRoot } from "../test/isolated-runtime-root";
 import { ReflectionPromptService } from "./reflection-prompt-service";
 import { resolveAssistantContextPath } from "./runtime-user-content";
 
-const testRoot = createIsolatedRuntimeRoot("openelinaro-reflection-prompt-");
-beforeEach(() => testRoot.setup());
-afterEach(() => testRoot.teardown());
+let runtimeRoot = "";
+let previousRootDirEnv: string | undefined;
+
+beforeEach(() => {
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-reflection-prompt-"));
+  process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
+});
+
+afterEach(() => {
+  if (previousRootDirEnv === undefined) {
+    delete process.env.OPENELINARO_ROOT_DIR;
+  } else {
+    process.env.OPENELINARO_ROOT_DIR = previousRootDirEnv;
+  }
+  fs.rmSync(runtimeRoot, { recursive: true, force: true });
+  runtimeRoot = "";
+});
 
 describe("ReflectionPromptService", () => {
   test("returns fallback reflection prompt when no files exist", () => {
