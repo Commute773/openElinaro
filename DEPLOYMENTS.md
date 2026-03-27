@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.40
+- Released at: 2026-03-27T22:07:17Z
+- Release id: 20260327T220717Z-d634657
+- Previous version: 2026.03.27.39
+- Trigger: ci/release workflow
+
+- refactor: add domain barrel exports for service subdirectories
+
 ## 2026.03.27.39
 - Released at: 2026-03-27T22:05:47Z
 - Release id: 20260327T220547Z-4cd3e25
