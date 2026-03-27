@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.27.7
+- Released at: 2026-03-27T02:11:29Z
+- Release id: 20260327T021129Z-14132bf
+- Previous version: 2026.03.27.6
+- Trigger: ci/release workflow
+
+- feat: semantic lights_* tools with natural language color interface
+
 ## 2026.03.27.6
 - Released at: 2026-03-27T02:05:27Z
 - Release id: 20260327T020527Z-289648b
