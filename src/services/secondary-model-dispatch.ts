@@ -69,11 +69,24 @@ interface UsageRecorder {
   }): void;
 }
 
+export interface AuthResolver {
+  resolveClaudeToken(profileId: string): string;
+  resolveCodexApiKey(profileId: string): Promise<{ apiKey: string }>;
+}
+
 export class SecondaryModelDispatch {
+  private readonly authResolver: AuthResolver;
+
   constructor(
     private readonly profile: ProfileRecord,
     private readonly usageRecorder: UsageRecorder,
-  ) {}
+    authResolver?: AuthResolver,
+  ) {
+    this.authResolver = authResolver ?? {
+      resolveClaudeToken,
+      resolveCodexApiKey,
+    };
+  }
 
   getToolSummarizerSelection(): ToolSummarizerSelection {
     const providerId = this.profile.toolSummarizerProvider ??
@@ -155,10 +168,10 @@ export class SecondaryModelDispatch {
 
   async resolveApiKeyForProvider(providerId: ModelProviderId) {
     if (providerId === "claude") {
-      return resolveClaudeToken(this.profile.id);
+      return this.authResolver.resolveClaudeToken(this.profile.id);
     }
 
-    const { apiKey } = await resolveCodexApiKey(this.profile.id);
+    const { apiKey } = await this.authResolver.resolveCodexApiKey(this.profile.id);
     return apiKey;
   }
 
