@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.27.17
+- Released at: 2026-03-27T16:08:18Z
+- Release id: 20260327T160818Z-6174678
+- Previous version: 2026.03.27.16
+- Trigger: ci/release workflow
+
+- refactor: consolidate duplicate ProviderId and runtime type aliases
+- remove dead mlx_batch_server.py script
+
 ## 2026.03.27.16
 - Released at: 2026-03-27T15:57:15Z
 - Release id: 20260327T155715Z-bd5362b
