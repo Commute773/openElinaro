@@ -1,7 +1,6 @@
-import fs from "node:fs";
-import path from "node:path";
 import type { ProfileRecord } from "../domain/profiles";
-import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
+import { resolveRuntimePath } from "./runtime-root";
+import { JsonStateService } from "./json-state-service";
 
 type ReflectionProfileState = {
   lastDailyLocalDate?: string;
@@ -50,27 +49,13 @@ function normalizeState(raw: unknown): ReflectionStateShape {
   };
 }
 
-export class ReflectionStateService {
-  constructor(private readonly filePath = getStatePath()) {}
-
-  load() {
-    if (!fs.existsSync(this.filePath)) {
-      return normalizeState(undefined);
-    }
-
-    try {
-      return normalizeState(JSON.parse(fs.readFileSync(this.filePath, "utf8")) as unknown);
-    } catch {
-      return normalizeState(undefined);
-    }
+export class ReflectionStateService extends JsonStateService<ReflectionStateShape> {
+  constructor(filePath = getStatePath()) {
+    super(filePath);
   }
 
-  save(state: ReflectionStateShape) {
-    assertTestRuntimeRootIsIsolated("Reflection state");
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    const normalized = normalizeState(state);
-    fs.writeFileSync(this.filePath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 });
-    return normalized;
+  protected normalize(raw: unknown): ReflectionStateShape {
+    return normalizeState(raw);
   }
 
   getProfileState(profile: Pick<ProfileRecord, "id"> | string) {
