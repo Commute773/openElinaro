@@ -36,14 +36,14 @@ afterEach(() => {
 });
 
 describe("ExtensionRegistryService", () => {
-  test("scan returns empty when extensions dir does not exist", () => {
+  test("scan returns empty when extensions dir does not exist", async () => {
     withIsolatedUserData();
     const svc = new ExtensionRegistryService();
-    const result = svc.scan();
+    const result = await svc.scan();
     expect(result).toEqual([]);
   });
 
-  test("scan discovers a valid extension", () => {
+  test("scan discovers a valid extension", async () => {
     const base = withIsolatedUserData();
     writeExtension(base, "hello-world", {
       id: "hello-world",
@@ -55,7 +55,7 @@ describe("ExtensionRegistryService", () => {
     });
 
     const svc = new ExtensionRegistryService();
-    const result = svc.scan();
+    const result = await svc.scan();
     expect(result.length).toBe(1);
     const ext = result[0]!;
     expect(ext.status).toBe("valid");
@@ -64,13 +64,13 @@ describe("ExtensionRegistryService", () => {
     expect(ext.error).toBeNull();
   });
 
-  test("scan marks extension as discovered when manifest is missing", () => {
+  test("scan marks extension as discovered when manifest is missing", async () => {
     const base = withIsolatedUserData();
     const extDir = path.join(base, "extensions", "no-manifest");
     fs.mkdirSync(extDir, { recursive: true });
 
     const svc = new ExtensionRegistryService();
-    const result = svc.scan();
+    const result = await svc.scan();
     expect(result.length).toBe(1);
     const ext = result[0]!;
     expect(ext.status).toBe("discovered");
@@ -78,12 +78,12 @@ describe("ExtensionRegistryService", () => {
     expect(ext.error).toContain("Missing extension.json");
   });
 
-  test("scan marks extension as invalid when manifest fails validation", () => {
+  test("scan marks extension as invalid when manifest fails validation", async () => {
     const base = withIsolatedUserData();
     writeExtension(base, "bad-ext", { id: "BAD ID!", version: "1.0.0" });
 
     const svc = new ExtensionRegistryService();
-    const result = svc.scan();
+    const result = await svc.scan();
     expect(result.length).toBe(1);
     const ext = result[0]!;
     expect(ext.status).toBe("invalid");
@@ -91,7 +91,7 @@ describe("ExtensionRegistryService", () => {
     expect(ext.error).toBeTruthy();
   });
 
-  test("listValid returns only valid extensions", () => {
+  test("listValid returns only valid extensions", async () => {
     const base = withIsolatedUserData();
     writeExtension(base, "good", {
       id: "good",
@@ -102,12 +102,12 @@ describe("ExtensionRegistryService", () => {
     writeExtension(base, "bad", { id: "BAD!", version: "nope" });
 
     const svc = new ExtensionRegistryService();
-    svc.scan();
+    await svc.scan();
     expect(svc.listValid().length).toBe(1);
     expect(svc.list().length).toBe(2);
   });
 
-  test("loadAll logs stub message without crashing", () => {
+  test("loadAll logs stub message without crashing", async () => {
     const base = withIsolatedUserData();
     writeExtension(base, "stub", {
       id: "stub",
@@ -117,19 +117,19 @@ describe("ExtensionRegistryService", () => {
     });
 
     const svc = new ExtensionRegistryService();
-    svc.scan();
+    await svc.scan();
     // Should not throw
     svc.loadAll();
   });
 
-  test("scan ignores non-directory entries", () => {
+  test("scan ignores non-directory entries", async () => {
     const base = withIsolatedUserData();
     const extDir = path.join(base, "extensions");
     fs.mkdirSync(extDir, { recursive: true });
     fs.writeFileSync(path.join(extDir, "stray-file.txt"), "not a directory");
 
     const svc = new ExtensionRegistryService();
-    const result = svc.scan();
+    const result = await svc.scan();
     expect(result.length).toBe(0);
   });
 });

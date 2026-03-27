@@ -1,4 +1,5 @@
-import fs from "node:fs";
+import { existsSync } from "node:fs";
+import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { ExtensionManifestSchema, type ExtensionManifest, type LoadedExtension } from "../domain/extensions";
 import { resolveUserDataPath } from "./runtime-root";
@@ -10,10 +11,10 @@ function getExtensionsDir() {
   return resolveUserDataPath(EXTENSIONS_DIR);
 }
 
-function readManifest(dirPath: string): { manifest: ExtensionManifest | null; error: string | null } {
+async function readManifest(dirPath: string): Promise<{ manifest: ExtensionManifest | null; error: string | null }> {
   const manifestPath = path.join(dirPath, MANIFEST_FILENAME);
   try {
-    const raw = fs.readFileSync(manifestPath, "utf8");
+    const raw = await Bun.file(manifestPath).text();
     const parsed = JSON.parse(raw);
     const manifest = ExtensionManifestSchema.parse(parsed);
     return { manifest, error: null };
@@ -30,17 +31,17 @@ export class ExtensionRegistryService {
    * Scan the extensions directory and validate each extension manifest.
    * Call this once at startup.
    */
-  scan(): LoadedExtension[] {
+  async scan(): Promise<LoadedExtension[]> {
     const extensionsDir = getExtensionsDir();
     this.extensions = [];
 
-    if (!fs.existsSync(extensionsDir)) {
+    if (!existsSync(extensionsDir)) {
       return this.extensions;
     }
 
-    let entries: fs.Dirent[];
+    let entries: import("node:fs").Dirent[];
     try {
-      entries = fs.readdirSync(extensionsDir, { withFileTypes: true });
+      entries = await readdir(extensionsDir, { withFileTypes: true });
     } catch {
       return this.extensions;
     }
@@ -51,7 +52,7 @@ export class ExtensionRegistryService {
       const dirPath = path.join(extensionsDir, entry.name);
       const manifestPath = path.join(dirPath, MANIFEST_FILENAME);
 
-      if (!fs.existsSync(manifestPath)) {
+      if (!await Bun.file(manifestPath).exists()) {
         this.extensions.push({
           manifest: null,
           status: "discovered",
@@ -61,7 +62,7 @@ export class ExtensionRegistryService {
         continue;
       }
 
-      const { manifest, error } = readManifest(dirPath);
+      const { manifest, error } = await readManifest(dirPath);
       if (manifest) {
         this.extensions.push({ manifest, status: "valid", error: null, dirPath });
       } else {

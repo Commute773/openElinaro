@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import fs from "node:fs/promises";
+import { rm, stat, mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { ProfileRecord } from "../domain/profiles";
 import { ProfileService } from "./profile-service";
@@ -249,7 +249,7 @@ function formatSearchResults(query: string, results: MemorySearchResult[]) {
 }
 
 async function ensureDirectory(targetPath: string) {
-  await fs.mkdir(targetPath, { recursive: true });
+  await mkdir(targetPath, { recursive: true });
 }
 
 async function resolveAbsolutePath(targetPath: string) {
@@ -280,14 +280,14 @@ async function removeMissingCopiedDocuments(keptRelativePaths: Set<string>) {
   const glob = new Bun.Glob("**/*");
   for await (const relativePath of glob.scan({ cwd: memoryDocumentRoot, onlyFiles: false })) {
     const absolutePath = path.join(memoryDocumentRoot, relativePath);
-    const stat = await fs.stat(absolutePath).catch(() => null);
-    if (!stat?.isFile()) {
+    const fileStat = await stat(absolutePath).catch(() => null);
+    if (!fileStat?.isFile()) {
       continue;
     }
     if (keptRelativePaths.has(relativePath)) {
       continue;
     }
-    await fs.rm(absolutePath, { force: true });
+    await rm(absolutePath, { force: true });
   }
 }
 
@@ -309,7 +309,7 @@ export class MemoryService {
       "memory.import",
       async () => {
         const resolvedSource = await resolveAbsolutePath(sourcePath);
-        const sourceStat = await fs.stat(resolvedSource).catch(() => null);
+        const sourceStat = await stat(resolvedSource).catch(() => null);
         if (!sourceStat?.isDirectory()) {
           throw new Error(`Memory source directory not found: ${resolvedSource}`);
         }
@@ -325,9 +325,9 @@ export class MemoryService {
             this.profiles.getWriteMemoryNamespace(this.profile),
             relativePath,
           );
-          const content = await fs.readFile(fromPath, "utf8");
+          const content = await Bun.file(fromPath).text();
           await ensureDirectory(path.dirname(toPath));
-          await fs.writeFile(toPath, content, "utf8");
+          await Bun.write(toPath, content);
           importedRelativePaths.add(
             path.join(this.profiles.getWriteMemoryNamespace(this.profile), relativePath),
           );
@@ -504,7 +504,7 @@ export class MemoryService {
       relativePath,
     );
     const targetPath = path.join(getMemoryDocumentRoot(), namespacedPath);
-    return fs.readFile(targetPath, "utf8").catch(() => null);
+    return Bun.file(targetPath).text().catch(() => null);
   }
 
   async deleteProfileDocument(relativePath: string) {
@@ -625,7 +625,7 @@ export class MemoryService {
     const targetPath = path.join(getMemoryDocumentRoot(), relativePath);
     assertTestRuntimeRootIsIsolated("Memory store");
     await ensureDirectory(path.dirname(targetPath));
-    await fs.writeFile(targetPath, `${content}\n`, "utf8");
+    await Bun.write(targetPath, `${content}\n`);
 
     const nextIndex = await this.buildIncrementalIndexForPath(relativePath);
     this.index = nextIndex;
@@ -636,13 +636,13 @@ export class MemoryService {
   private async deleteDocument(relativePath: string) {
     const normalizedPath = path.normalize(relativePath).replaceAll("\\", "/");
     const targetPath = path.join(getMemoryDocumentRoot(), normalizedPath);
-    const existed = await fs.stat(targetPath).then(() => true).catch(() => false);
+    const existed = await Bun.file(targetPath).exists();
     if (!existed) {
       return false;
     }
 
     assertTestRuntimeRootIsIsolated("Memory store");
-    await fs.rm(targetPath, { force: true });
+    await rm(targetPath, { force: true });
     const index = await this.loadOrBuildIndex();
     const nextIndex = this.rebuildIndexSnapshot({
       documents: index.documents.filter((document) => document.relativePath !== normalizedPath),
@@ -656,7 +656,7 @@ export class MemoryService {
 
   private async readExistingIndex() {
     try {
-      const raw = await fs.readFile(this.getIndexPath(), "utf8");
+      const raw = await Bun.file(this.getIndexPath()).text();
       const parsed = JSON.parse(raw) as MemoryIndex;
       if (parsed.version !== INDEX_VERSION || parsed.modelId !== EMBEDDING_MODEL_ID) {
         return null;
@@ -670,7 +670,7 @@ export class MemoryService {
   private async persistIndex(index: MemoryIndex) {
     assertTestRuntimeRootIsIsolated("Memory store");
     await ensureDirectory(getMemoryStoreRoot());
-    await fs.writeFile(this.getIndexPath(), `${JSON.stringify(index, null, 2)}\n`, "utf8");
+    await Bun.write(this.getIndexPath(), `${JSON.stringify(index, null, 2)}\n`);
   }
 
   private rebuildIndexSnapshot(params: {
@@ -697,9 +697,9 @@ export class MemoryService {
   private async buildIncrementalIndexForPath(relativePath: string) {
     const index = await this.loadOrBuildIndex();
     const targetPath = path.join(getMemoryDocumentRoot(), relativePath);
-    const content = await fs.readFile(targetPath, "utf8");
-    const stat = await fs.stat(targetPath);
-    const document = this.createDocumentRecord(relativePath, targetPath, content, stat);
+    const content = await Bun.file(targetPath).text();
+    const fileStat = await stat(targetPath);
+    const document = this.createDocumentRecord(relativePath, targetPath, content, fileStat);
     const chunks = await this.embedChunkRecords(chunkMarkdown(document, content));
 
     return this.rebuildIndexSnapshot({
@@ -759,9 +759,8 @@ export class MemoryService {
     const memoryDocumentRoot = getMemoryDocumentRoot();
     await ensureDirectory(memoryDocumentRoot);
 
-    const documentRootExists = await fs
-      .stat(memoryDocumentRoot)
-      .then((stat) => stat.isDirectory())
+    const documentRootExists = await stat(memoryDocumentRoot)
+      .then((s) => s.isDirectory())
       .catch(() => false);
 
     if (!documentRootExists) {
@@ -775,15 +774,15 @@ export class MemoryService {
         continue;
       }
       const copiedPath = path.join(memoryDocumentRoot, relativePath);
-      const content = await fs.readFile(copiedPath, "utf8");
-      const stat = await fs.stat(copiedPath);
+      const content = await Bun.file(copiedPath).text();
+      const fileStat = await stat(copiedPath);
 
-      documents.push(this.createDocumentRecord(relativePath, copiedPath, content, stat));
+      documents.push(this.createDocumentRecord(relativePath, copiedPath, content, fileStat));
     }
 
     const chunkBases: Omit<MemoryChunkRecord, "vector">[] = [];
     for (const document of documents) {
-      const content = await fs.readFile(document.copiedPath, "utf8");
+      const content = await Bun.file(document.copiedPath).text();
       chunkBases.push(...chunkMarkdown(document, content));
     }
     const chunks = await this.embedChunkRecords(chunkBases);

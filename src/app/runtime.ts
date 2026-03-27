@@ -710,7 +710,7 @@ export class OpenElinaroApp {
     }
 
     const requestId = `autonomous-time-${Date.now()}`;
-    const { text } = scope.autonomousTime.buildInjectedMessage(reference);
+    const { text } = await scope.autonomousTime.buildInjectedMessage(reference);
     const localDate = scope.autonomousTime.getTriggerLocalDate(reference);
     const conversationKey = buildAutomationSessionKey(`autonomous-time-${localDate}`, scope.profile.id);
     const response = await this.handleRequest(

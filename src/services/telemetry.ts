@@ -190,13 +190,11 @@ function redactAttributes(attributes?: TelemetryAttributes) {
 
 export class TelemetryService {
   private readonly storage = new AsyncLocalStorage<TelemetryScope>();
-  private readonly version = (() => {
-    try {
-      return new DeploymentVersionService().load().version;
-    } catch {
-      return "unknown";
-    }
-  })();
+  private version = "unknown";
+  private readonly versionReady = new DeploymentVersionService().load().then(
+    (info) => { this.version = info.version; },
+    () => {},
+  );
 
   constructor(
     private readonly store = new TelemetryStore(),

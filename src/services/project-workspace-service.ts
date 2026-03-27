@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import fs from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";
 import { telemetry as rootTelemetry, type TelemetryService } from "./telemetry";
@@ -33,7 +33,7 @@ function getWorkspaceStorePath() {
 }
 
 function ensureStoreDir() {
-  fs.mkdirSync(path.dirname(getWorkspaceStorePath()), { recursive: true });
+  mkdirSync(path.dirname(getWorkspaceStorePath()), { recursive: true });
 }
 
 function sanitizeSegment(value: string, fallback: string) {
@@ -62,7 +62,7 @@ function readTrimmedGitOutput(cwd: string, args: string[]) {
 }
 
 function resolveExistingPath(targetPath: string) {
-  return fs.realpathSync.native(path.resolve(targetPath));
+  return realpathSync.native(path.resolve(targetPath));
 }
 
 export class ProjectWorkspaceService {
@@ -109,7 +109,7 @@ export class ProjectWorkspaceService {
 
     const worktreeRoot = this.buildWorktreeRoot(repoRoot, params.goal, params.runId);
     const branch = this.buildBranchName(params.goal, params.runId);
-    fs.mkdirSync(path.dirname(worktreeRoot), { recursive: true });
+    mkdirSync(path.dirname(worktreeRoot), { recursive: true });
     readTrimmedGitOutput(repoRoot, ["worktree", "add", "-b", branch, worktreeRoot, "HEAD"]);
 
     const relativeWorkspacePath = path.relative(repoRoot, sourceWorkspaceCwd);
@@ -154,7 +154,7 @@ export class ProjectWorkspaceService {
   findManagedWorkspaceForPath(targetPath: string) {
     const resolvedTarget = path.resolve(targetPath);
     const store = this.loadStore();
-    const retained = store.workspaces.filter((record) => fs.existsSync(record.worktreeRoot));
+    const retained = store.workspaces.filter((record) => existsSync(record.worktreeRoot));
     const prunedMissingEntries = retained.length !== store.workspaces.length;
     const matchIndex = retained.findIndex((record) => isWithin(resolvedTarget, record.worktreeRoot));
 
@@ -204,14 +204,14 @@ export class ProjectWorkspaceService {
   private loadStore(): WorkspaceStore {
     ensureStoreDir();
     const storePath = getWorkspaceStorePath();
-    if (!fs.existsSync(storePath)) {
+    if (!existsSync(storePath)) {
       return {
         version: WORKSPACE_STORE_VERSION,
         workspaces: [],
       };
     }
 
-    const raw = JSON.parse(fs.readFileSync(storePath, "utf8")) as Partial<WorkspaceStore>;
+    const raw = JSON.parse(readFileSync(storePath, "utf8")) as Partial<WorkspaceStore>;
     return {
       version: raw.version ?? WORKSPACE_STORE_VERSION,
       workspaces: Array.isArray(raw.workspaces) ? raw.workspaces.map((entry) => ({
@@ -226,7 +226,7 @@ export class ProjectWorkspaceService {
 
   private saveStore(workspaces: ManagedProjectWorkspaceRecord[]) {
     ensureStoreDir();
-    fs.writeFileSync(
+    writeFileSync(
       getWorkspaceStorePath(),
       `${JSON.stringify({
         version: WORKSPACE_STORE_VERSION,

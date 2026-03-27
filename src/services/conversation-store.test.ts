@@ -52,9 +52,9 @@ describe("ConversationStore", () => {
     tempRoot = "";
   });
 
-  test("supports append-only writes", () => {
+  test("supports append-only writes", async () => {
     store.appendMessages("thread-1", [new HumanMessage("hello")], {
-      systemPrompt: systemPrompts.load(),
+      systemPrompt: await systemPrompts.load(),
     });
 
     const conversation = store.appendMessages("thread-1", [new AIMessage("world")]);
@@ -63,12 +63,12 @@ describe("ConversationStore", () => {
     expect(conversation.messages[1]).toBeInstanceOf(AIMessage);
   });
 
-  test("supports explicit rollback plus append", () => {
+  test("supports explicit rollback plus append", async () => {
     store.appendMessages("thread-1", [
       new HumanMessage("first"),
       new AIMessage("second"),
       new HumanMessage("third"),
-    ], { systemPrompt: systemPrompts.load() });
+    ], { systemPrompt: await systemPrompts.load() });
 
     const conversation = store.rollbackAndAppend("thread-1", 2, [new AIMessage("replacement")]);
 
@@ -77,11 +77,11 @@ describe("ConversationStore", () => {
     expect((conversation.messages[1] as AIMessage).content).toBe("replacement");
   });
 
-  test("preserves image mime types across store round-trips", () => {
+  test("preserves image mime types across store round-trips", async () => {
     store.appendMessages("thread-1", [new HumanMessage([
       { type: "text", text: "what is this?" },
       { type: "image", data: "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=", mimeType: "image/webp" },
-    ])], { systemPrompt: systemPrompts.load() });
+    ])], { systemPrompt: await systemPrompts.load() });
 
     const conversation = store.get("thread-1");
     const message = conversation.messages[0] as HumanMessage;
@@ -90,9 +90,9 @@ describe("ConversationStore", () => {
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/webp")).toBe(true);
   });
 
-  test("journals appended conversation messages to JSONL as they are saved", () => {
+  test("journals appended conversation messages to JSONL as they are saved", async () => {
     store.appendMessages("thread-1", [new HumanMessage("hello graph cache"), new AIMessage("world")], {
-      systemPrompt: systemPrompts.load(),
+      systemPrompt: await systemPrompts.load(),
     });
 
     const journalPath = path.join(getHistoryDir(), "events.root.jsonl");
@@ -119,10 +119,10 @@ describe("ConversationStore", () => {
 
   test("searches archived conversation history with hybrid ranking and recency output", async () => {
     store.appendMessages("thread-1", [new HumanMessage("We need to fix the cache miss issue in graph search.")], {
-      systemPrompt: systemPrompts.load(),
+      systemPrompt: await systemPrompts.load(),
     });
     store.appendMessages("thread-2", [new HumanMessage("Graph compaction is still weird but cache is fine.")], {
-      systemPrompt: systemPrompts.load(),
+      systemPrompt: await systemPrompts.load(),
     });
 
     const result = await store.searchHistory({
@@ -156,7 +156,7 @@ describe("ConversationStore", () => {
         new HumanMessage(
           index === 39 ? "Newest cache graph regression note." : `Background note ${index + 1}.`,
         ),
-      ], { systemPrompt: systemPrompts.load() });
+      ], { systemPrompt: await systemPrompts.load() });
     }
 
     const result = await boundedStore.searchHistory({

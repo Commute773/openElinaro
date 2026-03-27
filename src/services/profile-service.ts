@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import type { ThinkingLevel } from "@mariozechner/pi-ai";
@@ -34,17 +34,17 @@ function getBundledProfileRegistryPath() {
 
 function ensureUserProfileRegistry() {
   const targetPath = getProfileRegistryPath();
-  if (fs.existsSync(targetPath)) {
+  if (existsSync(targetPath)) {
     return targetPath;
   }
 
   const bundledPath = getBundledProfileRegistryPath();
-  if (!fs.existsSync(bundledPath)) {
+  if (!existsSync(bundledPath)) {
     throw new Error(`Bundled profile registry is missing: ${bundledPath}`);
   }
 
-  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-  fs.copyFileSync(bundledPath, targetPath);
+  mkdirSync(path.dirname(targetPath), { recursive: true });
+  copyFileSync(bundledPath, targetPath);
   return targetPath;
 }
 
@@ -56,10 +56,10 @@ function normalizeProfileId(value?: string) {
 function ensureSharedProfileTempDirectory(profileId: string) {
   const root = SHARED_PROFILE_TMP_ROOT;
   const profileDir = path.join(root, profileId);
-  fs.mkdirSync(root, { recursive: true, mode: 0o1777 });
-  fs.mkdirSync(profileDir, { recursive: true, mode: 0o1777 });
-  fs.chmodSync(root, 0o1777);
-  fs.chmodSync(profileDir, 0o1777);
+  mkdirSync(root, { recursive: true, mode: 0o1777 });
+  mkdirSync(profileDir, { recursive: true, mode: 0o1777 });
+  chmodSync(root, 0o1777);
+  chmodSync(profileDir, 0o1777);
   return profileDir;
 }
 
@@ -72,14 +72,14 @@ export class ProfileService {
   }
 
   loadRegistry() {
-    const raw = fs.readFileSync(ensureUserProfileRegistry(), "utf8");
+    const raw = readFileSync(ensureUserProfileRegistry(), "utf8");
     return ProfileRegistrySchema.parse(JSON.parse(raw));
   }
 
   saveRegistry(registry: ReturnType<ProfileService["loadRegistry"]>) {
     const validated = ProfileRegistrySchema.parse(registry);
-    fs.mkdirSync(path.dirname(getProfileRegistryPath()), { recursive: true });
-    fs.writeFileSync(getProfileRegistryPath(), `${JSON.stringify(validated, null, 2)}\n`);
+    mkdirSync(path.dirname(getProfileRegistryPath()), { recursive: true });
+    writeFileSync(getProfileRegistryPath(), `${JSON.stringify(validated, null, 2)}\n`);
     telemetry.event("profile.registry_saved", {
       entityType: "profile_registry",
       entityId: "default",
@@ -134,19 +134,19 @@ export class ProfileService {
   private loadLegacyProfileSshKeyPair(profileId: string) {
     const privateKeyPath = path.join(this.getLegacyProfileKeyDirectory(profileId), "id_ed25519");
     const publicKeyPath = `${privateKeyPath}.pub`;
-    if (!fs.existsSync(privateKeyPath) || !fs.existsSync(publicKeyPath)) {
+    if (!existsSync(privateKeyPath) || !existsSync(publicKeyPath)) {
       return null;
     }
     return {
-      privateKey: fs.readFileSync(privateKeyPath, "utf8"),
-      publicKey: fs.readFileSync(publicKeyPath, "utf8"),
+      privateKey: readFileSync(privateKeyPath, "utf8"),
+      publicKey: readFileSync(publicKeyPath, "utf8"),
       migrated: true,
       generated: false,
     };
   }
 
   private generateProfileSshKeyPair(profileId: string) {
-    const tmpRoot = fs.mkdtempSync(path.join(ensureSharedProfileTempDirectory(profileId), "ssh-keygen-"));
+    const tmpRoot = mkdtempSync(path.join(ensureSharedProfileTempDirectory(profileId), "ssh-keygen-"));
     const privateKeyPath = path.join(tmpRoot, "id_ed25519");
     execFileSync("ssh-keygen", [
       "-q",
@@ -161,12 +161,12 @@ export class ProfileService {
     ]);
     const publicKeyPath = `${privateKeyPath}.pub`;
     const keyPair = {
-      privateKey: fs.readFileSync(privateKeyPath, "utf8"),
-      publicKey: fs.readFileSync(publicKeyPath, "utf8"),
+      privateKey: readFileSync(privateKeyPath, "utf8"),
+      publicKey: readFileSync(publicKeyPath, "utf8"),
       migrated: false,
       generated: true,
     };
-    fs.rmSync(tmpRoot, { recursive: true, force: true });
+    rmSync(tmpRoot, { recursive: true, force: true });
     return keyPair;
   }
 
@@ -187,7 +187,7 @@ export class ProfileService {
       },
     });
     if (next.migrated) {
-      fs.rmSync(this.getLegacyProfileKeyDirectory(profileId), { recursive: true, force: true });
+      rmSync(this.getLegacyProfileKeyDirectory(profileId), { recursive: true, force: true });
       telemetry.event("profile.ssh_keypair_migrated", {
         profileId,
         entityType: "profile_ssh_keypair",
@@ -208,11 +208,11 @@ export class ProfileService {
     const keyPair = this.ensureStoredProfileSshKeyPair(profileId);
     const privateKeyPath = this.getProfileSshPrivateKeyPath(profileId);
     const publicKeyPath = this.getProfileSshPublicKeyPath(profileId);
-    fs.mkdirSync(this.getProfileKeyDirectory(profileId), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(privateKeyPath, keyPair.privateKey, { mode: 0o600 });
-    fs.writeFileSync(publicKeyPath, keyPair.publicKey, { mode: 0o644 });
-    fs.chmodSync(privateKeyPath, 0o600);
-    fs.chmodSync(publicKeyPath, 0o644);
+    mkdirSync(this.getProfileKeyDirectory(profileId), { recursive: true, mode: 0o700 });
+    writeFileSync(privateKeyPath, keyPair.privateKey, { mode: 0o600 });
+    writeFileSync(publicKeyPath, keyPair.publicKey, { mode: 0o644 });
+    chmodSync(privateKeyPath, 0o600);
+    chmodSync(publicKeyPath, 0o644);
     return {
       privateKeyPath,
       publicKeyPath,

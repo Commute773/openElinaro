@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import fsPromises from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import path from "node:path";
 import type { BaseMessage, StoredMessage } from "@langchain/core/messages";
 import { mapChatMessagesToStoredMessages } from "@langchain/core/messages";
@@ -466,7 +466,7 @@ export class ConversationHistoryService {
       const built = await this.buildIndex();
       this.index = built;
       ensureHistoryDirectory();
-      await fsPromises.writeFile(this.getIndexPath(), `${JSON.stringify(built, null, 2)}\n`, "utf8");
+      await Bun.write(this.getIndexPath(), `${JSON.stringify(built, null, 2)}\n`);
       return built;
     });
 
@@ -480,11 +480,11 @@ export class ConversationHistoryService {
 
   private async readExistingIndex() {
     try {
-      const raw = await fsPromises.readFile(this.getIndexPath(), "utf8");
+      const raw = await Bun.file(this.getIndexPath()).text();
       const parsed = JSON.parse(raw) as ConversationHistoryIndex;
-      const stat = await fsPromises.stat(this.getJournalPath()).catch(() => null);
-      const journalSize = stat?.size ?? 0;
-      const journalMtimeMs = stat?.mtimeMs ?? 0;
+      const journalStat = await stat(this.getJournalPath()).catch(() => null);
+      const journalSize = journalStat?.size ?? 0;
+      const journalMtimeMs = journalStat?.mtimeMs ?? 0;
       if (parsed.version !== INDEX_VERSION || parsed.journalSize !== journalSize || parsed.journalMtimeMs !== journalMtimeMs) {
         return null;
       }
@@ -500,12 +500,12 @@ export class ConversationHistoryService {
   private async buildIndex(): Promise<ConversationHistoryIndex> {
     ensureHistoryDirectory();
     const journalPath = this.getJournalPath();
-    const stat = await fsPromises.stat(journalPath).catch(() => null);
-    if (!stat?.isFile() || stat.size === 0) {
+    const journalStat = await stat(journalPath).catch(() => null);
+    if (!journalStat?.isFile() || journalStat.size === 0) {
       return emptyIndex(journalPath);
     }
 
-    const raw = await fsPromises.readFile(journalPath, "utf8");
+    const raw = await Bun.file(journalPath).text();
     const lines = raw.split(/\r?\n/).filter(Boolean);
     const messages: ConversationHistoryIndexRecord[] = [];
 
@@ -552,8 +552,8 @@ export class ConversationHistoryService {
       builtAt: new Date().toISOString(),
       modelId: EMBEDDING_MODEL_ID,
       journalPath,
-      journalSize: stat.size,
-      journalMtimeMs: stat.mtimeMs,
+      journalSize: journalStat.size,
+      journalMtimeMs: journalStat.mtimeMs,
       indexedMessages: messages.length,
       messages,
       documentFrequencies,

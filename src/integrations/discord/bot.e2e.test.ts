@@ -332,10 +332,12 @@ function createDiscordAppHarness(options?: {
       .filter(Boolean)
       .join("\n\n");
 
-  models.inspectContextWindowUsage = async ({ conversationKey }) => ({
+  models.inspectContextWindowUsage = async ({ conversationKey }) => {
+    const activeModel = await models.getActiveModel();
+    return {
     conversationKey,
-    providerId: models.getActiveModel().providerId,
-    modelId: models.getActiveModel().modelId,
+    providerId: activeModel.providerId,
+    modelId: activeModel.modelId,
     method: "heuristic_estimate",
     usedTokens: 128,
     maxContextTokens: 8_192,
@@ -353,7 +355,8 @@ function createDiscordAppHarness(options?: {
       toolDefinitionTokens: 32,
       estimatedTotalTokens: 128,
     },
-  });
+  };
+  };
 
   const transitions = new transitionServiceModule.ConversationStateTransitionService(
     connector,

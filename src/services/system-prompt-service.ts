@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
+import { existsSync } from "node:fs";
+import { readdir, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { buildAssistantIdentityPromptContext, getAssistantDisplayName } from "../config/runtime-identity";
@@ -75,11 +76,12 @@ type SystemPromptSource = {
   content?: string;
 };
 
-function listSystemPromptSources(root: string, displayPath: (fileName: string) => string) {
-  if (!fs.existsSync(root)) {
+async function listSystemPromptSources(root: string, displayPath: (fileName: string) => string) {
+  if (!existsSync(root)) {
     return [] as SystemPromptSource[];
   }
-  return fs.readdirSync(root, { withFileTypes: true })
+  const entries = await readdir(root, { withFileTypes: true });
+  return entries
     .filter((entry) => entry.isFile() && entry.name.endsWith(SYSTEM_PROMPT_EXTENSION))
     .map((entry) => ({
       absolutePath: path.join(root, entry.name),
@@ -120,18 +122,18 @@ function getDefaultAgentSources(): SystemPromptSource[] {
  * All sources are sorted alphabetically by filename and compiled into the
  * final prompt text.
  */
-function getSystemPromptSources() {
+async function getSystemPromptSources() {
   const userPromptRoot = getUserSystemPromptRoot();
-  fs.mkdirSync(userPromptRoot, { recursive: true });
+  await mkdir(userPromptRoot, { recursive: true });
 
-  const universalSources = listSystemPromptSources(
+  const universalSources = await listSystemPromptSources(
     getUniversalSystemPromptRoot(),
     (fileName) => path.posix.join("system_prompt", "universal", fileName),
   );
 
   const universalFileNames = new Set(universalSources.map((s) => s.fileName));
 
-  const rawOperatorSources = listSystemPromptSources(
+  const rawOperatorSources = await listSystemPromptSources(
     userPromptRoot,
     (fileName) => formatUserDataRelativePath("system_prompt", fileName),
   );
@@ -209,25 +211,25 @@ function buildRuntimeOverviewPrompt() {
   ].join("\n");
 }
 
-function readSourceContent(source: SystemPromptSource): string {
+async function readSourceContent(source: SystemPromptSource): Promise<string> {
   if (source.content !== undefined) {
     return source.content.trim();
   }
-  return fs.readFileSync(source.absolutePath, "utf8").trim();
+  return (await Bun.file(source.absolutePath).text()).trim();
 }
 
-function compileFiles(files: SystemPromptSource[]) {
+async function compileFiles(files: SystemPromptSource[]) {
   const runtimeOverview = buildRuntimeOverviewPrompt();
   const identityContext = buildAssistantIdentityPromptContext();
   if (files.length === 0) {
     return `${runtimeOverview}\n\n${buildFallbackSystemPrompt()}\n\n${identityContext}`;
   }
 
-  const compiled = files
-    .map((file) => {
-      const content = readSourceContent(file);
+  const compiled = (await Promise.all(files
+    .map(async (file) => {
+      const content = await readSourceContent(file);
       return `<!-- ${file.displayPath} -->\n${content}`;
-    })
+    })))
     .join("\n\n");
   return `${runtimeOverview}\n\n${compiled}\n\n${identityContext}`;
 }
@@ -263,10 +265,10 @@ export function formatSystemPromptWarning(prompt: ComposedSystemPrompt) {
 }
 
 export class SystemPromptService {
-  load(): SystemPromptSnapshot {
-    const sources = getSystemPromptSources();
+  async load(): Promise<SystemPromptSnapshot> {
+    const sources = await getSystemPromptSources();
     const files = sources.map((source) => source.displayPath);
-    const text = compileFiles(sources);
+    const text = await compileFiles(sources);
 
     return {
       text,

@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import type { OAuthCredentials } from "@mariozechner/pi-ai/oauth";
 import { getDefaultProfileId } from "../services/profile-service";
@@ -48,10 +48,10 @@ function assertAuthStoreWritesAreIsolated() {
 
 function readLegacyStore(): LegacyAuthStoreShape | null {
   const authStorePath = getLegacyAuthStorePath();
-  if (!fs.existsSync(authStorePath)) {
+  if (!existsSync(authStorePath)) {
     return null;
   }
-  return JSON.parse(fs.readFileSync(authStorePath, "utf8")) as LegacyAuthStoreShape;
+  return JSON.parse(readFileSync(authStorePath, "utf8")) as LegacyAuthStoreShape;
 }
 
 function getLegacyProfileProviders(store: LegacyAuthStoreShape, profileId: string) {
@@ -110,7 +110,7 @@ function migrateLegacyProfileIfNeeded(profileId: string) {
   }
 
   assertAuthStoreWritesAreIsolated();
-  fs.rmSync(getLegacyAuthStorePath(), { force: true });
+  rmSync(getLegacyAuthStorePath(), { force: true });
   telemetry.event("auth.legacy_store_migrated", {
     profileId,
     entityType: "auth_credentials",

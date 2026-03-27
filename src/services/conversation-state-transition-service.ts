@@ -49,7 +49,7 @@ export class ConversationStateTransitionService {
     onProgress?: ProgressReporter;
     signal?: AbortSignal;
   }): Promise<ConversationContinuationResult> {
-    const fallbackSnapshot = this.systemPrompts.load();
+    const fallbackSnapshot = await this.systemPrompts.load();
     const conversation = this.conversations.ensureSystemPrompt(
       params.conversationKey,
       fallbackSnapshot,
@@ -82,7 +82,7 @@ export class ConversationStateTransitionService {
     onProgress?: ProgressReporter;
     flushMemory?: boolean;
   }): Promise<FreshConversationResult> {
-    const snapshot = this.systemPrompts.load();
+    const snapshot = await this.systemPrompts.load();
     const conversation = this.conversations.ensureSystemPrompt(
       params.conversationKey,
       snapshot,

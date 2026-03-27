@@ -208,7 +208,7 @@ describe("agent compaction e2e", () => {
     const harness = await createHarness();
     const progress: string[] = [];
     const conversationKey = "conversation-success";
-    harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
+    harness.conversations.ensureSystemPrompt(conversationKey, await harness.systemPrompts.load());
     harness.conversations.appendMessages(conversationKey, [
       new HumanMessage("Earlier user request."),
       new AIMessage("Earlier assistant reply."),
@@ -260,7 +260,7 @@ describe("agent compaction e2e", () => {
     });
     const progress: string[] = [];
     const conversationKey = "conversation-abort";
-    harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
+    harness.conversations.ensureSystemPrompt(conversationKey, await harness.systemPrompts.load());
     harness.conversations.appendMessages(conversationKey, [
       new HumanMessage("Earlier user request."),
       new AIMessage("Earlier assistant reply."),

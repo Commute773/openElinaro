@@ -707,7 +707,7 @@ describe("ToolRegistry tool catalog", () => {
   test("new_chat force=true starts a brand new chat without flushing durable memory", async () => {
     const harness = createHarness();
     const conversationKey = "force-reset-test-thread";
-    harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
+    harness.conversations.ensureSystemPrompt(conversationKey, await harness.systemPrompts.load());
     harness.conversations.rollbackAndAppend(
       conversationKey,
       harness.conversations.get(conversationKey).messages.length,

@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 import { getServiceRootDir } from "./runtime-root";
 
@@ -51,13 +50,13 @@ const RELEASE_FILE_NAME = "release.json";
 const VERSION_FILE_NAME = "VERSION.json";
 const CHANGELOG_FILE_NAME = "DEPLOYMENTS.md";
 
-function readJsonFile<T>(filePath: string): T | null {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-
+async function readJsonFile<T>(filePath: string): Promise<T | null> {
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
+    const file = Bun.file(filePath);
+    if (!await file.exists()) {
+      return null;
+    }
+    return JSON.parse(await file.text()) as T;
   } catch {
     return null;
   }
@@ -154,9 +153,10 @@ function resolveSourceRoot(info: DeploymentVersionInfo) {
 }
 
 export class DeploymentVersionService {
-  private loadSourceVersionInfo(runtime = this.load()): SourceVersionInfo {
-    const sourceRoot = resolveSourceRoot(runtime);
-    const sourceVersion = readJsonFile<VersionFilePayload>(path.join(sourceRoot, VERSION_FILE_NAME));
+  private async loadSourceVersionInfo(runtime?: DeploymentVersionInfo): Promise<SourceVersionInfo> {
+    const resolvedRuntime = runtime ?? await this.load();
+    const sourceRoot = resolveSourceRoot(resolvedRuntime);
+    const sourceVersion = await readJsonFile<VersionFilePayload>(path.join(sourceRoot, VERSION_FILE_NAME));
 
     return {
       version: sourceVersion?.version?.trim() || null,
@@ -170,16 +170,16 @@ export class DeploymentVersionService {
     };
   }
 
-  private getChangelogEntriesBetween(
+  private async getChangelogEntriesBetween(
     changelogPath: string | null,
     sinceSegments: number[] | null,
     throughSegments?: number[] | null,
   ) {
-    if (!changelogPath || !fs.existsSync(changelogPath)) {
+    if (!changelogPath || !await Bun.file(changelogPath).exists()) {
       return [];
     }
 
-    return parseDeploymentChangelog(fs.readFileSync(changelogPath, "utf8")).filter((entry) => {
+    return parseDeploymentChangelog(await Bun.file(changelogPath).text()).filter((entry) => {
       const entrySegments = tryParseVersionSegments(entry.version);
       if (!entrySegments) {
         return false;
@@ -194,10 +194,10 @@ export class DeploymentVersionService {
     });
   }
 
-  load(): DeploymentVersionInfo {
+  async load(): Promise<DeploymentVersionInfo> {
     const serviceRoot = getServiceRootDir();
-    const release = readJsonFile<ReleaseFilePayload>(path.join(serviceRoot, RELEASE_FILE_NAME));
-    const version = readJsonFile<VersionFilePayload>(path.join(serviceRoot, VERSION_FILE_NAME));
+    const release = await readJsonFile<ReleaseFilePayload>(path.join(serviceRoot, RELEASE_FILE_NAME));
+    const version = await readJsonFile<VersionFilePayload>(path.join(serviceRoot, VERSION_FILE_NAME));
 
     return {
       version: release?.version ?? version?.version ?? DEFAULT_DEPLOYMENT_VERSION,
@@ -211,8 +211,8 @@ export class DeploymentVersionService {
     };
   }
 
-  formatSummary() {
-    const info = this.load();
+  async formatSummary() {
+    const info = await this.load();
     return [
       `Version: ${info.version}`,
       `Released at: ${info.releasedAt ?? "unknown"}`,
@@ -227,21 +227,21 @@ export class DeploymentVersionService {
       .join("\n");
   }
 
-  getChangelogSinceVersion(sinceVersion: string, options?: { limit?: number }) {
+  async getChangelogSinceVersion(sinceVersion: string, options?: { limit?: number }) {
     const normalizedSinceVersion = sinceVersion.trim();
     if (!normalizedSinceVersion) {
       throw new Error("sinceVersion is required.");
     }
 
-    const info = this.load();
+    const info = await this.load();
     if (!info.changelogPath) {
       throw new Error("No deployment changelog is available for this runtime.");
     }
-    if (!fs.existsSync(info.changelogPath)) {
+    if (!await Bun.file(info.changelogPath).exists()) {
       throw new Error(`Deployment changelog was not found: ${info.changelogPath}`);
     }
 
-    const entries = parseDeploymentChangelog(fs.readFileSync(info.changelogPath, "utf8"));
+    const entries = parseDeploymentChangelog(await Bun.file(info.changelogPath).text());
     const sinceSegments = parseVersionSegments(normalizedSinceVersion);
     const newerEntries = entries.filter(
       (entry) => compareVersionSegments(parseVersionSegments(entry.version), sinceSegments) > 0,
@@ -250,9 +250,9 @@ export class DeploymentVersionService {
     return limit ? newerEntries.slice(0, limit) : newerEntries;
   }
 
-  formatChangelogSinceVersion(sinceVersion: string, options?: { limit?: number }) {
-    const entries = this.getChangelogSinceVersion(sinceVersion, options);
-    const info = this.load();
+  async formatChangelogSinceVersion(sinceVersion: string, options?: { limit?: number }) {
+    const entries = await this.getChangelogSinceVersion(sinceVersion, options);
+    const info = await this.load();
     if (entries.length === 0) {
       return `No deployments were recorded after ${sinceVersion}. Current version: ${info.version}.`;
     }
@@ -271,9 +271,9 @@ export class DeploymentVersionService {
     ].join("\n");
   }
 
-  formatPreparedUpdate(latestTagVersion = "") {
-    const runtime = this.load();
-    const source = this.loadSourceVersionInfo(runtime);
+  async formatPreparedUpdate(latestTagVersion = "") {
+    const runtime = await this.load();
+    const source = await this.loadSourceVersionInfo(runtime);
     const preparedVersion = source.version;
     if (!preparedVersion) {
       return [
@@ -314,7 +314,7 @@ export class DeploymentVersionService {
       ].join("\n");
     }
 
-    const changelogEntries = this.getChangelogEntriesBetween(
+    const changelogEntries = await this.getChangelogEntriesBetween(
       source.changelogPath,
       runtimeSegments,
       preparedSegments,
@@ -341,9 +341,9 @@ export class DeploymentVersionService {
     ].join("\n");
   }
 
-  formatAvailableUpdate(latestTagVersion: string) {
-    const runtime = this.load();
-    const source = this.loadSourceVersionInfo(runtime);
+  async formatAvailableUpdate(latestTagVersion: string) {
+    const runtime = await this.load();
+    const source = await this.loadSourceVersionInfo(runtime);
     const currentVersion = runtime.version;
     const sourceVersion = source.version;
     const currentSegments = tryParseVersionSegments(currentVersion);
@@ -359,7 +359,7 @@ export class DeploymentVersionService {
     if (!latestTagVersion) {
       lines.push("No tagged versions were found on the remote.");
       if (sourceSegments && (!currentSegments || compareVersionSegments(sourceSegments, currentSegments) > 0)) {
-        const changelogEntries = this.getChangelogEntriesBetween(
+        const changelogEntries = await this.getChangelogEntriesBetween(
           source.changelogPath,
           currentSegments,
           sourceSegments,
@@ -407,7 +407,7 @@ export class DeploymentVersionService {
     }
 
     if (!currentSegments || compareVersionSegments(sourceSegments, currentSegments) > 0) {
-      const changelogEntries = this.getChangelogEntriesBetween(
+      const changelogEntries = await this.getChangelogEntriesBetween(
         source.changelogPath,
         currentSegments,
         sourceSegments,
@@ -437,9 +437,9 @@ export class DeploymentVersionService {
     return lines.join("\n");
   }
 
-  hasPreparedUpdate() {
-    const runtime = this.load();
-    const source = this.loadSourceVersionInfo(runtime);
+  async hasPreparedUpdate() {
+    const runtime = await this.load();
+    const source = await this.loadSourceVersionInfo(runtime);
     if (!source.version) {
       return false;
     }

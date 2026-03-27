@@ -121,9 +121,9 @@ export class AutonomousTimeService {
     return localDate;
   }
 
-  buildInjectedMessage(reference: Date = new Date()) {
+  async buildInjectedMessage(reference: Date = new Date()) {
     const timezone = this.routines.loadData().settings.timezone;
-    const snapshot = this.prompts.load();
+    const snapshot = await this.prompts.load();
     return {
       snapshot,
       text: [

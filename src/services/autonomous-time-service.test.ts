@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe("AutonomousTimeService", () => {
-  test("becomes eligible after 4AM local time and only once per local day", () => {
+  test("becomes eligible after 4AM local time and only once per local day", async () => {
     const config = getRuntimeConfig();
     saveRuntimeConfig({
       ...config,
@@ -58,7 +58,7 @@ describe("AutonomousTimeService", () => {
     expect(service.getNextRunAt(beforeFour)?.toISOString()).toBe("2026-03-22T08:00:00.000Z");
 
     expect(service.isEligible(afterFour)).toBe(true);
-    expect(service.buildInjectedMessage(afterFour).text).toContain("Write in your journal before you stop.");
+    expect((await service.buildInjectedMessage(afterFour)).text).toContain("Write in your journal before you stop.");
 
     service.markTriggered(afterFour);
 

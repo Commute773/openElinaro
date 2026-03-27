@@ -66,7 +66,7 @@ describe("ModelService.getInferenceOptions", () => {
 });
 
 describe("ModelService.getActiveModel", () => {
-  test("uses the profile default thinking level when no stored selection exists", () => {
+  test("uses the profile default thinking level when no stored selection exists", async () => {
     const previousCwd = process.cwd();
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-service-"));
     process.chdir(tempRoot);
@@ -77,7 +77,7 @@ describe("ModelService.getActiveModel", () => {
         defaultThinkingLevel: "high",
       });
 
-      expect(service.getActiveModel()).toMatchObject({
+      expect(await service.getActiveModel()).toMatchObject({
         providerId: "openai-codex",
         modelId: "gpt-5.4",
         thinkingLevel: "high",
@@ -88,7 +88,7 @@ describe("ModelService.getActiveModel", () => {
     }
   });
 
-  test("supports a separate subagent default model selection scope", () => {
+  test("supports a separate subagent default model selection scope", async () => {
     const previousCwd = process.cwd();
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-service-"));
     process.chdir(tempRoot);
@@ -115,11 +115,11 @@ describe("ModelService.getActiveModel", () => {
         },
       });
 
-      expect(interactive.getActiveModel()).toMatchObject({
+      expect(await interactive.getActiveModel()).toMatchObject({
         providerId: "claude",
         modelId: "claude-opus-4-6-20260301",
       });
-      expect(subagent.getActiveModel()).toMatchObject({
+      expect(await subagent.getActiveModel()).toMatchObject({
         providerId: "openai-codex",
         modelId: "gpt-5.4",
       });
@@ -129,7 +129,7 @@ describe("ModelService.getActiveModel", () => {
     }
   });
 
-  test("supports a separate subagent default thinking level override", () => {
+  test("supports a separate subagent default thinking level override", async () => {
     const previousCwd = process.cwd();
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-service-"));
     process.chdir(tempRoot);
@@ -145,7 +145,7 @@ describe("ModelService.getActiveModel", () => {
         },
       });
 
-      expect(subagent.getActiveModel()).toMatchObject({
+      expect(await subagent.getActiveModel()).toMatchObject({
         thinkingLevel: "high",
       });
     } finally {
@@ -154,7 +154,7 @@ describe("ModelService.getActiveModel", () => {
     }
   });
 
-  test("caps the active context window when the profile defines an artificial max", () => {
+  test("caps the active context window when the profile defines an artificial max", async () => {
     const service = new ModelService({
       ...TEST_PROFILE,
       maxContextTokens: 200_000,
@@ -162,7 +162,7 @@ describe("ModelService.getActiveModel", () => {
       defaultModelId: "gpt-5.4",
     });
 
-    expect(service.getActiveExtendedContextStatus()).toMatchObject({
+    expect(await service.getActiveExtendedContextStatus()).toMatchObject({
       activeContextWindow: 200_000,
     });
   });

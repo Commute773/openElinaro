@@ -808,7 +808,7 @@ describe("profile-scoped auth and permissions", () => {
       expect(updated.defaultModelId).toBe("claude-opus-4-6-20260301");
       expect(updated.defaultThinkingLevel).toBe("high");
 
-      expect(new modelsModule.ModelService(updated, {
+      expect(await new modelsModule.ModelService(updated, {
         selectionStoreKey: "restricted",
       }).getActiveModel()).toMatchObject({
         providerId: "claude",
@@ -816,7 +816,7 @@ describe("profile-scoped auth and permissions", () => {
         thinkingLevel: "high",
       });
 
-      expect(new modelsModule.ModelService(updated, {
+      expect(await new modelsModule.ModelService(updated, {
         selectionStoreKey: "restricted:subagent",
         defaultSelectionOverride: {
           providerId: updated.subagentPreferredProvider ?? updated.preferredProvider,

@@ -506,16 +506,17 @@ export class AgentChatService {
     }
 
     this.throwIfStopRequested(session);
+    const systemPromptSnapshot = await this.systemPrompts.load();
     const conversation = this.conversations.ensureSystemPrompt(
       job.conversationKey,
-      this.systemPrompts.load(),
+      systemPromptSnapshot,
     );
     if (conversation.messages.length === 0) {
       return;
     }
 
     const systemPrompt = composeSystemPrompt(
-      conversation.systemPrompt?.text ?? this.systemPrompts.load().text,
+      conversation.systemPrompt?.text ?? systemPromptSnapshot.text,
     );
     const resolvedTools = this.toolResolver.resolveForChat({
       activatedToolNames: [...session.activatedToolNames],
@@ -614,7 +615,7 @@ export class AgentChatService {
   private async appendAssistantMessage(job: QueuedAssistantMessageJob) {
     this.conversations.ensureSystemPrompt(
       job.conversationKey,
-      this.systemPrompts.load(),
+      await this.systemPrompts.load(),
     );
     this.conversations.appendMessages(job.conversationKey, [new AIMessage(job.message)]);
     job.resolve();
@@ -626,12 +627,13 @@ export class AgentChatService {
       async () => {
         const session = this.getSession(job.conversationKey);
         session.stopRequested = false;
-        const conversation = this.loadConversationForJob(job);
+        const conversation = await this.loadConversationForJob(job);
         const backgroundExecNotifications = job.execution.includeBackgroundExecNotifications
           ? this.routineTools.consumePendingBackgroundExecNotifications(job.conversationKey)
           : [];
+        const promptSnapshot = await this.systemPrompts.load();
         const systemPrompt = composeSystemPrompt(
-          conversation.systemPrompt?.text ?? this.systemPrompts.load().text,
+          conversation.systemPrompt?.text ?? promptSnapshot.text,
         );
         const promptWarning = formatSystemPromptWarning(systemPrompt);
         const backgroundExecMessages = this.buildBackgroundExecMessages(backgroundExecNotifications);
@@ -950,8 +952,8 @@ export class AgentChatService {
     });
   }
 
-  private loadConversationForJob(job: QueuedChatJob) {
-    const systemPromptSnapshot = this.systemPrompts.load();
+  private async loadConversationForJob(job: QueuedChatJob) {
+    const systemPromptSnapshot = await this.systemPrompts.load();
     if (job.execution.persistConversation) {
       return this.conversations.ensureSystemPrompt(
         job.conversationKey,

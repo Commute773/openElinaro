@@ -222,7 +222,7 @@ describe("AgentChatService", () => {
       },
     });
 
-    conversations.ensureSystemPrompt("conversation-1", new SystemPromptService().load());
+    conversations.ensureSystemPrompt("conversation-1", await new SystemPromptService().load());
     conversations.appendMessages("conversation-1", [new HumanMessage("Existing context.")]);
 
     const session = (service as any).getSession("conversation-1");

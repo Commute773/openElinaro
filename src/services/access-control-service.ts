@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { realpathSync } from "node:fs";
 import path from "node:path";
 import type { ProfileRecord } from "../domain/profiles";
 import { ProjectsService } from "./projects-service";
@@ -29,7 +29,7 @@ function normalize(targetPath: string, remote = false) {
     ? path.resolve(targetPath)
     : path.resolve(getRuntimeRootDir(), targetPath);
   try {
-    return fs.realpathSync.native(resolved);
+    return realpathSync.native(resolved);
   } catch {
     return resolved;
   }

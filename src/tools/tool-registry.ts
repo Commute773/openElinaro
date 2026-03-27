@@ -1978,9 +1978,9 @@ export class ToolRegistry {
     }
   }
 
-  private buildRuntimeContext() {
+  private async buildRuntimeContext() {
     const profile = this.access.getProfile();
-    const deployment = this.deploymentVersion.load();
+    const deployment = await this.deploymentVersion.load();
     const profileSection = [
       `Profile: ${profile.id}`,
       `Roles: ${profile.roles.join(", ")}`,
@@ -2383,10 +2383,10 @@ export class ToolRegistry {
     return "Service restart requested. Reconnect after the bot comes back. Running background agents will resume automatically after restart.";
   }
 
-  private getConversationForTool(input: { conversationKey?: string }, context?: ToolContext) {
+  private async getConversationForTool(input: { conversationKey?: string }, context?: ToolContext) {
     const conversationKey = this.resolveConversationKey(input, context);
     if (conversationKey) {
-      return this.conversations.ensureSystemPrompt(conversationKey, this.systemPrompts.load());
+      return this.conversations.ensureSystemPrompt(conversationKey, await this.systemPrompts.load());
     }
 
     const latest = this.conversations.getLatest();
@@ -2396,7 +2396,7 @@ export class ToolRegistry {
 
     return latest.systemPrompt
       ? latest
-      : this.conversations.ensureSystemPrompt(latest.key, this.systemPrompts.load());
+      : this.conversations.ensureSystemPrompt(latest.key, await this.systemPrompts.load());
   }
 
   private resolveWorkspacePath(workspace: string): string {
@@ -2938,9 +2938,9 @@ export class ToolRegistry {
         traceSpan(
           "tool.context",
           async () => {
-            const conversation = this.getConversationForTool(input, context);
+            const conversation = await this.getConversationForTool(input, context);
             const systemPrompt = composeSystemPrompt(
-              conversation.systemPrompt?.text ?? this.systemPrompts.load().text,
+              conversation.systemPrompt?.text ?? (await this.systemPrompts.load()).text,
             );
             const mode = normalizeContextMode(input.mode);
             const usage = await this.models.inspectContextWindowUsage({
@@ -2954,8 +2954,8 @@ export class ToolRegistry {
               providerId: usage.providerId,
               modelId: usage.modelId,
             });
-            const extendedContext = this.models.getActiveExtendedContextStatus();
-            const runtimeContext = this.buildRuntimeContext();
+            const extendedContext = await this.models.getActiveExtendedContextStatus();
+            const runtimeContext = await this.buildRuntimeContext();
             const rendered = renderContextSummary({
               usage,
               recorded,
@@ -2989,7 +2989,7 @@ export class ToolRegistry {
           "tool.usage_summary",
           async () => {
             const conversationKey = this.resolveConversationKey(input, context);
-            const active = this.models.getActiveModel();
+            const active = await this.models.getActiveModel();
             const timezone = input.timezone?.trim() || this.routines.loadData().settings.timezone;
             const localDate = input.localDate?.trim() || resolveLocalDateKey(new Date(), timezone);
             const recorded = this.models.inspectRecordedUsage({
@@ -3084,7 +3084,7 @@ export class ToolRegistry {
               );
             }
 
-            const snapshot = this.systemPrompts.load();
+            const snapshot = await this.systemPrompts.load();
             const conversation = this.conversations.replaceSystemPrompt(conversationKey, snapshot);
 
             return [
