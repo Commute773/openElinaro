@@ -4,7 +4,7 @@ import { type StructuredToolInterface } from "@langchain/core/tools";
 import { defineTool } from "../define-tool";
 import { z } from "zod";
 import type { ModelProviderId, ActiveExtendedContextStatus } from "../../services/model-service";
-import { SECRET_STORE_KINDS } from "../../services/secret-store-service";
+import { SECRET_STORE_KINDS } from "../../services/infrastructure/secret-store-service";
 import type { FeatureId } from "../../services/feature-config-service";
 import { parseFeatureValue } from "../../services/feature-config-service";
 import {
@@ -21,7 +21,7 @@ import {
 import { describeRuntimeConfigSchema } from "../../config/schema-introspect";
 import { stringify as stringifyYaml } from "yaml";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
-import { telemetry } from "../../services/telemetry";
+import { telemetry } from "../../services/infrastructure/telemetry";
 import type { ToolBuildContext } from "./tool-group-types";
 
 const toolTelemetry = telemetry.child({ component: "tool" });

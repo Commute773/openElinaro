@@ -1,6 +1,6 @@
 import { REST, Routes } from "discord.js";
 import { getRuntimeConfig } from "../config/runtime-config";
-import { SecretStoreService } from "./secret-store-service";
+import { SecretStoreService } from "./infrastructure/secret-store-service";
 
 const DISCORD_USER_ID_PATTERN = /^\d{15,22}$/;
 

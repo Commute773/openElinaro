@@ -15,7 +15,7 @@ import {
 } from "./hybrid-search";
 import { getDefaultProfileId } from "./profile-service";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import {
   EMBEDDING_MODEL_ID,

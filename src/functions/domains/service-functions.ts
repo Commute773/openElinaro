@@ -6,8 +6,8 @@
 import path from "node:path";
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
-import { isRunningInsideManagedService } from "../../services/runtime-platform";
-import type { RuntimePlatform } from "../../services/runtime-platform";
+import { isRunningInsideManagedService } from "../../services/infrastructure/runtime-platform";
+import type { RuntimePlatform } from "../../services/infrastructure/runtime-platform";
 import type { ToolBuildContext } from "../../tools/groups/tool-group-types";
 
 // ---------------------------------------------------------------------------

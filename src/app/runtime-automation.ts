@@ -7,7 +7,7 @@ import type { ProfileService } from "../services/profile-service";
 import type { ConversationStore } from "../services/conversation-store";
 import { WorkPlanningService } from "../services/work-planning-service";
 import type { RoutinesService } from "../services/routines-service";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 import type { RuntimeScope } from "./runtime-scope";
 
 export function finalizeAppResponse(scope: RuntimeScope, response: AppResponse): AppResponse {

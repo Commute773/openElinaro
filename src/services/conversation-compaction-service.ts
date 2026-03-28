@@ -10,7 +10,7 @@ import { extractTextFromMessage } from "./message-content-service";
 import { toModelMessages } from "./ai-sdk-message-service";
 import { MemoryService } from "./memory-service";
 import { ModelService } from "./model-service";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 
 const COMPACTION_TAIL_MESSAGES = 4;

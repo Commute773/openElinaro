@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { getRuntimeRootDir, getServiceRootDir, resolveRuntimePath } from "./runtime-root";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 
 const SUPPORTED_MEDIA_EXTENSIONS = new Set([
   ".aac",

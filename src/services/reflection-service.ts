@@ -3,7 +3,7 @@ import type { RoutinesService } from "./routines-service";
 import { ConversationStore } from "./conversation-store";
 import { MemoryService } from "./memory-service";
 import { ModelService } from "./model-service";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { ReflectionPromptService } from "./reflection-prompt-service";
 import { ReflectionStateService } from "./reflection-state-service";

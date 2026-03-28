@@ -14,7 +14,7 @@ import {
   getWebFetchPythonModules,
   resolvePythonScriptPath,
 } from "./python-runtime";
-import { SecretStoreService } from "./secret-store-service";
+import { SecretStoreService } from "./infrastructure/secret-store-service";
 import { detectZigbeeRadio } from "./zigbee2mqtt-service";
 
 export const FEATURE_IDS = [

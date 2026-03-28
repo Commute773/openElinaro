@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { SubagentEventRecord, SubagentRun, SubagentRunStatus } from "../domain/subagent-run";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../services/runtime-root";
-import { telemetry as rootTelemetry, type TelemetryService } from "../services/telemetry";
+import { telemetry as rootTelemetry, type TelemetryService } from "../services/infrastructure/telemetry";
 import { timestamp } from "../utils/timestamp";
 
 function getStorePath() {

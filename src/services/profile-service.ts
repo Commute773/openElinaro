@@ -11,8 +11,8 @@ import {
 } from "../domain/profiles";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath, resolveServicePath, resolveUserDataPath } from "./runtime-root";
-import { SecretStoreService } from "./secret-store-service";
-import { telemetry } from "./telemetry";
+import { SecretStoreService } from "./infrastructure/secret-store-service";
+import { telemetry } from "./infrastructure/telemetry";
 import { DEFAULT_PROFILE_ID } from "../config/service-constants";
 const SHARED_PROFILE_TMP_ROOT = path.join("/tmp", "openelinaro-profile-tmp");
 const PROFILE_SSH_SECRET_PREFIX = "profile_ssh_keypair";

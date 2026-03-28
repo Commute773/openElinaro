@@ -1,4 +1,4 @@
-import { telemetry } from "../../../services/telemetry";
+import { telemetry } from "../../../services/infrastructure/telemetry";
 
 export const g2Telemetry = telemetry.child({ component: "g2_api" });
 

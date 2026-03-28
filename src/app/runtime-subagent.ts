@@ -5,7 +5,7 @@ import type { ProfileService } from "../services/profile-service";
 import type { ProjectWorkspaceService } from "../services/project-workspace-service";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath } from "../services/runtime-root";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 import { timestamp } from "../utils/timestamp";
 import type { AppResponse } from "../domain/assistant";
 import type { RuntimeScope } from "./runtime-scope";

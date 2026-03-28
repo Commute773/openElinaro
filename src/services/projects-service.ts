@@ -6,7 +6,7 @@ import { JobRecordSchema, ProjectRecordSchema, resolveProjectScope } from "../do
 import type { ProfileRecord } from "../domain/profiles";
 import { ProfileService } from "./profile-service";
 import { getRuntimeRootDir, resolveServicePath, resolveUserDataPath } from "./runtime-root";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 
 /** Envelope schema — validates structure but defers per-entry validation to loadRegistry(). */
 const RegistryEnvelopeSchema = z.object({

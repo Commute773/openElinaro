@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
 import type { LiveCallbacks, Session } from "@google/genai";
 import { GeminiLivePhoneService } from "./gemini-live-phone-service";
-import { SecretStoreService } from "./secret-store-service";
+import { SecretStoreService } from "./infrastructure/secret-store-service";
 import type { VonageService } from "./vonage-service";
 
 const tempDirs: string[] = [];

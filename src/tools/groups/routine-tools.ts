@@ -8,7 +8,7 @@ import type {
   Weekday,
 } from "../../domain/routines";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
-import { telemetry } from "../../services/telemetry";
+import { telemetry } from "../../services/infrastructure/telemetry";
 import type { ToolBuildContext } from "./tool-group-types";
 
 const toolTelemetry = telemetry.child({ component: "tool" });

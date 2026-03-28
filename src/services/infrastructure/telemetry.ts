@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStdio } from "node:child_process";
-import { DeploymentVersionService } from "./deployment-version-service";
+import { DeploymentVersionService } from "../deployment-version-service";
 import {
   type TelemetryEventRecord,
   type TelemetryKnownFields,
@@ -9,7 +9,7 @@ import {
   type TelemetrySeverity,
   type TelemetrySpanRecord,
   TelemetryStore,
-} from "./telemetry-store";
+} from "../telemetry-store";
 
 type TelemetryAttributes = Record<string, unknown>;
 

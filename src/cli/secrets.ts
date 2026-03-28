@@ -1,4 +1,4 @@
-import { SECRET_STORE_KINDS, SecretStoreService, readSecretJsonFromStdin } from "../services/secret-store-service";
+import { SECRET_STORE_KINDS, SecretStoreService, readSecretJsonFromStdin } from "../services/infrastructure/secret-store-service";
 
 function usage() {
   return [

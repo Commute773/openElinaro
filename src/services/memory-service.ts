@@ -4,7 +4,7 @@ import path from "node:path";
 import type { ProfileRecord } from "../domain/profiles";
 import { ProfileService } from "./profile-service";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import {
   buildDocumentFrequencies,

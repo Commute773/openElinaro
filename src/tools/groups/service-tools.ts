@@ -2,10 +2,10 @@ import path from "node:path";
 import { type StructuredToolInterface } from "@langchain/core/tools";
 import { defineTool } from "../define-tool";
 import { z } from "zod";
-import { isRunningInsideManagedService } from "../../services/runtime-platform";
-import type { RuntimePlatform } from "../../services/runtime-platform";
+import { isRunningInsideManagedService } from "../../services/infrastructure/runtime-platform";
+import type { RuntimePlatform } from "../../services/infrastructure/runtime-platform";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
-import { telemetry } from "../../services/telemetry";
+import { telemetry } from "../../services/infrastructure/telemetry";
 import type { ToolBuildContext } from "./tool-group-types";
 import { renderShellExecResult } from "./shell-tools";
 

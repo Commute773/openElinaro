@@ -16,7 +16,7 @@ import { ProfileService } from "./profile-service";
 import { ProjectsService } from "./projects-service";
 import { RoutinesStore } from "./routines-store";
 import { formatLocalTime } from "./local-time-service";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { nowInTimezone, parseIso, toIso } from "../utils/time-helpers";
 import {
   trimHistory,

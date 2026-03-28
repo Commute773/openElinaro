@@ -1,17 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
-import { AccessControlService } from "./access-control-service";
-import { LocalShellBackend } from "./shell-backend-local";
-import type { ShellBackend } from "./shell-backend";
-import { resolveRuntimePath } from "./runtime-root";
+import { AccessControlService } from "../access-control-service";
+import { LocalShellBackend } from "../shell-backend-local";
+import type { ShellBackend } from "../shell-backend";
+import { resolveRuntimePath } from "../runtime-root";
 import { telemetry } from "./telemetry";
-import { createTraceSpan } from "../utils/telemetry-helpers";
-import { timestamp } from "../utils/timestamp";
+import { createTraceSpan } from "../../utils/telemetry-helpers";
+import { timestamp } from "../../utils/timestamp";
 import {
   SHELL_DEFAULT_TIMEOUT_MS as DEFAULT_TIMEOUT_MS,
   SHELL_COMMAND_PREVIEW_LIMIT as COMMAND_PREVIEW_LIMIT,
   SHELL_DEFAULT_NOTIFICATION_TAIL_LINES as DEFAULT_NOTIFICATION_TAIL_LINES,
-} from "../config/service-constants";
+} from "../../config/service-constants";
 
 const SHELL_TASK_ROOT = resolveRuntimePath("shell-tasks");
 const shellTelemetry = telemetry.child({ component: "shell" });

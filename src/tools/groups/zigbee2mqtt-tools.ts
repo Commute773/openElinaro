@@ -2,7 +2,7 @@ import { type StructuredToolInterface } from "@langchain/core/tools";
 import { defineTool } from "../define-tool";
 import { z } from "zod";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
-import { telemetry } from "../../services/telemetry";
+import { telemetry } from "../../services/infrastructure/telemetry";
 import type { ToolBuildContext } from "./tool-group-types";
 
 const toolTelemetry = telemetry.child({ component: "tool" });

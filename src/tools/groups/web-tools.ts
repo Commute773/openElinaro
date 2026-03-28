@@ -6,7 +6,7 @@ import {
   DEFAULT_WEB_SEARCH_UI_LANG,
 } from "../../services/tool-defaults";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
-import { telemetry } from "../../services/telemetry";
+import { telemetry } from "../../services/infrastructure/telemetry";
 import type { ToolBuildContext } from "./tool-group-types";
 
 const toolTelemetry = telemetry.child({ component: "tool" });

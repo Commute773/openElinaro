@@ -12,7 +12,7 @@ let tempRoot = "";
 
 let appRuntimeModule: typeof import("./runtime");
 let memoryServiceModule: typeof import("../services/memory-service");
-let shellServiceModule: typeof import("../services/shell-service");
+let shellServiceModule: typeof import("../services/infrastructure/shell-service");
 
 let originalEnsureReady: typeof memoryServiceModule.MemoryService.prototype.ensureReady;
 let originalShellExec: typeof shellServiceModule.ShellService.prototype.exec;
@@ -157,7 +157,7 @@ beforeAll(async () => {
 
   appRuntimeModule = await importFresh("src/app/runtime.ts");
   memoryServiceModule = await importFresh("src/services/memory-service.ts");
-  shellServiceModule = await importFresh("src/services/shell-service.ts");
+  shellServiceModule = await importFresh("src/services/infrastructure/shell-service.ts");
 
   originalEnsureReady = memoryServiceModule.MemoryService.prototype.ensureReady;
   originalShellExec = shellServiceModule.ShellService.prototype.exec;

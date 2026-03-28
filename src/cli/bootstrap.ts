@@ -1,7 +1,7 @@
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { ensureRuntimeConfigFile, getRuntimeConfig, saveRuntimeConfig, type RuntimeConfig } from "../config/runtime-config";
-import { SecretStoreService } from "../services/secret-store-service";
+import { SecretStoreService } from "../services/infrastructure/secret-store-service";
 
 function usage() {
   return [

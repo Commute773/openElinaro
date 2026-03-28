@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { LocalShellBackend } from "./shell-backend-local";
+import { LocalShellBackend } from "../shell-backend-local";
 import { ShellService } from "./shell-service";
 
 function makeTmpDir() {

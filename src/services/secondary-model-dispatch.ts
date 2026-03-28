@@ -9,7 +9,7 @@ import {
 } from "@mariozechner/pi-ai";
 import { assertSuccessfulProviderResponse } from "../connectors/provider-response";
 import type { ProfileRecord } from "../domain/profiles";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { timestamp } from "../utils/timestamp";
 import {

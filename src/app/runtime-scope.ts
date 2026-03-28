@@ -8,7 +8,7 @@ import { AutonomousTimeService } from "../services/autonomous-time-service";
 import { ConversationMemoryService } from "../services/conversation-memory-service";
 import { ConversationStateTransitionService } from "../services/conversation-state-transition-service";
 import type { ConversationStore } from "../services/conversation-store";
-import { FilesystemService } from "../services/filesystem-service";
+import { FilesystemService } from "../services/infrastructure/filesystem-service";
 import { LocalFilesystemBackend } from "../services/filesystem-backend-local";
 import { SshFilesystemBackend } from "../services/filesystem-backend-ssh";
 import type { FinanceService } from "../services/finance-service";
@@ -19,14 +19,14 @@ import type { ProfileService } from "../services/profile-service";
 import { ProjectsService } from "../services/projects-service";
 import { ReflectionService } from "../services/reflection-service";
 import type { RoutinesService } from "../services/routines-service";
-import { ShellService } from "../services/shell-service";
+import { ShellService } from "../services/infrastructure/shell-service";
 import { SshShellBackend } from "../services/shell-backend-ssh";
 import { LocalShellBackend } from "../services/shell-backend-local";
 import { SoulService } from "../services/soul-service";
 import type { SystemPromptService } from "../services/system-prompt-service";
 import { ToolResolutionService } from "../services/tool-resolution-service";
 import { ToolRegistry } from "../tools/tool-registry";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 import { getRuntimeConfig } from "../config/runtime-config";
 
 type ShellRuntime = Pick<

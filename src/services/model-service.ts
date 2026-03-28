@@ -37,7 +37,7 @@ import { getClaudeSetupToken, getCodexCredentials, saveCodexCredentials } from "
 import type { ProfileRecord } from "../domain/profiles";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath } from "./runtime-root";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { timestamp } from "../utils/timestamp";
 import { SecondaryModelDispatch, type ResolvedRuntimeModel } from "./secondary-model-dispatch";

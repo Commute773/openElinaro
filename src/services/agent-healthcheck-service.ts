@@ -3,7 +3,7 @@ import path from "node:path";
 import type { AppResponse } from "../domain/assistant";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath } from "./runtime-root";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { timestamp as nowIso } from "../utils/timestamp";
 
 export const AGENT_HEALTHCHECK_PROMPT =

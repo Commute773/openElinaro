@@ -1,4 +1,4 @@
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 
 type PromptInjectionSignalDefinition = {
   label: string;

@@ -3,7 +3,7 @@ import path from "node:path";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { getLocalTimezone } from "./local-time-service";
 import { assertTestRuntimeRootIsIsolated, getRuntimeRootDir, resolveRuntimePath } from "./runtime-root";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 
 type DocsSection = "assistant" | "research" | "other";
 

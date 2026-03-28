@@ -15,7 +15,7 @@ import {
 import { approximateTextTokens } from "../utils/text-utils";
 import { ModelService } from "./model-service";
 import { ProfileService } from "./profile-service";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 
 const MEMORY_RECALL_LIMIT = 3;
