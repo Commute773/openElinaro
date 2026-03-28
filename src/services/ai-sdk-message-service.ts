@@ -5,6 +5,7 @@ import type { LanguageModelV3FinishReason, LanguageModelV3Usage } from "@ai-sdk/
 import type { ModelMessage, ToolResultOutput } from "@ai-sdk/provider-utils";
 import { extractTextFromMessage, normalizeChatPromptContent, resolveRemoteImageUrl } from "./message-content-service";
 import { ToolResultStore } from "./tool-result-store";
+import { normalizeString } from "../utils/text-utils";
 
 const MAX_BASE64_IMAGE_BYTES = 5 * 1024 * 1024;
 const TOOL_RESULT_INLINE_CHAR_THRESHOLD = 1_000;
@@ -31,8 +32,9 @@ function toToolCallArgs(input: unknown): Record<string, unknown> {
 }
 
 function resolveImageMimeType(mediaType: unknown, image: unknown) {
-  if (typeof mediaType === "string" && mediaType.trim()) {
-    return mediaType.trim();
+  const normalizedMediaType = normalizeString(mediaType);
+  if (normalizedMediaType) {
+    return normalizedMediaType;
   }
 
   if (typeof image !== "string") {

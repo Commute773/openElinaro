@@ -7,6 +7,7 @@ import type {
   ToolProgramWorkerResponse,
 } from "../domain/tool-program";
 import { ToolProgramArtifactService, type ToolProgramArtifactRecord } from "../services/tool-program-artifact-service";
+import { normalizeString } from "../utils/text-utils";
 
 const AUTO_ARTIFACT_CHAR_THRESHOLD = 4_000;
 
@@ -58,14 +59,15 @@ function summarizeValue(value: unknown) {
 }
 
 function buildResultSummary(result: unknown) {
-  if (typeof result === "string" && result.trim()) {
-    return result.trim();
+  const resultStr = normalizeString(result);
+  if (resultStr) {
+    return resultStr;
   }
 
   if (result && typeof result === "object" && !Array.isArray(result)) {
-    const summary = (result as { summary?: unknown }).summary;
-    if (typeof summary === "string" && summary.trim()) {
-      return summary.trim();
+    const summary = normalizeString((result as { summary?: unknown }).summary);
+    if (summary) {
+      return summary;
     }
   }
 

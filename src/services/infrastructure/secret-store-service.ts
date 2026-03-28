@@ -10,6 +10,7 @@ import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../runtime-
 import { telemetry } from "./telemetry";
 import { DEFAULT_PROFILE_ID as DEFAULT_SECRET_STORE_PROFILE_ID } from "../../config/service-constants";
 import { timestamp as nowIso } from "../../utils/timestamp";
+import { writeJsonFileSecurely } from "../../utils/file-utils";
 
 export const SECRET_STORE_KINDS = ["generic", "payment_card", "password"] as const;
 export type SecretStoreKind = (typeof SECRET_STORE_KINDS)[number];
@@ -265,8 +266,7 @@ function readStore(): SecretStoreShape {
 
 function writeStore(store: SecretStoreShape) {
   assertTestRuntimeRootIsIsolated("Secret store");
-  ensureStoreDir();
-  fs.writeFileSync(getSecretStorePath(), `${JSON.stringify(store, null, 2)}\n`, { mode: 0o600 });
+  writeJsonFileSecurely(getSecretStorePath(), store);
 }
 
 function getProfileStore(store: SecretStoreShape, profileId: string) {

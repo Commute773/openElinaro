@@ -15,7 +15,7 @@ import {
   type Usage,
 } from "@mariozechner/pi-ai";
 import { getOAuthApiKey, type OAuthCredentials } from "@mariozechner/pi-ai/oauth";
-import { approximateTextTokens } from "../../utils/text-utils";
+import { approximateTextTokens, normalizeString } from "../../utils/text-utils";
 import { z } from "zod";
 import {
   approximateContentTokens,
@@ -406,9 +406,9 @@ function extractCandidateString(
   keys: string[],
 ): string | undefined {
   for (const key of keys) {
-    const raw = value[key];
-    if (typeof raw === "string" && raw.trim()) {
-      return raw.trim();
+    const result = normalizeString(value[key]);
+    if (result) {
+      return result;
     }
   }
   return undefined;

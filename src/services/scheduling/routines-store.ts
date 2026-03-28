@@ -9,6 +9,7 @@ import { getLocalTimezone } from "../local-time-service";
 import { ProfileService } from "../profiles";
 import { resolveRuntimePath } from "../runtime-root";
 import { DEFAULT_PROFILE_ID as DEFAULT_ROUTINE_PROFILE_ID } from "../../config/service-constants";
+import { writeJsonFileSecurely } from "../../utils/file-utils";
 
 function getStorePath() {
   return resolveRuntimePath("routines.json");
@@ -119,8 +120,7 @@ export class RoutinesStore {
   }
 
   save(data: RoutineStoreData): RoutineStoreData {
-    ensureStoreDir();
-    fs.writeFileSync(getStorePath(), `${JSON.stringify(data, null, 2)}\n`, { mode: 0o600 });
+    writeJsonFileSecurely(getStorePath(), data);
     return data;
   }
 }

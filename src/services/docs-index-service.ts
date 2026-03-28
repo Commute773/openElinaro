@@ -4,6 +4,7 @@ import { getRuntimeConfig } from "../config/runtime-config";
 import { getLocalTimezone } from "./local-time-service";
 import { assertTestRuntimeRootIsIsolated, getRuntimeRootDir, resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./infrastructure/telemetry";
+import { writeJsonFileSecurely } from "../utils/file-utils";
 
 type DocsSection = "assistant" | "research" | "other";
 
@@ -227,8 +228,7 @@ export class DocsIndexService {
     const inventory = this.collectInventory();
     const changedFiles = this.writeManagedFiles(inventory);
     const report = this.buildReport(inventory, changedFiles);
-    fs.mkdirSync(path.dirname(this.reportPath), { recursive: true });
-    fs.writeFileSync(this.reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+    writeJsonFileSecurely(this.reportPath, report);
     docsIndexTelemetry.event("docs.sync.completed", {
       rootDir: this.rootDir,
       changedFiles,

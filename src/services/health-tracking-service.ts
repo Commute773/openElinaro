@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";
 import { timestamp as nowIso } from "../utils/timestamp";
+import { writeJsonFileSecurely } from "../utils/file-utils";
 
 export interface HealthCheckinInput {
   observedAt?: string;
@@ -261,7 +262,7 @@ export class HealthTrackingService {
   }
 
   private saveStore(store: HealthStoreData) {
-    fs.writeFileSync(this.storePath, `${JSON.stringify(store, null, 2)}\n`, { mode: 0o600 });
+    writeJsonFileSecurely(this.storePath, store);
   }
 
   private getAllCheckins() {
