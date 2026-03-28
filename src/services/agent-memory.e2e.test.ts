@@ -29,7 +29,7 @@ let agentChatModule: typeof import("./agent-chat-service");
 let conversationMemoryModule: typeof import("./conversation-memory-service");
 let conversationStoreModule: typeof import("./conversation-store");
 let memoryServiceModule: typeof import("./memory-service");
-let profileServiceModule: typeof import("./profile-service");
+let profileServiceModule: typeof import("./profiles/profile-service");
 let systemPromptModule: typeof import("./system-prompt-service");
 
 type RequestCapture = {
@@ -275,7 +275,7 @@ beforeAll(async () => {
   conversationMemoryModule = await importFresh<typeof import("./conversation-memory-service")>("src/services/conversation-memory-service.ts");
   conversationStoreModule = await importFresh<typeof import("./conversation-store")>("src/services/conversation-store.ts");
   memoryServiceModule = await importFresh<typeof import("./memory-service")>("src/services/memory-service.ts");
-  profileServiceModule = await importFresh<typeof import("./profile-service")>("src/services/profile-service.ts");
+  profileServiceModule = await importFresh<typeof import("./profiles/profile-service")>("src/services/profiles/profile-service.ts");
   systemPromptModule = await importFresh<typeof import("./system-prompt-service")>("src/services/system-prompt-service.ts");
 });
 

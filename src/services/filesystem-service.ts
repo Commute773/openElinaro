@@ -1,5 +1,5 @@
 import path from "node:path";
-import { AccessControlService } from "./access-control-service";
+import { AccessControlService } from "./profiles";
 import { NotFoundError, ValidationError } from "../domain/errors";
 import type { FilesystemBackend } from "./filesystem-backend";
 import { LocalFilesystemBackend } from "./filesystem-backend-local";

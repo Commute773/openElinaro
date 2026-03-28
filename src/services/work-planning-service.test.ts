@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { ProjectsService } from "./projects-service";
 import { RoutinesService } from "./routines-service";
 import { WorkPlanningService } from "./work-planning-service";

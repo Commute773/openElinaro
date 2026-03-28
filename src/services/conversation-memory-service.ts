@@ -13,8 +13,8 @@ import {
   extractTextFromMessage,
 } from "./message-content-service";
 import { approximateTextTokens } from "../utils/text-utils";
-import { ModelService } from "./model-service";
-import { ProfileService } from "./profile-service";
+import { ModelService } from "./models/model-service";
+import { ProfileService } from "./profiles";
 import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 

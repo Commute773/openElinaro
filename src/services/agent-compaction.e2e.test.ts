@@ -66,7 +66,7 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
   const conversationStateTransitionModule = await importFresh<typeof import("./conversation-state-transition-service")>("src/services/conversation-state-transition-service.ts");
   const conversationStoreModule = await importFresh<typeof import("./conversation-store")>("src/services/conversation-store.ts");
   const memoryServiceModule = await importFresh<typeof import("./memory-service")>("src/services/memory-service.ts");
-  const profileServiceModule = await importFresh<typeof import("./profile-service")>("src/services/profile-service.ts");
+  const profileServiceModule = await importFresh<typeof import("./profiles/profile-service")>("src/services/profiles/profile-service.ts");
   const systemPromptModule = await importFresh<typeof import("./system-prompt-service")>("src/services/system-prompt-service.ts");
   const scriptedConnectorModule = await importFresh<typeof import("../test/scripted-provider-connector")>("src/test/scripted-provider-connector.ts");
 

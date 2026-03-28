@@ -15,15 +15,15 @@ let previousCwd = "";
 let previousRootDirEnv: string | undefined;
 
 let authStore: typeof import("../auth/store");
-let profilesModule: typeof import("../services/profile-service");
+let profilesModule: typeof import("../services/profiles/profile-service");
 let projectsModule: typeof import("../services/projects-service");
-let accessModule: typeof import("../services/access-control-service");
+let accessModule: typeof import("../services/profiles/access-control-service");
 let workspaceModule: typeof import("../services/project-workspace-service");
 let routinesModule: typeof import("../services/routines-service");
 let conversationsModule: typeof import("../services/conversation-store");
 let systemPromptsModule: typeof import("../services/system-prompt-service");
 let memoryModule: typeof import("../services/memory-service");
-let modelsModule: typeof import("../services/model-service");
+let modelsModule: typeof import("../services/models/model-service");
 let transitionsModule: typeof import("../services/conversation-state-transition-service");
 let toolRegistryModule: typeof import("../tools/tool-registry");
 let toolAuthModule: typeof import("../services/tool-authorization-service");
@@ -162,15 +162,15 @@ beforeAll(async () => {
   writeTestProjectRegistry();
 
   authStore = await importFresh("src/auth/store.ts");
-  profilesModule = await importFresh("src/services/profile-service.ts");
+  profilesModule = await importFresh("src/services/profiles/profile-service.ts");
   projectsModule = await importFresh("src/services/projects-service.ts");
-  accessModule = await importFresh("src/services/access-control-service.ts");
+  accessModule = await importFresh("src/services/profiles/access-control-service.ts");
   workspaceModule = await importFresh("src/services/project-workspace-service.ts");
   routinesModule = await importFresh("src/services/routines-service.ts");
   conversationsModule = await importFresh("src/services/conversation-store.ts");
   systemPromptsModule = await importFresh("src/services/system-prompt-service.ts");
   memoryModule = await importFresh("src/services/memory-service.ts");
-  modelsModule = await importFresh("src/services/model-service.ts");
+  modelsModule = await importFresh("src/services/models/model-service.ts");
   transitionsModule = await importFresh("src/services/conversation-state-transition-service.ts");
   toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
   toolAuthModule = await importFresh("src/services/tool-authorization-service.ts");

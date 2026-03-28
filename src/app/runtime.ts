@@ -4,7 +4,7 @@ import type { SubagentRun } from "../domain/subagent-run";
 import { ConversationStore } from "../services/conversation-store";
 import { FinanceService } from "../services/finance-service";
 import { HealthTrackingService } from "../services/health-tracking-service";
-import { ProfileService } from "../services/profile-service";
+import { ProfileService } from "../services/profiles";
 import { ProjectWorkspaceService } from "../services/project-workspace-service";
 import { HeartbeatService } from "../services/heartbeat-service";
 import type { CacheMissWarning } from "../services/cache-miss-monitor";

@@ -10,7 +10,7 @@ const repoRoot = process.cwd();
 let previousCwd = "";
 let tempRoot = "";
 let previousRootDirEnv: string | undefined;
-let profileServiceModule: typeof import("./profile-service");
+let profileServiceModule: typeof import("./profiles/profile-service");
 let projectsServiceModule: typeof import("./projects-service");
 let recentContextModule: typeof import("./recent-thread-context-service");
 
@@ -138,7 +138,7 @@ beforeAll(async () => {
     now,
   );
 
-  profileServiceModule = await importFresh("src/services/profile-service.ts");
+  profileServiceModule = await importFresh("src/services/profiles/profile-service.ts");
   projectsServiceModule = await importFresh("src/services/projects-service.ts");
   recentContextModule = await importFresh("src/services/recent-thread-context-service.ts");
 });

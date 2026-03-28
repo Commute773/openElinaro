@@ -5,7 +5,7 @@ import type { AppProgressEvent, ChatPromptContent, ChatPromptContentBlock } from
 import { ConversationStore } from "./conversation-store";
 import { ConversationStateTransitionService } from "./conversation-state-transition-service";
 import { appendResponseMessages, toModelMessages, toToolSet, toV3Usage } from "./ai-sdk-message-service";
-import { ModelService } from "./model-service";
+import { ModelService } from "./models/model-service";
 import { guardUntrustedText } from "./prompt-injection-guard-service";
 import { prependTextToChatPromptContent } from "./message-content-service";
 import { buildCurrentLocalTimePrefix } from "./local-time-service";

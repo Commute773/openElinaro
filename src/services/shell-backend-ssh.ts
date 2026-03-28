@@ -2,8 +2,8 @@ import { execFile, spawn } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { ProfileRecord } from "../domain/profiles";
-import type { AccessControlService } from "./access-control-service";
-import { ProfileService } from "./profile-service";
+import type { AccessControlService } from "./profiles";
+import { ProfileService } from "./profiles";
 import { buildOpenElinaroCommandEnvironment } from "./shell-environment";
 import {
   resolveDisplayCommand,
