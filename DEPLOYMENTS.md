@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.10
+- Released at: 2026-03-28T01:31:42Z
+- Release id: 20260328T013142Z-5ab6462
+- Previous version: 2026.03.28.9
+- Trigger: ci/release workflow
+
+- refactor: migrate remaining G2 API routes to function layer and delete static OpenAPI spec
+
 ## 2026.03.28.9
 - Released at: 2026-03-28T01:20:37Z
 - Release id: 20260328T012037Z-eb9e6d9
