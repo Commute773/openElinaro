@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createRuntimeScope, type RuntimeScope } from "./runtime-scope";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
 
 let tempRoot = "";

@@ -22,7 +22,7 @@ describe("TelemetryQueryService", () => {
   test("returns combined timeline text output", async () => {
     const { TelemetryStore } = await import("./telemetry-store");
     const { TelemetryQueryService } = await import("./telemetry-query-service");
-    const { TelemetryService } = await import("./telemetry");
+    const { TelemetryService } = await import("./infrastructure/telemetry");
     const store = new TelemetryStore(path.join(tempRoot, ".openelinarotest", "telemetry.sqlite"));
     store.insertSpan({
       traceId: "trace-1",
@@ -65,7 +65,7 @@ describe("TelemetryQueryService", () => {
   test("returns structured json output", async () => {
     const { TelemetryStore } = await import("./telemetry-store");
     const { TelemetryQueryService } = await import("./telemetry-query-service");
-    const { TelemetryService } = await import("./telemetry");
+    const { TelemetryService } = await import("./infrastructure/telemetry");
     const store = new TelemetryStore(path.join(tempRoot, ".openelinarotest", "telemetry.sqlite"));
     store.insertEvent({
       timestamp: "2026-03-16T11:00:00.000Z",

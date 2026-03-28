@@ -12,7 +12,7 @@ import type { InferencePromptDriftWarning } from "../services/inference-prompt-d
 import { RoutinesService } from "../services/scheduling/routines-service";
 import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
 import { SystemPromptService } from "../services/system-prompt-service";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 import { AlarmNotificationService } from "../services/alarm-notification-service";
 import { AlarmService, type ScheduledAlarm } from "../services/alarm-service";
 import { WorkPlanningService } from "../services/work-planning-service";

@@ -12,7 +12,7 @@ import type { GeminiLivePhoneService } from "../../services/gemini-live-phone-se
 import type { AlarmService } from "../../services/alarm-service";
 import type { AccessControlService } from "../../services/profiles";
 import type { OpenBrowserService } from "../../services/openbrowser-service";
-import type { SecretStoreService } from "../../services/secret-store-service";
+import type { SecretStoreService } from "../../services/infrastructure/secret-store-service";
 import type { WebFetchService } from "../../services/web-fetch-service";
 import type { WebSearchService } from "../../services/web-search-service";
 import type { WorkPlanningService } from "../../services/work-planning-service";
@@ -20,12 +20,12 @@ import type { TelemetryQueryService } from "../../services/telemetry-query-servi
 import type { DeploymentVersionService } from "../../services/deployment-version-service";
 import type { FeatureConfigService } from "../../services/feature-config-service";
 import type { ConversationStore } from "../../services/conversation-store";
-import type { FilesystemService } from "../../services/filesystem-service";
-import type { ShellService } from "../../services/shell-service";
+import type { FilesystemService } from "../../services/infrastructure/filesystem-service";
+import type { ShellService } from "../../services/infrastructure/shell-service";
 import type {
   ElinaroTicketsService,
 } from "../../services/elinaro-tickets-service";
-import type { RuntimePlatform } from "../../services/runtime-platform";
+import type { RuntimePlatform } from "../../services/infrastructure/runtime-platform";
 import type { PhoneCallBackend } from "../../services/phone-call-backends";
 import type { Zigbee2MqttService } from "../../services/zigbee2mqtt-service";
 

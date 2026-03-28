@@ -9,8 +9,8 @@ import type {
 } from "../domain/communications";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { CommunicationsStore } from "./communications-store";
-import { SecretStoreService } from "./secret-store-service";
-import { telemetry } from "./telemetry";
+import { SecretStoreService } from "./infrastructure/secret-store-service";
+import { telemetry } from "./infrastructure/telemetry";
 import { normalizeString } from "../utils/text-utils";
 import { DEFAULT_PROFILE_ID as DEFAULT_SECRET_PROFILE_ID } from "../config/service-constants";
 import { timestamp as nowIso } from "../utils/timestamp";

@@ -7,7 +7,7 @@ import {
   type CodexNotifyPayload,
   type SubagentEvent,
 } from "./events";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 
 type EventHandler = (event: SubagentEvent) => void | Promise<void>;
 

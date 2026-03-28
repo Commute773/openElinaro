@@ -2,7 +2,7 @@ import {
   DEFAULT_WEB_SEARCH_LANGUAGE,
   DEFAULT_WEB_SEARCH_UI_LANG,
 } from "./tool-defaults";
-import { telemetry as rootTelemetry, type TelemetryService } from "./telemetry";
+import { telemetry as rootTelemetry, type TelemetryService } from "./infrastructure/telemetry";
 
 const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";
 

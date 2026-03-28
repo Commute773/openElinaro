@@ -9,7 +9,7 @@ import {
   guardUntrustedText,
   type UntrustedContentDescriptor,
 } from "./prompt-injection-guard-service";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 
 const baseDescriptor: UntrustedContentDescriptor = {
   sourceType: "filesystem",

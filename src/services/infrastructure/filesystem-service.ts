@@ -1,15 +1,15 @@
 import path from "node:path";
-import { AccessControlService } from "./profiles";
-import { NotFoundError, ValidationError } from "../domain/errors";
-import type { FilesystemBackend } from "./filesystem-backend";
-import { LocalFilesystemBackend } from "./filesystem-backend-local";
+import { AccessControlService } from "../profiles";
+import { NotFoundError, ValidationError } from "../../domain/errors";
+import type { FilesystemBackend } from "../filesystem-backend";
+import { LocalFilesystemBackend } from "../filesystem-backend-local";
 import {
   applyStructuredUpdate,
   buildAddedFileContent,
   parseStructuredPatch,
-} from "./structured-patch";
+} from "../structured-patch";
 import { telemetry } from "./telemetry";
-import { createTraceSpan } from "../utils/telemetry-helpers";
+import { createTraceSpan } from "../../utils/telemetry-helpers";
 
 import {
   FS_DEFAULT_READ_LIMIT as DEFAULT_READ_LIMIT,
@@ -19,7 +19,7 @@ import {
   FS_MAX_LINE_LENGTH as MAX_LINE_LENGTH,
   FS_MAX_READ_BYTES as MAX_READ_BYTES,
   FS_MAX_READ_BYTES_LABEL as MAX_READ_BYTES_LABEL,
-} from "../config/service-constants";
+} from "../../config/service-constants";
 const filesystemTelemetry = telemetry.child({ component: "filesystem" });
 
 type ResolvedPathInput = {

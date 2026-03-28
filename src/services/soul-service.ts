@@ -4,7 +4,7 @@ import { ModelService } from "./models/model-service";
 import { ReflectionPromptService } from "./reflection-prompt-service";
 import { ReflectionStateService } from "./reflection-state-service";
 import type { RoutinesService } from "./scheduling/routines-service";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { nowInTimezone, localDateKey } from "../utils/time-helpers";
 

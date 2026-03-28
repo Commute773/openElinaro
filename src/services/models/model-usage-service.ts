@@ -1,7 +1,7 @@
 import type { Usage } from "@mariozechner/pi-ai";
 import type { ProfileRecord } from "../../domain/profiles";
 import { CacheMissMonitor, type CacheMissWarning } from "../cache-miss-monitor";
-import { telemetry } from "../telemetry";
+import { telemetry } from "../infrastructure/telemetry";
 import {
   UsageTrackingService,
   type UsageLedgerRecord,

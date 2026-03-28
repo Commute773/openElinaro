@@ -23,7 +23,7 @@ import { getAssistantDisplayName } from "../config/runtime-identity";
 import { InferencePromptDriftMonitor, type InferencePromptDriftWarning } from "../services/inference-prompt-drift-monitor";
 
 import { ModelService } from "../services/models/model-service";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import type {
   UsagePromptBreakdown,

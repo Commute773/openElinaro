@@ -12,9 +12,9 @@ import {
   getPythonRuntimeSetupCommand,
   resolvePythonScriptPath,
 } from "./python-runtime";
-import { SecretStoreService } from "./secret-store-service";
+import { SecretStoreService } from "./infrastructure/secret-store-service";
 import { resolveRuntimePath } from "./runtime-root";
-import { telemetry as rootTelemetry, type TelemetryService } from "./telemetry";
+import { telemetry as rootTelemetry, type TelemetryService } from "./infrastructure/telemetry";
 
 export type OpenBrowserMouseButton = "left" | "middle" | "right";
 export type OpenBrowserScreenshotFormat = "png" | "jpeg" | "webp";

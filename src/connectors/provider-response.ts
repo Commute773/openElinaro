@@ -1,5 +1,5 @@
 import type { AssistantMessage } from "@mariozechner/pi-ai";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 
 function truncate(value: string, maxChars: number) {
   return value.length > maxChars

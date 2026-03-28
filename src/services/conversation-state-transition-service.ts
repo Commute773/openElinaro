@@ -12,7 +12,7 @@ import {
   type SystemPromptSnapshot,
 } from "./system-prompt-service";
 import { extractTextFromMessage } from "./message-content-service";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 
 type ProgressReporter = (message: string) => Promise<void>;
 

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { parse, stringify } from "yaml";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 
 export const CURRENT_CONFIG_VERSION = 2;
 

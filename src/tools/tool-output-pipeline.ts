@@ -6,14 +6,14 @@ import type { AppProgressEvent, AppProgressUpdate } from "../domain/assistant";
 import { buildToolErrorEnvelope } from "../services/tool-error-service";
 import {
   MissingSecretStoreKeyError,
-} from "../services/secret-store-service";
+} from "../services/infrastructure/secret-store-service";
 import {
   guardUntrustedText,
   type UntrustedContentDescriptor,
   type UntrustedContentSourceType,
 } from "../services/prompt-injection-guard-service";
 import type { ToolResultStore } from "../services/tool-result-store";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 import type { ToolContext } from "./tool-registry";
 
 const toolRegistryTelemetry = telemetry.child({ component: "tool" });
