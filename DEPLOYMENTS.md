@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.8
+- Released at: 2026-03-28T01:18:51Z
+- Release id: 20260328T011851Z-43cc2f5
+- Previous version: 2026.03.28.7
+- Trigger: ci/release workflow
+
+- refactor: move tool metadata from ToolRegistry inference to function definitions
+
 ## 2026.03.28.7
 - Released at: 2026-03-28T01:08:27Z
 - Release id: 20260328T010827Z-fd08b59
