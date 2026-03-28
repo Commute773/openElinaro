@@ -22,7 +22,7 @@ Profiles are explicit runtime objects, not vague personas.
 - Current pattern:
   - `root` is unrestricted
   - non-root profiles are constrained by `roles`, project access, tool access, and memory namespace access
-- Access rules come from `src/services/profile-service.ts` and `src/services/access-control-service.ts`
+- Access rules come from `src/services/profiles/profile-service.ts` and `src/services/profiles/access-control-service.ts`
   - root can access all projects and tools
   - non-root project access is allowed only when a project's `allowedRoles` overlaps the profile's `roles`
   - non-root memory reads are limited to namespaces derived from the profile roles

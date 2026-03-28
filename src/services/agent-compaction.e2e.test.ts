@@ -66,7 +66,7 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
   const conversationStateTransitionModule = await importFresh<typeof import("./conversation/conversation-state-transition-service")>("src/services/conversation/conversation-state-transition-service.ts");
   const conversationStoreModule = await importFresh<typeof import("./conversation/conversation-store")>("src/services/conversation/conversation-store.ts");
   const memoryServiceModule = await importFresh<typeof import("./memory-service")>("src/services/memory-service.ts");
-  const profileServiceModule = await importFresh<typeof import("./profile-service")>("src/services/profile-service.ts");
+  const profileServiceModule = await importFresh<typeof import("./profiles/profile-service")>("src/services/profiles/profile-service.ts");
   const systemPromptModule = await importFresh<typeof import("./system-prompt-service")>("src/services/system-prompt-service.ts");
   const scriptedConnectorModule = await importFresh<typeof import("../test/scripted-provider-connector")>("src/test/scripted-provider-connector.ts");
 
@@ -142,9 +142,9 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
     modelHelpers as any,
     systemPrompts,
   );
-  const service = new agentChatModule.AgentChatService(
+  const service = new agentChatModule.AgentChatService({
     connector,
-    {
+    routineTools: {
       consumePendingBackgroundExecNotifications() {
         return [];
       },
@@ -152,7 +152,7 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
         return null;
       },
     } as any,
-    {
+    toolResolver: {
       resolveAllForChat() {
         return { entries: [] };
       },
@@ -163,10 +163,8 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
     transitions,
     conversations,
     systemPrompts,
-    modelHelpers as any,
-    undefined,
-    undefined,
-  );
+    models: modelHelpers as any,
+  });
 
   return {
     service,

@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { RoutineItem, RoutineStoreData } from "../domain/routines";
 import { getLocalTimezone } from "./local-time-service";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { resolveRuntimePath } from "./runtime-root";
 import { DEFAULT_PROFILE_ID as DEFAULT_ROUTINE_PROFILE_ID } from "../config/service-constants";
 

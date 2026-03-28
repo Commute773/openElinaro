@@ -63,9 +63,9 @@ function createService(options?: {
     return new AIMessage(`Acknowledged: ${humanMessages.at(-1) ?? ""}`);
   });
   const conversations = new ConversationStore();
-  const service = new AgentChatService(
+  const service = new AgentChatService({
     connector,
-    {
+    routineTools: {
       consumePendingBackgroundExecNotifications() {
         return [];
       },
@@ -73,7 +73,7 @@ function createService(options?: {
         return null;
       },
     } as any,
-    {
+    toolResolver: {
       resolveAllForChat() {
         return { entries: [] };
       },
@@ -81,7 +81,7 @@ function createService(options?: {
         return { entries: [], tools: [] };
       },
     } as any,
-    {
+    transitions: {
       async compactForContinuation() {
         await options?.onCompact?.();
         return {
@@ -92,8 +92,8 @@ function createService(options?: {
       },
     } as any,
     conversations,
-    new SystemPromptService(),
-    {
+    systemPrompts: new SystemPromptService(),
+    models: {
       async inspectContextWindowUsage(params: { messages: unknown[] }) {
         if (options?.inspectContextWindowUsage) {
           return options.inspectContextWindowUsage(params as { messages: HumanMessage[] | unknown[] });
@@ -107,15 +107,14 @@ function createService(options?: {
         };
       },
     } as any,
-    options?.disableAutomaticMemory
+    memory: options?.disableAutomaticMemory
       ? undefined
       : {
           async buildRecallContext() {
             return options?.recallContext ?? "";
           },
         } as any,
-    undefined,
-  );
+  });
 
   return { service, requests, conversations };
 }
@@ -380,13 +379,13 @@ describe("AgentChatService", () => {
     });
 
     const conversations = new ConversationStore();
-    const service = new AgentChatService(
+    const service = new AgentChatService({
       connector,
-      {
+      routineTools: {
         consumePendingBackgroundExecNotifications() { return []; },
         consumePendingConversationReset() { return null; },
       } as any,
-      {
+      toolResolver: {
         resolveAllForChat() {
           return { entries: allTools };
         },
@@ -394,10 +393,10 @@ describe("AgentChatService", () => {
           return { entries: allTools, tools: allTools.map((t) => t.name) };
         },
       } as any,
-      {} as any,
+      transitions: {} as any,
       conversations,
-      new SystemPromptService(),
-      {
+      systemPrompts: new SystemPromptService(),
+      models: {
         async inspectContextWindowUsage() {
           return {
             usedTokens: 100,
@@ -408,9 +407,7 @@ describe("AgentChatService", () => {
           };
         },
       } as any,
-      undefined,
-      undefined,
-    );
+    });
 
     const result = await service.reply({
       conversationKey: "conversation-1",
@@ -474,13 +471,13 @@ describe("AgentChatService", () => {
     });
 
     const conversations = new ConversationStore();
-    const service = new AgentChatService(
+    const service = new AgentChatService({
       connector,
-      {
+      routineTools: {
         consumePendingBackgroundExecNotifications() { return []; },
         consumePendingConversationReset() { return null; },
       } as any,
-      {
+      toolResolver: {
         resolveAllForChat() {
           return { entries: [mockTool] };
         },
@@ -488,10 +485,10 @@ describe("AgentChatService", () => {
           return { entries: [mockTool], tools: [mockTool.name] };
         },
       } as any,
-      {} as any,
+      transitions: {} as any,
       conversations,
-      new SystemPromptService(),
-      {
+      systemPrompts: new SystemPromptService(),
+      models: {
         async inspectContextWindowUsage() {
           return {
             usedTokens: 100,
@@ -502,9 +499,7 @@ describe("AgentChatService", () => {
           };
         },
       } as any,
-      undefined,
-      undefined,
-    );
+    });
 
     // Grab the internal session after it's created
     const originalGetSession = (service as any).getSession.bind(service);

@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { ProfileRecord } from "../domain/profiles";
 import type { JobRecord, ProjectRecord } from "../domain/projects";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { ProjectsService } from "./projects-service";
 
 let runtimeRoot = "";

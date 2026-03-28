@@ -58,9 +58,9 @@ Where to look:
 - `~/.openelinaro/projects/registry.json`
 - `src/domain/profiles.ts`
 - `src/domain/projects.ts`
-- `src/services/profile-service.ts`
+- `src/services/profiles/profile-service.ts`
 - `src/services/projects-service.ts`
-- `src/services/access-control-service.ts`
+- `src/services/profiles/access-control-service.ts`
 
 ## 6. Project Context Is Deliberately Separate From Platform Code
 
@@ -153,3 +153,19 @@ Where to look:
 - `scripts/service-transition-run.sh`
 - `scripts/install-linux.sh`
 - `src/services/agent-healthcheck-service.ts`
+
+## 12. Unified Function Layer For Tools, API Routes, And Discord Commands
+
+All agent capabilities are defined as `FunctionDefinition` objects using Zod schemas, authorization metadata, domain tags, and surface annotations. A central `FunctionRegistry` collects definitions from per-domain builder functions and generates agent tools, HTTP routes, Discord slash commands, and OpenAPI specs from the same source of truth.
+
+This eliminates duplication between the tool, API, and Discord command layers. Metadata such as domains, scopes, examples, auth declarations, and behavioral flags lives alongside the handler instead of in separate inference maps or parallel registration sites.
+
+Where to look:
+
+- `src/functions/define-function.ts` — `FunctionDefinition` type, `defineFunction` helper, `FunctionDomainBuilder` signature
+- `src/functions/function-registry.ts` — central registry that builds definitions and generates each surface
+- `src/functions/domains/` — per-domain builder functions (e.g. `shell-functions.ts`, `finance-functions.ts`)
+- `src/functions/generate-tools.ts` — agent tool surface generator
+- `src/functions/generate-api-routes.ts` — HTTP API route generator
+- `src/functions/generate-discord-commands.ts` — Discord slash command generator
+- `src/functions/generate-openapi.ts` — OpenAPI spec generator

@@ -14,11 +14,11 @@ let previousCwd = "";
 let tempRoot = "";
 let conversationStoreModule: typeof import("./conversation/conversation-store");
 let transitionServiceModule: typeof import("./conversation/conversation-state-transition-service");
-let accessControlModule: typeof import("./access-control-service");
+let accessControlModule: typeof import("./profiles/access-control-service");
 let agentChatModule: typeof import("./conversation/agent-chat-service");
 let memoryServiceModule: typeof import("./memory-service");
-let modelServiceModule: typeof import("./model-service");
-let profileServiceModule: typeof import("./profile-service");
+let modelServiceModule: typeof import("./models/model-service");
+let profileServiceModule: typeof import("./profiles/profile-service");
 let projectsServiceModule: typeof import("./projects-service");
 let routinesServiceModule: typeof import("./routines-service");
 let systemPromptModule: typeof import("./system-prompt-service");
@@ -295,20 +295,20 @@ function createHarness(expectedArtifactDir: string) {
     access,
   );
   const toolResolver = new toolResolutionModule.ToolResolutionService(toolRegistry);
-  const chat = new agentChatModule.AgentChatService(
+  const chat = new agentChatModule.AgentChatService({
     connector,
-    toolRegistry,
+    routineTools: toolRegistry,
     toolResolver,
     transitions,
     conversations,
     systemPrompts,
     models,
-    {
+    memory: {
       async buildRecallContext() {
         return "";
       },
     },
-  );
+  });
 
   return { chat };
 }
@@ -333,11 +333,11 @@ describe("OpenBrowser agent e2e", () => {
 
     conversationStoreModule = await importFresh("src/services/conversation/conversation-store.ts");
     transitionServiceModule = await importFresh("src/services/conversation/conversation-state-transition-service.ts");
-    accessControlModule = await importFresh("src/services/access-control-service.ts");
+    accessControlModule = await importFresh("src/services/profiles/access-control-service.ts");
     agentChatModule = await importFresh("src/services/conversation/agent-chat-service.ts");
     memoryServiceModule = await importFresh("src/services/memory-service.ts");
-    modelServiceModule = await importFresh("src/services/model-service.ts");
-    profileServiceModule = await importFresh("src/services/profile-service.ts");
+    modelServiceModule = await importFresh("src/services/models/model-service.ts");
+    profileServiceModule = await importFresh("src/services/profiles/profile-service.ts");
     projectsServiceModule = await importFresh("src/services/projects-service.ts");
     routinesServiceModule = await importFresh("src/services/routines-service.ts");
     systemPromptModule = await importFresh("src/services/system-prompt-service.ts");

@@ -1,11 +1,11 @@
 import { realpathSync } from "node:fs";
 import path from "node:path";
-import type { ProfileRecord } from "../domain/profiles";
-import { ProjectsService } from "./projects-service";
+import type { ProfileRecord } from "../../domain/profiles";
+import { ProjectsService } from "../projects-service";
 import { ProfileService } from "./profile-service";
-import { ProjectWorkspaceService } from "./project-workspace-service";
-import { getToolAuthorizationDeclaration } from "./tool-authorization-service";
-import { getRuntimeRootDir, resolveRuntimePath, resolveUserDataPath } from "./runtime-root";
+import { ProjectWorkspaceService } from "../project-workspace-service";
+import { getToolAuthorizationDeclaration } from "../tool-authorization-service";
+import { getRuntimeRootDir, resolveRuntimePath, resolveUserDataPath } from "../runtime-root";
 
 const PROTECTED_DATA_EXCEPTIONS = new Set<string>();
 

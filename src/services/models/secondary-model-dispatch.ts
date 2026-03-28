@@ -7,11 +7,11 @@ import {
   type Api,
   type Usage,
 } from "@mariozechner/pi-ai";
-import { assertSuccessfulProviderResponse } from "../connectors/provider-response";
-import type { ProfileRecord } from "../domain/profiles";
-import { telemetry } from "./telemetry";
-import { createTraceSpan } from "../utils/telemetry-helpers";
-import { timestamp } from "../utils/timestamp";
+import { assertSuccessfulProviderResponse } from "../../connectors/provider-response";
+import type { ProfileRecord } from "../../domain/profiles";
+import { telemetry } from "../telemetry";
+import { createTraceSpan } from "../../utils/telemetry-helpers";
+import { timestamp } from "../../utils/timestamp";
 import {
   PROVIDER_RUNTIME_MAP,
   getSelectedContextWindow,
