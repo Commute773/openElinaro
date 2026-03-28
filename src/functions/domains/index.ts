@@ -22,6 +22,7 @@ import { buildConversationLifecycleFunctions } from "./conversation-lifecycle-fu
 import { buildDashboardFunctions } from "./dashboard-functions";
 import { buildAgentApiFunctions } from "./agent-api-functions";
 import { buildNotificationFunctions } from "./notification-functions";
+import { buildRedditFunctions } from "./reddit-functions";
 
 /**
  * All domain builders, including subagent and conversation-lifecycle tools.
@@ -46,4 +47,5 @@ export const ALL_FUNCTION_BUILDERS: FunctionDomainBuilder[] = [
   buildDashboardFunctions,
   buildAgentApiFunctions,
   buildNotificationFunctions,
+  buildRedditFunctions,
 ];
