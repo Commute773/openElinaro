@@ -28,4 +28,5 @@ export {
   toHeartbeatReminderCandidate,
   formatSchedule,
 } from "./routine-helpers";
-export { RoutinesService } from "../routines-service";
+export { RoutinesService } from "./routines-service";
+export { RoutinesStore } from "./routines-store";

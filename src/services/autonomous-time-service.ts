@@ -1,5 +1,5 @@
 import type { ProfileRecord } from "../domain/profiles";
-import type { RoutinesService } from "./routines-service";
+import type { RoutinesService } from "./scheduling/routines-service";
 import { formatLocalTime } from "./local-time-service";
 import { AutonomousTimePromptService } from "./autonomous-time-prompt-service";
 import { AutonomousTimeStateService } from "./autonomous-time-state-service";
