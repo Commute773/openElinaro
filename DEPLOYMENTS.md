@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.21
+- Released at: 2026-03-28T14:42:32Z
+- Release id: 20260328T144232Z-ed56da7
+- Previous version: 2026.03.28.20
+- Trigger: ci/release workflow
+
+- feat: add pi-coding-agent dependency and canonical message types (Phase 1)
+
 ## 2026.03.28.20
 - Released at: 2026-03-28T13:40:40Z
 - Release id: 20260328T134040Z-816b3a0
