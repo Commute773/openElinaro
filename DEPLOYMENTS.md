@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.22
+- Released at: 2026-03-28T15:44:03Z
+- Release id: 20260328T154403Z-576f943
+- Previous version: 2026.03.28.21
+- Trigger: ci/release workflow
+
+- feat: replace Vercel AI SDK + LangChain with pi-ai (Phases 2-7)
+
 ## 2026.03.28.21
 - Released at: 2026-03-28T14:42:32Z
 - Release id: 20260328T144232Z-ed56da7
