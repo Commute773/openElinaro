@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.19
+- Released at: 2026-03-28T03:39:06Z
+- Release id: 20260328T033906Z-1d16520
+- Previous version: 2026.03.28.18
+- Trigger: ci/release workflow
+
+- fix: restore runtime subagent summaries and routine compatibility
+
 ## 2026.03.28.18
 - Released at: 2026-03-28T03:36:26Z
 - Release id: 20260328T033626Z-77392da
