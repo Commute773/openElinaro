@@ -1590,7 +1590,8 @@ describe("ToolRegistry tool catalog", () => {
   });
 
   test("keeps coding-worker defaults focused on file edits plus exec", () => {
-    const visible = getRuntimeAgentDefaultVisibleToolNames("coding-worker");
+    const harness = createHarness();
+    const visible = getRuntimeAgentDefaultVisibleToolNames("coding-worker", harness.registry.functionRegistry);
 
     expect(visible).toContain("exec_command");
     expect(visible).toContain("exec_status");

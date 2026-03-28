@@ -80,7 +80,14 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEDIA_AUTH, note: "Reads the local tagged media library under the runtime media/ directory." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
+    examples: ["list songs and ambience", "find thunder audio"],
     featureGate: "media",
+    readsWorkspace: true,
+    untrustedOutput: {
+      sourceType: "filesystem",
+      sourceName: "local media library listing",
+      notes: "Media filenames and tags come from local files and optional user-managed catalog metadata.",
+    },
   }),
 
   // -----------------------------------------------------------------------
@@ -105,7 +112,9 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEDIA_AUTH, note: "Inspects local output devices and configured speaker aliases." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
+    examples: ["list speakers", "check if B06HD is available"],
     featureGate: "media",
+    readsWorkspace: true,
   }),
 
   // -----------------------------------------------------------------------
@@ -138,6 +147,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEDIA_AUTH, note: "Controls local audio playback and speaker routing on this machine." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
+    examples: ["play thunder on bedroom speaker", "start a song on B06HD"],
     featureGate: "media",
     mutatesState: true,
   }),
@@ -158,6 +168,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEDIA_AUTH, note: "Controls local audio playback and speaker routing on this machine." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
+    examples: ["pause the speaker", "pause current audio"],
     featureGate: "media",
     mutatesState: true,
   }),
@@ -178,6 +189,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEDIA_AUTH, note: "Controls local audio playback and speaker routing on this machine." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
+    examples: ["stop the speaker", "stop current audio"],
     featureGate: "media",
     mutatesState: true,
   }),
@@ -198,6 +210,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEDIA_AUTH, note: "Controls local audio playback volume on this machine." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
+    examples: ["set volume to 60", "turn down current audio"],
     featureGate: "media",
     mutatesState: true,
   }),
@@ -227,6 +240,13 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEDIA_AUTH, note: "Reads local audio playback state from the managed mpv player." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
+    examples: ["what is playing now", "show current speaker playback"],
     featureGate: "media",
+    readsWorkspace: true,
+    untrustedOutput: {
+      sourceType: "filesystem",
+      sourceName: "local media playback state",
+      notes: "Playback state may include local file paths and user-managed media metadata.",
+    },
   }),
 ];

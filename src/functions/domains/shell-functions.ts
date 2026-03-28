@@ -83,7 +83,16 @@ export const buildShellFunctions: FunctionDomainBuilder = (ctx) => [
     auth: SHELL_AUTH,
     domains: SHELL_DOMAINS,
     agentScopes: SHELL_SCOPES,
+    defaultVisibleScopes: ["chat", "coding-worker", "direct"],
+    examples: ["run bun test", "execute a shell command"],
+    supportsBackground: true,
     mutatesState: true,
+    readsWorkspace: true,
+    untrustedOutput: {
+      sourceType: "shell",
+      sourceName: "shell stdout/stderr",
+      notes: "Command output can echo attacker-controlled content.",
+    },
   }),
 
   // -------------------------------------------------------------------------
@@ -143,6 +152,14 @@ export const buildShellFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { access: "anyone" as const, behavior: "role-sensitive" as const, note: "Background shell job visibility follows the active profile's shell access." },
     domains: SHELL_DOMAINS,
     agentScopes: SHELL_SCOPES,
+    defaultVisibleScopes: ["chat", "coding-worker", "direct"],
+    examples: ["check command status", "list background jobs"],
+    readsWorkspace: true,
+    untrustedOutput: {
+      sourceType: "shell",
+      sourceName: "background shell status and tail output",
+      notes: "Background job output can echo attacker-controlled content.",
+    },
   }),
 
   // -------------------------------------------------------------------------
@@ -167,5 +184,12 @@ export const buildShellFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { access: "anyone" as const, behavior: "role-sensitive" as const, note: "Background shell output visibility follows the active profile's shell access." },
     domains: SHELL_DOMAINS,
     agentScopes: SHELL_SCOPES,
+    defaultVisibleScopes: ["chat", "coding-worker", "direct"],
+    examples: ["show command output", "tail process logs"],
+    untrustedOutput: {
+      sourceType: "shell",
+      sourceName: "background shell output",
+      notes: "Background job output can echo attacker-controlled content.",
+    },
   }),
 ];

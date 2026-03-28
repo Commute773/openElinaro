@@ -51,7 +51,16 @@ export const buildSystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { access: "root", behavior: "uniform", note: "Launches a local browser session and may write screenshot artifacts to disk." },
     domains: ["browser", "automation"],
     agentScopes: ["chat", "direct"],
+    examples: [
+      "open page and screenshot",
+      "reuse the current browser session and fill a form with { secretRef: \"prepaid_card.number\" }",
+    ],
     featureGate: "openbrowser",
     mutatesState: true,
+    untrustedOutput: {
+      sourceType: "web",
+      sourceName: "browser automation results",
+      notes: "Page titles, JavaScript output, and screenshot paths come from external browser content.",
+    },
   }),
 ];
