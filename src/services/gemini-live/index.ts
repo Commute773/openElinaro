@@ -2,32 +2,27 @@
  * GeminiLivePhoneService — thin coordinator that imports focused sub-modules.
  *
  * Sub-modules:
- * - `audio-stream.ts`    — PCM constants, resampling, speech detection
- * - `latency-tracker.ts` — Latency types, metrics, turn management
+ * - `audio-stream.ts`     — PCM constants, resampling, speech detection
+ * - `latency-tracker.ts`  — Latency types, metrics, turn management
  * - `phone-transcript.ts` — Transcript types, persistence, end-call detection
+ * - `session-manager.ts`  — Gemini API config, credentials, prompt building
+ * - `vonage-bridge.ts`    — Vonage event processing, call-index, URL helpers
  */
 
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { GoogleGenAI, Modality, type Session } from "@google/genai";
+import { GoogleGenAI, type Session } from "@google/genai";
 import type { LiveCallbacks, LiveServerMessage } from "@google/genai";
 import type { ServerWebSocket } from "bun";
-import { getRuntimeConfig } from "../../config/runtime-config";
 import { normalizeString } from "../../utils/text-utils";
 import { timestamp as nowIso } from "../../utils/timestamp";
 import { readWebhookPayload } from "../../utils/http-helpers";
-import {
-  buildPhoneCallStartPrompt,
-  buildPhoneCallSystemInstruction,
-} from "../phone-call-prompts";
-import { DEFAULT_PROFILE_ID as DEFAULT_SECRET_PROFILE_ID } from "../../config/service-constants";
 import { SecretStoreService } from "../infrastructure/secret-store-service";
 import { telemetry } from "../infrastructure/telemetry";
-import { VonageService, getVonageWebhookPath } from "../vonage-service";
+import { VonageService } from "../vonage-service";
 
 import {
-  type AudioStreamStats,
   LinearPcmResampler,
   bytesToPcm16kDurationMs,
   hasSpeechLikeEnergy,
@@ -37,7 +32,6 @@ import {
 
 import {
   type LiveCallLatencyProfile,
-  type TurnLatencyMetrics,
   createLatencyProfile,
   diffMs,
   estimateInputLatencyBreakdown,
@@ -51,25 +45,33 @@ import {
 
 import {
   type GeminiTranscriptState,
-  type TranscriptLogEntry,
   appendTranscriptLog,
   containsEndCallTrigger,
   ensureLivePhoneRoot,
-  getCallIndexPath,
   getSessionDir,
   getSessionPath,
   getTranscriptLogPath,
 } from "./phone-transcript";
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
+import {
+  buildCallStartPrompt,
+  buildGeminiConnectConfig,
+  resolveCallerSilenceDurationMs,
+  resolveGeminiApiKey,
+  resolveModel,
+} from "./session-manager";
 
-const DEFAULT_GEMINI_SECRET_REF = "gemini.apiKey";
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
-const DEFAULT_CALLER_PREFIX_PADDING_MS = 20;
-const DEFAULT_CALLER_SILENCE_DURATION_MS = 100;
-const DEFAULT_GEMINI_LIVE_THINKING_BUDGET = 0;
+import {
+  applyVoiceEventToLatency,
+  deriveSessionStatus,
+  getSessionWebSocketPath as getSessionWsPath,
+  isTerminalVoiceStatus,
+  logVoiceEvent,
+  readCallIndex,
+  resolveSessionIdFromPath as resolveSessionIdFromPathImpl,
+  toWebSocketUrl,
+  writeCallIndex,
+} from "./vonage-bridge";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -144,27 +146,6 @@ type ActiveBridge = {
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function toWebSocketUrl(baseUrl: string, pathname: string) {
-  const url = new URL(baseUrl);
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname = pathname;
-  url.search = "";
-  url.hash = "";
-  return url.toString();
-}
-
-function decodePathSegment(value: string) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
 
@@ -214,19 +195,11 @@ export class GeminiLivePhoneService {
   }
 
   getSessionWebSocketPath(sessionId: string) {
-    return `${getVonageWebhookPath("voice.answer").replace(/\/answer$/, "")}/live/${encodeURIComponent(sessionId)}`;
+    return getSessionWsPath(sessionId);
   }
 
   resolveSessionIdFromPath(pathname: string) {
-    const marker = `${getVonageWebhookPath("voice.answer").replace(/\/answer$/, "")}/live/`;
-    if (!pathname.startsWith(marker)) {
-      return null;
-    }
-    const encoded = pathname.slice(marker.length).split("/")[0]?.trim() ?? "";
-    if (!encoded) {
-      return null;
-    }
-    return decodePathSegment(encoded);
+    return resolveSessionIdFromPathImpl(pathname);
   }
 
   async makePhoneCall(input: {
@@ -254,7 +227,7 @@ export class GeminiLivePhoneService {
       to: input.to,
       from: normalizeString(input.from),
       instructions: input.instructions.trim(),
-      model: this.resolveModel(),
+      model: resolveModel(),
       websocketUrl: toWebSocketUrl(
         communications.publicBaseUrl,
         this.getSessionWebSocketPath(sessionId),
@@ -298,7 +271,7 @@ export class GeminiLivePhoneService {
         updatedAt: nowIso(),
         latency: withSetupMetric(record.latency, "callCreatedAt", nowIso()),
       });
-      this.writeCallIndex(call.id, record.id);
+      writeCallIndex(call.id, record.id);
       appendTranscriptLog(record.id, {
         timestamp: nowIso(),
         type: "call.created",
@@ -362,7 +335,7 @@ export class GeminiLivePhoneService {
       resampler: new LinearPcmResampler(24_000, 16_000),
       vonageConnected: false,
       introSent: false,
-      startPrompt: this.buildCallStartPrompt(session.instructions),
+      startPrompt: buildCallStartPrompt(session.instructions),
       closed: false,
       inputTranscript: null,
       outputTranscript: null,
@@ -489,29 +462,11 @@ export class GeminiLivePhoneService {
     bridge: ActiveBridge,
     session: GeminiLivePhoneSessionRecord,
   ) {
-    const apiKey = this.resolveGeminiApiKey();
+    const apiKey = resolveGeminiApiKey(this.secrets);
     const ai = this.geminiFactory(apiKey);
     const connected = await ai.live.connect({
       model: session.model,
-      config: {
-        responseModalities: [Modality.AUDIO],
-        systemInstruction: this.buildSystemInstruction(session.instructions),
-        generationConfig: {
-          thinkingConfig: {
-            thinkingBudget: DEFAULT_GEMINI_LIVE_THINKING_BUDGET,
-          },
-        },
-        inputAudioTranscription: {},
-        outputAudioTranscription: {},
-        realtimeInputConfig: {
-          automaticActivityDetection: {
-            disabled: false,
-            prefixPaddingMs: this.resolveCallerPrefixPaddingMs(),
-            silenceDurationMs: this.resolveCallerSilenceDurationMs(),
-          },
-        },
-        speechConfig: this.buildSpeechConfig(),
-      },
+      config: buildGeminiConnectConfig(session.instructions),
       callbacks: {
         onopen: () => {
           bridge.latency = withSetupMetric(
@@ -817,7 +772,7 @@ export class GeminiLivePhoneService {
     ) {
       const breakdown = estimateInputLatencyBreakdown(
         turn.callerLastAudioToFirstTranscriptMs,
-        this.resolveCallerSilenceDurationMs(),
+        resolveCallerSilenceDurationMs(),
       );
       turn.estimatedEndpointingDelayMs = breakdown.endpointingDelayMs;
       turn.estimatedRecognitionDelayMs = breakdown.recognitionDelayMs;
@@ -831,7 +786,7 @@ export class GeminiLivePhoneService {
           turn.callerLastAudioToFirstTranscriptMs,
         estimatedEndpointingDelayMs: turn.estimatedEndpointingDelayMs,
         estimatedRecognitionDelayMs: turn.estimatedRecognitionDelayMs,
-        configuredSilenceDurationMs: this.resolveCallerSilenceDurationMs(),
+        configuredSilenceDurationMs: resolveCallerSilenceDurationMs(),
       });
     }
     if (finished) {
@@ -1018,55 +973,6 @@ export class GeminiLivePhoneService {
   }
 
   // -----------------------------------------------------------------------
-  // Configuration helpers
-  // -----------------------------------------------------------------------
-
-  private resolveGeminiApiKey() {
-    const gemini = getRuntimeConfig().communications.geminiLive;
-    const secretRef = gemini.apiKeySecretRef || DEFAULT_GEMINI_SECRET_REF;
-    const profileId = gemini.secretProfileId || DEFAULT_SECRET_PROFILE_ID;
-    return this.secrets.resolveSecretRef(secretRef, profileId);
-  }
-
-  private resolveModel() {
-    return (
-      getRuntimeConfig().communications.geminiLive.model.trim() ||
-      DEFAULT_GEMINI_MODEL
-    );
-  }
-
-  private resolveCallerPrefixPaddingMs() {
-    const raw = getRuntimeConfig().communications.geminiLive.prefixPaddingMs;
-    return Number.isFinite(raw) ? raw : DEFAULT_CALLER_PREFIX_PADDING_MS;
-  }
-
-  private resolveCallerSilenceDurationMs() {
-    const raw = getRuntimeConfig().communications.geminiLive.silenceDurationMs;
-    return Number.isFinite(raw) ? raw : DEFAULT_CALLER_SILENCE_DURATION_MS;
-  }
-
-  private buildSpeechConfig() {
-    const voiceName =
-      getRuntimeConfig().communications.geminiLive.voiceName?.trim();
-    if (!voiceName) {
-      return undefined;
-    }
-    return {
-      voiceConfig: {
-        prebuiltVoiceConfig: { voiceName },
-      },
-    };
-  }
-
-  private buildSystemInstruction(operatorInstructions: string) {
-    return buildPhoneCallSystemInstruction(operatorInstructions);
-  }
-
-  private buildCallStartPrompt(operatorInstructions: string) {
-    return buildPhoneCallStartPrompt(operatorInstructions);
-  }
-
-  // -----------------------------------------------------------------------
   // Session persistence
   // -----------------------------------------------------------------------
 
@@ -1090,7 +996,7 @@ export class GeminiLivePhoneService {
     if (!callId) {
       return null;
     }
-    const sessionId = this.readCallIndex(callId);
+    const sessionId = readCallIndex(callId);
     if (!sessionId) {
       return null;
     }
@@ -1100,119 +1006,37 @@ export class GeminiLivePhoneService {
     }
     const status = normalizeString(payload.status) ?? "event";
     const detail = normalizeString(payload.detail);
-    let latency = session.latency;
     const timestamp = nowIso();
-    if (status === "ringing") {
-      latency = withSetupMetric(latency, "ringingAt", timestamp);
-    } else if (status === "started") {
-      latency = withSetupMetric(latency, "startedAt", timestamp);
-    } else if (status === "answered") {
-      latency = withSetupMetric(latency, "answeredAt", timestamp);
-    } else if (
-      status === "completed" ||
-      status === "disconnected" ||
-      status === "rejected" ||
-      status === "busy" ||
-      status === "timeout" ||
-      status === "failed"
-    ) {
-      latency = withSetupMetric(latency, "callEndedAt", timestamp);
-    }
+    const latency = applyVoiceEventToLatency(
+      session.latency,
+      status,
+      timestamp,
+    );
     const updated = this.saveSession({
       ...session,
-      status:
-        status === "failed"
-          ? "failed"
-          : status === "answered" ||
-              status === "ringing" ||
-              status === "started"
-            ? session.status === "failed"
-              ? "failed"
-              : status === "answered"
-                ? "active"
-                : session.status
-            : status === "completed" ||
-                status === "disconnected" ||
-                status === "rejected" ||
-                status === "busy" ||
-                status === "timeout"
-              ? session.status === "failed"
-                ? "failed"
-                : "completed"
-              : session.status,
+      status: deriveSessionStatus(session.status, status),
       updatedAt: timestamp,
       startedAt:
         session.startedAt ??
         (status === "answered" ? timestamp : session.startedAt),
-      endedAt:
-        status === "failed" ||
-        status === "completed" ||
-        status === "disconnected" ||
-        status === "rejected" ||
-        status === "busy" ||
-        status === "timeout"
-          ? (session.endedAt ?? timestamp)
-          : session.endedAt,
+      endedAt: isTerminalVoiceStatus(status)
+        ? (session.endedAt ?? timestamp)
+        : session.endedAt,
       error: status === "failed" ? (detail ?? status) : session.error,
       latency,
     });
-    appendTranscriptLog(sessionId, {
-      timestamp,
-      type: "voice.event",
+    logVoiceEvent(
+      sessionId,
       status,
       detail,
       payload,
-    });
-    if (
-      status === "ringing" ||
-      status === "answered" ||
-      status === "completed" ||
-      status === "failed"
-    ) {
-      appendTranscriptLog(sessionId, {
-        timestamp,
-        type: "latency.setup",
-        status,
-        createToRingingMs: updated.latency.setup.createToRingingMs,
-        createToAnsweredMs: updated.latency.setup.createToAnsweredMs,
-        answeredToVonageWebsocketMs:
-          updated.latency.setup.answeredToVonageWebsocketMs,
-      });
-    }
+      updated.latency.setup,
+    );
     const activeBridge = this.activeBridges.get(sessionId);
     if (activeBridge) {
       activeBridge.latency = updated.latency;
     }
     return updated;
-  }
-
-  private readCallIndex(callId: string) {
-    ensureLivePhoneRoot();
-    const indexPath = getCallIndexPath();
-    if (!fs.existsSync(indexPath)) {
-      return null;
-    }
-    const index = JSON.parse(
-      fs.readFileSync(indexPath, "utf8"),
-    ) as Record<string, string>;
-    return normalizeString(index[callId]);
-  }
-
-  private writeCallIndex(callId: string, sessionId: string) {
-    ensureLivePhoneRoot();
-    const indexPath = getCallIndexPath();
-    const current = fs.existsSync(indexPath)
-      ? (JSON.parse(fs.readFileSync(indexPath, "utf8")) as Record<
-          string,
-          string
-        >)
-      : {};
-    current[callId] = sessionId;
-    fs.writeFileSync(
-      indexPath,
-      `${JSON.stringify(current, null, 2)}\n`,
-      "utf8",
-    );
   }
 
   private failSession(sessionId: string, error: unknown) {
