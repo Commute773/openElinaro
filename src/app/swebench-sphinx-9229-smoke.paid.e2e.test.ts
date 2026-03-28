@@ -32,6 +32,8 @@ const RUN_SWEBENCH_SPHINX_SMOKE =
   process.env.OPENELINARO_ENABLE_LIVE_MODEL_E2E !== "0" && hasRootOpenAICodexAuthInRepo();
 
 describe("swebench sphinx 9229 smoke e2e", () => {
+  // Skip when OpenAI Codex credentials are not present in the machine test fixtures directory.
+  // Disable explicitly with OPENELINARO_ENABLE_LIVE_MODEL_E2E=0.
   const liveTest = RUN_SWEBENCH_SPHINX_SMOKE ? test : test.skip;
 
   liveTest("runs the isolated live-model smoke harness for Sphinx 9229", () => {

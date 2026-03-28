@@ -292,6 +292,8 @@ afterAll(() => {
 });
 
 describe("real-corpus memory recall", () => {
+  // Skip fixture-dependent tests when memory corpus files are not present on this machine.
+  // To enable: place memory index and documents under the machine test fixtures directory.
   const fixtureTest = HAS_MEMORY_FIXTURES ? test : test.skip;
 
   test("injects nothing when recall has no relevant match", async () => {
