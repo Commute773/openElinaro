@@ -293,17 +293,19 @@ export function createRuntimeScope(ctx: {
     const automaticConversationMemoryDisabled = isAutomaticConversationMemoryDisabled();
     const profile = c.resolve<ProfileRecord>(K.profile);
     const chat = new AgentChatService(
-      c.resolve<ActiveModelConnector>(K.connector),
-      c.resolve<ToolRegistry>(K.routineTools),
-      c.resolve<ToolResolutionService>(K.toolResolver),
-      c.resolve<ConversationStateTransitionService>(K.transitions),
-      conversations,
-      systemPrompts,
-      c.resolve<ModelService>(K.models),
-      mode === "subagent" || automaticConversationMemoryDisabled
-        ? undefined
-        : c.resolve<ConversationMemoryService>(K.conversationMemory),
-      c.resolve<ReflectionService>(K.reflection),
+      {
+        connector: c.resolve<ActiveModelConnector>(K.connector),
+        routineTools: c.resolve<ToolRegistry>(K.routineTools),
+        toolResolver: c.resolve<ToolResolutionService>(K.toolResolver),
+        transitions: c.resolve<ConversationStateTransitionService>(K.transitions),
+        conversations,
+        systemPrompts,
+        models: c.resolve<ModelService>(K.models),
+        memory: mode === "subagent" || automaticConversationMemoryDisabled
+          ? undefined
+          : c.resolve<ConversationMemoryService>(K.conversationMemory),
+        reflection: c.resolve<ReflectionService>(K.reflection),
+      },
       mode === "interactive" && profile.id === "root",
       ctx.onConversationActivityChange
         ? (params) => {
