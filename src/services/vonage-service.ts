@@ -14,6 +14,7 @@ import { telemetry } from "./infrastructure/telemetry";
 import { normalizeString } from "../utils/text-utils";
 import { DEFAULT_PROFILE_ID as DEFAULT_SECRET_PROFILE_ID } from "../config/service-constants";
 import { timestamp as nowIso } from "../utils/timestamp";
+import { readWebhookPayload } from "../utils/http-helpers";
 
 const DEFAULT_HTTP_HOST = "0.0.0.0";
 const DEFAULT_HTTP_PORT = 3000;
@@ -172,30 +173,6 @@ function getCommunicationsConfig() {
 
 function getVonageConfig() {
   return getCommunicationsConfig().vonage;
-}
-
-async function readWebhookPayload(request: Request) {
-  const method = request.method.toUpperCase();
-  if (method === "GET") {
-    return Object.fromEntries(new URL(request.url).searchParams.entries());
-  }
-  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
-  if (contentType.includes("application/json")) {
-    return await request.json() as Record<string, unknown>;
-  }
-  if (contentType.includes("application/x-www-form-urlencoded")) {
-    const text = await request.text();
-    return Object.fromEntries(new URLSearchParams(text).entries());
-  }
-  const text = await request.text();
-  if (!text.trim()) {
-    return {};
-  }
-  try {
-    return JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    return { raw: text };
-  }
 }
 
 export class VonageService {
