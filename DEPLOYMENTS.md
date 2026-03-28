@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.24
+- Released at: 2026-03-28T16:04:35Z
+- Release id: 20260328T160435Z-1b51843
+- Previous version: 2026.03.28.23
+- Trigger: ci/release workflow
+
+- fix: e2e runners fall back to ~/.openelinarotest for credentials (#184)
+
 ## 2026.03.28.23
 - Released at: 2026-03-28T16:01:31Z
 - Release id: 20260328T160131Z-6fc0fa5
