@@ -12,6 +12,7 @@ import type { ProfileRecord } from "../../domain/profiles";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { timestamp } from "../../utils/timestamp";
+import { getRuntimeConfig } from "../../config/runtime-config";
 import {
   PROVIDER_RUNTIME_MAP,
   getSelectedContextWindow,
@@ -120,12 +121,16 @@ export class SecondaryModelDispatch {
   }
 
   getHeartbeatSelection(): HeartbeatModelSelection {
+    const heartbeatConfig = getRuntimeConfig().core.app.heartbeat;
+    const configProvider = heartbeatConfig.provider || undefined;
+    const configModel = heartbeatConfig.model || undefined;
     const providerId = this.profile.heartbeatProvider ??
+      (configProvider as ModelProviderId | undefined) ??
       this.profile.preferredProvider ??
       DEFAULT_ACTIVE_MODEL_PROVIDER_ID;
     return {
       providerId,
-      modelId: this.profile.heartbeatModelId ?? DEFAULT_HEARTBEAT_MODEL_IDS[providerId],
+      modelId: this.profile.heartbeatModelId ?? configModel ?? DEFAULT_HEARTBEAT_MODEL_IDS[providerId],
       thinkingLevel: "low",
     };
   }

@@ -580,6 +580,8 @@ export class OpenElinaroApp {
 
     const requestId = `heartbeat-${Date.now()}`;
     const scope = this.getScope();
+    const heartbeatConfig = getRuntimeConfig().core.app.heartbeat;
+    const useFullContext = heartbeatConfig.contextMode === "full";
     const workFocus = this.buildHeartbeatWorkFocus(options?.reference);
     const reminderSnapshot = this.routines.getHeartbeatReminderSnapshot(options?.reference);
     const localTime = reminderSnapshot.currentLocalTime;
@@ -650,7 +652,8 @@ export class OpenElinaroApp {
         optionalCandidateCount: reminderSnapshot.optionalCandidates.length,
         reflectionEligible,
         hasDeliveryRequirement: Boolean(deliveryRequirement),
-        isolatedFromMainConversation: true,
+        contextMode: heartbeatConfig.contextMode,
+        isolatedFromMainConversation: !useFullContext,
       });
       return prompt;
     };
@@ -675,9 +678,10 @@ export class OpenElinaroApp {
           onToolUse: async () => {},
           typingEligible: false,
           chatOptions: {
+            contextConversationKey: useFullContext ? conversationKey : undefined,
             persistConversation: false,
             enableMemoryIngestion: false,
-            enableThreadStartContext: false,
+            enableThreadStartContext: useFullContext,
             enableCompaction: false,
             includeBackgroundExecNotifications: false,
             providerSessionId: `${heartbeatConversationKey}-${turnId}`,
