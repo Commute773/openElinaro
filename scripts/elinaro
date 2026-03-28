@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+#
+# Interactive CLI connector for the OpenElinaro agent.
+#
+# Usage:
+#   elinaro --session_id="test-123" set lights brightness to 100%
+#   elinaro "what time is it?"
+#   elinaro --session_id="s1" --json "add a todo: buy milk"
+#
+# Starts an isolated runtime (or reuses one if --no-isolate), sends the
+# prompt through the DirectConnector, and prints the response.
+#
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SESSION_ID=""
+JSON_OUTPUT=false
+ISOLATE=true
+PROMPT_PARTS=()
+
+# ---- Parse args ----
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --session_id=*)
+      SESSION_ID="${1#*=}"
+      shift
+      ;;
+    --session_id)
+      SESSION_ID="$2"
+      shift 2
+      ;;
+    --json)
+      JSON_OUTPUT=true
+      shift
+      ;;
+    --no-isolate)
+      ISOLATE=false
+      shift
+      ;;
+    --help|-h)
+      echo 'Usage: elinaro [--session_id=ID] [--json] [--no-isolate] <prompt...>'
+      exit 0
+      ;;
+    *)
+      PROMPT_PARTS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+PROMPT="${PROMPT_PARTS[*]}"
+if [[ -z "$PROMPT" ]]; then
+  echo "Error: no prompt provided." >&2
+  echo 'Usage: elinaro [--session_id=ID] [--json] [--no-isolate] <prompt...>' >&2
+  exit 1
+fi
+
+if [[ -z "$SESSION_ID" ]]; then
+  SESSION_ID="cli-$(date +%s)-$$"
+fi
+
+# ---- Run inline via bun ----
+
+cd "$REPO_ROOT"
+exec bun run -e "
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const repoRoot = process.cwd();
+const sessionId = $(printf '%s' "$SESSION_ID" | jq -Rs .);
+const prompt = $(printf '%s' "$PROMPT" | jq -Rs .);
+const jsonOutput = $JSON_OUTPUT;
+const isolate = $ISOLATE;
+
+async function importFresh(relativePath) {
+  const absolutePath = path.join(repoRoot, relativePath);
+  const url = pathToFileURL(absolutePath).href;
+  return import(url + '?cli=' + Date.now() + '-' + Math.random());
+}
+
+let tempRoot = '';
+let previousRootDirEnv;
+
+if (isolate) {
+  previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
+  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'openelinaro-cli-'));
+  process.env.OPENELINARO_ROOT_DIR = tempRoot;
+
+  // Copy system prompt
+  const spDir = path.join(repoRoot, 'system_prompt');
+  if (fs.existsSync(spDir)) fs.cpSync(spDir, path.join(tempRoot, 'system_prompt'), { recursive: true });
+
+  // Copy machine test fixtures
+  const fixturesDir = path.join(repoRoot, 'src/test/fixtures');
+  for (const name of ['system_prompt', 'assistant_context']) {
+    const src = path.join(fixturesDir, name);
+    if (fs.existsSync(src)) fs.cpSync(src, path.join(tempRoot, '.openelinarotest', name), { recursive: true });
+  }
+  const authSrc = path.join(fixturesDir, 'auth-store.json');
+  if (fs.existsSync(authSrc)) {
+    fs.mkdirSync(path.join(tempRoot, '.openelinarotest'), { recursive: true });
+    fs.copyFileSync(authSrc, path.join(tempRoot, '.openelinarotest', 'auth-store.json'));
+  }
+
+  // Minimal fixtures
+  const testRoot = path.join(tempRoot, '.openelinarotest');
+  fs.mkdirSync(path.join(testRoot, 'profiles'), { recursive: true });
+  fs.mkdirSync(path.join(testRoot, 'projects'), { recursive: true });
+  fs.mkdirSync(path.join(testRoot, 'memory', 'documents', 'root'), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, 'README.md'), '# cli workspace\n');
+  fs.writeFileSync(path.join(tempRoot, 'package.json'), JSON.stringify({ name: 'elinaro-cli', private: true, type: 'module' }, null, 2));
+  fs.writeFileSync(path.join(testRoot, 'projects', 'registry.json'), JSON.stringify({ version: 1, projects: [] }, null, 2));
+
+  const authModule = await importFresh('src/auth/store.ts');
+  const pid = authModule.hasProviderAuth('openai-codex', 'root') ? 'openai-codex'
+    : authModule.hasProviderAuth('claude', 'root') ? 'claude' : null;
+  if (!pid) { console.error('No root provider auth configured.'); process.exit(1); }
+
+  const modelId = pid === 'openai-codex' ? 'gpt-5.4' : 'claude-opus-4-6-20260301';
+  const summarizerId = pid === 'openai-codex' ? 'gpt-5.4' : 'claude-haiku-4-5';
+  fs.writeFileSync(path.join(testRoot, 'profiles', 'registry.json'), JSON.stringify({
+    version: 1,
+    profiles: [{
+      id: 'root', name: 'Root', roles: ['root'], memoryNamespace: 'root',
+      preferredProvider: pid, defaultModelId: modelId,
+      toolSummarizerProvider: pid, toolSummarizerModelId: summarizerId,
+      subagentPreferredProvider: pid, subagentDefaultModelId: modelId,
+      maxSubagentDepth: 1,
+    }],
+  }, null, 2));
+}
+
+const { DirectConnector } = await importFresh('src/e2e/connector.ts');
+const runtimeModule = await importFresh('src/app/runtime.ts');
+const app = new runtimeModule.OpenElinaroApp({ profileId: 'root' });
+const connector = new DirectConnector({ handleRequest: (req, opts) => app.handleRequest(req, opts) });
+
+const result = await connector.send(prompt, { conversationKey: 'cli:' + sessionId });
+
+if (jsonOutput) {
+  console.log(JSON.stringify({
+    sessionId,
+    response: result.response.message,
+    toolUseEvents: result.toolUseEvents,
+    mode: result.response.mode,
+  }, null, 2));
+} else {
+  console.log(result.response.message);
+}
+
+if (isolate && tempRoot) {
+  fs.rmSync(tempRoot, { recursive: true, force: true });
+}
+process.exit(0);
+"
