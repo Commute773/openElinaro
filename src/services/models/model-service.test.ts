@@ -766,4 +766,35 @@ describe("ModelService.countAnthropicTokens", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  test("falls back to heuristic when messages array is empty", async () => {
+    const service = new ModelService(TEST_PROFILE);
+    let fetchCalled = false;
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (_input: unknown, _init?: RequestInit) => {
+      fetchCalled = true;
+      return new Response(JSON.stringify({ input_tokens: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      const tokens = await (service as any).countAnthropicTokens({
+        modelId: "claude-opus-4-6",
+        apiKey: "test-claude-token",
+        systemPrompt: "You are a test system prompt.",
+        messages: [],
+        tools: [],
+      });
+
+      // Should not call the API at all — uses heuristic instead
+      expect(fetchCalled).toBe(false);
+      expect(typeof tokens).toBe("number");
+      expect(tokens).toBeGreaterThanOrEqual(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

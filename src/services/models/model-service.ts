@@ -1222,13 +1222,20 @@ export class ModelService {
     messages: Message[];
     tools: PiTool[];
   }) {
+    // The Anthropic count_tokens API requires at least one message.
+    // When the conversation is empty, fall back to heuristic estimation.
+    const anthropicMessages = toAnthropicMessages(params.messages);
+    if (anthropicMessages.length === 0) {
+      return approximateConversationTokens(params);
+    }
+
     const response = await fetch("https://api.anthropic.com/v1/messages/count_tokens", {
       method: "POST",
       headers: buildAnthropicAuthHeaders(params.apiKey),
       body: JSON.stringify({
         model: params.modelId,
         system: params.systemPrompt,
-        messages: toAnthropicMessages(params.messages),
+        messages: anthropicMessages,
         tools: params.tools.map((tool) => ({
           name: tool.name,
           description: tool.description,
