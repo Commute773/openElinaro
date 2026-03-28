@@ -13,7 +13,7 @@ import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
 import type { RouteDefinition } from "../integrations/http/g2/router";
 import type { ToolAuthorizationDeclaration, ToolCatalogCard, AgentToolScope } from "../domain/tool-catalog";
-import { generateAgentTools } from "./generate-tools";
+import { generateAgentTools, type FunctionContextExtras } from "./generate-tools";
 import { generateApiRoutes } from "./generate-api-routes";
 import { generateDiscordCommands, type DiscordCommandDescriptor } from "./generate-discord-commands";
 import { generateOpenApiSpec } from "./generate-openapi";
@@ -85,12 +85,14 @@ export class FunctionRegistry {
     resolveServices: () => ToolBuildContext,
     resolveToolContext?: () => ToolContext | undefined,
     featureChecker?: (featureId: string) => boolean,
+    resolveExtras?: () => FunctionContextExtras,
   ): StructuredToolInterface[] {
     return generateAgentTools(
       [...this.definitions.values()],
       resolveServices,
       resolveToolContext,
       featureChecker,
+      resolveExtras,
     );
   }
 

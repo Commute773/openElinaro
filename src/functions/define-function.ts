@@ -4,8 +4,11 @@ import type {
   ToolAuthorizationAccess,
   ToolAuthorizationBehavior,
 } from "../domain/tool-catalog";
+import type { StructuredToolInterface } from "@langchain/core/tools";
+import type { BaseMessage } from "@langchain/core/messages";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
+import type { ToolLibraryDefinition } from "../services/tool-library-service";
 
 // ---------------------------------------------------------------------------
 // Surface types
@@ -114,6 +117,29 @@ export interface FunctionContext {
   conversationKey?: string;
   /** Agent tool context (progress callbacks, scope activation, etc.). */
   toolContext?: ToolContext;
+
+  // -- Conversation-lifecycle callbacks (set by ToolRegistry) ----------------
+
+  /** Pending conversation resets map. */
+  pendingConversationResets?: Map<string, string>;
+  /** Resolve a conversation key from tool input and context. */
+  resolveConversationKey?: (input: { conversationKey?: string }, context?: ToolContext) => string | undefined;
+  /** Get a conversation with an ensured system prompt. */
+  getConversationForTool?: (input: { conversationKey?: string }, context?: ToolContext) => Promise<{
+    key: string;
+    messages: BaseMessage[];
+    systemPrompt?: { text: string; version: string; files: string[]; loadedAt: string } | null;
+  }>;
+  /** Build a runtime context string for full context inspection. */
+  buildRuntimeContext?: () => Promise<string>;
+  /** Report progress for a tool call. */
+  reportProgress?: (context: ToolContext | undefined, summary: string, input?: unknown) => Promise<void>;
+  /** Get all agent tools for the current context. */
+  getTools?: (context?: ToolContext) => StructuredToolInterface[];
+  /** Get tool libraries for the current context and scope. */
+  getToolLibraries?: (context?: ToolContext, scope?: AgentToolScope) => ToolLibraryDefinition[];
+  /** Get default visible tool names for a given scope. */
+  getAgentDefaultVisibleToolNames?: (agentScope: AgentToolScope) => string[];
 }
 
 // ---------------------------------------------------------------------------

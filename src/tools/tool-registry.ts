@@ -1,8 +1,6 @@
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
 import {
-  buildSubagentTools,
-  buildConversationLifecycleTools,
   renderShellExecResult,
 } from "./groups";
 import type { SubagentController } from "./groups";
@@ -910,6 +908,12 @@ function requiresPrivilegedServiceControl(runtimePlatform: RuntimePlatform, acti
 export class ToolRegistry {
   private readonly tools: StructuredToolInterface[];
   private readonly toolsByName: Map<string, StructuredToolInterface>;
+  /**
+   * Mutable reference to the ToolContext that should be used by function-layer
+   * tools during the current invocation. Set by getTools/getToolsByNames/invoke
+   * wrappers so that function handlers can access conversationKey, invocationSource, etc.
+   */
+  private _activeToolContext: ToolContext | undefined;
   private readonly runtimePlatform: RuntimePlatform;
   private readonly shell: ShellRuntime;
   private readonly finance: FinanceService;
@@ -1011,55 +1015,66 @@ export class ToolRegistry {
       resolvePhoneCallBackend: (requestedBackend) => this.resolvePhoneCallBackend(requestedBackend),
       createWebSearchService: () => this.createWebSearchService(),
       requestManagedServiceRestart: (source) => this.requestManagedServiceRestart(source),
+      get subagents() { return self.subagents; },
+      get systemPrompts() { return self.systemPrompts; },
+      get transitions() { return self.transitions; },
+      get reflection() { return self.reflection; },
+      get toolResults() { return self.toolResults; },
+      get toolPrograms() { return self.toolPrograms; },
     };
     // Build the unified function registry and register its auth declarations
     this.functionRegistry = new FunctionRegistry(ALL_FUNCTION_BUILDERS);
     this.functionRegistry.build(toolBuildContext);
     registerAuthDeclarations(this.functionRegistry.generateAuthDeclarations());
 
-    // All tool definitions come from the unified function layer
+    // All tool definitions come from the unified function layer.
+    // resolveToolContext reads the mutable _activeToolContext so that
+    // function handlers see the correct ToolContext during invocation.
     const fnResolveServices = () => toolBuildContext;
+    const fnResolveToolContext = () => self._activeToolContext;
     this.tools = this.functionRegistry.generateAgentTools(
       fnResolveServices,
-      undefined,
+      fnResolveToolContext,
       (featureId) => this.featureConfig.isActive(featureId as any),
+      () => ({
+        pendingConversationResets: self.pendingConversationResets,
+        resolveConversationKey: (input, ctx) => self.resolveConversationKey(input, ctx ?? self._activeToolContext),
+        getConversationForTool: (input, ctx) => self.getConversationForTool(input, ctx ?? self._activeToolContext),
+        buildRuntimeContext: () => self.buildRuntimeContext(),
+        reportProgress: (ctx, summary, input) => reportProgress(ctx ?? self._activeToolContext, summary, input),
+        getTools: (ctx) => self.getTools(ctx ?? self._activeToolContext),
+        getToolLibraries: (ctx, scope) => self.getToolLibraries(ctx ?? self._activeToolContext, scope),
+        getAgentDefaultVisibleToolNames: (scope) => self.getAgentDefaultVisibleToolNames(scope),
+      }),
     );
     assertToolAuthorizationCoverage([
       ...this.tools.map((entry) => entry.name),
-      "load_tool_library",
-      "run_tool_program",
-      "context",
       "model_context_usage",
-      "compact",
-      "reload",
-      "new_chat",
-      "launch_agent",
-      "resume_agent",
-      "steer_agent",
-      "cancel_agent",
-      "agent_status",
-      "read_agent_terminal",
     ]);
     this.toolsByName = new Map(this.tools.map((entry) => [entry.name, entry]));
   }
 
   getTools(context?: ToolContext) {
+    // Set the active context so function-layer handlers can see it.
+    this._activeToolContext = context;
     const tools = this.getRawTools(context);
     if (!context?.onToolUse) {
       return tools.map((entry) => wrapToolOutput(entry, this.toolResults, (n, i, c) => this.injectToolContext(n, i, c), context));
     }
 
+    const self = this;
     return tools.map((entry) =>
       tool(
         async (input) => {
+          self._activeToolContext = context;
           await notifyToolUse(context, entry.name, input);
-          const nextInput = this.injectToolContext(entry.name, input, context);
+          const nextInput = self.injectToolContext(entry.name, input, context);
           try {
             const result = await (entry as { invoke: (arg: unknown) => Promise<unknown> }).invoke(
               stripToolControlInput(nextInput),
             );
             await notifyToolResultProgress(context, entry.name, result, input);
-            return await finalizeToolResult(result, entry.name, input, this.toolResults);
+            return await finalizeToolResult(result, entry.name, input, self.toolResults);
           } catch (error) {
             return await normalizeToolResult(normalizeToolFailure(entry.name, error));
           }
@@ -1118,6 +1133,12 @@ export class ToolRegistry {
       resolvePhoneCallBackend: (requestedBackend) => this.resolvePhoneCallBackend(requestedBackend),
       createWebSearchService: () => this.createWebSearchService(),
       requestManagedServiceRestart: (source) => this.requestManagedServiceRestart(source),
+      get subagents() { return self.subagents; },
+      get systemPrompts() { return self.systemPrompts; },
+      get transitions() { return self.transitions; },
+      get reflection() { return self.reflection; },
+      get toolResults() { return self.toolResults; },
+      get toolPrograms() { return self.toolPrograms; },
     };
   }
 
@@ -1156,6 +1177,8 @@ export class ToolRegistry {
     context?: ToolContext,
     options?: { defaultCwd?: string },
   ): StructuredToolInterface[] {
+    // Set the active context so function-layer handlers can see it.
+    this._activeToolContext = context;
     const selectedNames = new Set(names);
     const rawTools = this.getRawTools(context).filter((entry) => selectedNames.has(entry.name));
     const wrapped = (!context?.onToolUse
@@ -1294,23 +1317,14 @@ export class ToolRegistry {
   }
 
   private resolveToolEntry(name: string, context?: ToolContext) {
-    const dynamicTools = this.buildDynamicTools(context);
-    const dynamicMatch = dynamicTools.find((entry) => entry.name === name);
-    if (dynamicMatch) {
-      return dynamicMatch;
-    }
     if (name === "model_context_usage") {
-      const contextTool = dynamicTools.find((entry) => entry.name === "context");
-      return contextTool;
+      return this.toolsByName.get("context");
     }
     return this.toolsByName.get(name);
   }
 
   private getRawTools(context?: ToolContext): StructuredToolInterface[] {
-    return [
-      ...this.tools,
-      ...this.buildDynamicTools(context),
-    ].filter((entry) => this.access.canUseTool(entry.name));
+    return this.tools.filter((entry) => this.access.canUseTool(entry.name));
   }
 
   async invoke(name: string, input: unknown, context?: ToolContext) {
@@ -1325,6 +1339,8 @@ export class ToolRegistry {
   async invokeRaw(name: string, input: unknown, context?: ToolContext) {
     this.access.assertToolAllowed(name);
     const directContext = context ? { ...context, invocationSource: "direct" as const } : undefined;
+    // Set the active context so function-layer handlers can see it.
+    this._activeToolContext = directContext;
     const selected = this.resolveToolEntry(name, directContext);
     if (!selected) {
       throw new Error(`Unknown tool: ${name}`);
@@ -1397,38 +1413,6 @@ export class ToolRegistry {
     return latest.systemPrompt
       ? latest
       : this.conversations.ensureSystemPrompt(latest.key, await this.systemPrompts.load());
-  }
-
-  private buildDynamicTools(context?: ToolContext): StructuredToolInterface[] {
-    const self = this;
-    return [
-      ...buildSubagentTools(
-        { subagents: this.subagents, projects: this.projects },
-        context,
-      ),
-      ...buildConversationLifecycleTools(
-        {
-          get models() { return self.models; },
-          get routines() { return self.routines; },
-          get conversations() { return self.conversations; },
-          get systemPrompts() { return self.systemPrompts; },
-          get transitions() { return self.transitions; },
-          get reflection() { return self.reflection; },
-          get toolResults() { return self.toolResults; },
-          get toolPrograms() { return self.toolPrograms; },
-          get access() { return self.access; },
-          pendingConversationResets: this.pendingConversationResets,
-          resolveConversationKey: (input, ctx) => self.resolveConversationKey(input, ctx),
-          getConversationForTool: (input, ctx) => self.getConversationForTool(input, ctx),
-          buildRuntimeContext: () => self.buildRuntimeContext(),
-          reportProgress: (ctx, summary, input) => reportProgress(ctx, summary, input),
-          getTools: (ctx) => self.getTools(ctx),
-          getToolLibraries: (ctx, scope) => self.getToolLibraries(ctx, scope),
-          getAgentDefaultVisibleToolNames: (scope) => self.getAgentDefaultVisibleToolNames(scope),
-        },
-        context,
-      ),
-    ];
   }
 
   consumePendingConversationReset(conversationKey: string) {
