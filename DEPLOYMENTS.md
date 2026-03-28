@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.32
+- Released at: 2026-03-28T17:56:14Z
+- Release id: 20260328T175614Z-5c37f95
+- Previous version: 2026.03.28.31
+- Trigger: ci/release workflow
+
+- feat: upgrade default voice call model from Gemini Flash 2.5 to 3.1 (#191)
+
 ## 2026.03.28.31
 - Released at: 2026-03-28T17:45:43Z
 - Release id: 20260328T174543Z-08d2ad5
