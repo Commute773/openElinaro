@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { SubagentProvider } from "../domain/subagent-run";
 import { resolveRuntimePath } from "../services/runtime-root";
+import { writeJsonFileSecurely } from "../utils/file-utils";
 
 export interface SpawnAgentParams {
   runId: string;
@@ -234,7 +235,7 @@ export function writeClaudeHooksConfig(params: {
 
   // Write settings file into the hooks dir (passed via --settings flag)
   const settingsPath = path.join(hooksDir, "settings.json");
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), { mode: 0o600 });
+  writeJsonFileSecurely(settingsPath, settings);
 
   return { hookScriptPath, settingsPath };
 }

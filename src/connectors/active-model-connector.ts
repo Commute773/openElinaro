@@ -13,7 +13,7 @@ import type {
   LanguageModelV3StreamResult,
 } from "@ai-sdk/provider";
 import type { ModelMessage } from "@ai-sdk/provider-utils";
-import { approximateTextTokens } from "../utils/text-utils";
+import { approximateTextTokens, normalizeString } from "../utils/text-utils";
 import {
   mapStopReasonToFinishReason,
   stringifyToolResultOutput,
@@ -260,8 +260,9 @@ function shouldRetryWithDefaultTransport(
 }
 
 function resolveImageMimeType(mediaType: unknown, image: unknown) {
-  if (typeof mediaType === "string" && mediaType.trim()) {
-    return mediaType.trim();
+  const normalizedMediaType = normalizeString(mediaType);
+  if (normalizedMediaType) {
+    return normalizedMediaType;
   }
 
   if (typeof image !== "string") {

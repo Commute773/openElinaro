@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { getRuntimeRootDir, getServiceRootDir, resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./infrastructure/telemetry";
+import { normalizeString } from "../utils/text-utils";
 
 const SUPPORTED_MEDIA_EXTENSIONS = new Set([
   ".aac",
@@ -630,16 +631,15 @@ export class MediaService {
     const pause = await this.queryPlayerProperty(socketPath, "pause");
     const volume = await this.queryPlayerProperty(socketPath, "volume");
     const mediaPath = await this.queryPlayerProperty(socketPath, "path");
-    const media = this.resolveMediaForPath(
-      typeof mediaPath === "string" && mediaPath.trim() ? mediaPath.trim() : metadata?.mediaPath,
-    );
+    const normalizedMediaPath = normalizeString(mediaPath) ?? metadata?.mediaPath;
+    const media = this.resolveMediaForPath(normalizedMediaPath);
 
     return {
       speaker,
       state: pause ? "paused" : "playing",
       volume: typeof volume === "number" ? Math.round(volume) : metadata?.volume ?? null,
       media,
-      path: typeof mediaPath === "string" && mediaPath.trim() ? mediaPath.trim() : metadata?.mediaPath ?? null,
+      path: normalizedMediaPath ?? null,
       startedAt: metadata?.startedAt,
     };
   }
