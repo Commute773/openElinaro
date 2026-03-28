@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.14
+- Released at: 2026-03-28T01:52:56Z
+- Release id: 20260328T015256Z-97708e9
+- Previous version: 2026.03.28.13
+- Trigger: ci/release workflow
+
+- refactor: adopt writeJsonFileSecurely and normalizeString utilities across codebase
+
 ## 2026.03.28.13
 - Released at: 2026-03-28T01:51:35Z
 - Release id: 20260328T015135Z-37b7c3c
