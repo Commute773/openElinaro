@@ -1,6 +1,6 @@
-import fs from "node:fs";
-import path from "node:path";
-import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
+import { normalizeString } from "../utils/text-utils";
+import { FileStateService } from "./file-state-service";
+import { resolveRuntimePath } from "./runtime-root";
 
 export interface CalendarSyncState {
   lastAttemptAt?: string;
@@ -22,47 +22,23 @@ function normalizeCalendarSyncState(raw: unknown): CalendarSyncState {
   }
 
   const candidate = raw as Record<string, unknown>;
-  const readString = (key: string) =>
-    typeof candidate[key] === "string" && candidate[key]!.trim().length > 0
-      ? candidate[key] as string
-      : undefined;
-
   return {
-    lastAttemptAt: readString("lastAttemptAt"),
-    lastCompletedAt: readString("lastCompletedAt"),
-    lastFailureAt: readString("lastFailureAt"),
-    nextAttemptAt: readString("nextAttemptAt"),
+    lastAttemptAt: normalizeString(candidate.lastAttemptAt) ?? undefined,
+    lastCompletedAt: normalizeString(candidate.lastCompletedAt) ?? undefined,
+    lastFailureAt: normalizeString(candidate.lastFailureAt) ?? undefined,
+    nextAttemptAt: normalizeString(candidate.nextAttemptAt) ?? undefined,
     consecutiveFailures:
       typeof candidate.consecutiveFailures === "number" && Number.isFinite(candidate.consecutiveFailures)
         ? Math.max(0, Math.floor(candidate.consecutiveFailures))
         : undefined,
-    etag: readString("etag"),
-    lastModified: readString("lastModified"),
+    etag: normalizeString(candidate.etag) ?? undefined,
+    lastModified: normalizeString(candidate.lastModified) ?? undefined,
   };
 }
 
-export class CalendarSyncStateService {
-  constructor(private readonly filePath = getCalendarSyncStateFilePath()) {}
-
-  load(): CalendarSyncState {
-    if (!fs.existsSync(this.filePath)) {
-      return {};
-    }
-
-    try {
-      const raw = JSON.parse(fs.readFileSync(this.filePath, "utf8")) as unknown;
-      return normalizeCalendarSyncState(raw);
-    } catch {
-      return {};
-    }
-  }
-
-  save(state: CalendarSyncState): CalendarSyncState {
-    assertTestRuntimeRootIsIsolated("Calendar sync state");
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    const normalized = normalizeCalendarSyncState(state);
-    fs.writeFileSync(this.filePath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 });
-    return normalized;
+export class CalendarSyncStateService extends FileStateService<CalendarSyncState> {
+  constructor(filePath = getCalendarSyncStateFilePath()) {
+    super(filePath, "Calendar sync state", normalizeCalendarSyncState, () => ({}));
   }
 }
 
