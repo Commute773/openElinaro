@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.25
+- Released at: 2026-03-28T16:08:22Z
+- Release id: 20260328T160822Z-fafa5f2
+- Previous version: 2026.03.28.24
+- Trigger: ci/release workflow
+
+- fix: prefer production secret-store for e2e credentials (#185)
+
 ## 2026.03.28.24
 - Released at: 2026-03-28T16:04:35Z
 - Release id: 20260328T160435Z-1b51843
