@@ -83,9 +83,19 @@ if [[ "${OPENELINARO_ENABLE_LIVE_MODEL_E2E:-}" == "0" ]]; then
   exit 0
 fi
 
-AUTH_STORE="$REPO_ROOT/src/test/fixtures/auth-store.json"
-if [[ ! -f "$AUTH_STORE" ]]; then
-  echo "ERROR: No auth store at $AUTH_STORE"
+AUTH_FIXTURE="$REPO_ROOT/src/test/fixtures/auth-store.json"
+AUTH_LIVE="$HOME/.openelinarotest/auth-store.json"
+SECRET_FIXTURE="$REPO_ROOT/src/test/fixtures/secret-store.json"
+SECRET_LIVE="$HOME/.openelinarotest/secret-store.json"
+
+HAS_AUTH=false
+if [[ -f "$AUTH_FIXTURE" ]] || [[ -f "$AUTH_LIVE" ]] || [[ -f "$SECRET_FIXTURE" ]] || [[ -f "$SECRET_LIVE" ]]; then
+  HAS_AUTH=true
+fi
+
+if ! $HAS_AUTH; then
+  echo "ERROR: No auth credentials found."
+  echo "Checked: $AUTH_FIXTURE, $AUTH_LIVE, $SECRET_FIXTURE, $SECRET_LIVE"
   echo "Configure root provider auth before running e2e tests."
   exit 1
 fi

@@ -29,6 +29,7 @@ import type { E2eTestCase } from "./test-case";
 const repoRoot = process.cwd();
 const TEST_ROOT_NAME = ".openelinarotest";
 const MACHINE_TEST_ROOT = getTestFixturesDir();
+const MACHINE_LIVE_ROOT = path.join(os.homedir(), ".openelinarotest");
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,19 @@ function copyFile(relativePath: string) {
   const destination = path.join(tempRoot, TEST_ROOT_NAME, relativePath);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.copyFileSync(source, destination);
+}
+
+function copyLiveCredentials() {
+  const dest = path.join(tempRoot, TEST_ROOT_NAME);
+  fs.mkdirSync(dest, { recursive: true });
+  for (const name of ["auth-store.json", "secret-store.json"]) {
+    const fixtureSrc = path.join(MACHINE_TEST_ROOT, name);
+    const liveSrc = path.join(MACHINE_LIVE_ROOT, name);
+    const src = fs.existsSync(fixtureSrc) ? fixtureSrc : fs.existsSync(liveSrc) ? liveSrc : null;
+    if (src) {
+      fs.copyFileSync(src, path.join(dest, name));
+    }
+  }
 }
 
 function resolveTestPath(...segments: string[]) {
@@ -215,7 +229,7 @@ async function main() {
   copyDirectory("system_prompt");
   copyMachineTestDirectory("system_prompt");
   copyMachineTestDirectory("assistant_context");
-  copyFile("auth-store.json");
+  copyLiveCredentials();
   writeProjectRegistry();
   writeWorkspaceFixture();
 

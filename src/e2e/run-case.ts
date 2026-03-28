@@ -27,6 +27,7 @@ import { TEST_CASES } from "./test-cases";
 const repoRoot = process.cwd();
 const TEST_ROOT_NAME = ".openelinarotest";
 const MACHINE_TEST_ROOT = getTestFixturesDir();
+const MACHINE_LIVE_ROOT = path.join(os.homedir(), ".openelinarotest");
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 // ---------------------------------------------------------------------------
@@ -61,6 +62,20 @@ function copyFile(relativePath: string, tempRoot: string) {
   const destination = path.join(tempRoot, TEST_ROOT_NAME, relativePath);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.copyFileSync(source, destination);
+}
+
+function copyLiveCredentials(tempRoot: string) {
+  const dest = path.join(tempRoot, TEST_ROOT_NAME);
+  fs.mkdirSync(dest, { recursive: true });
+  for (const name of ["auth-store.json", "secret-store.json"]) {
+    // Prefer src/test/fixtures, fall back to ~/.openelinarotest
+    const fixtureSrc = path.join(MACHINE_TEST_ROOT, name);
+    const liveSrc = path.join(MACHINE_LIVE_ROOT, name);
+    const src = fs.existsSync(fixtureSrc) ? fixtureSrc : fs.existsSync(liveSrc) ? liveSrc : null;
+    if (src) {
+      fs.copyFileSync(src, path.join(dest, name));
+    }
+  }
 }
 
 function resolveTestPath(tempRoot: string, ...segments: string[]) {
@@ -184,7 +199,7 @@ async function main() {
     copyDirectory("system_prompt", tempRoot);
     copyMachineTestDirectory("system_prompt", tempRoot);
     copyMachineTestDirectory("assistant_context", tempRoot);
-    copyFile("auth-store.json", tempRoot);
+    copyLiveCredentials(tempRoot);
     writeProjectRegistry(tempRoot);
     writeWorkspaceFixture(tempRoot);
 
