@@ -3,11 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { HumanMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { ConversationStore } from "./conversation-store";
+import { ConversationStore } from "./conversation/conversation-store";
 import { MemoryService } from "./memory-service";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { ReflectionService } from "./reflection-service";
-import { RoutinesService } from "./routines-service";
+import { RoutinesService } from "./scheduling/routines-service";
 import { resolveAssistantContextPath } from "./runtime-user-content";
 
 let runtimeRoot = "";

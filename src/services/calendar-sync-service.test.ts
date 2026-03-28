@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { CalendarSyncService, parseCalendarOccurrences } from "./calendar-sync-service";
-import { ProfileService } from "./profile-service";
-import { RoutinesService } from "./routines-service";
+import { ProfileService } from "./profiles";
+import { RoutinesService } from "./scheduling/routines-service";
 
 let runtimeRoot = "";
 let previousRootDirEnv: string | undefined;

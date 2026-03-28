@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
 import { CommunicationsStore } from "./communications-store";
-import { SecretStoreService } from "./secret-store-service";
+import { SecretStoreService } from "./infrastructure/secret-store-service";
 import { VonageService } from "./vonage-service";
 
 const tempDirs: string[] = [];

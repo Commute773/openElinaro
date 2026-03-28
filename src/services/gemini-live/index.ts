@@ -21,8 +21,8 @@ import {
   buildPhoneCallSystemInstruction,
 } from "../phone-call-prompts";
 import { DEFAULT_PROFILE_ID as DEFAULT_SECRET_PROFILE_ID } from "../../config/service-constants";
-import { SecretStoreService } from "../secret-store-service";
-import { telemetry } from "../telemetry";
+import { SecretStoreService } from "../infrastructure/secret-store-service";
+import { telemetry } from "../infrastructure/telemetry";
 import { VonageService, getVonageWebhookPath } from "../vonage-service";
 
 import {

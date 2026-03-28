@@ -5,8 +5,8 @@ import { z } from "zod";
 import type { SubagentRun } from "../../domain/subagent-run";
 import type { ProjectsService } from "../../services/projects-service";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
-import { telemetry } from "../../services/telemetry";
-import { formatDurationMs } from "./service-tools";
+import { telemetry } from "../../services/infrastructure/telemetry";
+import { formatDurationMs } from "./tool-group-types";
 import type { ToolContext } from "../tool-registry";
 
 const toolTelemetry = telemetry.child({ component: "tool" });

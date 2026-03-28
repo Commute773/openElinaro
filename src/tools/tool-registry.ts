@@ -18,13 +18,13 @@ import {
   guardRuntimeContextSection,
 } from "./tool-output-pipeline";
 import type { AppProgressEvent } from "../domain/assistant";
-import { ConversationStore } from "../services/conversation-store";
-import { ConversationStateTransitionService } from "../services/conversation-state-transition-service";
+import { ConversationStore } from "../services/conversation/conversation-store";
+import { ConversationStateTransitionService } from "../services/conversation/conversation-state-transition-service";
 import { FinanceService } from "../services/finance-service";
 import {
   ElinaroTicketsService,
 } from "../services/elinaro-tickets-service";
-import { FilesystemService } from "../services/filesystem-service";
+import { FilesystemService } from "../services/infrastructure/filesystem-service";
 import { HealthTrackingService } from "../services/health-tracking-service";
 import { DeploymentVersionService } from "../services/deployment-version-service";
 import { EmailService } from "../services/email-service";
@@ -32,12 +32,12 @@ import { MediaService } from "../services/media-service";
 import { MemoryService } from "../services/memory-service";
 import {
   ModelService,
-} from "../services/model-service";
+} from "../services/models/model-service";
 import { ProjectsService } from "../services/projects-service";
 import type { ReflectionService } from "../services/reflection-service";
-import { RoutinesService } from "../services/routines-service";
-import { ShellService } from "../services/shell-service";
-import { AccessControlService } from "../services/access-control-service";
+import { RoutinesService } from "../services/scheduling/routines-service";
+import { ShellService } from "../services/infrastructure/shell-service";
+import { AccessControlService } from "../services/profiles";
 import { AlarmService } from "../services/alarm-service";
 import { ToolProgramService } from "../services/tool-program-service";
 import {
@@ -50,7 +50,7 @@ import { ALL_FUNCTION_BUILDERS } from "../functions/domains";
 import { OpenBrowserService } from "../services/openbrowser-service";
 import {
   SecretStoreService,
-} from "../services/secret-store-service";
+} from "../services/infrastructure/secret-store-service";
 import { WebFetchService } from "../services/web-fetch-service";
 import { Zigbee2MqttService } from "../services/zigbee2mqtt-service";
 import { WebSearchService } from "../services/web-search-service";
@@ -65,7 +65,7 @@ import { TelemetryQueryService } from "../services/telemetry-query-service";
 import { ToolResultStore } from "../services/tool-result-store";
 import { getToolLibraryDefinitions } from "../services/tool-library-service";
 import type { ToolLibraryDefinition } from "../services/tool-library-service";
-import { isRunningInsideManagedService, resolveRuntimePlatform, type RuntimePlatform } from "../services/runtime-platform";
+import { isRunningInsideManagedService, resolveRuntimePlatform, type RuntimePlatform } from "../services/infrastructure/runtime-platform";
 import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
 import { FeatureConfigService } from "../services/feature-config-service";
 import {

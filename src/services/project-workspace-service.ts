@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";
-import { telemetry as rootTelemetry, type TelemetryService } from "./telemetry";
+import { telemetry as rootTelemetry, type TelemetryService } from "./infrastructure/telemetry";
 import { timestamp } from "../utils/timestamp";
 
 const WORKSPACE_STORE_VERSION = 1;

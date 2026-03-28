@@ -5,7 +5,7 @@ import type { Readable } from "node:stream";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { assertSharedPythonRuntimeReady, getLocalVoicePythonModules } from "./python-runtime";
 import { resolveRuntimePath, resolveServicePath } from "./runtime-root";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 
 const DEFAULT_LOCAL_LLM_BASE_URL = "http://127.0.0.1:8800/v1";
 const DEFAULT_KOKORO_BASE_URL = "http://127.0.0.1:8801/v1";

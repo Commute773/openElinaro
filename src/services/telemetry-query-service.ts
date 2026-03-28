@@ -1,5 +1,5 @@
 import { TelemetryStore, type TelemetryQueryParams } from "./telemetry-store";
-import { TelemetryService, telemetry } from "./telemetry";
+import { TelemetryService, telemetry } from "./infrastructure/telemetry";
 
 type TelemetryQueryFormat = "text" | "json";
 

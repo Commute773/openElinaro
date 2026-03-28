@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
-import type { ActiveExtendedContextStatus, ContextWindowUsage, ModelProviderId, RecordedUsageDailyInspection, RecordedUsageInspection } from "../../services/model-service";
+import type { ActiveExtendedContextStatus, ContextWindowUsage, ModelProviderId, RecordedUsageDailyInspection, RecordedUsageInspection } from "../../services/models/model-service";
 import type { AgentToolScope } from "../../domain/tool-catalog";
 import { composeSystemPrompt } from "../../services/system-prompt-service";
 import { renderExtendedContextStatus, formatTokenCount } from "./config-functions";
@@ -362,7 +362,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
 
       const compacted = await fnCtx.services.transitions.compactForContinuation({
         conversationKey,
-        onProgress: async (message) => report(fnCtx.toolContext, message, input),
+        onProgress: async (message: string) => report(fnCtx.toolContext, message, input),
       });
 
       return [
@@ -484,7 +484,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
       const freshConversation = await fnCtx.services.transitions.startFreshConversation({
         conversationKey,
         flushMemory,
-        onProgress: async (message) => report(context, message, input),
+        onProgress: async (message: string) => report(context, message, input),
       });
 
       const resultMessage = [

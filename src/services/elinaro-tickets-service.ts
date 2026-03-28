@@ -1,8 +1,8 @@
 import net from "node:net";
 import { spawn } from "node:child_process";
 import { getRuntimeConfig } from "../config/runtime-config";
-import { SecretStoreService } from "./secret-store-service";
-import { telemetry } from "./telemetry";
+import { SecretStoreService } from "./infrastructure/secret-store-service";
+import { telemetry } from "./infrastructure/telemetry";
 
 const ticketsTelemetry = telemetry.child({ component: "tickets" });
 

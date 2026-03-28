@@ -23,13 +23,13 @@ import type {
   ChatPromptContentBlock,
 } from "../../domain/assistant";
 import type { Weekday } from "../../domain/routines";
-import type { ModelProviderId } from "../../services/model-service";
+import type { ModelProviderId } from "../../services/models/model-service";
 import { buildChatPromptContent } from "../../services/message-content-service";
 import { AgentHealthcheckService } from "../../services/agent-healthcheck-service";
 import { DISCORD_MAX_ATTACHMENT_BYTES as MAX_IMAGE_ATTACHMENT_BYTES, DISCORD_MAX_TEXT_ATTACHMENT_BYTES as MAX_TEXT_ATTACHMENT_BYTES } from "../../config/service-constants";
 import { sanitizeDiscordText } from "../../services/discord-response-service";
-import { SecretStoreService } from "../../services/secret-store-service";
-import { telemetry } from "../../services/telemetry";
+import { SecretStoreService } from "../../services/infrastructure/secret-store-service";
+import { telemetry } from "../../services/infrastructure/telemetry";
 import { compressImageForApi } from "../../utils/image-compression";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { DiscordAuthSessionManager } from "./auth-session-manager";

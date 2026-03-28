@@ -25,11 +25,11 @@ let previousCwd = "";
 let previousRootDirEnv: string | undefined;
 let tempRoot = "";
 
-let agentChatModule: typeof import("./agent-chat-service");
-let conversationMemoryModule: typeof import("./conversation-memory-service");
-let conversationStoreModule: typeof import("./conversation-store");
+let agentChatModule: typeof import("./conversation/agent-chat-service");
+let conversationMemoryModule: typeof import("./conversation/conversation-memory-service");
+let conversationStoreModule: typeof import("./conversation/conversation-store");
 let memoryServiceModule: typeof import("./memory-service");
-let profileServiceModule: typeof import("./profile-service");
+let profileServiceModule: typeof import("./profiles/profile-service");
 let systemPromptModule: typeof import("./system-prompt-service");
 
 type RequestCapture = {
@@ -167,9 +167,9 @@ function createHarness(options: {
     return new AIMessage(`E2E reply: ${humanMessages.at(-1) ?? ""}`);
   }, { providerId: "scripted-memory-e2e" });
 
-  const chat = new agentChatModule.AgentChatService(
+  const chat = new agentChatModule.AgentChatService({
     connector,
-    {
+    routineTools: {
       consumePendingBackgroundExecNotifications() {
         return [];
       },
@@ -177,7 +177,7 @@ function createHarness(options: {
         return null;
       },
     } as any,
-    {
+    toolResolver: {
       resolveAllForChat() {
         return { entries: [] };
       },
@@ -185,14 +185,14 @@ function createHarness(options: {
         return { entries: [], tools: [] };
       },
     } as any,
-    {
+    transitions: {
       async compactForContinuation() {
         throw new Error("Compaction should not run in memory e2e tests.");
       },
     } as any,
     conversations,
     systemPrompts,
-    {
+    models: {
       async inspectContextWindowUsage() {
         return {
           usedTokens: 128,
@@ -203,7 +203,7 @@ function createHarness(options: {
         };
       },
     } as any,
-    {
+    memory: {
       async buildRecallContext(params: {
         conversationKey: string;
         userContent: string;
@@ -216,7 +216,7 @@ function createHarness(options: {
         return recallService.buildRecallContext(params);
       },
     } as any,
-  );
+  });
 
   return {
     chat: new Proxy(chat, {
@@ -271,11 +271,11 @@ beforeAll(async () => {
   copyMachineTestFile("memory/index.root.json");
   copyMachineTestDirectory("memory/documents/root");
 
-  agentChatModule = await importFresh<typeof import("./agent-chat-service")>("src/services/agent-chat-service.ts");
-  conversationMemoryModule = await importFresh<typeof import("./conversation-memory-service")>("src/services/conversation-memory-service.ts");
-  conversationStoreModule = await importFresh<typeof import("./conversation-store")>("src/services/conversation-store.ts");
+  agentChatModule = await importFresh<typeof import("./conversation/agent-chat-service")>("src/services/conversation/agent-chat-service.ts");
+  conversationMemoryModule = await importFresh<typeof import("./conversation/conversation-memory-service")>("src/services/conversation/conversation-memory-service.ts");
+  conversationStoreModule = await importFresh<typeof import("./conversation/conversation-store")>("src/services/conversation/conversation-store.ts");
   memoryServiceModule = await importFresh<typeof import("./memory-service")>("src/services/memory-service.ts");
-  profileServiceModule = await importFresh<typeof import("./profile-service")>("src/services/profile-service.ts");
+  profileServiceModule = await importFresh<typeof import("./profiles/profile-service")>("src/services/profiles/profile-service.ts");
   systemPromptModule = await importFresh<typeof import("./system-prompt-service")>("src/services/system-prompt-service.ts");
 });
 

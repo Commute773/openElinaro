@@ -4,7 +4,7 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 import type { ProfileRecord } from "../domain/profiles";
 import { MemoryService } from "./memory-service";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { getServiceRootDir, getUserDataRootDir, resolveRuntimePath } from "./runtime-root";
 
 const LONGMEMEVAL_DATASET_URLS = {

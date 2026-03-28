@@ -14,12 +14,12 @@ import {
   type ElinaroTicket,
 } from "../../services/elinaro-tickets-service";
 import { hasProviderAuth, getAuthStatus } from "../../auth/store";
-import { ProfileService } from "../../services/profile-service";
+import { ProfileService } from "../../services/profiles";
 import {
   AmbiguousModelIdentifierError,
   ModelService,
   type ModelProviderId,
-} from "../../services/model-service";
+} from "../../services/models/model-service";
 import type { ThinkingLevel } from "@mariozechner/pi-ai";
 
 // ---------------------------------------------------------------------------

@@ -1,10 +1,10 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import type { OAuthCredentials } from "@mariozechner/pi-ai/oauth";
-import { getDefaultProfileId } from "../services/profile-service";
+import { getDefaultProfileId } from "../services/profiles";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../services/runtime-root";
-import { type ProviderAuthSecret, SecretStoreService } from "../services/secret-store-service";
-import { telemetry } from "../services/telemetry";
+import { type ProviderAuthSecret, SecretStoreService } from "../services/infrastructure/secret-store-service";
+import { telemetry } from "../services/infrastructure/telemetry";
 import { timestamp } from "../utils/timestamp";
 
 export type ProviderId = "openai-codex" | "claude";

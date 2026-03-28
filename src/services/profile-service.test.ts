@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { ProfileRecord } from "../domain/profiles";
-import { ProfileService, getDefaultProfileId } from "./profile-service";
+import { ProfileService, getDefaultProfileId } from "./profiles";
 
 let runtimeRoot = "";
 let previousRootDirEnv: string | undefined;

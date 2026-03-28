@@ -2,9 +2,9 @@ import crypto from "node:crypto";
 import { rm, stat, mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { ProfileRecord } from "../domain/profiles";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import {
   buildDocumentFrequencies,

@@ -1,5 +1,69 @@
 # Deployments
 
+## 2026.03.28.7
+- Released at: 2026-03-28T01:08:27Z
+- Release id: 20260328T010827Z-fd08b59
+- Previous version: 2026.03.28.6
+- Trigger: ci/release workflow
+
+- docs: add src/functions/ to repo layout map
+
+## 2026.03.28.6
+- Released at: 2026-03-28T01:05:59Z
+- Release id: 20260328T010559Z-6111537
+- Previous version: 2026.03.28.5
+- Trigger: ci/release workflow
+
+- refactor: move conversation services into domain subdirectory
+
+## 2026.03.28.5
+- Released at: 2026-03-28T01:01:33Z
+- Release id: 20260328T010133Z-de3e7fd
+- Previous version: 2026.03.28.4
+- Trigger: ci/release workflow
+
+- refactor: move infrastructure services into domain subdirectory
+
+## 2026.03.28.4
+- Released at: 2026-03-28T00:57:35Z
+- Release id: 20260328T005735Z-16db973
+- Previous version: 2026.03.28.3
+- Trigger: ci/release workflow
+
+- refactor: move scheduling services into domain subdirectory
+
+## 2026.03.28.3
+- Released at: 2026-03-28T00:55:39Z
+- Release id: 20260328T005539Z-af796a2
+- Previous version: 2026.03.28.2
+- Trigger: ci/release workflow
+
+- refactor: extract ChatDependencies facade from AgentChatService constructor
+- refactor: move profiles services into domain subdirectory
+- refactor: move models services into domain subdirectory
+- test: add unit tests for generate-openapi function layer module
+- docs: document function-layer generated API routes in api.md
+- refactor: wire ServiceContainer into createRuntimeScope
+- refactor: delete 14 legacy tool group files superseded by function layer
+- test: add unit tests for generate-api-routes function layer
+- test: add unit tests for FunctionRegistry
+
+## 2026.03.28.2
+- Released at: 2026-03-28T00:48:21Z
+- Release id: 20260328T004821Z-ac373ee
+- Previous version: 2026.03.28
+- Trigger: ci/release workflow
+
+- test: add unit tests for generate-tools function layer (#151)
+
+## 2026.03.28
+- Released at: 2026-03-28T00:46:51Z
+- Release id: 20260328T004651Z-91c3d9a
+- Previous version: 2026.03.27.40
+- Trigger: ci/release workflow
+
+- docs: add function layer architecture decision record (#150)
+
 ## 2026.03.27.40
 - Released at: 2026-03-27T22:07:17Z
 - Release id: 20260327T220717Z-d634657

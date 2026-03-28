@@ -3,8 +3,8 @@ import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import PostalMime, { type Address as PostalAddress, type Email as ParsedEmail } from "postal-mime";
 import { getRuntimeConfig } from "../config/runtime-config";
-import { SecretStoreService } from "./secret-store-service";
-import { telemetry } from "./telemetry";
+import { SecretStoreService } from "./infrastructure/secret-store-service";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 
 const DEFAULT_EMAIL_PROVIDER = "IMAP/SMTP";

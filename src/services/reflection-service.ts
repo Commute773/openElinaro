@@ -1,9 +1,9 @@
 import type { ProfileRecord } from "../domain/profiles";
-import type { RoutinesService } from "./routines-service";
-import { ConversationStore } from "./conversation-store";
+import type { RoutinesService } from "./scheduling/routines-service";
+import { ConversationStore } from "./conversation/conversation-store";
 import { MemoryService } from "./memory-service";
-import { ModelService } from "./model-service";
-import { telemetry } from "./telemetry";
+import { ModelService } from "./models/model-service";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { ReflectionPromptService } from "./reflection-prompt-service";
 import { ReflectionStateService } from "./reflection-state-service";

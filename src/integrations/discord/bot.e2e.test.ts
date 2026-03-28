@@ -20,18 +20,18 @@ let previousRootDirEnv: string | undefined;
 
 let botModule: typeof import("./bot");
 let authSessionManagerModule: typeof import("./auth-session-manager");
-let profileServiceModule: typeof import("../../services/profile-service");
+let profileServiceModule: typeof import("../../services/profiles/profile-service");
 let projectsServiceModule: typeof import("../../services/projects-service");
-let accessControlModule: typeof import("../../services/access-control-service");
-let routinesServiceModule: typeof import("../../services/routines-service");
-let conversationStoreModule: typeof import("../../services/conversation-store");
+let accessControlModule: typeof import("../../services/profiles/access-control-service");
+let routinesServiceModule: typeof import("../../services/scheduling/routines-service");
+let conversationStoreModule: typeof import("../../services/conversation/conversation-store");
 let systemPromptModule: typeof import("../../services/system-prompt-service");
 let memoryServiceModule: typeof import("../../services/memory-service");
-let modelServiceModule: typeof import("../../services/model-service");
-let transitionServiceModule: typeof import("../../services/conversation-state-transition-service");
+let modelServiceModule: typeof import("../../services/models/model-service");
+let transitionServiceModule: typeof import("../../services/conversation/conversation-state-transition-service");
 let toolRegistryModule: typeof import("../../tools/tool-registry");
 let toolResolutionModule: typeof import("../../services/tool-resolution-service");
-let agentChatModule: typeof import("../../services/agent-chat-service");
+let agentChatModule: typeof import("../../services/conversation/agent-chat-service");
 
 const liveStateBefore = {
   authStore: readOptionalFile(path.join(machineTestRoot, "auth-store.json")),
@@ -374,20 +374,20 @@ function createDiscordAppHarness(options?: {
     access,
   );
   const toolResolver = new toolResolutionModule.ToolResolutionService(toolRegistry);
-  const chat = new agentChatModule.AgentChatService(
+  const chat = new agentChatModule.AgentChatService({
     connector,
-    toolRegistry,
+    routineTools: toolRegistry,
     toolResolver,
     transitions,
     conversations,
     systemPrompts,
     models,
-    {
+    memory: {
       async buildRecallContext() {
         return "";
       },
     },
-  );
+  });
 
   return {
     profile,
@@ -674,18 +674,18 @@ if (RUN_CHILD_SUITE) {
 
     botModule = await importFresh("src/integrations/discord/bot.ts");
     authSessionManagerModule = await importFresh("src/integrations/discord/auth-session-manager.ts");
-    profileServiceModule = await importFresh("src/services/profile-service.ts");
+    profileServiceModule = await importFresh("src/services/profiles/profile-service.ts");
     projectsServiceModule = await importFresh("src/services/projects-service.ts");
-    accessControlModule = await importFresh("src/services/access-control-service.ts");
-    routinesServiceModule = await importFresh("src/services/routines-service.ts");
-    conversationStoreModule = await importFresh("src/services/conversation-store.ts");
+    accessControlModule = await importFresh("src/services/profiles/access-control-service.ts");
+    routinesServiceModule = await importFresh("src/services/scheduling/routines-service.ts");
+    conversationStoreModule = await importFresh("src/services/conversation/conversation-store.ts");
     systemPromptModule = await importFresh("src/services/system-prompt-service.ts");
     memoryServiceModule = await importFresh("src/services/memory-service.ts");
-    modelServiceModule = await importFresh("src/services/model-service.ts");
-    transitionServiceModule = await importFresh("src/services/conversation-state-transition-service.ts");
+    modelServiceModule = await importFresh("src/services/models/model-service.ts");
+    transitionServiceModule = await importFresh("src/services/conversation/conversation-state-transition-service.ts");
     toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
     toolResolutionModule = await importFresh("src/services/tool-resolution-service.ts");
-    agentChatModule = await importFresh("src/services/agent-chat-service.ts");
+    agentChatModule = await importFresh("src/services/conversation/agent-chat-service.ts");
   });
 
   afterAll(() => {

@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import { getLocalTimezone } from "./local-time-service";
 import { openDatabase, withSqliteRetry } from "../utils/sqlite-helpers";
 import { resolveRuntimePath } from "./runtime-root";
-import { telemetry as rootTelemetry, type TelemetryService } from "./telemetry";
+import { telemetry as rootTelemetry, type TelemetryService } from "./infrastructure/telemetry";
 
 export type AlarmKind = "alarm" | "timer";
 export type AlarmState = "pending" | "delivered" | "cancelled" | "all";

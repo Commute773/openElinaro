@@ -11,7 +11,7 @@ import type {
 } from "../domain/tool-program";
 import type { ToolContext } from "../tools/tool-registry";
 import { stringifyToolErrorEnvelope } from "./tool-error-service";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 
 const DEFAULT_TIMEOUT_MS = 45_000;
