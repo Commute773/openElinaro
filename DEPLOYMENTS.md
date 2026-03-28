@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.17
+- Released at: 2026-03-28T02:25:20Z
+- Release id: 20260328T022520Z-fdd516d
+- Previous version: 2026.03.28.16
+- Trigger: ci/release workflow
+
+- refactor: replace as-any casts with proper types in tool/function layer
+
 ## 2026.03.28.16
 - Released at: 2026-03-28T02:20:09Z
 - Release id: 20260328T022009Z-a84702e
