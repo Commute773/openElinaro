@@ -37,6 +37,7 @@ That means `projects/` is part of the assistant's world model, but not part of t
 - `src/utils/`: shared utility modules (`timestamp.ts`, `text-utils.ts`, `file-utils.ts`, `time-helpers.ts`, `telemetry-helpers.ts`, `sqlite-helpers.ts`)
 - `src/connectors/`: provider/model connectors
 - `src/domain/`: schemas, runtime domain objects, and structured error types (`errors.ts`)
+- `src/functions/`: unified function layer — `FunctionDefinition` types (`define-function.ts`), domain builders (`domains/`), a central registry (`function-registry.ts`), and generators that produce agent tools (`generate-tools.ts`), HTTP API routes (`generate-api-routes.ts`), Discord commands (`generate-discord-commands.ts`), and OpenAPI specs (`generate-openapi.ts`) from the same function definitions
 - `src/auth/`: provider-specific auth helpers
 - `src/integrations/`: external surfaces such as Discord and the local HTTP webhook listener
 - `src/workers/`: background worker entrypoints
