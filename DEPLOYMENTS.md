@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.7
+- Released at: 2026-03-28T01:08:27Z
+- Release id: 20260328T010827Z-fd08b59
+- Previous version: 2026.03.28.6
+- Trigger: ci/release workflow
+
+- docs: add src/functions/ to repo layout map
+
 ## 2026.03.28.6
 - Released at: 2026-03-28T01:05:59Z
 - Release id: 20260328T010559Z-6111537
