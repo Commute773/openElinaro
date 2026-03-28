@@ -83,7 +83,7 @@ const DEFAULT_COMMUNICATIONS_VONAGE = {
 const DEFAULT_COMMUNICATIONS_GEMINI = {
   apiKeySecretRef: "gemini.apiKey",
   secretProfileId: "root",
-  model: "gemini-2.5-flash-native-audio-preview-12-2025",
+  model: "gemini-3.1-flash-native-audio-preview-12-2025",
   voiceName: "",
   prefixPaddingMs: 20,
   silenceDurationMs: 100,
@@ -204,7 +204,7 @@ export const RuntimeConfigSchema = z.object({
     geminiLive: z.object({
       apiKeySecretRef: z.string().min(1).default("gemini.apiKey"),
       secretProfileId: z.string().min(1).default("root"),
-      model: z.string().min(1).default("gemini-2.5-flash-native-audio-preview-12-2025"),
+      model: z.string().min(1).default("gemini-3.1-flash-native-audio-preview-12-2025"),
       voiceName: z.string().default(""),
       prefixPaddingMs: z.number().int().nonnegative().default(20),
       silenceDurationMs: z.number().int().nonnegative().default(100),

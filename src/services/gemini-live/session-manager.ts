@@ -20,7 +20,7 @@ import type { SecretStoreService } from "../infrastructure/secret-store-service"
 // ---------------------------------------------------------------------------
 
 const DEFAULT_GEMINI_SECRET_REF = "gemini.apiKey";
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
+const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-native-audio-preview-12-2025";
 const DEFAULT_CALLER_PREFIX_PADDING_MS = 20;
 const DEFAULT_CALLER_SILENCE_DURATION_MS = 100;
 const DEFAULT_GEMINI_LIVE_THINKING_BUDGET = 0;
