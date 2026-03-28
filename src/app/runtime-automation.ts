@@ -3,6 +3,7 @@ import type { AppResponse } from "../domain/assistant";
 import type { ProfileRecord } from "../domain/profiles";
 import { resolveDiscordResponse } from "../services/discord-response-service";
 import { RecentThreadContextService, shouldIncludeRecentThreadContext } from "../services/recent-thread-context-service";
+import { wrapInjectedMessage } from "../services/injected-message-service";
 import type { ProfileService } from "../services/profiles";
 import type { ConversationStore } from "../services/conversation/conversation-store";
 import { WorkPlanningService } from "../services/work-planning-service";
@@ -46,7 +47,9 @@ export async function buildThreadStartSystemContext(
   ).buildThreadStartContext();
   const reflectionContext = await scope.reflection.buildThreadBootstrapContext();
   const sections = [reflectionContext, recentThreadContext].filter(Boolean);
-  return sections.length > 0 ? sections.join("\n\n") : undefined;
+  return sections.length > 0
+    ? wrapInjectedMessage("recent_context", sections.join("\n\n"))
+    : undefined;
 }
 
 export function buildHeartbeatWorkFocus(

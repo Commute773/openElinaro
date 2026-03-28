@@ -195,6 +195,7 @@ export const ROUTINE_TOOL_NAMES = [
   "steer_agent",
   "cancel_agent",
   "agent_status",
+  "agent_summary",
   "read_agent_terminal",
 ] as const;
 
@@ -266,6 +267,7 @@ const BASE_USER_FACING_TOOL_NAMES = [
   "secret_generate_password",
   "secret_delete",
   "agent_status",
+  "agent_summary",
   "read_agent_terminal",
   "launch_agent",
   "resume_agent",

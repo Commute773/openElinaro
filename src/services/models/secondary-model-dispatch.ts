@@ -22,6 +22,7 @@ import {
   type HeartbeatModelSelection,
   type MemoryModelSelection,
   type ModelProviderId,
+  type ReflectionModelSelection,
   type ToolSummarizerSelection,
 } from "./model-service";
 
@@ -38,6 +39,11 @@ const DEFAULT_TOOL_SUMMARIZER_MODEL_IDS: Record<ModelProviderId, string> = {
 const DEFAULT_HEARTBEAT_MODEL_IDS: Record<ModelProviderId, string> = {
   "openai-codex": "gpt-5.1-codex-mini",
   claude: "claude-haiku-4-5",
+};
+
+const DEFAULT_REFLECTION_MODEL_IDS: Record<ModelProviderId, string> = {
+  "openai-codex": "gpt-5.1-codex-mini",
+  claude: "claude-sonnet-4-5",
 };
 
 type ActiveModelInferenceOptions = ({
@@ -121,6 +127,17 @@ export class SecondaryModelDispatch {
       providerId,
       modelId: this.profile.heartbeatModelId ?? DEFAULT_HEARTBEAT_MODEL_IDS[providerId],
       thinkingLevel: "low",
+    };
+  }
+
+  getReflectionSelection(): ReflectionModelSelection {
+    const providerId = this.profile.reflectionProvider ??
+      this.profile.preferredProvider ??
+      DEFAULT_ACTIVE_MODEL_PROVIDER_ID;
+    return {
+      providerId,
+      modelId: this.profile.reflectionModelId ?? DEFAULT_REFLECTION_MODEL_IDS[providerId],
+      thinkingLevel: "minimal",
     };
   }
 
@@ -281,8 +298,9 @@ export class SecondaryModelDispatch {
     userPrompt: string;
     usagePurpose: string;
     sessionIdPrefix?: string;
+    selection?: Pick<ActiveModelSelection, "providerId" | "modelId" | "thinkingLevel">;
   }) {
-    const selection = this.getMemorySelection();
+    const selection = params.selection ?? this.getMemorySelection();
     return traceSpan(
       "model.generate_memory_text",
       async () => {

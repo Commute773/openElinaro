@@ -141,7 +141,7 @@ export class ReflectionService {
     private readonly routines: RoutinesService,
     private readonly conversations: ConversationStore,
     private readonly memory: MemoryService,
-    private readonly models: Pick<ModelService, "generateMemoryText">,
+    private readonly models: Pick<ModelService, "generateMemoryText" | "getReflectionSelection">,
     private readonly soul?: Pick<import("./soul-service").SoulService, "queueScheduledRewriteIfEligible">,
   ) {}
 
@@ -304,6 +304,7 @@ export class ReflectionService {
           ].filter(Boolean).join("\n"),
           usagePurpose: `reflection_${params.trigger}`,
           sessionIdPrefix: `reflection-${params.trigger}`,
+          selection: this.models.getReflectionSelection(),
         });
 
         const parsed = JSON.parse(extractJsonObject(responseText)) as ReflectionResponse;

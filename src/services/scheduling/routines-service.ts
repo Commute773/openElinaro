@@ -36,8 +36,6 @@ import {
   reminderStage,
   attentionLevelFromAssessment,
   shouldSuppressForContext,
-  updateStreak,
-  computeStreakFromHistory,
   sortAssessments,
   toHeartbeatReminderCandidate,
   formatSchedule,
@@ -126,6 +124,7 @@ export class RoutinesService {
     status?: RoutineStatus;
     enabled?: boolean;
     description?: string;
+    notes?: string;
     dose?: string;
     labels?: string[];
     jobId?: string;
@@ -157,7 +156,7 @@ export class RoutinesService {
       priority: input.priority ?? "medium",
       status,
       enabled: input.enabled ?? (status !== "paused" && status !== "archived" && status !== "completed"),
-      description: input.description,
+      description: input.description ?? input.notes,
       dose: input.dose,
       labels: input.labels,
       jobId: scope.jobId,
@@ -244,6 +243,7 @@ export class RoutinesService {
       profileId?: string;
       title?: string;
       description?: string;
+      notes?: string;
       priority?: RoutinePriority;
       kind?: RoutineItemKind;
       labels?: string[];
@@ -275,7 +275,7 @@ export class RoutinesService {
     });
     item.title = updates.title ?? item.title;
     item.profileId = profileId;
-    item.description = updates.description ?? item.description;
+    item.description = updates.description ?? updates.notes ?? item.description;
     item.priority = updates.priority ?? item.priority;
     item.kind = nextKind;
     item.labels = updates.labels ?? item.labels;
@@ -320,7 +320,6 @@ export class RoutinesService {
 
   formatItem(item: RoutineItem) {
     const blocked = item.blockedBy?.length ? ` blocked-by:${item.blockedBy.join(",")}` : "";
-    const streak = item.state.streak > 0 ? ` streak:${item.state.streak}` : "";
     const alarmTag = item.alarm ? " alarm" : "";
     const scope = item.projectId
       ? ` profile:${item.profileId} project:${item.projectId}${item.jobId ? ` job:${item.jobId}` : ""}`
@@ -333,7 +332,7 @@ export class RoutinesService {
       `${item.kind}/${item.priority}`,
       item.status,
       formatSchedule(item.schedule),
-      scope + blocked + streak + alarmTag,
+      scope + blocked + alarmTag,
     ]
       .filter(Boolean)
       .join(" | ");
@@ -643,9 +642,6 @@ export class RoutinesService {
     if (isTodoKind(item.kind)) {
       item.status = "completed";
       item.enabled = false;
-      item.state.streak = 0;
-    } else {
-      item.state.streak = updateStreak(item, now);
     }
     if (item.schedule.kind === "once" && !isTodoKind(item.kind)) {
       item.status = "archived";
@@ -681,7 +677,6 @@ export class RoutinesService {
 
     item.state.lastCompletedAt =
       item.state.completionHistory[item.state.completionHistory.length - 1];
-    item.state.streak = computeStreakFromHistory(item);
     item.state.reminderCountForOccurrence = 0;
     item.state.activeOccurrenceKey = undefined;
 

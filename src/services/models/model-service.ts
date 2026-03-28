@@ -146,6 +146,12 @@ export interface HeartbeatModelSelection {
   thinkingLevel: ThinkingLevel;
 }
 
+export interface ReflectionModelSelection {
+  providerId: ModelProviderId;
+  modelId: string;
+  thinkingLevel: ThinkingLevel;
+}
+
 interface ModelServiceOptions {
   usageTracking?: UsageTrackingService;
   cacheMissMonitor?: CacheMissMonitor;
@@ -815,6 +821,10 @@ export class ModelService {
     return this.secondaryDispatch.getHeartbeatSelection();
   }
 
+  getReflectionSelection(): ReflectionModelSelection {
+    return this.secondaryDispatch.getReflectionSelection();
+  }
+
   async getActiveModel(): Promise<ActiveModelSelection> {
     const store = await readStore();
     const activeModel = getStoredActiveModel(
@@ -974,6 +984,7 @@ export class ModelService {
     userPrompt: string;
     usagePurpose: string;
     sessionIdPrefix?: string;
+    selection?: Pick<ActiveModelSelection, "providerId" | "modelId" | "thinkingLevel">;
   }) {
     return this.secondaryDispatch.generateMemoryText(params);
   }

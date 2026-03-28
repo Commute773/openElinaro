@@ -284,6 +284,7 @@ describe("AgentChatService", () => {
 
     expect(result.message).toContain("Acknowledged:");
     expect(requests[0]?.humanMessages).toHaveLength(1);
+    expect(requests[0]?.humanMessages[0]).toContain("<INJECTED_MESSAGE generated_by=\\\"memory_recall\\\">");
     expect(requests[0]?.humanMessages[0]).toContain("<recalled_memory>");
     expect(requests[0]?.humanMessages[0]).toContain("User prefers terse replies");
     expect(requests[0]?.humanMessages[0]).toContain("How should you answer me?");

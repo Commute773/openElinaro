@@ -58,7 +58,9 @@ describe("AutonomousTimeService", () => {
     expect(service.getNextRunAt(beforeFour)?.toISOString()).toBe("2026-03-22T08:00:00.000Z");
 
     expect(service.isEligible(afterFour)).toBe(true);
-    expect((await service.buildInjectedMessage(afterFour)).text).toContain("Write in your journal before you stop.");
+    const injected = await service.buildInjectedMessage(afterFour);
+    expect(injected.text).toContain("<INJECTED_MESSAGE generated_by=\"autonomous_time\">");
+    expect(injected.text).toContain("Write in your journal before you stop.");
 
     service.markTriggered(afterFour);
 

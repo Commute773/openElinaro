@@ -3,6 +3,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { summarizeAgentRun } from "../../services/subagent-summary-service";
 
 const AGENT_API_AUTH = { access: "anyone" as const, behavior: "uniform" as const };
 
@@ -78,6 +79,30 @@ export const buildAgentApiFunctions: FunctionDomainBuilder = (_ctx) => [
       queryParams: z.object({
         lines: z.string().optional(),
       }),
+    },
+  }),
+
+  defineFunction({
+    name: "api_agent_summary",
+    description: "Summarize a running or recently completed agent.",
+    input: z.object({
+      id: z.string().min(1),
+    }),
+    surfaces: ["api"],
+    handler: async (input, fnCtx) => ({
+      runId: input.id,
+      summary: await summarizeAgentRun({
+        runId: input.id,
+        subagents: fnCtx.services.subagents,
+        models: fnCtx.services.models,
+      }),
+    }),
+    auth: AGENT_API_AUTH,
+    domains: ["agents"],
+    agentScopes: [],
+    http: {
+      method: "GET",
+      path: "/api/g2/agents/:id/summary",
     },
   }),
 

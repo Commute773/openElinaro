@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ScheduledAlarm } from "./alarm-service";
+import { wrapInjectedMessage } from "./injected-message-service";
 import { formatLocalTime } from "./local-time-service";
 import { getAssistantContextRoot } from "./runtime-user-content";
 import { timestamp } from "../utils/timestamp";
@@ -46,7 +47,7 @@ export class AlarmNotificationService {
 
   buildInjectedMessage(alarm: ScheduledAlarm, reference: Date = new Date()) {
     const snapshot = this.load();
-    return [
+    return wrapInjectedMessage("alarm", [
       "Automated alarm notification trigger. This is an internal runtime event, not a user-authored Discord message.",
       `Triggered at: ${reference.toISOString()}`,
       `Current local time: ${formatLocalTime(reference, alarm.timezone)}`,
@@ -62,7 +63,7 @@ export class AlarmNotificationService {
         `Created at: ${alarm.createdAt}`,
         `Alarm id: ${alarm.id}`,
       ].join("\n"),
-    ].join("\n\n");
+    ].join("\n\n"));
   }
 
   normalizeAssistantReply(message: string | undefined) {

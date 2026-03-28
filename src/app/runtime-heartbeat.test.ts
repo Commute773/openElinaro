@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { OpenElinaroApp } from "./runtime";
+import { wrapInjectedMessage } from "../services/injected-message-service";
 
 type HeartbeatAppOverrides = {
   appTelemetry: {
@@ -147,7 +148,10 @@ function createAppDouble(options?: {
       if (heartbeatOptions?.deliveryRequirement) {
         deliveryRequirements.push(heartbeatOptions.deliveryRequirement);
       }
-      const message = `heartbeat:${heartbeatOptions?.workFocus ?? "none"}:${heartbeatOptions?.deliveryRequirement ?? "none"}`;
+      const message = wrapInjectedMessage(
+        "heartbeat",
+        `heartbeat:${heartbeatOptions?.workFocus ?? "none"}:${heartbeatOptions?.deliveryRequirement ?? "none"}`,
+      );
       injectedMessages.push(message);
       return message;
     },
@@ -214,6 +218,7 @@ describe("OpenElinaroApp.runHourlyHeartbeat", () => {
     const response = await harness.app.runHourlyHeartbeat("conversation-1");
 
     expect(harness.getInjectedWorkFocus()).toContain("Finish the operator demo.");
+    expect(harness.getInjectedMessages()[0]).toContain("<INJECTED_MESSAGE generated_by=\"heartbeat\">");
     expect(harness.getInjectedMessages()[0]).toContain("Work focus (restricted)");
     expect(response.message).toBe("");
     expect(response.completed).toBe(true);

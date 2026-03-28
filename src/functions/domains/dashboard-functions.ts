@@ -9,7 +9,7 @@ const DASHBOARD_AUTH = { access: "anyone" as const, behavior: "uniform" as const
 export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
   defineFunction({
     name: "api_home",
-    description: "Dashboard summary: time context, active agent count, streak, next routine, pending notification count.",
+    description: "Dashboard summary: time context, active agent count, next routine, and pending notification count.",
     input: z.object({}),
     surfaces: ["api"],
     handler: async (_input, fnCtx) => {
@@ -21,14 +21,6 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
       );
 
       const assessment = routines.assessNow();
-      const allRoutines = routines.listItems({ status: "active" });
-
-      let maxStreak = 0;
-      for (const item of allRoutines) {
-        if (item.state.streak > maxStreak) {
-          maxStreak = item.state.streak;
-        }
-      }
 
       const upcoming = assessment.items.find((a) => a.state === "upcoming");
       const nextRoutine = upcoming
@@ -46,7 +38,6 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
       return {
         timeContext: assessment.context,
         activeAgentCount: activeAgents.length,
-        streak: maxStreak,
         nextRoutine,
         pendingNotificationCount,
       };

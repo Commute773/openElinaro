@@ -7,6 +7,7 @@ import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
 import type { SubagentRun } from "../../domain/subagent-run";
 import type { ProjectsService } from "../../services/projects-service";
+import { summarizeAgentRun } from "../../services/subagent-summary-service";
 import { formatDurationMs } from "./service-functions";
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,10 @@ const agentStatusSchema = z.object({
   capture: z.boolean().optional().describe("When true, include the last N lines of the agent's tmux pane output."),
   captureLines: z.number().int().min(1).max(200).optional().describe("Number of tmux pane lines to capture. Defaults to 50."),
   format: responseFormatSchema.optional(),
+});
+
+const agentSummarySchema = z.object({
+  runId: z.string().min(1),
 });
 
 // ---------------------------------------------------------------------------
@@ -372,6 +377,23 @@ export const buildSubagentFunctions: FunctionDomainBuilder = (ctx) => {
       domains: SUBAGENT_DOMAINS,
       agentScopes: SUBAGENT_SCOPES,
       examples: ["read agent terminal output", "see what an agent is doing"],
+    }),
+
+    defineFunction({
+      name: "agent_summary",
+      description:
+        "Summarize a background agent's current terminal state or recent failure/completion context. Uses the full terminal buffer when available and falls back to stored run metadata when the tmux window is gone.",
+      input: agentSummarySchema,
+      handler: async (input, fnCtx) =>
+        summarizeAgentRun({
+          runId: input.runId,
+          subagents: fnCtx.services.subagents,
+          models: fnCtx.services.models,
+        }),
+      auth: { ...SUBAGENT_AUTH, note: "Only summaries for runs visible to the active profile are returned." },
+      domains: SUBAGENT_DOMAINS,
+      agentScopes: SUBAGENT_SCOPES,
+      examples: ["summarize what a subagent is doing", "summarize why a run failed"],
     }),
   ];
 };

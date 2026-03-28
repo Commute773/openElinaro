@@ -153,7 +153,10 @@ export class OpenElinaroApp {
         // Capture tmux pane output for additional diagnostics (window stays
         // alive thanks to remain-on-exit)
         try {
-          const paneOutput = await this.tmux.capturePane(event.runId, 80);
+          let paneOutput = await this.tmux.readTerminal(event.runId);
+          if (!paneOutput.trim()) {
+            paneOutput = await this.tmux.capturePane(event.runId, 80);
+          }
           if (paneOutput) {
             errorParts.push(`\nTerminal output (last 80 lines):\n${paneOutput}`);
           }

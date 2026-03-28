@@ -1,5 +1,6 @@
 import type { ProfileRecord } from "../domain/profiles";
 import type { RoutinesService } from "./scheduling/routines-service";
+import { wrapInjectedMessage } from "./injected-message-service";
 import { formatLocalTime } from "./local-time-service";
 import { AutonomousTimePromptService } from "./autonomous-time-prompt-service";
 import { AutonomousTimeStateService } from "./autonomous-time-state-service";
@@ -126,13 +127,13 @@ export class AutonomousTimeService {
     const snapshot = await this.prompts.load();
     return {
       snapshot,
-      text: [
+      text: wrapInjectedMessage("autonomous_time", [
         "Autonomous-time trigger. This is a private internal session, not a user-authored message.",
         `Triggered at: ${reference.toISOString()}`,
         `Current local time: ${formatLocalTime(reference, timezone)}`,
         `Autonomous-time instructions from ${snapshot.path}:`,
         snapshot.text,
-      ].join("\n\n"),
+      ].join("\n\n")),
     };
   }
 }

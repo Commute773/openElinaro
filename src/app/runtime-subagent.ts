@@ -6,6 +6,7 @@ import type { ProjectWorkspaceService } from "../services/project-workspace-serv
 import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath } from "../services/runtime-root";
 import { telemetry } from "../services/infrastructure/telemetry";
+import { buildOpenElinaroCommandEnvironment } from "../services/shell-environment";
 import { timestamp } from "../utils/timestamp";
 import type { AppResponse } from "../domain/assistant";
 import type { RuntimeScope } from "./runtime-scope";
@@ -22,6 +23,7 @@ import {
   writeCodexNotifyConfig,
 } from "../subagent";
 import type { SubagentEvent } from "../subagent";
+import { wrapInjectedMessage } from "../services/injected-message-service";
 
 const DEFAULT_SUBAGENT_TIMEOUT_MS = 3_600_000;
 
@@ -37,7 +39,7 @@ function getSidecarSocketPath(): string {
 // --- Completion turn building ---
 
 export function buildSubagentCompletionTurn(activeProfileId: string, run: SubagentRun): string {
-  return [
+  return wrapInjectedMessage("subagent_completion", [
     "Background subagent completion update.",
     `Run id: ${run.id}`,
     `Provider: ${run.provider}`,
@@ -59,7 +61,7 @@ export function buildSubagentCompletionTurn(activeProfileId: string, run: Subage
     ].join(" "),
   ]
     .filter(Boolean)
-    .join("\n\n");
+    .join("\n\n"));
 }
 
 // --- Subagent controller ---
@@ -316,7 +318,10 @@ export function createSubagentController(ctx: {
       // Spawn in tmux — for SSH profiles, use a local fallback cwd since the
       // real working directory is on the remote machine (handled inside the SSH command).
       const tmuxCwd = isSsh ? "/tmp" : workspaceCwd;
-      await tmux.runInWindow(runId, spawnCommand, tmuxCwd);
+      const launchEnvironment = buildOpenElinaroCommandEnvironment(undefined, {
+        shellUser: targetProfile.shellUser,
+      });
+      await tmux.runInWindow(runId, spawnCommand, tmuxCwd, launchEnvironment);
       registry.markStarted(runId);
 
       // Register timeout
@@ -338,7 +343,10 @@ export function createSubagentController(ctx: {
           // Process died without firing hooks — capture pane for diagnostics
           let paneOutput = "";
           try {
-            paneOutput = await tmux.capturePane(runId, 100);
+            paneOutput = await tmux.readTerminal(runId);
+            if (!paneOutput.trim()) {
+              paneOutput = await tmux.capturePane(runId, 100);
+            }
           } catch {
             // best effort
           }
@@ -487,7 +495,10 @@ export function createSubagentController(ctx: {
 
       // Spawn in tmux — local fallback cwd for SSH profiles
       const resumeTmuxCwd = isResumeSsh ? "/tmp" : existingRun.workspaceCwd;
-      await tmux.runInWindow(existingRun.id, spawnCommand, resumeTmuxCwd);
+      const resumeEnvironment = buildOpenElinaroCommandEnvironment(undefined, {
+        shellUser: resumeTargetProfile.shellUser,
+      });
+      await tmux.runInWindow(existingRun.id, spawnCommand, resumeTmuxCwd, resumeEnvironment);
       registry.markStarted(existingRun.id);
       timeouts.register(existingRun.id, timeoutMs, onTimeout);
 
@@ -546,7 +557,15 @@ export function createSubagentController(ctx: {
       if (!run) return "";
       const hasWindow = await tmux.hasWindow(run.id);
       if (!hasWindow) return "(tmux window no longer exists)";
-      return tmux.capturePane(run.id, lines);
+      const terminal = await tmux.readTerminal(run.id);
+      if (!terminal.trim()) {
+        return tmux.capturePane(run.id, lines);
+      }
+      return terminal
+        .split("\n")
+        .slice(-Math.max(1, lines))
+        .join("\n")
+        .trim();
     },
 
     readAgentTerminal: async (runId) => {

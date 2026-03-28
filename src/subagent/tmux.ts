@@ -19,6 +19,21 @@ function resolveTmuxBinary(): string {
   );
 }
 
+function shellQuote(value: string) {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function wrapCommandWithEnv(command: string, env?: Record<string, string>) {
+  if (!env || Object.keys(env).length === 0) {
+    return command;
+  }
+
+  const exports = Object.entries(env)
+    .map(([key, value]) => `${key}=${shellQuote(value)}`)
+    .join(" ");
+  return `/usr/bin/env ${exports} ${command}`;
+}
+
 /**
  * Manages tmux sessions and windows for subagent worker processes.
  *
@@ -57,13 +72,19 @@ export class TmuxManager {
    * Sets remain-on-exit so the window stays alive after process death,
    * allowing pane capture for diagnostics.
    */
-  async runInWindow(windowName: string, command: string, cwd: string): Promise<void> {
+  async runInWindow(
+    windowName: string,
+    command: string,
+    cwd: string,
+    env?: Record<string, string>,
+  ): Promise<void> {
     await this.ensureSession();
-    const result = await $`${this.tmux} new-window -t ${this.sessionName} -n ${windowName} -c ${cwd} ${command}`.nothrow().quiet();
+    const resolvedCommand = wrapCommandWithEnv(command, env);
+    const result = await $`${this.tmux} new-window -t ${this.sessionName} -n ${windowName} -c ${cwd} ${resolvedCommand}`.nothrow().quiet();
     if (result.exitCode !== 0) {
       const stderr = result.stderr.toString().trim();
       throw new Error(
-        `Failed to create tmux window "${windowName}" (exit ${result.exitCode}).${stderr ? ` stderr: ${stderr}` : ""} Command: ${command.slice(0, 200)}`,
+        `Failed to create tmux window "${windowName}" (exit ${result.exitCode}).${stderr ? ` stderr: ${stderr}` : ""} Command: ${resolvedCommand.slice(0, 200)}`,
       );
     }
     // Keep window alive after process exits so we can capture output for diagnostics
@@ -123,8 +144,13 @@ export class TmuxManager {
     // -S 0: start from the very beginning of the visible area
     // First try the full scrollback + visible
     const result = await $`${this.tmux} capture-pane -t ${this.sessionName}:${windowName} -p -S - -E -`.nothrow().quiet();
-    if (result.exitCode !== 0) return "";
-    return result.text();
+    if (result.exitCode === 0) {
+      const text = result.text();
+      if (text.trim()) {
+        return text;
+      }
+    }
+    return this.capturePane(windowName, 200);
   }
 
   /** List all window names in this session. */

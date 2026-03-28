@@ -107,6 +107,7 @@ export const TOOL_AUTH_DECLARATIONS = {
   steer_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can receive steering instructions." },
   cancel_agent: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile can be cancelled." },
   agent_status: { access: "anyone", behavior: "role-sensitive", note: "Only runs visible to the active profile are returned." },
+  agent_summary: { access: "anyone", behavior: "role-sensitive", note: "Only summaries for runs visible to the active profile are returned." },
   read_agent_terminal: { access: "anyone", behavior: "role-sensitive", note: "Only terminal output for runs visible to the active profile is returned." },
   lights_status: { access: "root", behavior: "uniform", note: "Reads status of all paired Zigbee smart lights." },
   lights_inspect: { access: "root", behavior: "uniform", note: "Reads detailed capabilities and state of a specific light." },
