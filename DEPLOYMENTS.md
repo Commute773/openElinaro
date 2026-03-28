@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.20
+- Released at: 2026-03-28T13:40:40Z
+- Release id: 20260328T134040Z-816b3a0
+- Previous version: 2026.03.28.19
+- Trigger: ci/release workflow
+
+- feat: make heartbeat model and conversation context configurable
+
 ## 2026.03.28.19
 - Released at: 2026-03-28T03:39:06Z
 - Release id: 20260328T033906Z-1d16520
