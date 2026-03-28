@@ -17,10 +17,11 @@ import { buildServiceFunctions } from "./service-functions";
 import { buildShellFunctions } from "./shell-functions";
 import { buildFilesystemFunctions } from "./filesystem-functions";
 import { buildZigbee2MqttFunctions } from "./zigbee2mqtt-functions";
+import { buildSubagentFunctions } from "./subagent-functions";
+import { buildConversationLifecycleFunctions } from "./conversation-lifecycle-functions";
 
 /**
- * All domain builders. Subagent and conversation-lifecycle tools remain
- * in the legacy tool group system for now (they require dynamic context).
+ * All domain builders, including subagent and conversation-lifecycle tools.
  */
 export const ALL_FUNCTION_BUILDERS: FunctionDomainBuilder[] = [
   buildRoutineFunctions,
@@ -37,4 +38,6 @@ export const ALL_FUNCTION_BUILDERS: FunctionDomainBuilder[] = [
   buildShellFunctions,
   buildFilesystemFunctions,
   buildZigbee2MqttFunctions,
+  buildSubagentFunctions,
+  buildConversationLifecycleFunctions,
 ];
