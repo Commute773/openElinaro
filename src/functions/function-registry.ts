@@ -13,6 +13,7 @@ import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
 import type { RouteDefinition } from "../integrations/http/g2/router";
 import type { ToolAuthorizationDeclaration, ToolCatalogCard, AgentToolScope } from "../domain/tool-catalog";
+import type { FeatureId } from "../services/feature-config-service";
 import { generateAgentTools, type FunctionContextExtras } from "./generate-tools";
 import { generateApiRoutes } from "./generate-api-routes";
 import { generateDiscordCommands, type DiscordCommandDescriptor } from "./generate-discord-commands";
@@ -56,7 +57,7 @@ export class FunctionRegistry {
   /** Get all definitions, optionally filtered. */
   getDefinitions(options?: {
     surface?: "api" | "discord" | "agent";
-    featureChecker?: (featureId: string) => boolean;
+    featureChecker?: (featureId: FeatureId) => boolean;
   }): FunctionDefinition[] {
     let defs = [...this.definitions.values()];
     if (options?.surface) {
@@ -84,7 +85,7 @@ export class FunctionRegistry {
   generateAgentTools(
     resolveServices: () => ToolBuildContext,
     resolveToolContext?: () => ToolContext | undefined,
-    featureChecker?: (featureId: string) => boolean,
+    featureChecker?: (featureId: FeatureId) => boolean,
     resolveExtras?: () => FunctionContextExtras,
   ): StructuredToolInterface[] {
     return generateAgentTools(
@@ -99,7 +100,7 @@ export class FunctionRegistry {
   /** Generate RouteDefinition[] for the HTTP API surface. */
   generateApiRoutes(
     resolveServices: () => ToolBuildContext,
-    featureChecker?: (featureId: string) => boolean,
+    featureChecker?: (featureId: FeatureId) => boolean,
   ): RouteDefinition[] {
     return generateApiRoutes(
       [...this.definitions.values()],
@@ -110,7 +111,7 @@ export class FunctionRegistry {
 
   /** Generate DiscordCommandDescriptor[] for the Discord surface. */
   generateDiscordCommands(
-    featureChecker?: (featureId: string) => boolean,
+    featureChecker?: (featureId: FeatureId) => boolean,
   ): DiscordCommandDescriptor[] {
     return generateDiscordCommands(
       [...this.definitions.values()],
@@ -120,7 +121,7 @@ export class FunctionRegistry {
 
   /** Generate an OpenAPI 3.1 spec from all API-surface definitions. */
   generateOpenApiSpec(
-    featureChecker?: (featureId: string) => boolean,
+    featureChecker?: (featureId: FeatureId) => boolean,
     options?: { title?: string; version?: string; serverUrl?: string },
   ): Record<string, unknown> {
     return generateOpenApiSpec(

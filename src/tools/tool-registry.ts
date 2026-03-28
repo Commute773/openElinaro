@@ -68,7 +68,7 @@ import { getToolLibraryDefinitions } from "../services/tool-library-service";
 import type { ToolLibraryDefinition } from "../services/tool-library-service";
 import { isRunningInsideManagedService, resolveRuntimePlatform, type RuntimePlatform } from "../services/infrastructure/runtime-platform";
 import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
-import { FeatureConfigService } from "../services/feature-config-service";
+import { FeatureConfigService, type FeatureId } from "../services/feature-config-service";
 import {
   SystemPromptService,
 } from "../services/system-prompt-service";
@@ -546,7 +546,7 @@ export class ToolRegistry {
     this.tools = this.functionRegistry.generateAgentTools(
       fnResolveServices,
       fnResolveToolContext,
-      (featureId) => this.featureConfig.isActive(featureId as any),
+      (featureId) => this.featureConfig.isActive(featureId),
       () => ({
         pendingConversationResets: self.pendingConversationResets,
         resolveConversationKey: (input, ctx) => self.resolveConversationKey(input, ctx ?? self._activeToolContext),
@@ -660,8 +660,8 @@ export class ToolRegistry {
   }
 
   /** Check if a feature is active (delegates to FeatureConfigService). */
-  isFeatureActive(featureId: string): boolean {
-    return this.featureConfig.isActive(featureId as any);
+  isFeatureActive(featureId: FeatureId): boolean {
+    return this.featureConfig.isActive(featureId);
   }
 
   getToolLibraries(context?: ToolContext, scope?: AgentToolScope): ToolLibraryDefinition[] {

@@ -173,19 +173,19 @@ describe("surface filtering", () => {
 
 describe("feature gating", () => {
   test("excludes gated definitions when feature is inactive", () => {
-    const gated = makeDef({ name: "gated", featureGate: "experimental" });
+    const gated = makeDef({ name: "gated", featureGate: "calendar" });
     const ungated = makeDef({ name: "ungated" });
 
     const registry = new FunctionRegistry([makeBuilder([gated, ungated])]);
     registry.build(stubCtx);
 
-    const featureChecker = (id: string) => id !== "experimental";
+    const featureChecker = (id: string) => id !== "calendar";
     const defs = registry.getDefinitions({ featureChecker });
     expect(defs.map((d) => d.name)).toEqual(["ungated"]);
   });
 
   test("includes gated definitions when feature is active", () => {
-    const gated = makeDef({ name: "gated", featureGate: "experimental" });
+    const gated = makeDef({ name: "gated", featureGate: "calendar" });
     const ungated = makeDef({ name: "ungated" });
 
     const registry = new FunctionRegistry([makeBuilder([gated, ungated])]);
@@ -207,8 +207,8 @@ describe("feature gating", () => {
   });
 
   test("combined surface and feature filtering", () => {
-    const gatedAgent = makeDef({ name: "gated-agent", surfaces: ["agent"], featureGate: "exp" });
-    const gatedApi = makeDef({ name: "gated-api", surfaces: ["api"], featureGate: "exp" });
+    const gatedAgent = makeDef({ name: "gated-agent", surfaces: ["agent"], featureGate: "email" });
+    const gatedApi = makeDef({ name: "gated-api", surfaces: ["api"], featureGate: "email" });
     const ungatedAgent = makeDef({ name: "ungated-agent", surfaces: ["agent"] });
 
     const registry = new FunctionRegistry([makeBuilder([gatedAgent, gatedApi, ungatedAgent])]);
@@ -217,7 +217,7 @@ describe("feature gating", () => {
     // Feature inactive, agent surface only
     const defs = registry.getDefinitions({
       surface: "agent",
-      featureChecker: (id) => id !== "exp",
+      featureChecker: (id) => id !== "email",
     });
     expect(defs.map((d) => d.name)).toEqual(["ungated-agent"]);
   });
@@ -241,7 +241,7 @@ describe("generateAgentTools() surface filtering", () => {
   });
 
   test("excludes feature-gated functions when gated off", () => {
-    const gatedFn = makeDef({ name: "gated", surfaces: ["agent"], featureGate: "beta" });
+    const gatedFn = makeDef({ name: "gated", surfaces: ["agent"], featureGate: "finance" });
     const normalFn = makeDef({ name: "normal", surfaces: ["agent"] });
 
     const registry = new FunctionRegistry([makeBuilder([gatedFn, normalFn])]);
@@ -250,7 +250,7 @@ describe("generateAgentTools() surface filtering", () => {
     const tools = registry.generateAgentTools(
       () => stubCtx,
       undefined,
-      (id) => id !== "beta",
+      (id) => id !== "finance",
     );
     const toolNames = tools.map((t) => t.name);
     expect(toolNames).toEqual(["normal"]);

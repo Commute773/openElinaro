@@ -5,6 +5,7 @@
 import type { FunctionDefinition, FunctionContext } from "./define-function";
 import type { RouteDefinition } from "../integrations/http/g2/router";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
+import type { FeatureId } from "../services/feature-config-service";
 import { CORS_HEADERS, json, error } from "../integrations/http/g2/helpers";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { telemetry } from "../services/infrastructure/telemetry";
@@ -126,7 +127,7 @@ export function generateApiRoute(
 export function generateApiRoutes(
   definitions: FunctionDefinition[],
   resolveServices: () => ToolBuildContext,
-  featureChecker?: (featureId: string) => boolean,
+  featureChecker?: (featureId: FeatureId) => boolean,
 ): RouteDefinition[] {
   const routes: RouteDefinition[] = [];
   for (const def of definitions) {

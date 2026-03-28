@@ -9,6 +9,7 @@ import type { BaseMessage } from "@langchain/core/messages";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
 import type { ToolLibraryDefinition } from "../services/tool-library-service";
+import type { FeatureId } from "../services/feature-config-service";
 
 // ---------------------------------------------------------------------------
 // Surface types
@@ -95,7 +96,7 @@ export interface FunctionDefinition<
   // -- Feature gating --------------------------------------------------------
 
   /** Feature id from FeatureConfigService. If set, function is excluded when the feature is inactive. */
-  featureGate?: string;
+  featureGate?: FeatureId;
 
   // -- Untrusted output guarding ---------------------------------------------
 

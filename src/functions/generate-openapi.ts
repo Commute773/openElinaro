@@ -4,31 +4,40 @@
  */
 import { z } from "zod";
 import type { FunctionDefinition } from "./define-function";
+import type { FeatureId } from "../services/feature-config-service";
 
 // ---------------------------------------------------------------------------
 // Zod-to-JSON-Schema conversion (lightweight, no external deps)
 // ---------------------------------------------------------------------------
 
-function zodToJsonSchema(schema: any): Record<string, unknown> {
+/** Access Zod internal `_def` property (no public API for schema introspection). */
+function zodDef(schema: z.ZodType): Record<string, unknown> {
+  return (schema as unknown as Record<string, unknown>)._def as Record<string, unknown>;
+}
+
+function zodToJsonSchema(schema: z.ZodType): Record<string, unknown> {
   if (schema instanceof z.ZodString) return { type: "string" };
   if (schema instanceof z.ZodNumber) {
-    const checks = (schema as any)._def?.checks ?? [];
-    const hasInt = checks.some((c: any) => c.kind === "int");
+    const checks = (zodDef(schema).checks ?? []) as { kind: string }[];
+    const hasInt = checks.some((c) => c.kind === "int");
     return { type: hasInt ? "integer" : "number" };
   }
   if (schema instanceof z.ZodBoolean) return { type: "boolean" };
-  if (schema instanceof z.ZodLiteral) return { type: typeof (schema as any)._def.value, const: (schema as any)._def.value };
-  if (schema instanceof z.ZodEnum) return { type: "string", enum: (schema as any)._def.values };
-  if (schema instanceof z.ZodArray) return { type: "array", items: zodToJsonSchema((schema as any)._def.type) };
-  if (schema instanceof z.ZodOptional) return zodToJsonSchema((schema as any)._def.innerType);
-  if (schema instanceof z.ZodDefault) return zodToJsonSchema((schema as any)._def.innerType);
-  if (schema instanceof z.ZodNullable) return { oneOf: [zodToJsonSchema((schema as any)._def.innerType), { type: "null" }] };
+  if (schema instanceof z.ZodLiteral) {
+    const value = zodDef(schema).value;
+    return { type: typeof value, const: value };
+  }
+  if (schema instanceof z.ZodEnum) return { type: "string", enum: zodDef(schema).values as string[] };
+  if (schema instanceof z.ZodArray) return { type: "array", items: zodToJsonSchema(zodDef(schema).type as z.ZodType) };
+  if (schema instanceof z.ZodOptional) return zodToJsonSchema(zodDef(schema).innerType as z.ZodType);
+  if (schema instanceof z.ZodDefault) return zodToJsonSchema(zodDef(schema).innerType as z.ZodType);
+  if (schema instanceof z.ZodNullable) return { oneOf: [zodToJsonSchema(zodDef(schema).innerType as z.ZodType), { type: "null" }] };
   if (schema instanceof z.ZodUnion) {
-    const options = (schema as any)._def.options as z.ZodType[];
+    const options = zodDef(schema).options as z.ZodType[];
     return { oneOf: options.map(zodToJsonSchema) };
   }
   if (schema instanceof z.ZodObject) {
-    const shape = (schema as z.ZodObject<any>).shape;
+    const shape = (schema as z.ZodObject<Record<string, z.ZodType>>).shape as Record<string, z.ZodType>;
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
     for (const [key, value] of Object.entries(shape)) {
@@ -73,13 +82,13 @@ function buildPathParameters(def: FunctionDefinition): Record<string, unknown>[]
 
   // Query params from annotation
   if (def.http!.method === "GET" && def.http!.queryParams instanceof z.ZodObject) {
-    const shape = (def.http!.queryParams as z.ZodObject<any>).shape;
+    const shape = def.http!.queryParams.shape as Record<string, z.ZodType>;
     for (const [key, value] of Object.entries(shape)) {
       params.push({
         name: key,
         in: "query",
         required: !(value instanceof z.ZodOptional) && !(value instanceof z.ZodDefault),
-        schema: zodToJsonSchema(value as z.ZodType),
+        schema: zodToJsonSchema(value),
       });
     }
   }
@@ -89,7 +98,7 @@ function buildPathParameters(def: FunctionDefinition): Record<string, unknown>[]
 
 export function generateOpenApiSpec(
   definitions: FunctionDefinition[],
-  featureChecker?: (featureId: string) => boolean,
+  featureChecker?: (featureId: FeatureId) => boolean,
   options?: OpenApiOptions,
 ): Record<string, unknown> {
   const paths: Record<string, Record<string, unknown>> = {};

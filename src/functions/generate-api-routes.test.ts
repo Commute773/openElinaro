@@ -354,10 +354,10 @@ describe("generateApiRoutes", () => {
 
   test("excludes feature-gated functions when gate is inactive", () => {
     const defs = [
-      makeDef({ name: "gated", featureGate: "experimental_feature" }),
+      makeDef({ name: "gated", featureGate: "calendar" }),
       makeDef({ name: "ungated" }),
     ];
-    const featureChecker = (id: string) => id !== "experimental_feature";
+    const featureChecker = (id: string) => id !== "calendar";
     const routes = generateApiRoutes(defs, stubServices, featureChecker);
 
     expect(routes).toHaveLength(1);
@@ -365,7 +365,7 @@ describe("generateApiRoutes", () => {
 
   test("includes feature-gated functions when gate is active", () => {
     const defs = [
-      makeDef({ name: "gated", featureGate: "experimental_feature" }),
+      makeDef({ name: "gated", featureGate: "calendar" }),
       makeDef({ name: "ungated" }),
     ];
     const featureChecker = (_id: string) => true;
@@ -376,7 +376,7 @@ describe("generateApiRoutes", () => {
 
   test("includes all functions when no featureChecker is provided", () => {
     const defs = [
-      makeDef({ name: "gated", featureGate: "experimental_feature" }),
+      makeDef({ name: "gated", featureGate: "calendar" }),
       makeDef({ name: "ungated" }),
     ];
     const routes = generateApiRoutes(defs, stubServices);

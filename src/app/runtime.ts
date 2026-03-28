@@ -18,6 +18,7 @@ import { AlarmService, type ScheduledAlarm } from "../services/alarm-service";
 import { WorkPlanningService } from "../services/work-planning-service";
 import { CalendarSyncService } from "../services/calendar-sync-service";
 import { getRuntimeConfig } from "../config/runtime-config";
+import type { FeatureId } from "../services/feature-config-service";
 import { resolveRuntimePath } from "../services/runtime-root";
 
 import { type RuntimeScope, createRuntimeScope } from "./runtime-scope";
@@ -484,7 +485,7 @@ export class OpenElinaroApp {
     return registry.isBuilt ? registry : null;
   }
 
-  isFeatureActive(featureId: string): boolean {
+  isFeatureActive(featureId: FeatureId): boolean {
     return this.getScope().routineTools.isFeatureActive(featureId);
   }
 

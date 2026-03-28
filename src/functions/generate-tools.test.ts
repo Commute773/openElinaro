@@ -195,7 +195,7 @@ describe("generateAgentTools", () => {
 
   test("excludes feature-gated definitions when gate is inactive", () => {
     const defs = [
-      makeDef({ name: "gated", featureGate: "beta_feature" }),
+      makeDef({ name: "gated", featureGate: "calendar" }),
       makeDef({ name: "ungated" }),
     ];
     const tools = generateAgentTools(defs, stubServices, undefined, (_id) => false);
@@ -205,7 +205,7 @@ describe("generateAgentTools", () => {
 
   test("includes feature-gated definitions when gate is active", () => {
     const defs = [
-      makeDef({ name: "gated", featureGate: "beta_feature" }),
+      makeDef({ name: "gated", featureGate: "calendar" }),
       makeDef({ name: "ungated" }),
     ];
     const tools = generateAgentTools(defs, stubServices, undefined, (_id) => true);
@@ -214,7 +214,7 @@ describe("generateAgentTools", () => {
 
   test("includes feature-gated definitions when no featureChecker provided", () => {
     const defs = [
-      makeDef({ name: "gated", featureGate: "beta_feature" }),
+      makeDef({ name: "gated", featureGate: "calendar" }),
       makeDef({ name: "ungated" }),
     ];
     const tools = generateAgentTools(defs, stubServices);
@@ -237,26 +237,26 @@ describe("generateAgentTools", () => {
   test("featureChecker receives the correct feature id", () => {
     const checkedIds: string[] = [];
     const defs = [
-      makeDef({ name: "a", featureGate: "feat_a" }),
-      makeDef({ name: "b", featureGate: "feat_b" }),
+      makeDef({ name: "a", featureGate: "email" }),
+      makeDef({ name: "b", featureGate: "finance" }),
     ];
     generateAgentTools(defs, stubServices, undefined, (id) => {
       checkedIds.push(id);
       return true;
     });
-    expect(checkedIds).toEqual(["feat_a", "feat_b"]);
+    expect(checkedIds).toEqual(["email", "finance"]);
   });
 
   test("definitions without featureGate skip the featureChecker", () => {
     const checkedIds: string[] = [];
     const defs = [
       makeDef({ name: "plain" }),
-      makeDef({ name: "gated", featureGate: "feat_x" }),
+      makeDef({ name: "gated", featureGate: "media" }),
     ];
     generateAgentTools(defs, stubServices, undefined, (id) => {
       checkedIds.push(id);
       return true;
     });
-    expect(checkedIds).toEqual(["feat_x"]);
+    expect(checkedIds).toEqual(["media"]);
   });
 });

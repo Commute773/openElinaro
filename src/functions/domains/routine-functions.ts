@@ -9,6 +9,7 @@ import type {
   RoutineItemKind,
   RoutinePriority,
   RoutineSchedule,
+  RoutineStatus,
   Weekday,
 } from "../../domain/routines";
 
@@ -199,7 +200,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     input: listRoutineSchema,
     handler: async (input, fnCtx) => {
       const items = fnCtx.services.routines.listItems({
-        status: input.status as any,
+        status: input.status as RoutineStatus | "all" | undefined,
         kind: (input.kind as RoutineItemKind | "all" | undefined) ?? "all",
         profileId: input.profileId,
         scope: input.scope,
@@ -586,7 +587,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         jobId: input.jobId,
         projectId: input.projectId,
         blockedBy: input.blockedBy,
-        schedule: (input.schedule as any) ?? { kind: "once", dueAt: new Date().toISOString() },
+        schedule: (input.schedule as RoutineSchedule | undefined) ?? { kind: "once", dueAt: new Date().toISOString() },
       });
     },
     auth: ROUTINE_AUTH,
@@ -633,7 +634,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         description: input.description,
         priority: input.priority as RoutinePriority | undefined,
         labels: input.labels,
-        schedule: input.schedule as any,
+        schedule: input.schedule as RoutineSchedule | undefined,
         jobId: input.jobId,
         projectId: input.projectId,
         blockedBy: input.blockedBy,

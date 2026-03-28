@@ -319,7 +319,7 @@ describe("generateDiscordCommands — batch generation", () => {
 describe("generateDiscordCommands — feature gating", () => {
   test("excludes gated function when feature is inactive", () => {
     const defs = [
-      makeDef({ name: "gated", input: z.object({}), featureGate: "beta-feature" }),
+      makeDef({ name: "gated", input: z.object({}), featureGate: "finance" }),
       makeDef({ name: "ungated", input: z.object({}) }),
     ];
     const commands = generateDiscordCommands(defs, () => false);
@@ -329,7 +329,7 @@ describe("generateDiscordCommands — feature gating", () => {
 
   test("includes gated function when feature is active", () => {
     const defs = [
-      makeDef({ name: "gated", input: z.object({}), featureGate: "beta-feature" }),
+      makeDef({ name: "gated", input: z.object({}), featureGate: "finance" }),
       makeDef({ name: "ungated", input: z.object({}) }),
     ];
     const commands = generateDiscordCommands(defs, () => true);
@@ -338,7 +338,7 @@ describe("generateDiscordCommands — feature gating", () => {
 
   test("includes gated function when no featureChecker is provided", () => {
     const defs = [
-      makeDef({ name: "gated", input: z.object({}), featureGate: "beta-feature" }),
+      makeDef({ name: "gated", input: z.object({}), featureGate: "finance" }),
     ];
     const commands = generateDiscordCommands(defs);
     expect(commands).toHaveLength(1);
@@ -346,15 +346,15 @@ describe("generateDiscordCommands — feature gating", () => {
 
   test("featureChecker receives the correct feature id", () => {
     const defs = [
-      makeDef({ name: "a", input: z.object({}), featureGate: "alpha" }),
-      makeDef({ name: "b", input: z.object({}), featureGate: "beta" }),
+      makeDef({ name: "a", input: z.object({}), featureGate: "calendar" }),
+      makeDef({ name: "b", input: z.object({}), featureGate: "email" }),
     ];
     const checkedIds: string[] = [];
     generateDiscordCommands(defs, (id) => {
       checkedIds.push(id);
       return true;
     });
-    expect(checkedIds).toEqual(["alpha", "beta"]);
+    expect(checkedIds).toEqual(["calendar", "email"]);
   });
 });
 
