@@ -41,6 +41,8 @@ const RUN_LIVE_MODEL_E2E =
   process.env.OPENELINARO_ENABLE_LIVE_MODEL_E2E !== "0" && hasRootProviderAuthInRepo();
 
 describe("runtime live model e2e", () => {
+  // Skip when auth credentials are not present in the machine test fixtures directory.
+  // Disable explicitly with OPENELINARO_ENABLE_LIVE_MODEL_E2E=0.
   const liveTest = RUN_LIVE_MODEL_E2E ? test : test.skip;
 
   liveTest("runs isolated live-model checks in a fresh Bun process", () => {

@@ -31,6 +31,8 @@ const RUN_PHONE_E2E =
   process.env.OPENELINARO_ENABLE_PHONE_E2E !== "0" && hasPhoneCallE2ePrerequisites();
 
 describe("phone call e2e", () => {
+  // Skip when Vonage API keys or Gemini secrets are not available.
+  // Disable explicitly with OPENELINARO_ENABLE_PHONE_E2E=0.
   const liveTest = RUN_PHONE_E2E ? test : test.skip;
 
   liveTest("calls a test number and verifies Gemini transcribes the TTS audio", () => {

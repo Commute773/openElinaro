@@ -27,6 +27,8 @@ const RUN_SSH_E2E =
   process.env.OPENELINARO_ENABLE_SSH_E2E !== "0" && canSshToLocalhost();
 
 describe("SSH tools e2e", () => {
+  // Skip when SSH to localhost is not available (requires ssh key and local sshd).
+  // Disable explicitly with OPENELINARO_ENABLE_SSH_E2E=0.
   const liveTest = RUN_SSH_E2E ? test : test.skip;
 
   liveTest("exercises all SSH tools and subagent launching via real SSH to localhost", () => {

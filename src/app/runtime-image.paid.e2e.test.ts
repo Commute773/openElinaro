@@ -41,6 +41,8 @@ const RUN_IMAGE_E2E =
   process.env.OPENELINARO_ENABLE_LIVE_MODEL_E2E !== "0" && hasRootProviderAuthInRepo();
 
 describe("runtime image e2e", () => {
+  // Skip when auth credentials are not present in the machine test fixtures directory.
+  // Disable explicitly with OPENELINARO_ENABLE_LIVE_MODEL_E2E=0.
   const liveTest = RUN_IMAGE_E2E ? test : test.skip;
 
   liveTest("sends an image with sourceUrl and receives a valid response", () => {
