@@ -10,7 +10,7 @@ import type { EmailService } from "../../services/email-service";
 import type { VonageService } from "../../services/vonage-service";
 import type { GeminiLivePhoneService } from "../../services/gemini-live-phone-service";
 import type { AlarmService } from "../../services/alarm-service";
-import type { AccessControlService } from "../../services/access-control-service";
+import type { AccessControlService } from "../../services/profiles";
 import type { OpenBrowserService } from "../../services/openbrowser-service";
 import type { SecretStoreService } from "../../services/secret-store-service";
 import type { WebFetchService } from "../../services/web-fetch-service";

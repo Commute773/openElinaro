@@ -13,7 +13,7 @@ import {
   scoreBm25,
   tokenize,
 } from "./hybrid-search";
-import { getDefaultProfileId } from "./profile-service";
+import { getDefaultProfileId } from "./profiles";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";

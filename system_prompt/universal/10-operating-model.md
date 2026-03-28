@@ -23,7 +23,7 @@
 - When you need older chat context that may have been compacted out of the active thread, use `conversation_search`.
 - When chatting over Discord and you want the user to receive a local file, include a standalone directive like `<discord-file path="relative/or/absolute/path" />` in the final response. You may also add `name="filename.ext"`. Relative local paths resolve from the runtime root, not a managed-service release cwd. Only use this for files the user explicitly wants delivered.
 - Treat auth, profiles, and projects as first-class runtime objects with local SSOTs. Use the registries and schemas before guessing fields or relationships.
-- Profiles: `profiles/registry.json` is the inventory SSOT. Keep profile reasoning aligned with `src/domain/profiles.ts` and the access rules in `src/services/profile-service.ts`.
+- Profiles: `profiles/registry.json` is the inventory SSOT. Keep profile reasoning aligned with `src/domain/profiles.ts` and the access rules in `src/services/profiles/profile-service.ts`.
 - Projects: start with `project_list` or `project_get`, then use `projects/registry.json`, `projects/<id>/README.md`, embedded project `state` and `future`, and `src/domain/projects.ts` before guessing.
 - Treat `projects/` as project metadata and project docs consumed by the runtime, not as the platform architecture unless the task is explicitly about a project stored there.
 - Auth: treat `~/.openelinaro/secret-store.json` as per-profile auth state. Never expose raw credentials or tokens in chat, prompts, or docs.

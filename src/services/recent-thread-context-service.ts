@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import type { ProfileRecord } from "../domain/profiles";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { ProjectsService } from "./projects-service";
 import { resolveRuntimePath, resolveUserDataPath } from "./runtime-root";
 

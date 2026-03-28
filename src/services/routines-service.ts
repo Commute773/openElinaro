@@ -12,7 +12,7 @@ import type {
   RoutineStoreData,
 } from "../domain/routines";
 import { AuthorizationError, NotFoundError, ValidationError } from "../domain/errors";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { ProjectsService } from "./projects-service";
 import { RoutinesStore } from "./routines-store";
 import { formatLocalTime } from "./local-time-service";

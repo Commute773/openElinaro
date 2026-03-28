@@ -11,7 +11,7 @@ import { composeSystemPrompt } from "../../services/system-prompt-service";
 import type { ReflectionService } from "../../services/reflection-service";
 import type { ToolResultStore } from "../../services/tool-result-store";
 import type { ToolProgramService } from "../../services/tool-program-service";
-import type { AccessControlService } from "../../services/access-control-service";
+import type { AccessControlService } from "../../services/profiles";
 import type { AgentToolScope, ToolCatalogCard } from "../../domain/tool-catalog";
 import type { ToolLibraryDefinition } from "../../services/tool-library-service";
 import { renderExtendedContextStatus, formatTokenCount } from "./tool-group-types";

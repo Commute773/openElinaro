@@ -14,11 +14,11 @@ let previousCwd = "";
 let tempRoot = "";
 let conversationStoreModule: typeof import("./conversation-store");
 let transitionServiceModule: typeof import("./conversation-state-transition-service");
-let accessControlModule: typeof import("./access-control-service");
+let accessControlModule: typeof import("./profiles/access-control-service");
 let agentChatModule: typeof import("./agent-chat-service");
 let memoryServiceModule: typeof import("./memory-service");
 let modelServiceModule: typeof import("./models/model-service");
-let profileServiceModule: typeof import("./profile-service");
+let profileServiceModule: typeof import("./profiles/profile-service");
 let projectsServiceModule: typeof import("./projects-service");
 let routinesServiceModule: typeof import("./routines-service");
 let systemPromptModule: typeof import("./system-prompt-service");
@@ -333,11 +333,11 @@ describe("OpenBrowser agent e2e", () => {
 
     conversationStoreModule = await importFresh("src/services/conversation-store.ts");
     transitionServiceModule = await importFresh("src/services/conversation-state-transition-service.ts");
-    accessControlModule = await importFresh("src/services/access-control-service.ts");
+    accessControlModule = await importFresh("src/services/profiles/access-control-service.ts");
     agentChatModule = await importFresh("src/services/agent-chat-service.ts");
     memoryServiceModule = await importFresh("src/services/memory-service.ts");
     modelServiceModule = await importFresh("src/services/models/model-service.ts");
-    profileServiceModule = await importFresh("src/services/profile-service.ts");
+    profileServiceModule = await importFresh("src/services/profiles/profile-service.ts");
     projectsServiceModule = await importFresh("src/services/projects-service.ts");
     routinesServiceModule = await importFresh("src/services/routines-service.ts");
     systemPromptModule = await importFresh("src/services/system-prompt-service.ts");

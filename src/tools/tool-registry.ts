@@ -39,7 +39,7 @@ import { ProjectsService } from "../services/projects-service";
 import type { ReflectionService } from "../services/reflection-service";
 import { RoutinesService } from "../services/routines-service";
 import { ShellService } from "../services/shell-service";
-import { AccessControlService } from "../services/access-control-service";
+import { AccessControlService } from "../services/profiles";
 import { AlarmService } from "../services/alarm-service";
 import { ToolProgramService } from "../services/tool-program-service";
 import {

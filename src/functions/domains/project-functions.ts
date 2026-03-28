@@ -14,7 +14,7 @@ import {
   type ElinaroTicket,
 } from "../../services/elinaro-tickets-service";
 import { hasProviderAuth, getAuthStatus } from "../../auth/store";
-import { ProfileService } from "../../services/profile-service";
+import { ProfileService } from "../../services/profiles";
 import {
   AmbiguousModelIdentifierError,
   ModelService,

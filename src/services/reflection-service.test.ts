@@ -5,7 +5,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ConversationStore } from "./conversation-store";
 import { MemoryService } from "./memory-service";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { ReflectionService } from "./reflection-service";
 import { RoutinesService } from "./routines-service";
 import { resolveAssistantContextPath } from "./runtime-user-content";

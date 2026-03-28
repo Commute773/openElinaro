@@ -7,7 +7,7 @@ import type { ProfileRecord } from "../domain/profiles";
 import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 import { ConversationCompactionService } from "./conversation-compaction-service";
 import { MemoryService } from "./memory-service";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 
 const ROOT_PROFILE: ProfileRecord = {
   id: "root",

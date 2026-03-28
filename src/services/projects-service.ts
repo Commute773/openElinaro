@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { JobRecord, JobStatus, ProjectRecord, ProjectScope, ProjectStatus } from "../domain/projects";
 import { JobRecordSchema, ProjectRecordSchema, resolveProjectScope } from "../domain/projects";
 import type { ProfileRecord } from "../domain/profiles";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { getRuntimeRootDir, resolveServicePath, resolveUserDataPath } from "./runtime-root";
 import { telemetry } from "./telemetry";
 
