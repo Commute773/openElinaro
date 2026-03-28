@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { assistantTextMessage, userMessage } from "../messages/types";
 
 const repoRoot = process.cwd();
 
@@ -189,12 +189,12 @@ describe("RecentThreadContextService", () => {
   test("only includes startup context before the first human message", () => {
     expect(recentContextModule.shouldIncludeRecentThreadContext([])).toBe(true);
     expect(
-      recentContextModule.shouldIncludeRecentThreadContext([new AIMessage("Fresh conversation.")]),
+      recentContextModule.shouldIncludeRecentThreadContext([assistantTextMessage("Fresh conversation.")]),
     ).toBe(true);
     expect(
       recentContextModule.shouldIncludeRecentThreadContext([
-        new AIMessage("Fresh conversation."),
-        new HumanMessage("hello"),
+        assistantTextMessage("Fresh conversation."),
+        userMessage("hello"),
       ]),
     ).toBe(false);
   });

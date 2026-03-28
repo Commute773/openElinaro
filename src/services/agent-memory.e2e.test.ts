@@ -3,10 +3,17 @@ import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
-import { AIMessage, HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import type { Message, UserMessage, AssistantMessage } from "../messages/types";
+import {
+  userMessage,
+  assistantTextMessage,
+  isUserMessage,
+  isAssistantMessage,
+  extractAssistantText,
+} from "../messages/types";
+import type { ChatPromptContent } from "../domain/assistant";
 import { getTestFixturesDir } from "../test/fixtures";
-import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 
 const repoRoot = process.cwd();
 const MACHINE_TEST_ROOT = getTestFixturesDir();
@@ -110,7 +117,7 @@ function summarizeDurations(values: number[]) {
   };
 }
 
-function extractHumanText(message: HumanMessage) {
+function extractHumanText(message: UserMessage) {
   if (typeof message.content === "string") {
     return message.content;
   }
@@ -131,8 +138,8 @@ function extractHumanText(message: HumanMessage) {
 function createHarness(options: {
   recallOverride?: (params: {
     conversationKey: string;
-    userContent: string;
-    conversationMessages: BaseMessage[];
+    userContent: ChatPromptContent;
+    conversationMessages: Message[];
     limit?: number;
   }) => Promise<string>;
 } = {}): Harness {
@@ -155,20 +162,26 @@ function createHarness(options: {
 
   const requests: RequestCapture[] = [];
   let replyStartedAt = 0;
-  const connector = new ScriptedProviderConnector(async (request) => {
+  // NOTE: In the Pi architecture, scripted model responses need to be wired
+  // through ModelService.resolveModelForPurpose or the pi-ai complete()
+  // function. The scripted handler captures intent for future integration.
+  const _scriptedHandler = async (request: { messages: Message[] }) => {
     const preProviderMs = performance.now() - replyStartedAt;
     const humanMessages = request.messages
-      .filter((message): message is HumanMessage => message instanceof HumanMessage)
+      .filter((message): message is UserMessage => isUserMessage(message))
       .map((message) => extractHumanText(message));
     requests.push({
       humanMessages,
       preProviderMs,
     });
-    return new AIMessage(`E2E reply: ${humanMessages.at(-1) ?? ""}`);
-  }, { providerId: "scripted-memory-e2e" });
+    return assistantTextMessage(`E2E reply: ${humanMessages.at(-1) ?? ""}`, {
+      api: "scripted",
+      provider: "scripted-memory-e2e",
+      model: "scripted-model",
+    });
+  };
 
   const chat = new agentChatModule.AgentChatService({
-    connector,
     routineTools: {
       consumePendingBackgroundExecNotifications() {
         return [];
@@ -206,8 +219,8 @@ function createHarness(options: {
     memory: {
       async buildRecallContext(params: {
         conversationKey: string;
-        userContent: string;
-        conversationMessages: BaseMessage[];
+        userContent: ChatPromptContent;
+        conversationMessages: Message[];
         limit?: number;
       }) {
         if (options.recallOverride) {
@@ -315,9 +328,10 @@ describe("real-corpus memory recall", () => {
     expect(harness.requests[0]?.humanMessages).toHaveLength(1);
     expect(harness.requests[0]?.humanMessages[0]).toContain(NO_HIT_PROMPT);
     const savedConversation = await harness.conversations.get("e2e:memory:no-hit:reply");
-    const savedHumanMessage = savedConversation.messages.findLast((message) => message instanceof HumanMessage);
-    expect(savedHumanMessage).toBeInstanceOf(HumanMessage);
-    expect(extractHumanText(savedHumanMessage as HumanMessage)).toContain(NO_HIT_PROMPT);
+    const savedHumanMessage = savedConversation.messages.findLast((message) => isUserMessage(message));
+    expect(savedHumanMessage).toBeDefined();
+    expect(isUserMessage(savedHumanMessage!)).toBe(true);
+    expect(extractHumanText(savedHumanMessage as UserMessage)).toContain(NO_HIT_PROMPT);
   });
 
   fixtureTest("prepends recalled memory to the top of the same user message", async () => {
@@ -343,9 +357,10 @@ describe("real-corpus memory recall", () => {
     expect(userMessage).toContain(HIT_PROMPT);
     expect(userMessage.indexOf(HIT_PROMPT)).toBeGreaterThan(0);
     const savedConversation = await harness.conversations.get("e2e:memory:hit:reply");
-    const savedHumanMessage = savedConversation.messages.findLast((message) => message instanceof HumanMessage);
-    expect(savedHumanMessage).toBeInstanceOf(HumanMessage);
-    expect(extractHumanText(savedHumanMessage as HumanMessage)).toBe(HIT_PROMPT);
+    const savedHumanMessage = savedConversation.messages.findLast((message) => isUserMessage(message));
+    expect(savedHumanMessage).toBeDefined();
+    expect(isUserMessage(savedHumanMessage!)).toBe(true);
+    expect(extractHumanText(savedHumanMessage as UserMessage)).toBe(HIT_PROMPT);
   });
 
   test("skips recall for healthcheck prompts", async () => {

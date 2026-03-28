@@ -1,9 +1,5 @@
 import path from "node:path";
-import {
-  AIMessage,
-  ToolMessage,
-  type BaseMessage,
-} from "@langchain/core/messages";
+import type { Message } from "../../messages/types";
 import type { ChatPromptContent } from "../../domain/assistant";
 import type { ProfileRecord } from "../../domain/profiles";
 import { ConversationStore } from "./conversation-store";
@@ -112,7 +108,7 @@ function uniqueRecallMatches(matches: MemorySearchMatch[]) {
 }
 
 
-function buildRecallQuery(userText: string, conversationMessages: BaseMessage[]) {
+function buildRecallQuery(userText: string, conversationMessages: Message[]) {
   const trimmed = userText.trim();
   if (trimmed.length >= 24) {
     return trimmed;
@@ -224,7 +220,7 @@ export class ConversationMemoryService {
   async buildRecallContext(params: {
     conversationKey: string;
     userContent: ChatPromptContent;
-    conversationMessages: BaseMessage[];
+    conversationMessages: Message[];
     limit?: number;
   }) {
     return traceSpan(

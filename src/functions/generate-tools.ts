@@ -1,9 +1,13 @@
 /**
- * Generates LangChain StructuredToolInterface instances from FunctionDefinitions.
- * These slot directly into the existing ToolRegistry wrapping/output pipeline.
+ * Generates pi-ai Tool definitions + handler map from FunctionDefinitions.
+ *
+ * Replaces the old LangChain StructuredToolInterface generation.
+ * Produces:
+ * - pi-ai Tool[] (name + description + JSON Schema parameters) for the model API
+ * - Handler map for tool execution by the agent loop
  */
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
+import type { Tool } from "@mariozechner/pi-ai";
 import type { FunctionDefinition, FunctionContext } from "./define-function";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
@@ -23,8 +27,30 @@ const traceSpan = createTraceSpan(fnTelemetry);
 export type FunctionContextExtras = Partial<Omit<FunctionContext, "services" | "toolContext" | "conversationKey">>;
 
 /**
- * Convert a single FunctionDefinition into a StructuredToolInterface.
- * The generated tool follows the same contract as tools produced by defineTool():
+ * A tool entry combining the pi-ai tool schema with its execution handler.
+ */
+export interface PiToolEntry {
+  /** pi-ai tool definition (name + description + JSON Schema parameters) for the model API. */
+  tool: Tool;
+  /** The execution handler. Receives raw input from the model, returns the result. */
+  handler: (input: Record<string, unknown>) => Promise<unknown>;
+}
+
+/**
+ * Convert a Zod schema to a JSON Schema object suitable for pi-ai's Tool parameters.
+ * Pi-ai uses TypeBox TSchema which is structurally a JSON Schema object at runtime.
+ */
+function zodToToolParameters(schema: z.ZodType): Record<string, unknown> {
+  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
+  // z.toJSONSchema produces a full JSON Schema with $schema, etc.
+  // pi-ai just needs the object schema (type, properties, required).
+  // Strip top-level $schema if present — pi-ai doesn't need it.
+  const { $schema: _, ...rest } = jsonSchema;
+  return rest;
+}
+
+/**
+ * Convert a single FunctionDefinition into a PiToolEntry.
  * - Input schema extended with TOOL_CALL_BEHAVIOR_SCHEMA (silent flag)
  * - Handler wrapped in traceSpan for telemetry
  * - Receives services via closure over the ToolBuildContext getter
@@ -34,7 +60,7 @@ export function generateAgentTool(
   resolveServices: () => ToolBuildContext,
   resolveToolContext?: () => ToolContext | undefined,
   resolveExtras?: () => FunctionContextExtras,
-): StructuredToolInterface | null {
+): PiToolEntry | null {
   const surfaces = def.surfaces ?? ["api", "discord", "agent"];
   if (!surfaces.includes("agent")) return null;
 
@@ -46,8 +72,15 @@ export function generateAgentTool(
     schema = def.input;
   }
 
-  return tool(
-    async (input: Record<string, unknown>) => {
+  const parameters = zodToToolParameters(schema);
+
+  return {
+    tool: {
+      name: def.name,
+      description: def.description,
+      parameters: parameters as any,
+    },
+    handler: async (input: Record<string, unknown>) => {
       return traceSpan(`tool.${def.name}`, async () => {
         const extras = resolveExtras?.() ?? {};
         const toolContext = resolveToolContext?.();
@@ -60,16 +93,11 @@ export function generateAgentTool(
         return def.handler(input, ctx);
       }, { attributes: input });
     },
-    {
-      name: def.name,
-      description: def.description,
-      schema: schema as any,
-    },
-  ) as StructuredToolInterface;
+  };
 }
 
 /**
- * Convert all agent-surface FunctionDefinitions into StructuredToolInterface[].
+ * Convert all agent-surface FunctionDefinitions into PiToolEntry[].
  * Feature-gated functions are excluded when the gate is inactive.
  */
 export function generateAgentTools(
@@ -78,12 +106,12 @@ export function generateAgentTools(
   resolveToolContext?: () => ToolContext | undefined,
   featureChecker?: (featureId: FeatureId) => boolean,
   resolveExtras?: () => FunctionContextExtras,
-): StructuredToolInterface[] {
-  const tools: StructuredToolInterface[] = [];
+): PiToolEntry[] {
+  const entries: PiToolEntry[] = [];
   for (const def of definitions) {
     if (def.featureGate && featureChecker && !featureChecker(def.featureGate)) continue;
-    const t = generateAgentTool(def, resolveServices, resolveToolContext, resolveExtras);
-    if (t) tools.push(t);
+    const entry = generateAgentTool(def, resolveServices, resolveToolContext, resolveExtras);
+    if (entry) entries.push(entry);
   }
-  return tools;
+  return entries;
 }

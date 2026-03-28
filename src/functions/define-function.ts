@@ -1,11 +1,11 @@
 import type { z } from "zod";
+import type { Tool } from "@mariozechner/pi-ai";
 import type {
   AgentToolScope,
   ToolAuthorizationAccess,
   ToolAuthorizationBehavior,
 } from "../domain/tool-catalog";
-import type { StructuredToolInterface } from "@langchain/core/tools";
-import type { BaseMessage } from "@langchain/core/messages";
+import type { Message } from "../messages/types";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
 import type { ToolLibraryDefinition } from "../services/tool-library-service";
@@ -128,15 +128,15 @@ export interface FunctionContext {
   /** Get a conversation with an ensured system prompt. */
   getConversationForTool?: (input: { conversationKey?: string }, context?: ToolContext) => Promise<{
     key: string;
-    messages: BaseMessage[];
+    messages: Message[];
     systemPrompt?: { text: string; version: string; files: string[]; loadedAt: string } | null;
   }>;
   /** Build a runtime context string for full context inspection. */
   buildRuntimeContext?: () => Promise<string>;
   /** Report progress for a tool call. */
   reportProgress?: (context: ToolContext | undefined, summary: string, input?: unknown) => Promise<void>;
-  /** Get all agent tools for the current context. */
-  getTools?: (context?: ToolContext) => StructuredToolInterface[];
+  /** Get all agent tools as pi-ai Tool definitions. */
+  getTools?: (context?: ToolContext) => Tool[];
   /** Get tool libraries for the current context and scope. */
   getToolLibraries?: (context?: ToolContext, scope?: AgentToolScope) => ToolLibraryDefinition[];
   /** Get default visible tool names for a given scope. */

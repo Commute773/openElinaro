@@ -153,7 +153,7 @@ describe("createRuntimeScope", () => {
     expect(scope.conversationMemory).toBeDefined();
     expect(scope.reflection).toBeDefined();
     expect(scope.autonomousTime).toBeDefined();
-    expect(scope.connector).toBeDefined();
+    // connector was removed in the Pi migration; models resolve internally
     expect(scope.shell).toBeDefined();
     expect(scope.transitions).toBeDefined();
     expect(scope.routineTools).toBeDefined();
@@ -168,7 +168,6 @@ describe("createRuntimeScope", () => {
       "access",
       "autonomousTime",
       "chat",
-      "connector",
       "conversationMemory",
       "memory",
       "models",

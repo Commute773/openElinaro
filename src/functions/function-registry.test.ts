@@ -236,7 +236,7 @@ describe("generateAgentTools() surface filtering", () => {
     registry.build(stubCtx);
 
     const tools = registry.generateAgentTools(() => stubCtx);
-    const toolNames = tools.map((t) => t.name);
+    const toolNames = tools.map((t) => t.tool.name);
     expect(toolNames).toEqual(["agent-fn"]);
   });
 
@@ -252,7 +252,7 @@ describe("generateAgentTools() surface filtering", () => {
       undefined,
       (id) => id !== "finance",
     );
-    const toolNames = tools.map((t) => t.name);
+    const toolNames = tools.map((t) => t.tool.name);
     expect(toolNames).toEqual(["normal"]);
   });
 });

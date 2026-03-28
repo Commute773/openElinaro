@@ -1,4 +1,11 @@
-import type { BaseMessage } from "@langchain/core/messages";
+import type {
+  Message,
+  UserMessage,
+  AssistantMessage,
+  ToolResultMessage,
+  TextContent,
+  ImageContent,
+} from "../messages/types";
 import type {
   ChatImageContentBlock,
   ChatPromptContent,
@@ -139,8 +146,35 @@ export function extractTextFromContent(content: unknown): string {
     .join("\n\n");
 }
 
-export function extractTextFromMessage(message: BaseMessage): string {
-  return extractTextFromContent(message.content);
+export function extractTextFromMessage(message: Message): string {
+  if (message.role === "user") {
+    const user = message as UserMessage;
+    if (typeof user.content === "string") {
+      return user.content;
+    }
+    return (user.content as (TextContent | ImageContent)[])
+      .filter((block): block is TextContent => block.type === "text")
+      .map((block) => block.text)
+      .join("\n\n");
+  }
+
+  if (message.role === "assistant") {
+    const assistant = message as AssistantMessage;
+    return assistant.content
+      .filter((block): block is TextContent => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+  }
+
+  if (message.role === "toolResult") {
+    const toolResult = message as ToolResultMessage;
+    return toolResult.content
+      .filter((block): block is TextContent => block.type === "text")
+      .map((block) => block.text)
+      .join("\n\n");
+  }
+
+  return "";
 }
 
 export function approximateContentTokens(content: unknown) {

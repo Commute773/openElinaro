@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { HumanMessage, AIMessage } from "@langchain/core/messages";
+import { userMessage, assistantTextMessage } from "../messages/types";
 import {
   normalizeChatPromptContent,
   buildChatPromptContent,
@@ -185,23 +185,21 @@ describe("extractTextFromContent", () => {
 });
 
 describe("extractTextFromMessage", () => {
-  test("extracts text from HumanMessage", () => {
-    const msg = new HumanMessage("hello user");
+  test("extracts text from user message", () => {
+    const msg = userMessage("hello user");
     expect(extractTextFromMessage(msg)).toBe("hello user");
   });
 
-  test("extracts text from AIMessage", () => {
-    const msg = new AIMessage("assistant reply");
+  test("extracts text from assistant message", () => {
+    const msg = assistantTextMessage("assistant reply");
     expect(extractTextFromMessage(msg)).toBe("assistant reply");
   });
 
   test("extracts text from message with content blocks", () => {
-    const msg = new HumanMessage({
-      content: [
-        { type: "text", text: "part one" },
-        { type: "text", text: "part two" },
-      ],
-    });
+    const msg = userMessage([
+      { type: "text", text: "part one" },
+      { type: "text", text: "part two" },
+    ]);
     expect(extractTextFromMessage(msg)).toBe("part one\n\npart two");
   });
 });

@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { HumanMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { userMessage } from "../messages/types";
 import { ConversationStore } from "./conversation/conversation-store";
 import { MemoryService } from "./memory-service";
 import { ProfileService } from "./profiles";
@@ -124,7 +124,7 @@ describe("ReflectionService", () => {
     const profile = profiles.getActiveProfile();
     const routines = new RoutinesService();
     const conversations = new ConversationStore();
-    await conversations.appendMessages("dm-1", [new HumanMessage("We should clean up the finance onboarding.")]);
+    await conversations.appendMessages("dm-1", [userMessage("We should clean up the finance onboarding.")]);
     const memory = new MemoryService(profile, profiles);
     const reflection = new ReflectionService(
       profile,
@@ -166,7 +166,7 @@ describe("ReflectionService", () => {
     const profile = profiles.getActiveProfile();
     const routines = new RoutinesService();
     const conversations = new ConversationStore();
-    await conversations.appendMessages("dm-2", [new HumanMessage("The reminder system still feels too passive.")]);
+    await conversations.appendMessages("dm-2", [userMessage("The reminder system still feels too passive.")]);
     const memory = new MemoryService(profile, profiles);
     const reflection = new ReflectionService(
       profile,

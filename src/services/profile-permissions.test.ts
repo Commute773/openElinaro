@@ -3,10 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { AIMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { assistantTextMessage } from "../messages/types";
 import { NotFoundError } from "../domain/errors";
-import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 
 const repoRoot = process.cwd();
 
@@ -420,14 +419,10 @@ describe("profile-scoped auth and permissions", () => {
     const systemPrompts = new systemPromptsModule.SystemPromptService();
     const memory = new memoryModule.MemoryService(restricted, restrictedProfileService);
     const models = new modelsModule.ModelService(restricted);
-    const fakeConnector = new ScriptedProviderConnector(() => new AIMessage("stub"), {
-      providerId: "test",
-    });
     const transitions = new transitionsModule.ConversationStateTransitionService(
-      fakeConnector,
+      models,
       conversations,
       memory,
-      models,
       systemPrompts,
     );
     const registry = new toolRegistryModule.ToolRegistry(
@@ -515,14 +510,10 @@ describe("profile-scoped auth and permissions", () => {
     const systemPrompts = new systemPromptsModule.SystemPromptService();
     const memory = new memoryModule.MemoryService(root, rootProfileService);
     const models = new modelsModule.ModelService(root);
-    const fakeConnector = new ScriptedProviderConnector(() => new AIMessage("stub"), {
-      providerId: "test",
-    });
     const transitions = new transitionsModule.ConversationStateTransitionService(
-      fakeConnector,
+      models,
       conversations,
       memory,
-      models,
       systemPrompts,
     );
     const registry = new toolRegistryModule.ToolRegistry(
@@ -614,14 +605,10 @@ describe("profile-scoped auth and permissions", () => {
     const systemPrompts = new systemPromptsModule.SystemPromptService();
     const memory = new memoryModule.MemoryService(root, rootProfileService);
     const models = new modelsModule.ModelService(root);
-    const fakeConnector = new ScriptedProviderConnector(() => new AIMessage("stub"), {
-      providerId: "test",
-    });
     const transitions = new transitionsModule.ConversationStateTransitionService(
-      fakeConnector,
+      models,
       conversations,
       memory,
-      models,
       systemPrompts,
     );
     const registry = new toolRegistryModule.ToolRegistry(
@@ -711,14 +698,10 @@ describe("profile-scoped auth and permissions", () => {
     const systemPrompts = new systemPromptsModule.SystemPromptService();
     const memory = new memoryModule.MemoryService(root, rootProfileService);
     const models = new modelsModule.ModelService(root);
-    const fakeConnector = new ScriptedProviderConnector(() => new AIMessage("stub"), {
-      providerId: "test",
-    });
     const transitions = new transitionsModule.ConversationStateTransitionService(
-      fakeConnector,
+      models,
       conversations,
       memory,
-      models,
       systemPrompts,
     );
     const registry = new toolRegistryModule.ToolRegistry(
@@ -874,14 +857,10 @@ describe("profile-scoped auth and permissions", () => {
     const systemPrompts = new systemPromptsModule.SystemPromptService();
     const memory = new memoryModule.MemoryService(restricted, profileService);
     const models = new modelsModule.ModelService(restricted);
-    const fakeConnector = new ScriptedProviderConnector(() => new AIMessage("stub"), {
-      providerId: "test",
-    });
     const transitions = new transitionsModule.ConversationStateTransitionService(
-      fakeConnector,
+      models,
       conversations,
       memory,
-      models,
       systemPrompts,
     );
     const registry = new toolRegistryModule.ToolRegistry(

@@ -3,7 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { ToolMessage, type BaseMessage } from "@langchain/core/messages";
+import type { Message, ToolResultMessage } from "../messages/types";
+import { isToolResultMessage } from "../messages/types";
 
 import { getTestFixturesDir } from "../test/fixtures";
 
@@ -117,10 +118,11 @@ function readUsageLedger() {
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
-function getToolMessageText(message: ToolMessage) {
-  return typeof message.content === "string"
-    ? message.content
-    : JSON.stringify(message.content);
+function getToolResultMessageText(message: ToolResultMessage) {
+  return message.content
+    .filter((block): block is { type: "text"; text: string } => block.type === "text")
+    .map((block) => block.text)
+    .join("");
 }
 
 async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 60_000) {
@@ -196,20 +198,20 @@ async function main() {
   const store = new conversationStoreModule.ConversationStore();
   await waitFor(async () => {
     const conversation = await store.get(conversationKey);
-    return conversation.messages.some((message: BaseMessage) => message instanceof ToolMessage && message.name === "tool_result_read");
+    return conversation.messages.some((message: Message) => isToolResultMessage(message) && message.toolName === "tool_result_read");
   });
   const conversation = await store.get(conversationKey);
   const execToolMessage = [...conversation.messages]
     .reverse()
-    .find((message): message is ToolMessage => message instanceof ToolMessage && message.name === "exec_command");
+    .find((message): message is ToolResultMessage => isToolResultMessage(message) && message.toolName === "exec_command");
   const readToolMessage = [...conversation.messages]
     .reverse()
-    .find((message): message is ToolMessage => message instanceof ToolMessage && message.name === "tool_result_read");
+    .find((message): message is ToolResultMessage => isToolResultMessage(message) && message.toolName === "tool_result_read");
 
   assert(execToolMessage);
   assert(readToolMessage);
-  const execToolText = getToolMessageText(execToolMessage);
-  const readToolText = getToolMessageText(readToolMessage);
+  const execToolText = getToolResultMessageText(execToolMessage);
+  const readToolText = getToolResultMessageText(readToolMessage);
   assert.match(execToolText, /\[tool_result_ref\b/);
   assert.doesNotMatch(execToolText, /noise-1/);
   assert.match(readToolText.toLowerCase(), /raspberry/);

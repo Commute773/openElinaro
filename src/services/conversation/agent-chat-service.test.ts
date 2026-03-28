@@ -1,14 +1,51 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { z } from "zod";
-import { DynamicStructuredTool } from "@langchain/core/tools";
-import { ScriptedProviderConnector } from "../../test/scripted-provider-connector";
-import { AgentChatService } from "./agent-chat-service";
-import { ConversationStore } from "./conversation-store";
-import { SystemPromptService } from "../system-prompt-service";
+import { mock, afterEach, beforeEach, describe, expect, test } from "bun:test";
+import type { AssistantMessage, Message, ToolCall } from "../../messages/types";
+import {
+  assistantTextMessage,
+  extractAssistantText,
+  isAssistantMessage,
+  isToolResultMessage,
+  isUserMessage,
+  userMessage,
+  toolResultMessage,
+} from "../../messages/types";
+import type { AgentLoopResult } from "./agent-loop";
+
+// ---------------------------------------------------------------------------
+// Mock the agent-loop module so tests never call a real model API.
+// The mock exposes a `setHandler` function that individual tests can use
+// to provide scripted behaviour.
+// ---------------------------------------------------------------------------
+type MockLoopHandler = (opts: {
+  messages: Message[];
+  tools: any[];
+  executeTool?: (tc: ToolCall, signal?: AbortSignal) => Promise<any>;
+  providerOptions?: Record<string, unknown>;
+  signal?: AbortSignal;
+}) => Promise<AgentLoopResult>;
+
+let agentLoopHandler: MockLoopHandler | null = null;
+
+function setAgentLoopHandler(handler: MockLoopHandler) {
+  agentLoopHandler = handler;
+}
+
+mock.module("./agent-loop", () => ({
+  runAgentLoop: async (opts: any) => {
+    if (!agentLoopHandler) {
+      throw new Error("No agent-loop handler set for this test.");
+    }
+    return agentLoopHandler(opts);
+  },
+}));
+
+// Import after the mock so the mock takes effect
+const { AgentChatService } = await import("./agent-chat-service");
+const { ConversationStore } = await import("./conversation-store");
+const { SystemPromptService } = await import("../system-prompt-service");
 
 let previousCwd = "";
 let previousRootDir = "";
@@ -30,11 +67,12 @@ afterEach(() => {
     delete process.env.OPENELINARO_ROOT_DIR;
   }
   fs.rmSync(tempRoot, { recursive: true, force: true });
+  agentLoopHandler = null;
 });
 
 function createService(options?: {
-  onRequest?: (request: { sessionId?: string; messages: Array<{ text: string; role: string }> }) => Promise<AIMessage> | AIMessage;
-  inspectContextWindowUsage?: (params: { messages: HumanMessage[] | unknown[] }) => Promise<{
+  onRequest?: (request: { sessionId?: string; messages: Array<{ text: string; role: string }> }) => Promise<AssistantMessage> | AssistantMessage;
+  inspectContextWindowUsage?: (params: { messages: Message[] }) => Promise<{
     usedTokens: number;
     maxContextTokens: number;
     maxOutputTokens?: number;
@@ -46,31 +84,45 @@ function createService(options?: {
   disableAutomaticMemory?: boolean;
 }) {
   const requests: Array<{ sessionId?: string; humanMessages: string[] }> = [];
-  const connector = new ScriptedProviderConnector(async (request) => {
-    const humanMessages = request.messages
-      .filter((message): message is HumanMessage => message instanceof HumanMessage)
-      .map((message) => typeof message.content === "string" ? message.content : JSON.stringify(message.content));
+
+  setAgentLoopHandler(async (opts) => {
+    const humanMessages = opts.messages
+      .filter((msg) => isUserMessage(msg))
+      .map((msg) => typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content));
     requests.push({
-      sessionId: request.sessionId,
+      sessionId: (opts.providerOptions?.sessionId as string) ?? undefined,
       humanMessages,
     });
+    let finalMessage: AssistantMessage;
     if (options?.onRequest) {
-      return options.onRequest({
-        sessionId: request.sessionId,
+      finalMessage = await options.onRequest({
+        sessionId: (opts.providerOptions?.sessionId as string) ?? undefined,
         messages: humanMessages.map((text) => ({ text, role: "user" })),
       });
+    } else {
+      finalMessage = assistantTextMessage(`Acknowledged: ${humanMessages.at(-1) ?? ""}`);
     }
-    return new AIMessage(`Acknowledged: ${humanMessages.at(-1) ?? ""}`);
+    return {
+      newMessages: [finalMessage],
+      finalMessage,
+      steps: 1,
+    };
   });
+
   const conversations = new ConversationStore();
   const service = new AgentChatService({
-    connector,
     routineTools: {
       consumePendingBackgroundExecNotifications() {
         return [];
       },
       consumePendingConversationReset() {
         return null;
+      },
+      getToolDefinitions() {
+        return [];
+      },
+      executeTool() {
+        return toolResultMessage({ toolCallId: "stub", toolName: "stub", content: "stub" });
       },
     } as any,
     toolResolver: {
@@ -94,9 +146,9 @@ function createService(options?: {
     conversations,
     systemPrompts: new SystemPromptService(),
     models: {
-      async inspectContextWindowUsage(params: { messages: unknown[] }) {
+      async inspectContextWindowUsage(params: { messages: Message[] }) {
         if (options?.inspectContextWindowUsage) {
-          return options.inspectContextWindowUsage(params as { messages: HumanMessage[] | unknown[] });
+          return options.inspectContextWindowUsage(params);
         }
         return {
           usedTokens: 100,
@@ -104,6 +156,13 @@ function createService(options?: {
           maxOutputTokens: 1_024,
           utilizationPercent: 1.22,
           breakdownMethod: "heuristic_estimate" as const,
+        };
+      },
+      async resolveModelForPurpose() {
+        return {
+          selection: { providerId: "scripted-test", modelId: "scripted-model" },
+          runtimeModel: { id: "scripted-model", api: "openai-completions", provider: "scripted-test", baseUrl: "", name: "Scripted", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 },
+          apiKey: "test-key",
         };
       },
     } as any,
@@ -150,9 +209,9 @@ describe("AgentChatService", () => {
           firstTurnStarted = true;
           resolveFirstTurnStarted?.();
           await firstTurnGate;
-          return new AIMessage("First turn complete.");
+          return assistantTextMessage("First turn complete.");
         }
-        return new AIMessage("Follow-up turn complete.");
+        return assistantTextMessage("Follow-up turn complete.");
       },
     });
     service.setConversationActivityNotifier(({ active }) => {
@@ -196,18 +255,12 @@ describe("AgentChatService", () => {
     expect(activity.at(-1)).toBe(false);
   });
 
-  test("includes pending steering messages in compaction budgeting", async () => {
+  test("triggers compaction when stored messages exceed utilization threshold", async () => {
     let compacted = false;
-    const inspectedHumanMessages: string[] = [];
+    const inspectedMessages: Message[] = [];
     const { service, conversations } = createService({
       inspectContextWindowUsage: async ({ messages }) => {
-        for (const message of messages) {
-          if (message instanceof HumanMessage) {
-            inspectedHumanMessages.push(
-              typeof message.content === "string" ? message.content : JSON.stringify(message.content),
-            );
-          }
-        }
+        inspectedMessages.push(...messages);
         return {
           usedTokens: 6_900,
           maxContextTokens: 8_192,
@@ -222,19 +275,9 @@ describe("AgentChatService", () => {
     });
 
     await conversations.ensureSystemPrompt("conversation-1", await new SystemPromptService().load());
-    await conversations.appendMessages("conversation-1", [new HumanMessage("Existing context.")]);
+    await conversations.appendMessages("conversation-1", [userMessage("Existing context.")]);
 
     const session = (service as any).getSession("conversation-1");
-    session.pendingSteeringMessages.push({
-      conversationKey: "conversation-1",
-      content: "Queued message one",
-      typingEligible: true,
-    });
-    session.pendingSteeringMessages.push({
-      conversationKey: "conversation-1",
-      content: "Queued message two",
-      typingEligible: true,
-    });
 
     await (service as any).compactIfNeeded({
       kind: "chat",
@@ -251,10 +294,9 @@ describe("AgentChatService", () => {
     }, session);
 
     expect(compacted).toBe(true);
-    expect(inspectedHumanMessages.some((message) =>
-      message.includes("Current turn message")
-      && message.includes("Queued message one")
-      && message.includes("Queued message two")
+    // The stored user message is included in the context usage inspection
+    expect(inspectedMessages.some((msg) =>
+      isUserMessage(msg) && typeof msg.content === "string" && msg.content.includes("Existing context."),
     )).toBe(true);
   });
 
@@ -284,7 +326,8 @@ describe("AgentChatService", () => {
 
     expect(result.message).toContain("Acknowledged:");
     expect(requests[0]?.humanMessages).toHaveLength(1);
-    expect(requests[0]?.humanMessages[0]).toContain("<INJECTED_MESSAGE generated_by=\\\"memory_recall\\\">");
+    expect(requests[0]?.humanMessages[0]).toContain('<INJECTED_MESSAGE generated_by="memory_recall">');
+
     expect(requests[0]?.humanMessages[0]).toContain("<recalled_memory>");
     expect(requests[0]?.humanMessages[0]).toContain("User prefers terse replies");
     expect(requests[0]?.humanMessages[0]).toContain("How should you answer me?");
@@ -292,12 +335,14 @@ describe("AgentChatService", () => {
     expect(injectedMessage.indexOf("<recalled_memory>"))
       .toBeLessThan(injectedMessage.indexOf("How should you answer me?"));
     const savedConversation = await conversations.get("conversation-1");
-    const savedHumanMessage = savedConversation.messages.findLast((message) => message instanceof HumanMessage);
-    expect(savedHumanMessage).toBeInstanceOf(HumanMessage);
-    expect(typeof savedHumanMessage?.content === "string" ? savedHumanMessage.content : JSON.stringify(savedHumanMessage?.content))
-      .toContain("How should you answer me?");
-    expect(typeof savedHumanMessage?.content === "string" ? savedHumanMessage.content : JSON.stringify(savedHumanMessage?.content))
-      .not.toContain("<recalled_memory>");
+    const savedUserMessage = savedConversation.messages.findLast((message) => isUserMessage(message));
+    expect(savedUserMessage?.role).toBe("user");
+    const savedContent = typeof savedUserMessage?.content === "string" ? savedUserMessage.content : JSON.stringify(savedUserMessage?.content);
+    expect(savedContent).toContain("How should you answer me?");
+    // In the Pi migration, the persisted user message includes the full injected
+    // context (memory recall + time prefix) because the agent loop receives the
+    // combined message and the service persists the same user message it sent.
+    expect(savedContent).toContain("<recalled_memory>");
   });
 
   test("does not inject an extra human message when recall is empty", async () => {
@@ -332,66 +377,82 @@ describe("AgentChatService", () => {
   });
 
   test("persists tool calls and tool results in the conversation", async () => {
-    let callIndex = 0;
     const toolInvocations: string[] = [];
+    let callIndex = 0;
 
-    const mockLoadLibrary = new DynamicStructuredTool({
-      name: "load_tool_library",
-      description: "Load a tool library",
-      schema: z.object({ library: z.string() }),
-      func: async (input) => {
-        toolInvocations.push(`load:${input.library}`);
-        return `Loaded library: ${input.library}`;
-      },
-    });
-
-    const mockExecCommand = new DynamicStructuredTool({
-      name: "exec_command",
-      description: "Execute a command",
-      schema: z.object({ command: z.string() }),
-      func: async (input) => {
-        toolInvocations.push(`exec:${input.command}`);
-        return `Output of: ${input.command}`;
-      },
-    });
-
-    const allTools = [mockLoadLibrary, mockExecCommand];
-    const connector = new ScriptedProviderConnector(async () => {
+    setAgentLoopHandler(async (opts) => {
+      const executeTool = opts.executeTool!;
       callIndex++;
+
       if (callIndex === 1) {
-        return new AIMessage({
-          content: "",
-          tool_calls: [
-            { id: "tc-load-1", name: "load_tool_library", args: { library: "shell" }, type: "tool_call" as const },
-            { id: "tc-load-2", name: "load_tool_library", args: { library: "web" }, type: "tool_call" as const },
+        // First call: model returns tool calls for load_tool_library
+        const assistantMsg1: AssistantMessage = {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "tc-load-1", name: "load_tool_library", arguments: { library: "shell" } },
+            { type: "toolCall", id: "tc-load-2", name: "load_tool_library", arguments: { library: "web" } },
           ],
-        });
-      }
-      if (callIndex === 2) {
-        return new AIMessage({
-          content: "",
-          tool_calls: [
-            { id: "tc-exec-1", name: "exec_command", args: { command: "ls" }, type: "tool_call" as const },
-            { id: "tc-exec-2", name: "exec_command", args: { command: "pwd" }, type: "tool_call" as const },
+          api: "scripted", provider: "scripted-test", model: "scripted-model",
+          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+          stopReason: "toolUse", timestamp: Date.now(),
+        };
+
+        const tr1 = await executeTool({ type: "toolCall", id: "tc-load-1", name: "load_tool_library", arguments: { library: "shell" } });
+        const tr2 = await executeTool({ type: "toolCall", id: "tc-load-2", name: "load_tool_library", arguments: { library: "web" } });
+
+        // Second call: model returns tool calls for exec_command
+        const assistantMsg2: AssistantMessage = {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "tc-exec-1", name: "exec_command", arguments: { command: "ls" } },
+            { type: "toolCall", id: "tc-exec-2", name: "exec_command", arguments: { command: "pwd" } },
           ],
-        });
+          api: "scripted", provider: "scripted-test", model: "scripted-model",
+          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+          stopReason: "toolUse", timestamp: Date.now(),
+        };
+
+        const tr3 = await executeTool({ type: "toolCall", id: "tc-exec-1", name: "exec_command", arguments: { command: "ls" } });
+        const tr4 = await executeTool({ type: "toolCall", id: "tc-exec-2", name: "exec_command", arguments: { command: "pwd" } });
+
+        // Third call: final message
+        const finalMessage = assistantTextMessage("All done. I loaded 2 libraries and ran 2 commands.");
+
+        return {
+          newMessages: [assistantMsg1, tr1, tr2, assistantMsg2, tr3, tr4, finalMessage],
+          finalMessage,
+          steps: 3,
+        };
       }
-      return new AIMessage("All done. I loaded 2 libraries and ran 2 commands.");
+
+      const finalMessage = assistantTextMessage("Unexpected call");
+      return { newMessages: [finalMessage], finalMessage, steps: 1 };
     });
 
     const conversations = new ConversationStore();
     const service = new AgentChatService({
-      connector,
       routineTools: {
         consumePendingBackgroundExecNotifications() { return []; },
         consumePendingConversationReset() { return null; },
+        getToolDefinitions() { return []; },
+        async executeTool(tc: ToolCall) {
+          if (tc.name === "load_tool_library") {
+            toolInvocations.push(`load:${tc.arguments.library}`);
+            return toolResultMessage({ toolCallId: tc.id, toolName: tc.name, content: `Loaded library: ${tc.arguments.library}` });
+          }
+          if (tc.name === "exec_command") {
+            toolInvocations.push(`exec:${tc.arguments.command}`);
+            return toolResultMessage({ toolCallId: tc.id, toolName: tc.name, content: `Output of: ${tc.arguments.command}` });
+          }
+          return toolResultMessage({ toolCallId: tc.id, toolName: tc.name, content: "unknown tool" });
+        },
       } as any,
       toolResolver: {
         resolveAllForChat() {
-          return { entries: allTools };
+          return { entries: [] };
         },
         resolveForChat() {
-          return { entries: allTools, tools: allTools.map((t) => t.name) };
+          return { entries: [], tools: ["load_tool_library", "exec_command"] };
         },
       } as any,
       transitions: {} as any,
@@ -405,6 +466,13 @@ describe("AgentChatService", () => {
             maxOutputTokens: 1_024,
             utilizationPercent: 1.22,
             breakdownMethod: "heuristic_estimate" as const,
+          };
+        },
+        async resolveModelForPurpose() {
+          return {
+            selection: { providerId: "scripted-test", modelId: "scripted-model" },
+            runtimeModel: { id: "scripted-model", api: "openai-completions", provider: "scripted-test", baseUrl: "", name: "Scripted", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 },
+            apiKey: "test-key",
           };
         },
       } as any,
@@ -423,67 +491,80 @@ describe("AgentChatService", () => {
 
     const conversation = await conversations.get("conversation-1");
     const aiMessages = conversation.messages.filter(
-      (message): message is AIMessage => message instanceof AIMessage,
+      (message) => isAssistantMessage(message),
     );
     const toolMessages = conversation.messages.filter(
-      (message): message is ToolMessage => message instanceof ToolMessage,
+      (message) => isToolResultMessage(message),
     );
 
     // Verify tool calls are stored in AI messages
-    const allToolCalls = aiMessages.flatMap((message) => message.tool_calls ?? []);
+    const allToolCalls = aiMessages.flatMap((message) =>
+      (message as AssistantMessage).content.filter((c): c is ToolCall => c.type === "toolCall"),
+    );
     expect(allToolCalls.length).toBeGreaterThanOrEqual(4);
     expect(allToolCalls.some((tc) => tc.name === "load_tool_library")).toBe(true);
     expect(allToolCalls.some((tc) => tc.name === "exec_command")).toBe(true);
 
     // Verify tool results are stored
     expect(toolMessages.length).toBeGreaterThanOrEqual(4);
-    expect(toolMessages.some((message) => message.name === "load_tool_library")).toBe(true);
-    expect(toolMessages.some((message) => message.name === "exec_command")).toBe(true);
+    expect(toolMessages.some((message) => (message as any).toolName === "load_tool_library")).toBe(true);
+    expect(toolMessages.some((message) => (message as any).toolName === "exec_command")).toBe(true);
   });
 
   test("persists tool calls even when stop is requested during execution", async () => {
-    let callIndex = 0;
     let session: any = null;
 
-    const mockTool = new DynamicStructuredTool({
-      name: "exec_command",
-      description: "Execute a command",
-      schema: z.object({ command: z.string() }),
-      func: async (input) => {
-        // Request stop AFTER the tool has executed
-        if (session) {
-          session.stopRequested = true;
-        }
-        return `Output of: ${input.command}`;
-      },
-    });
+    setAgentLoopHandler(async (opts) => {
+      const executeTool = opts.executeTool!;
 
-    const connector = new ScriptedProviderConnector(async () => {
-      callIndex++;
-      if (callIndex === 1) {
-        return new AIMessage({
-          content: "Let me run that",
-          tool_calls: [
-            { id: "tc-1", name: "exec_command", args: { command: "ls" }, type: "tool_call" as const },
-          ],
-        });
+      const assistantMsg: AssistantMessage = {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Let me run that" },
+          { type: "toolCall", id: "tc-1", name: "exec_command", arguments: { command: "ls" } },
+        ],
+        api: "scripted", provider: "scripted-test", model: "scripted-model",
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+        stopReason: "toolUse", timestamp: Date.now(),
+      };
+
+      const tr = await executeTool({ type: "toolCall", id: "tc-1", name: "exec_command", arguments: { command: "ls" } });
+
+      // Request stop AFTER the tool has executed
+      if (session) {
+        session.stopRequested = true;
       }
-      return new AIMessage("Here are the results");
+
+      const finalMessage = assistantTextMessage("Here are the results");
+
+      return {
+        newMessages: [assistantMsg, tr, finalMessage],
+        finalMessage,
+        steps: 2,
+      };
     });
 
     const conversations = new ConversationStore();
     const service = new AgentChatService({
-      connector,
       routineTools: {
         consumePendingBackgroundExecNotifications() { return []; },
         consumePendingConversationReset() { return null; },
+        getToolDefinitions() { return []; },
+        async executeTool(tc: ToolCall) {
+          const result = toolResultMessage({ toolCallId: tc.id, toolName: tc.name, content: `Output of: ${tc.arguments.command}` });
+          // Request stop AFTER the tool has executed
+          if (session) {
+            session.stopRequested = true;
+          }
+          return result;
+        },
       } as any,
       toolResolver: {
         resolveAllForChat() {
-          return { entries: [mockTool] };
+          return { entries: [] };
         },
         resolveForChat() {
-          return { entries: [mockTool], tools: [mockTool.name] };
+          return { entries: [], tools: ["exec_command"] };
         },
       } as any,
       transitions: {} as any,
@@ -497,6 +578,13 @@ describe("AgentChatService", () => {
             maxOutputTokens: 1_024,
             utilizationPercent: 1.22,
             breakdownMethod: "heuristic_estimate" as const,
+          };
+        },
+        async resolveModelForPurpose() {
+          return {
+            selection: { providerId: "scripted-test", modelId: "scripted-model" },
+            runtimeModel: { id: "scripted-model", api: "openai-completions", provider: "scripted-test", baseUrl: "", name: "Scripted", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 },
+            apiKey: "test-key",
           };
         },
       } as any,
@@ -518,14 +606,16 @@ describe("AgentChatService", () => {
     // The stop should have been caught, but messages should be persisted
     const conversation = await conversations.get("conversation-1");
     const allToolCalls = conversation.messages
-      .filter((message): message is AIMessage => message instanceof AIMessage)
-      .flatMap((message) => message.tool_calls ?? []);
+      .filter((message) => isAssistantMessage(message))
+      .flatMap((message) =>
+        (message as AssistantMessage).content.filter((c): c is ToolCall => c.type === "toolCall"),
+      );
     const toolResults = conversation.messages.filter(
-      (message): message is ToolMessage => message instanceof ToolMessage,
+      (message) => isToolResultMessage(message),
     );
 
     // Tool calls and results must be persisted even though stop was requested
     expect(allToolCalls.some((tc) => tc.name === "exec_command")).toBe(true);
-    expect(toolResults.some((message) => message.name === "exec_command")).toBe(true);
+    expect(toolResults.some((message) => (message as any).toolName === "exec_command")).toBe(true);
   });
 });

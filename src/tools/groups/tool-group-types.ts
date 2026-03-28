@@ -1,4 +1,3 @@
-import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { FinanceService } from "../../services/finance-service";
 import type { HealthTrackingService } from "../../services/health-tracking-service";
 import type { RoutinesService } from "../../services/scheduling/routines-service";
@@ -28,7 +27,7 @@ import type {
 import type { RuntimePlatform } from "../../services/infrastructure/runtime-platform";
 import type { PhoneCallBackend } from "../../services/phone-call-backends";
 import type { Zigbee2MqttService } from "../../services/zigbee2mqtt-service";
-import type { SubagentController } from "./subagent-tools";
+import type { SubagentController } from "../../app/runtime-subagent";
 import type { SystemPromptService } from "../../services/system-prompt-service";
 import type { ConversationStateTransitionService } from "../../services/conversation/conversation-state-transition-service";
 import type { ReflectionService } from "../../services/reflection-service";

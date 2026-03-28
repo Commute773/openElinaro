@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import type { Message } from "../messages/types";
+import { userMessage, assistantTextMessage } from "../messages/types";
 import { InferencePromptDriftMonitor } from "./inference-prompt-drift-monitor";
 
 describe("InferencePromptDriftMonitor", () => {
@@ -7,7 +9,7 @@ describe("InferencePromptDriftMonitor", () => {
 
     const warning = monitor.inspect({
       sessionId: "session-1",
-      prompt: [{ role: "user", content: "hello" }],
+      prompt: [userMessage("hello")],
     });
 
     expect(warning).toBeNull();
@@ -17,14 +19,14 @@ describe("InferencePromptDriftMonitor", () => {
     const monitor = new InferencePromptDriftMonitor();
     monitor.inspect({
       sessionId: "session-1",
-      prompt: [{ role: "user", content: "hello" }],
+      prompt: [userMessage("hello")],
     });
 
     const warning = monitor.inspect({
       sessionId: "session-1",
       prompt: [
-        { role: "user", content: "hello" },
-        { role: "assistant", content: "world" },
+        userMessage("hello"),
+        assistantTextMessage("world"),
       ],
     });
 
@@ -36,16 +38,16 @@ describe("InferencePromptDriftMonitor", () => {
     monitor.inspect({
       sessionId: "session-1",
       prompt: [
-        { role: "user", content: "alpha" },
-        { role: "assistant", content: "beta" },
+        userMessage("alpha"),
+        assistantTextMessage("beta"),
       ],
     });
 
     const warning = monitor.inspect({
       sessionId: "session-1",
       prompt: [
-        { role: "user", content: "alpha changed" },
-        { role: "assistant", content: "beta" },
+        userMessage("alpha changed"),
+        assistantTextMessage("beta"),
       ],
     });
 
@@ -66,18 +68,18 @@ describe("InferencePromptDriftMonitor", () => {
     const monitor = new InferencePromptDriftMonitor();
     monitor.inspect({
       sessionId: "session-1",
+      systemPrompt: "base prompt",
       prompt: [
-        { role: "system", content: "base prompt" },
-        { role: "user", content: "hello" },
-        { role: "assistant", content: "world" },
+        userMessage("hello"),
+        assistantTextMessage("world"),
       ],
     });
 
     const warning = monitor.inspect({
       sessionId: "session-1",
+      systemPrompt: "base prompt",
       prompt: [
-        { role: "system", content: "base prompt" },
-        { role: "user", content: "hello" },
+        userMessage("hello"),
       ],
     });
 
@@ -88,18 +90,18 @@ describe("InferencePromptDriftMonitor", () => {
     const monitor = new InferencePromptDriftMonitor();
     monitor.inspect({
       sessionId: "session-1",
+      systemPrompt: "base prompt",
       prompt: [
-        { role: "system", content: "base prompt" },
-        { role: "user", content: "hello" },
-        { role: "assistant", content: "world" },
+        userMessage("hello"),
+        assistantTextMessage("world"),
       ],
     });
 
     const warning = monitor.inspect({
       sessionId: "session-1",
+      systemPrompt: "base prompt",
       prompt: [
-        { role: "system", content: "base prompt" },
-        { role: "user", content: "replacement" },
+        userMessage("replacement"),
       ],
     });
 
@@ -114,18 +116,18 @@ describe("InferencePromptDriftMonitor", () => {
     const longSystemContent = "base prompt ".repeat(100).trim();
     monitor.inspect({
       sessionId: "session-1",
+      systemPrompt: longSystemContent,
       prompt: [
-        { role: "system", content: longSystemContent },
-        { role: "user", content: "hello" },
-        { role: "assistant", content: "world" },
+        userMessage("hello"),
+        assistantTextMessage("world"),
       ],
     });
 
     const warning = monitor.inspect({
       sessionId: "session-1",
+      systemPrompt: longSystemContent,
       prompt: [
-        { role: "system", content: longSystemContent },
-        { role: "user", content: "replacement" },
+        userMessage("replacement"),
       ],
     });
 
@@ -136,17 +138,17 @@ describe("InferencePromptDriftMonitor", () => {
     const monitor = new InferencePromptDriftMonitor();
     monitor.inspect({
       sessionId: "session-1",
+      systemPrompt: "base prompt",
       prompt: [
-        { role: "system", content: "base prompt" },
-        { role: "user", content: "hello" },
+        userMessage("hello"),
       ],
     });
 
     const warning = monitor.inspect({
       sessionId: "session-1",
+      systemPrompt: "changed prompt",
       prompt: [
-        { role: "system", content: "changed prompt" },
-        { role: "user", content: "hello" },
+        userMessage("hello"),
       ],
     });
 

@@ -2,8 +2,6 @@ import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { ConfigurationError, NotFoundError, ValidationError } from "../../domain/errors";
-import { AIMessage, HumanMessage, SystemMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
-import type { StructuredToolInterface } from "@langchain/core/tools";
 import {
   getModels,
   stream,
@@ -12,11 +10,18 @@ import {
   type Message,
   type Model,
   type ThinkingLevel,
+  type Tool as PiTool,
   type Usage,
 } from "@mariozechner/pi-ai";
+import type {
+  AssistantMessage,
+  ToolResultMessage,
+  TextContent,
+  ImageContent,
+  ToolCall,
+} from "../../messages/types";
 import { getOAuthApiKey, type OAuthCredentials } from "@mariozechner/pi-ai/oauth";
 import { approximateTextTokens, normalizeString } from "../../utils/text-utils";
-import { z } from "zod";
 import {
   approximateContentTokens,
   extractTextFromMessage,
@@ -369,11 +374,8 @@ function extractAccountId(token: string) {
   }
 }
 
-function toolSchemaToJson(tool: StructuredToolInterface) {
-  if ("safeParse" in tool.schema) {
-    return z.toJSONSchema(tool.schema as unknown as Parameters<typeof z.toJSONSchema>[0]);
-  }
-  return tool.schema;
+function toolSchemaToJson(tool: PiTool) {
+  return tool.parameters;
 }
 
 function buildAnthropicAuthHeaders(apiKey: string) {
@@ -584,17 +586,17 @@ function hrtimeMs(startedAt: bigint, endedAt: bigint) {
 
 function approximateConversationTokens(params: {
   systemPrompt: string;
-  messages: BaseMessage[];
-  tools: StructuredToolInterface[];
+  messages: Message[];
+  tools: PiTool[];
 }) {
   const breakdown = approximateConversationTokenBreakdown(params);
   const latestAssistant = [...params.messages]
     .reverse()
-    .find((message): message is AIMessage => message instanceof AIMessage);
-  const usageMetadata = latestAssistant?.usage_metadata;
+    .find((message): message is AssistantMessage => message.role === "assistant") as AssistantMessage | undefined;
+  const usage = latestAssistant?.usage;
   const usageEstimate =
-    usageMetadata?.input_tokens && usageMetadata?.output_tokens
-      ? usageMetadata.input_tokens + usageMetadata.output_tokens
+    usage?.input && usage?.output
+      ? usage.input + usage.output
       : 0;
 
   return Math.max(breakdown.estimatedTotalTokens, usageEstimate);
@@ -602,8 +604,8 @@ function approximateConversationTokens(params: {
 
 function approximateConversationTokenBreakdown(params: {
   systemPrompt: string;
-  messages: BaseMessage[];
-  tools: StructuredToolInterface[];
+  messages: Message[];
+  tools: PiTool[];
 }) {
   const breakdown = {
     systemPromptTokens: approximateTextTokens(params.systemPrompt),
@@ -623,23 +625,25 @@ function approximateConversationTokenBreakdown(params: {
   };
 
   for (const message of params.messages) {
-    if (message instanceof ToolMessage) {
+    if (message.role === "toolResult") {
       breakdown.toolResponseTokens += approximateTextTokens(extractTextFromMessage(message)) + 24;
       continue;
     }
 
-    if (message instanceof AIMessage) {
+    if (message.role === "assistant") {
+      const assistant = message as AssistantMessage;
       breakdown.assistantReplyTokens += approximateTextTokens(extractTextFromMessage(message));
-      breakdown.toolCallInputTokens += (message.tool_calls ?? []).reduce((toolSum, toolCall) =>
+      const toolCalls = assistant.content.filter((block): block is ToolCall => block.type === "toolCall");
+      breakdown.toolCallInputTokens += toolCalls.reduce((toolSum, toolCall) =>
         toolSum + approximateTextTokens(JSON.stringify({
           id: toolCall.id,
           name: toolCall.name,
-          args: toolCall.args ?? {},
+          input: toolCall.arguments ?? {},
         })) + 24, 0);
       continue;
     }
 
-    if (message instanceof HumanMessage || message instanceof SystemMessage) {
+    if (message.role === "user") {
       breakdown.userMessageTokens += approximateContentTokens(message.content) + 12;
     }
   }
@@ -696,28 +700,25 @@ function toAnthropicUserContent(content: unknown): string | Array<Record<string,
   });
 }
 
-function toAnthropicMessages(messages: BaseMessage[]) {
+function toAnthropicMessages(messages: Message[]) {
   const normalized: AnthropicRequestMessage[] = [];
   for (const message of messages) {
-    if (message instanceof SystemMessage) {
-      continue;
-    }
-
-    if (message instanceof HumanMessage) {
+    if (message.role === "user") {
       normalized.push({ role: "user", content: toAnthropicUserContent(message.content) });
       continue;
     }
 
-    if (message instanceof ToolMessage) {
+    if (message.role === "toolResult") {
+      const toolResult = message as ToolResultMessage;
       normalized.push(
         {
           role: "user",
           content: [
             {
               type: "tool_result",
-              tool_use_id: message.tool_call_id,
+              tool_use_id: toolResult.toolCallId,
               content: extractTextFromMessage(message),
-              is_error: message.status === "error",
+              is_error: toolResult.isError ?? false,
             },
           ],
         },
@@ -725,24 +726,24 @@ function toAnthropicMessages(messages: BaseMessage[]) {
       continue;
     }
 
-    if (message instanceof AIMessage) {
+    if (message.role === "assistant") {
+      const assistant = message as AssistantMessage;
       const textContent = extractTextFromMessage(message);
+      const toolCalls = assistant.content.filter((block): block is ToolCall => block.type === "toolCall");
       const content = [
         ...(textContent
           ? [{ type: "text", text: textContent }]
           : []),
-        ...((message.tool_calls ?? []).map((toolCall) => ({
+        ...(toolCalls.map((toolCall) => ({
           type: "tool_use",
           id: toolCall.id ?? `tool_${Date.now()}`,
           name: toolCall.name,
-          input: toolCall.args ?? {},
+          input: toolCall.arguments ?? {},
         }))),
       ];
       normalized.push({ role: "assistant", content });
       continue;
     }
-
-    normalized.push({ role: "user", content: toAnthropicUserContent(message.content) });
   }
   return normalized;
 }
@@ -1010,8 +1011,8 @@ export class ModelService {
   async inspectContextWindowUsage(params: {
     conversationKey: string;
     systemPrompt: string;
-    messages: BaseMessage[];
-    tools: StructuredToolInterface[];
+    messages: Message[];
+    tools: PiTool[];
   }): Promise<ContextWindowUsage> {
     const resolved = await this.resolveActiveRuntimeModel();
     const maxContextTokens = getSelectedContextWindow(
@@ -1218,8 +1219,8 @@ export class ModelService {
     modelId: string;
     apiKey: string;
     systemPrompt: string;
-    messages: BaseMessage[];
-    tools: StructuredToolInterface[];
+    messages: Message[];
+    tools: PiTool[];
   }) {
     const response = await fetch("https://api.anthropic.com/v1/messages/count_tokens", {
       method: "POST",

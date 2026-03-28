@@ -1,9 +1,11 @@
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
-import { z } from "zod";
+import type { Tool, ToolCall } from "@mariozechner/pi-ai";
+import type { ToolResultMessage } from "../messages/types";
+import { toolResultMessage } from "../messages/types";
 import {
   renderShellExecResult,
 } from "./groups";
 import type { SubagentController } from "./groups";
+import type { PiToolEntry } from "../functions/generate-tools";
 import {
   stripToolControlInput,
   normalizeToolFailure,
@@ -12,11 +14,9 @@ import {
   notifyToolUse,
   notifyToolResultProgress,
   reportProgress,
-  wrapToolWithDefaultCwd,
-  wrapToolOutput,
-  getToolInputSchema,
   guardRuntimeContextSection,
   initUntrustedOutputMap,
+  formatToolUseSummary,
 } from "./tool-output-pipeline";
 import type { AppProgressEvent } from "../domain/assistant";
 import { ConversationStore } from "../services/conversation/conversation-store";
@@ -76,19 +76,7 @@ import {
   getRuntimeConfig,
 } from "../config/runtime-config";
 import type { AgentToolScope, ToolCatalogCard } from "../domain/tool-catalog";
-
-type ShellRuntime = Pick<
-  ShellService,
-  "consumeConversationNotifications" | "exec" | "launchBackground" | "listBackgroundJobs" | "readBackgroundOutput"
->;
-type FilesystemRuntime = Pick<
-  FilesystemService,
-  "applyPatch" | "copyPath" | "deletePath" | "edit" | "glob" | "grep" | "listDir" | "mkdir" | "movePath" | "read" | "statPath" | "write"
->;
-type TicketsRuntime = Pick<
-  ElinaroTicketsService,
-  "isConfigured" | "getConfigurationError" | "listTickets" | "getTicket" | "createTicket" | "updateTicket"
->;
+import type { ShellRuntime, FilesystemRuntime, TicketsRuntime } from "./groups/tool-group-types";
 
 export const ROUTINE_TOOL_NAMES = [
   "load_tool_library",
@@ -336,23 +324,23 @@ const DYNAMIC_TOOL_CATALOG: Record<string, Partial<ToolCatalogCard>> = {
   read_agent_terminal: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["read agent terminal output", "see what an agent is doing"] },
 };
 
-function buildDynamicToolCatalogCard(entry: StructuredToolInterface): ToolCatalogCard {
-  const meta = DYNAMIC_TOOL_CATALOG[entry.name] ?? {};
-  const authorization = getToolAuthorizationDeclaration(entry.name);
+function buildDynamicToolCatalogCard(entry: PiToolEntry): ToolCatalogCard {
+  const meta = DYNAMIC_TOOL_CATALOG[entry.tool.name] ?? {};
+  const authorization = getToolAuthorizationDeclaration(entry.tool.name);
   const defaultVisibleScopes = (Object.entries(DYNAMIC_TOOL_DEFAULT_VISIBLE_SCOPES) as Array<[AgentToolScope, readonly string[]]>)
-    .filter(([, toolNames]) => toolNames.includes(entry.name))
+    .filter(([, toolNames]) => toolNames.includes(entry.tool.name))
     .map(([scope]) => scope);
-  const tags = entry.name
+  const tags = entry.tool.name
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .split(/[_\s]+/g)
-    .concat(entry.description.toLowerCase().match(/[a-z0-9-]+/g) ?? [])
+    .concat(entry.tool.description.toLowerCase().match(/[a-z0-9-]+/g) ?? [])
     .filter((value, index, values) => Boolean(value?.trim()) && values.indexOf(value) === index);
 
   return {
-    name: entry.name,
-    description: entry.description,
+    name: entry.tool.name,
+    description: entry.tool.description,
     examples: meta.examples ?? [],
-    canonicalName: entry.name,
+    canonicalName: entry.tool.name,
     domains: meta.domains ?? ["general"],
     tags,
     agentScopes: meta.agentScopes ?? ["chat", "direct"],
@@ -418,11 +406,11 @@ function requiresPrivilegedServiceControl(runtimePlatform: RuntimePlatform, acti
 }
 
 export class ToolRegistry {
-  private readonly tools: StructuredToolInterface[];
-  private readonly toolsByName: Map<string, StructuredToolInterface>;
+  private readonly toolEntries: PiToolEntry[];
+  private readonly toolsByName: Map<string, PiToolEntry>;
   /**
    * Mutable reference to the ToolContext that should be used by function-layer
-   * tools during the current invocation. Set by getTools/getToolsByNames/invoke
+   * tools during the current invocation. Set by getTools/executeTool/invoke
    * wrappers so that function handlers can access conversationKey, invocationSource, etc.
    */
   private _activeToolContext: ToolContext | undefined;
@@ -450,6 +438,7 @@ export class ToolRegistry {
   private readonly workPlanning: WorkPlanningService;
   private readonly pendingConversationResets = new Map<string, string>();
   private readonly reflection?: Pick<ReflectionService, "runExplicitReflection">;
+  private readonly _toolBuildContext: import("./groups/tool-group-types").ToolBuildContext;
 
   /** The unified function registry, built alongside legacy tool groups. */
   readonly functionRegistry: FunctionRegistry;
@@ -498,7 +487,7 @@ export class ToolRegistry {
     // Use property accessors so that test mocks applied after construction
     // take effect when tools invoke context properties at call time.
     const self = this;
-    const toolBuildContext: import("./groups/tool-group-types").ToolBuildContext = {
+    this._toolBuildContext = {
       get routines() { return self.routines; },
       get projects() { return self.projects; },
       get models() { return self.models; },
@@ -536,16 +525,16 @@ export class ToolRegistry {
     };
     // Build the unified function registry and register its auth declarations
     this.functionRegistry = new FunctionRegistry(ALL_FUNCTION_BUILDERS);
-    this.functionRegistry.build(toolBuildContext);
+    this.functionRegistry.build(this._toolBuildContext);
     registerAuthDeclarations(this.functionRegistry.generateAuthDeclarations());
     initUntrustedOutputMap(this.functionRegistry.generateUntrustedOutputMap());
 
     // All tool definitions come from the unified function layer.
     // resolveToolContext reads the mutable _activeToolContext so that
     // function handlers see the correct ToolContext during invocation.
-    const fnResolveServices = () => toolBuildContext;
+    const fnResolveServices = () => self._toolBuildContext;
     const fnResolveToolContext = () => self._activeToolContext;
-    this.tools = this.functionRegistry.generateAgentTools(
+    this.toolEntries = this.functionRegistry.generateAgentTools(
       fnResolveServices,
       fnResolveToolContext,
       (featureId) => this.featureConfig.isActive(featureId),
@@ -555,56 +544,96 @@ export class ToolRegistry {
         getConversationForTool: (input, ctx) => self.getConversationForTool(input, ctx ?? self._activeToolContext),
         buildRuntimeContext: () => self.buildRuntimeContext(),
         reportProgress: (ctx, summary, input) => reportProgress(ctx ?? self._activeToolContext, summary, input),
-        getTools: (ctx) => self.getTools(ctx ?? self._activeToolContext),
+        getTools: (ctx) => self.getToolDefinitions(ctx ?? self._activeToolContext),
         getToolLibraries: (ctx, scope) => self.getToolLibraries(ctx ?? self._activeToolContext, scope),
         getAgentDefaultVisibleToolNames: (scope) => self.getAgentDefaultVisibleToolNames(scope),
       }),
     );
     assertToolAuthorizationCoverage([
-      ...this.tools.map((entry) => entry.name),
+      ...this.toolEntries.map((entry) => entry.tool.name),
       "model_context_usage",
     ]);
-    this.toolsByName = new Map(this.tools.map((entry) => [entry.name, entry]));
+    this.toolsByName = new Map(this.toolEntries.map((entry) => [entry.tool.name, entry]));
   }
 
-  getTools(context?: ToolContext) {
-    // Set the active context so function-layer handlers can see it.
+  /**
+   * Get pi-ai Tool definitions for the model API.
+   * Filters by access control. Used by the agent loop to build the tools array.
+   */
+  getToolDefinitions(context?: ToolContext): Tool[] {
     this._activeToolContext = context;
-    const tools = this.getRawTools(context);
-    if (!context?.onToolUse) {
-      return tools.map((entry) => wrapToolOutput(entry, this.toolResults, (n, i, c) => this.injectToolContext(n, i, c), context));
+    return this.getAccessibleEntries(context).map((entry) => entry.tool);
+  }
+
+  /**
+   * Get pi-ai Tool definitions for a specific set of tool names.
+   */
+  getToolDefinitionsByNames(names: string[], context?: ToolContext): Tool[] {
+    this._activeToolContext = context;
+    const selectedNames = new Set(names);
+    return this.getAccessibleEntries(context)
+      .filter((entry) => selectedNames.has(entry.tool.name))
+      .map((entry) => entry.tool);
+  }
+
+  /**
+   * Execute a tool call from the agent loop.
+   * Handles context injection, output wrapping, untrusted content guarding,
+   * progress notification, and tool result storage.
+   */
+  async executeTool(
+    call: ToolCall,
+    context?: ToolContext,
+    signal?: AbortSignal,
+  ): Promise<ToolResultMessage> {
+    this._activeToolContext = context;
+    const entry = this.toolsByName.get(call.name);
+    if (!entry) {
+      return toolResultMessage({
+        toolCallId: call.id,
+        toolName: call.name,
+        content: `Unknown tool: ${call.name}`,
+        isError: true,
+      });
     }
 
-    const self = this;
-    return tools.map((entry) =>
-      tool(
-        async (input) => {
-          self._activeToolContext = context;
-          await notifyToolUse(context, entry.name, input);
-          const nextInput = self.injectToolContext(entry.name, input, context);
-          try {
-            const result = await (entry as { invoke: (arg: unknown) => Promise<unknown> }).invoke(
-              stripToolControlInput(nextInput),
-            );
-            await notifyToolResultProgress(context, entry.name, result, input);
-            return await finalizeToolResult(result, entry.name, input, self.toolResults);
-          } catch (error) {
-            return await normalizeToolResult(normalizeToolFailure(entry.name, error));
-          }
-        },
-        {
-          name: entry.name,
-          description: entry.description,
-          schema: getToolInputSchema(entry),
-        },
-      ));
+    this.access.assertToolAllowed(call.name);
+
+    const rawInput = call.arguments ?? {};
+    if (context?.onToolUse) {
+      await notifyToolUse(context, call.name, rawInput);
+    }
+
+    const nextInput = this.injectToolContext(call.name, rawInput, context);
+    const strippedInput = stripToolControlInput(nextInput) as Record<string, unknown>;
+
+    try {
+      const result = await entry.handler(strippedInput);
+      if (context?.onToolUse) {
+        await notifyToolResultProgress(context, call.name, result, rawInput);
+      }
+      const content = await finalizeToolResult(result, call.name, rawInput, this.toolResults);
+      return toolResultMessage({
+        toolCallId: call.id,
+        toolName: call.name,
+        content: typeof content === "string" ? content : JSON.stringify(content),
+      });
+    } catch (error) {
+      const content = await normalizeToolResult(normalizeToolFailure(call.name, error));
+      return toolResultMessage({
+        toolCallId: call.id,
+        toolName: call.name,
+        content: typeof content === "string" ? content : JSON.stringify(content),
+        isError: true,
+      });
+    }
   }
 
   getToolCatalog(context?: ToolContext): ToolCatalogCard[] {
     const fnCards = this.functionRegistry.generateCatalog();
     const fnCardsByName = new Map(fnCards.map((card) => [card.name, card]));
-    return this.getRawTools(context).map((entry) => {
-      const fnCard = fnCardsByName.get(entry.name);
+    return this.getAccessibleEntries(context).map((entry) => {
+      const fnCard = fnCardsByName.get(entry.tool.name);
       if (fnCard) return fnCard;
       return buildDynamicToolCatalogCard(entry);
     });
@@ -612,53 +641,15 @@ export class ToolRegistry {
 
   getToolJsonSchema(name: string): Record<string, unknown> | null {
     if (!this.access.canUseTool(name)) return null;
-    const entry = this.resolveToolEntry(name);
+    const entry = this.toolsByName.get(name);
     if (!entry) return null;
-    if (entry.schema instanceof z.ZodObject) {
-      return z.toJSONSchema(entry.schema) as Record<string, unknown>;
-    }
-    return null;
+    // pi-ai tool parameters are already JSON Schema objects
+    return entry.tool.parameters as Record<string, unknown>;
   }
 
   /** Expose the ToolBuildContext for the function-layer API route generator. */
   getToolBuildContext(): import("./groups/tool-group-types").ToolBuildContext {
-    const self = this;
-    return {
-      get routines() { return self.routines; },
-      get projects() { return self.projects; },
-      get models() { return self.models; },
-      get conversations() { return self.conversations; },
-      get memory() { return self.memory; },
-      get access() { return self.access; },
-      get finance() { return self.finance; },
-      get health() { return self.health; },
-      get shell() { return self.shell; },
-      get filesystem() { return self.filesystem; },
-      get email() { return self.email; },
-      get vonage() { return self.vonage; },
-      get geminiLivePhone() { return self.geminiLivePhone; },
-      get media() { return self.media; },
-      get alarms() { return self.alarms; },
-      get tickets() { return self.tickets; },
-      get openbrowser() { return self.openbrowser; },
-      get secrets() { return self.secrets; },
-      get webFetch() { return self.webFetch; },
-      get workPlanning() { return self.workPlanning; },
-      get telemetryQuery() { return self.telemetryQuery; },
-      get deploymentVersion() { return self.deploymentVersion; },
-      get featureConfig() { return self.featureConfig; },
-      get zigbee2mqtt() { return self.zigbee2mqtt; },
-      get runtimePlatform() { return self.runtimePlatform; },
-      resolvePhoneCallBackend: (requestedBackend) => this.resolvePhoneCallBackend(requestedBackend),
-      createWebSearchService: () => this.createWebSearchService(),
-      requestManagedServiceRestart: (source) => this.requestManagedServiceRestart(source),
-      get subagents() { return self.subagents; },
-      get systemPrompts() { return self.systemPrompts; },
-      get transitions() { return self.transitions; },
-      get reflection() { return self.reflection; },
-      get toolResults() { return self.toolResults; },
-      get toolPrograms() { return self.toolPrograms; },
-    };
+    return this._toolBuildContext;
   }
 
   /** Check if a feature is active (delegates to FeatureConfigService). */
@@ -691,44 +682,9 @@ export class ToolRegistry {
     return "gemini-live";
   }
 
-  getToolsByNames(
-    names: string[],
-    context?: ToolContext,
-    options?: { defaultCwd?: string },
-  ): StructuredToolInterface[] {
-    // Set the active context so function-layer handlers can see it.
-    this._activeToolContext = context;
-    const selectedNames = new Set(names);
-    const rawTools = this.getRawTools(context).filter((entry) => selectedNames.has(entry.name));
-    const wrapped = (!context?.onToolUse
-      ? rawTools.map((entry) => wrapToolOutput(entry, this.toolResults, (n, i, c) => this.injectToolContext(n, i, c), context))
-      : rawTools.map((entry) =>
-          tool(
-            async (input) => {
-              await notifyToolUse(context, entry.name, input);
-              const nextInput = this.injectToolContext(entry.name, input, context);
-              try {
-                const result = await (entry as { invoke: (arg: unknown) => Promise<unknown> }).invoke(
-                  stripToolControlInput(nextInput),
-                );
-                await notifyToolResultProgress(context, entry.name, result, input);
-                return await finalizeToolResult(result, entry.name, input, this.toolResults);
-              } catch (error) {
-                return await normalizeToolResult(normalizeToolFailure(entry.name, error));
-              }
-            },
-            {
-              name: entry.name,
-              description: entry.description,
-              schema: getToolInputSchema(entry),
-            },
-          )));
-    return wrapped.map((entry) => wrapToolWithDefaultCwd(entry, options?.defaultCwd));
-  }
-
   getToolNames() {
-    return this.tools
-      .map((entry) => entry.name)
+    return this.toolEntries
+      .map((entry) => entry.tool.name)
       .filter((name, index, values) => values.indexOf(name) === index)
       .filter((name) => this.access.canUseTool(name));
   }
@@ -835,15 +791,8 @@ export class ToolRegistry {
     ].join("\n\n");
   }
 
-  private resolveToolEntry(name: string, context?: ToolContext) {
-    if (name === "model_context_usage") {
-      return this.toolsByName.get("context");
-    }
-    return this.toolsByName.get(name);
-  }
-
-  private getRawTools(context?: ToolContext): StructuredToolInterface[] {
-    return this.tools.filter((entry) => this.access.canUseTool(entry.name));
+  private getAccessibleEntries(context?: ToolContext): PiToolEntry[] {
+    return this.toolEntries.filter((entry) => this.access.canUseTool(entry.tool.name));
   }
 
   async invoke(name: string, input: unknown, context?: ToolContext) {
@@ -858,15 +807,14 @@ export class ToolRegistry {
   async invokeRaw(name: string, input: unknown, context?: ToolContext) {
     this.access.assertToolAllowed(name);
     const directContext = context ? { ...context, invocationSource: "direct" as const } : undefined;
-    // Set the active context so function-layer handlers can see it.
     this._activeToolContext = directContext;
-    const selected = this.resolveToolEntry(name, directContext);
-    if (!selected) {
+    const entry = this.toolsByName.get(name === "model_context_usage" ? "context" : name);
+    if (!entry) {
       throw new Error(`Unknown tool: ${name}`);
     }
     await notifyToolUse(directContext, name, input);
     const nextInput = this.injectToolContext(name, input, directContext);
-    const result = await (selected as { invoke: (arg: unknown) => Promise<unknown> }).invoke(stripToolControlInput(nextInput));
+    const result = await entry.handler(stripToolControlInput(nextInput) as Record<string, unknown>);
     await notifyToolResultProgress(directContext, name, result, input);
     return result;
   }

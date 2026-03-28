@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { HumanMessage } from "@langchain/core/messages";
 import { describe, expect, test } from "bun:test";
+import { userMessage } from "../../messages/types";
 import type { ProfileRecord } from "../../domain/profiles";
 import type { ActiveModelSelection } from "./model-service";
 import { ModelService, resolveListedModelIdentifier, resolveRuntimeModelIdentifier } from "./model-service";
@@ -373,7 +373,7 @@ describe("ModelService.inspectContextWindowUsage", () => {
     const usage = await service.inspectContextWindowUsage({
       conversationKey: "conversation-1",
       systemPrompt: "You are a test system prompt.",
-      messages: [new HumanMessage("hello")],
+      messages: [userMessage("hello")],
       tools: [],
     });
 
@@ -406,7 +406,7 @@ describe("ModelService.inspectContextWindowUsage", () => {
     const usage = await service.inspectContextWindowUsage({
       conversationKey: "conversation-1",
       systemPrompt: "You are a test system prompt.",
-      messages: [new HumanMessage("hello")],
+      messages: [userMessage("hello")],
       tools: [],
     });
 
@@ -619,7 +619,7 @@ describe("ModelService.countAnthropicTokens", () => {
         apiKey: "test-claude-token",
         systemPrompt: "You are a test system prompt.",
         messages: [
-          new HumanMessage([
+          userMessage([
             { type: "text", text: "What is in this image?" },
             {
               type: "image",
@@ -677,7 +677,7 @@ describe("ModelService.countAnthropicTokens", () => {
         apiKey: "test-claude-token",
         systemPrompt: "You are a test system prompt.",
         messages: [
-          new HumanMessage([
+          userMessage([
             { type: "text", text: "What is in this image?" },
             {
               type: "image",
@@ -731,14 +731,14 @@ describe("ModelService.countAnthropicTokens", () => {
         apiKey: "test-claude-token",
         systemPrompt: "You are a test system prompt.",
         messages: [
-          new HumanMessage([
+          userMessage([
             { type: "text", text: "What is in this image?" },
             {
               type: "image",
               data: "base64data",
               mimeType: "image/png",
               sourceUrl: "https://cdn.discordapp.com/attachments/example.png",
-            },
+            } as any,
           ]),
         ],
         tools: [],

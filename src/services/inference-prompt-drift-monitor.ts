@@ -1,5 +1,10 @@
-import type { ModelMessage } from "@ai-sdk/provider-utils";
-import { stringifyToolResultOutput } from "./ai-sdk-message-service";
+import type {
+  Message,
+  UserMessage,
+  AssistantMessage,
+  ToolResultMessage,
+  TextContent,
+} from "../messages/types";
 
 export interface InferencePromptDriftWarning {
   sessionId: string;
@@ -23,52 +28,51 @@ function formatPercent(value: number) {
   return `${(value * 100).toFixed(2)}%`;
 }
 
-function serializeModelMessage(message: ModelMessage): string {
+function serializePiMessage(message: Message): string {
   switch (message.role) {
-    case "system":
-      return `<system>\n${message.content}`;
-    case "user":
-      if (typeof message.content === "string") {
-        return `<user>\n${message.content}`;
+    case "user": {
+      const user = message as UserMessage;
+      if (typeof user.content === "string") {
+        return `<user>\n${user.content}`;
       }
       return [
         "<user>",
-        ...message.content.map((part) => {
+        ...user.content.map((part) => {
           if (part.type === "text") {
-            return part.text;
+            return (part as TextContent).text;
           }
           if (part.type === "image") {
-            return `[image:${part.mediaType ?? "image/*"}]`;
+            return `[image]`;
           }
           return JSON.stringify(part);
         }),
       ].join("\n");
-    case "assistant":
-      if (typeof message.content === "string") {
-        return `<assistant>\n${message.content}`;
-      }
+    }
+    case "assistant": {
+      const assistant = message as AssistantMessage;
       return [
         "<assistant>",
-        ...message.content.map((part) => {
+        ...assistant.content.map((part) => {
           if (part.type === "text") {
-            return part.text;
+            return (part as TextContent).text;
           }
-          if (part.type === "tool-call") {
-            return `[tool-call:${part.toolName}] ${JSON.stringify(part.input ?? {})}`;
+          if (part.type === "toolCall") {
+            return `[tool-call:${(part as any).name}] ${JSON.stringify((part as any).input ?? {})}`;
           }
-          return JSON.stringify(part);
-        }),
-      ].join("\n");
-    case "tool":
-      return [
-        "<tool>",
-        ...message.content.map((part) => {
-          if (part.type === "tool-result") {
-            return `[tool-result:${part.toolName}] ${stringifyToolResultOutput(part.output)}`;
+          if (part.type === "thinking") {
+            return `[thinking]`;
           }
           return JSON.stringify(part);
         }),
       ].join("\n");
+    }
+    case "toolResult": {
+      const toolResult = message as ToolResultMessage;
+      const textParts = toolResult.content
+        .filter((part): part is TextContent => part.type === "text")
+        .map((part) => part.text);
+      return `<tool>\n[tool-result:${toolResult.toolName}] ${textParts.join("\n")}`;
+    }
     default:
       return JSON.stringify(message);
   }
@@ -141,9 +145,13 @@ export class InferencePromptDriftMonitor {
 
   inspect(params: {
     sessionId: string;
-    prompt: ModelMessage[];
+    prompt: Message[];
+    systemPrompt?: string;
   }): InferencePromptDriftWarning | null {
-    const currentMessages = params.prompt.map((message) => serializeModelMessage(message));
+    const serialized = params.prompt.map((message) => serializePiMessage(message));
+    const currentMessages = params.systemPrompt
+      ? [`<system>\n${params.systemPrompt}`, ...serialized]
+      : serialized;
     const currentPrompt = currentMessages.join("\n\n");
     const previousPrompt = this.promptBySession.get(params.sessionId);
     const previousMessages = this.promptMessagesBySession.get(params.sessionId);

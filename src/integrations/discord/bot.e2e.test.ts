@@ -3,12 +3,25 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ChannelType, MessageFlags, type ChatInputCommandInteraction, type Message } from "discord.js";
+import type {
+  Message as PiMessage,
+  UserMessage,
+  AssistantMessage,
+  ToolResultMessage,
+} from "../../messages/types";
+import {
+  userMessage,
+  assistantTextMessage,
+  toolResultMessage,
+  isUserMessage,
+  isAssistantMessage,
+  isToolResultMessage,
+  extractAssistantText,
+} from "../../messages/types";
 import type { AppProgressEvent, ChatPromptContentBlock } from "../../domain/assistant";
 import { getTestFixturesDir } from "../../test/fixtures";
-import { ScriptedProviderConnector, type ScriptedConnectorRequest } from "../../test/scripted-provider-connector";
 
 const repoRoot = process.cwd();
 const machineTestRoot = getTestFixturesDir();
@@ -176,14 +189,26 @@ async function importFresh<T>(relativePath: string): Promise<T> {
   return import(`${url}?test=${Date.now()}-${Math.random()}`) as Promise<T>;
 }
 
-function lastTextContent(message: HumanMessage | ToolMessage | AIMessage) {
-  if (typeof message.content === "string") {
-    return message.content;
+function lastTextContent(message: PiMessage) {
+  if (isUserMessage(message)) {
+    if (typeof message.content === "string") {
+      return message.content;
+    }
+    return message.content
+      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .map((block) => block.text)
+      .join("\n\n");
   }
-  return (message.content as ChatPromptContentBlock[])
-    .filter((block): block is Extract<ChatPromptContentBlock, { type: "text" }> => block.type === "text")
-    .map((block) => block.text)
-    .join("\n\n");
+  if (isAssistantMessage(message)) {
+    return extractAssistantText(message);
+  }
+  if (isToolResultMessage(message)) {
+    return message.content
+      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .map((block) => block.text)
+      .join("\n\n");
+  }
+  return "";
 }
 
 function extractTrailingUserText(text: string) {
@@ -195,53 +220,73 @@ function extractTrailingUserText(text: string) {
     ?.trim() ?? text.trim();
 }
 
-function createScriptedConnector(
-  handler?: (request: ScriptedConnectorRequest) => AIMessage | Promise<AIMessage>,
-) {
-  if (handler) {
-    return new ScriptedProviderConnector(handler, { providerId: "scripted-discord-test" });
+type ScriptedConnectorRequest = {
+  sessionId?: string;
+  conversationKey?: string;
+  usagePurpose?: string;
+  systemPrompt: string;
+  messages: PiMessage[];
+};
+
+function defaultScriptedHandler(request: ScriptedConnectorRequest): AssistantMessage {
+  if (request.usagePurpose === "conversation_compaction") {
+    return assistantTextMessage(
+      JSON.stringify({
+        summary: "Conversation compacted for the Discord e2e harness.",
+        memory_markdown: "",
+      }),
+      { api: "scripted", provider: "scripted-discord-test", model: "scripted-model" },
+    );
   }
 
-  return new ScriptedProviderConnector(async (request: ScriptedConnectorRequest) => {
-    if (request.usagePurpose === "conversation_compaction") {
-      return new AIMessage(
-        JSON.stringify({
-          summary: "Conversation compacted for the Discord e2e harness.",
-          memory_markdown: "",
-        }),
-      );
-    }
+  if (request.usagePurpose === "conversation_opening") {
+    return assistantTextMessage("What do you want to work on next?", {
+      api: "scripted",
+      provider: "scripted-discord-test",
+      model: "scripted-model",
+    });
+  }
 
-    if (request.usagePurpose === "conversation_opening") {
-      return new AIMessage("What do you want to work on next?");
-    }
+  const latestMessage = request.messages.at(-1);
+  if (isToolResultMessage(latestMessage!) && latestMessage!.toolName === "new_chat") {
+    return assistantTextMessage("Fresh thread prepared.", {
+      api: "scripted",
+      provider: "scripted-discord-test",
+      model: "scripted-model",
+    });
+  }
 
-    const latestMessage = request.messages.at(-1);
-    if (latestMessage instanceof ToolMessage && latestMessage.name === "new_chat") {
-      return new AIMessage("Fresh thread prepared.");
-    }
+  const latestHumanMessage = [...request.messages]
+    .reverse()
+    .find((message): message is UserMessage => isUserMessage(message));
+  const text = latestHumanMessage ? extractTrailingUserText(lastTextContent(latestHumanMessage)) : "";
 
-    const latestHumanMessage = [...request.messages]
-      .reverse()
-      .find((message): message is HumanMessage => message instanceof HumanMessage);
-    const text = latestHumanMessage ? extractTrailingUserText(lastTextContent(latestHumanMessage)) : "";
+  if (/start over/i.test(text)) {
+    const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+    return {
+      role: "assistant",
+      content: [
+        {
+          type: "toolCall" as const,
+          id: "tool-new-1",
+          name: "new_chat",
+          arguments: {},
+        },
+      ],
+      api: "scripted",
+      provider: "scripted-discord-test",
+      model: "scripted-model",
+      usage,
+      stopReason: "toolUse",
+      timestamp: Date.now(),
+    };
+  }
 
-    if (/start over/i.test(text)) {
-      return new AIMessage({
-        content: "",
-        tool_calls: [
-          {
-            id: "tool-new-1",
-            name: "new_chat",
-            args: {},
-            type: "tool_call",
-          },
-        ],
-      });
-    }
-
-    return new AIMessage(`Acknowledged: ${text}`);
-  }, { providerId: "scripted-discord-test" });
+  return assistantTextMessage(`Acknowledged: ${text}`, {
+    api: "scripted",
+    provider: "scripted-discord-test",
+    model: "scripted-model",
+  });
 }
 
 function createWorkflowStub() {
@@ -311,7 +356,7 @@ function createWorkflowStub() {
 }
 
 function createDiscordAppHarness(options?: {
-  connectorHandler?: (request: ScriptedConnectorRequest) => AIMessage | Promise<AIMessage>;
+  connectorHandler?: (request: ScriptedConnectorRequest) => AssistantMessage | Promise<AssistantMessage>;
 }) {
   const profiles = new profileServiceModule.ProfileService("root");
   const profile = profiles.getActiveProfile();
@@ -322,7 +367,11 @@ function createDiscordAppHarness(options?: {
   const systemPrompts = new systemPromptModule.SystemPromptService();
   const memory = new memoryServiceModule.MemoryService(profile, profiles);
   const models = new modelServiceModule.ModelService(profile);
-  const connector = createScriptedConnector(options?.connectorHandler);
+  // NOTE: In the Pi architecture, scripted model responses require mocking
+  // ModelService.resolveModelForPurpose or the pi-ai complete() function.
+  // The connectorHandler is captured but not wired into the chat service
+  // until a proper scripted model adapter is added.
+  const _scriptedHandler = options?.connectorHandler ?? defaultScriptedHandler;
   const buildAssistantContext = () =>
     [
       profiles.buildAssistantContext(profile),
@@ -356,10 +405,9 @@ function createDiscordAppHarness(options?: {
   });
 
   const transitions = new transitionServiceModule.ConversationStateTransitionService(
-    connector,
+    models,
     conversations,
     memory,
-    models,
     systemPrompts,
   );
   const toolRegistry = new toolRegistryModule.ToolRegistry(
@@ -375,7 +423,6 @@ function createDiscordAppHarness(options?: {
   );
   const toolResolver = new toolResolutionModule.ToolResolutionService(toolRegistry);
   const chat = new agentChatModule.AgentChatService({
-    connector,
     routineTools: toolRegistry,
     toolResolver,
     transitions,
@@ -829,11 +876,12 @@ if (RUN_CHILD_SUITE) {
 
     const storedConversation = await harness.conversations.get(message.author.id);
     const firstMessage = storedConversation.messages.find((entry) =>
-      entry instanceof HumanMessage && typeof entry.content !== "string"
+      isUserMessage(entry) && typeof entry.content !== "string"
     );
-    expect(firstMessage).toBeInstanceOf(HumanMessage);
+    expect(firstMessage).toBeDefined();
+    expect(isUserMessage(firstMessage!)).toBe(true);
 
-    const blocks = firstMessage?.content as ChatPromptContentBlock[];
+    const blocks = (firstMessage as UserMessage).content as ChatPromptContentBlock[];
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/png")).toBe(true);
     expect(
       blocks.some((block) =>
@@ -875,9 +923,9 @@ if (RUN_CHILD_SUITE) {
 
     const storedConversation = await harness.conversations.get(message.author.id);
     const firstMessage = [...storedConversation.messages].reverse().find((entry) =>
-      entry instanceof HumanMessage && typeof entry.content !== "string"
+      isUserMessage(entry) && typeof entry.content !== "string"
     );
-    const blocks = firstMessage?.content as ChatPromptContentBlock[];
+    const blocks = (firstMessage as UserMessage).content as ChatPromptContentBlock[];
 
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/webp")).toBe(true);
   });
@@ -905,9 +953,9 @@ if (RUN_CHILD_SUITE) {
 
     const storedConversation = await harness.conversations.get(message.author.id);
     const firstMessage = [...storedConversation.messages].reverse().find((entry) =>
-      entry instanceof HumanMessage && typeof entry.content !== "string"
+      isUserMessage(entry) && typeof entry.content !== "string"
     );
-    const blocks = firstMessage?.content as ChatPromptContentBlock[];
+    const blocks = (firstMessage as UserMessage).content as ChatPromptContentBlock[];
 
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/png")).toBe(true);
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/webp")).toBe(false);
@@ -917,12 +965,16 @@ if (RUN_CHILD_SUITE) {
     const seenTexts: string[] = [];
     const harness = createDiscordAppHarness({
       connectorHandler: async (request) => {
-        const latestHumanMessage = [...request.messages]
+        const latestHumanMsg = [...request.messages]
           .reverse()
-          .find((message): message is HumanMessage => message instanceof HumanMessage);
-        const text = latestHumanMessage ? extractTrailingUserText(lastTextContent(latestHumanMessage)) : "";
+          .find((message): message is UserMessage => isUserMessage(message));
+        const text = latestHumanMsg ? extractTrailingUserText(lastTextContent(latestHumanMsg)) : "";
         seenTexts.push(text);
-        return new AIMessage(`Acknowledged: ${text}`);
+        return assistantTextMessage(`Acknowledged: ${text}`, {
+          api: "scripted",
+          provider: "scripted-discord-test",
+          model: "scripted-model",
+        });
       },
     });
     const authManager = new authSessionManagerModule.DiscordAuthSessionManager();
@@ -946,11 +998,12 @@ if (RUN_CHILD_SUITE) {
     expect(seenTexts.at(-1)).toBe("alpha\nbeta\ngamma");
 
     const storedConversation = await harness.conversations.get(finalMessage.author.id);
-    const latestHumanMessage = [...storedConversation.messages]
+    const latestHumanMsg = [...storedConversation.messages]
       .reverse()
-      .find((entry): entry is HumanMessage => entry instanceof HumanMessage);
-    expect(latestHumanMessage).toBeInstanceOf(HumanMessage);
-    expect(extractTrailingUserText(lastTextContent(latestHumanMessage!))).toBe("alpha\nbeta\ngamma");
+      .find((entry): entry is UserMessage => isUserMessage(entry));
+    expect(latestHumanMsg).toBeDefined();
+    expect(isUserMessage(latestHumanMsg!)).toBe(true);
+    expect(extractTrailingUserText(lastTextContent(latestHumanMsg!))).toBe("alpha\nbeta\ngamma");
   });
 
   test("sends attached files back over Discord when the app response includes them", async () => {
@@ -1183,8 +1236,8 @@ if (RUN_CHILD_SUITE) {
       .toContain("Memory flushed to");
     expect(resetMessage.replies.join("\n")).toContain(`Started a new conversation for ${conversationKey}.`);
     expect(storedConversation.messages).toHaveLength(1);
-    expect(storedConversation.messages[0]).toBeInstanceOf(AIMessage);
-    expect(lastTextContent(storedConversation.messages[0] as AIMessage)).toContain("What do you want to work on next?");
+    expect(isAssistantMessage(storedConversation.messages[0]!)).toBe(true);
+    expect(lastTextContent(storedConversation.messages[0]!)).toContain("What do you want to work on next?");
     expect(tempMemoryFiles.some((entry) => entry.includes("documents/root/core/MEMORY.md"))).toBe(true);
     expect(readOptionalFile(path.join(machineTestRoot, "conversations.json"))).toBe(liveStateBefore.conversations);
     expect(listRelativeFiles(path.join(machineTestRoot, "memory"))).toEqual(liveStateBefore.memoryFiles);
@@ -1217,8 +1270,8 @@ if (RUN_CHILD_SUITE) {
     expect(fastResetInteraction.replies.map((reply) => reply.content).join("\n"))
       .toContain("Durable memory flush was intentionally skipped.");
     expect(storedConversation.messages).toHaveLength(1);
-    expect(storedConversation.messages[0]).toBeInstanceOf(AIMessage);
-    expect(lastTextContent(storedConversation.messages[0] as AIMessage)).toContain("What do you want to work on next?");
+    expect(isAssistantMessage(storedConversation.messages[0]!)).toBe(true);
+    expect(lastTextContent(storedConversation.messages[0]!)).toContain("What do you want to work on next?");
     expect(listRelativeFiles(tempMemoryRoot)).toEqual(memoryFilesBefore);
     expect(readOptionalFile(path.join(machineTestRoot, "conversations.json"))).toBe(liveStateBefore.conversations);
     expect(listRelativeFiles(path.join(machineTestRoot, "memory"))).toEqual(liveStateBefore.memoryFiles);
@@ -1232,16 +1285,24 @@ if (RUN_CHILD_SUITE) {
     let firstTurnSeen = false;
     const harness = createDiscordAppHarness({
       connectorHandler: async (request) => {
-        const latestHumanMessage = [...request.messages]
+        const latestHumanMsg = [...request.messages]
           .reverse()
-          .find((message): message is HumanMessage => message instanceof HumanMessage);
-        const text = latestHumanMessage ? extractTrailingUserText(lastTextContent(latestHumanMessage)) : "";
+          .find((message): message is UserMessage => isUserMessage(message));
+        const text = latestHumanMsg ? extractTrailingUserText(lastTextContent(latestHumanMsg)) : "";
         if (text === "hold the line" && !firstTurnSeen) {
           firstTurnSeen = true;
           await firstTurnGate;
-          return new AIMessage("First turn finished.");
+          return assistantTextMessage("First turn finished.", {
+            api: "scripted",
+            provider: "scripted-discord-test",
+            model: "scripted-model",
+          });
         }
-        return new AIMessage(`Acknowledged: ${text}`);
+        return assistantTextMessage(`Acknowledged: ${text}`, {
+          api: "scripted",
+          provider: "scripted-discord-test",
+          model: "scripted-model",
+        });
       },
     });
     const authManager = new authSessionManagerModule.DiscordAuthSessionManager();

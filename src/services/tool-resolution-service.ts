@@ -1,4 +1,4 @@
-import type { StructuredToolInterface } from "@langchain/core/tools";
+import type { Tool } from "@mariozechner/pi-ai";
 import type { AgentToolScope, ResolvedToolBundle, ToolCatalogCard } from "../domain/tool-catalog";
 import type { ToolContext } from "../tools/tool-registry";
 import { ToolRegistry } from "../tools/tool-registry";
@@ -24,15 +24,13 @@ function buildScopeResolver(service: ToolResolutionService, scope: AgentToolScop
 export class ToolResolutionService {
   constructor(private readonly tools: ToolRegistry) {}
 
-  resolve(params: ResolveParams): ResolvedToolBundle & { entries: StructuredToolInterface[] } {
+  resolve(params: ResolveParams): ResolvedToolBundle & { entries: Tool[] } {
     const selectedNames = new Set(this.tools.getAgentDefaultVisibleToolNames(params.agentScope));
     for (const name of params.activatedToolNames ?? []) {
       selectedNames.add(name);
     }
 
-    const tools = this.tools.getToolsByNames([...selectedNames], params.context, {
-      defaultCwd: params.defaultCwd,
-    });
+    const tools = this.tools.getToolDefinitionsByNames([...selectedNames], params.context);
     return {
       entries: tools,
       tools: tools.map((entry) => entry.name),
@@ -49,12 +47,11 @@ export class ToolResolutionService {
   resolveAllForScope(
     agentScope: AgentToolScope,
     params?: ScopedResolveAllParams,
-  ): ResolvedToolBundle & { entries: StructuredToolInterface[] } {
+  ): ResolvedToolBundle & { entries: Tool[] } {
     const catalog = this.getScopeCatalog(agentScope, params?.context);
-    const tools = this.tools.getToolsByNames(
+    const tools = this.tools.getToolDefinitionsByNames(
       catalog.map((card) => card.canonicalName),
       params?.context,
-      { defaultCwd: params?.defaultCwd },
     );
     return {
       entries: tools,

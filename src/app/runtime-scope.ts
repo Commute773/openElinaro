@@ -1,8 +1,6 @@
 import type { CacheMissWarning } from "../services/cache-miss-monitor";
-import type { InferencePromptDriftWarning } from "../services/inference-prompt-drift-monitor";
 import type { ProfileRecord } from "../domain/profiles";
 import { AccessControlService } from "../services/profiles";
-import { ActiveModelConnector } from "../connectors/active-model-connector";
 import { AgentChatService } from "../services/conversation/agent-chat-service";
 import { AutonomousTimeService } from "../services/autonomous-time-service";
 import { ConversationMemoryService } from "../services/conversation/conversation-memory-service";
@@ -53,7 +51,6 @@ export type RuntimeScope = {
   conversationMemory: ConversationMemoryService;
   reflection: ReflectionService;
   autonomousTime: AutonomousTimeService;
-  connector: ActiveModelConnector;
   shell: ShellRuntime;
   transitions: ConversationStateTransitionService;
   routineTools: ToolRegistry;
@@ -73,7 +70,6 @@ const K = {
   soul: "soul",
   reflection: "reflection",
   autonomousTime: "autonomousTime",
-  connector: "connector",
   shellBackend: "shellBackend",
   shell: "shell",
   filesystemBackend: "filesystemBackend",
@@ -100,7 +96,6 @@ export function createRuntimeScope(ctx: {
   finance: FinanceService;
   health: HealthTrackingService;
   onCacheMissWarning?: (warning: CacheMissWarning) => Promise<void> | void;
-  onPromptDriftWarning?: (warning: InferencePromptDriftWarning) => Promise<void> | void;
   onConversationActivityChange?: (params: {
     conversationKey: string;
     active: boolean;
@@ -210,22 +205,6 @@ export function createRuntimeScope(ctx: {
     new AutonomousTimeService(c.resolve<ProfileRecord>(K.profile), routines),
   );
 
-  c.register<ActiveModelConnector>(K.connector, () => {
-    const connector = new ActiveModelConnector(c.resolve<ModelService>(K.models));
-    if (ctx.onPromptDriftWarning) {
-      connector.setPromptDriftWarningCallback((warning) => {
-        void Promise.resolve(ctx.onPromptDriftWarning!(warning)).catch((error) => {
-          appTelemetry.recordError(error, {
-            profileId,
-            sessionId: warning.sessionId,
-            operation: "app.prompt_drift_warning_notifier",
-          });
-        });
-      });
-    }
-    return connector;
-  });
-
   c.register(K.shellBackend, () => {
     const profile = c.resolve<ProfileRecord>(K.profile);
     const isSsh = profiles.isSshExecutionProfile(profile);
@@ -253,10 +232,9 @@ export function createRuntimeScope(ctx: {
   c.register<ConversationStateTransitionService>(K.transitions, () =>
     appTelemetry.instrumentMethods(
       new ConversationStateTransitionService(
-        c.resolve<ActiveModelConnector>(K.connector),
+        c.resolve<ModelService>(K.models),
         conversations,
         c.resolve<MemoryService>(K.memory),
-        c.resolve<ModelService>(K.models),
         systemPrompts,
       ),
       { component: "conversation_transition", profileId },
@@ -294,7 +272,6 @@ export function createRuntimeScope(ctx: {
     const profile = c.resolve<ProfileRecord>(K.profile);
     const chat = new AgentChatService(
       {
-        connector: c.resolve<ActiveModelConnector>(K.connector),
         routineTools: c.resolve<ToolRegistry>(K.routineTools),
         toolResolver: c.resolve<ToolResolutionService>(K.toolResolver),
         transitions: c.resolve<ConversationStateTransitionService>(K.transitions),
@@ -333,7 +310,6 @@ export function createRuntimeScope(ctx: {
     conversationMemory: c.resolve<ConversationMemoryService>(K.conversationMemory),
     reflection: c.resolve<ReflectionService>(K.reflection),
     autonomousTime: c.resolve<AutonomousTimeService>(K.autonomousTime),
-    connector: c.resolve<ActiveModelConnector>(K.connector),
     shell: c.resolve<ShellRuntime>(K.shell),
     transitions: c.resolve<ConversationStateTransitionService>(K.transitions),
     routineTools: c.resolve<ToolRegistry>(K.routineTools),
