@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.26
+- Released at: 2026-03-28T16:29:56Z
+- Release id: 20260328T162956Z-591e113
+- Previous version: 2026.03.28.25
+- Trigger: ci/release workflow
+
+- feat: comprehensive e2e test cases covering all agent features (#186)
+
 ## 2026.03.28.25
 - Released at: 2026-03-28T16:08:22Z
 - Release id: 20260328T160822Z-fafa5f2
