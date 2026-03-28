@@ -19,7 +19,7 @@ import type { WorkPlanningService } from "../../services/work-planning-service";
 import type { TelemetryQueryService } from "../../services/telemetry-query-service";
 import type { DeploymentVersionService } from "../../services/deployment-version-service";
 import type { FeatureConfigService } from "../../services/feature-config-service";
-import type { ConversationStore } from "../../services/conversation-store";
+import type { ConversationStore } from "../../services/conversation/conversation-store";
 import type { FilesystemService } from "../../services/infrastructure/filesystem-service";
 import type { ShellService } from "../../services/infrastructure/shell-service";
 import type {

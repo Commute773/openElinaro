@@ -10,10 +10,10 @@ import {
   type StoredMessage,
 } from "@langchain/core/messages";
 import { ConversationHistoryService } from "./conversation-history-service";
-import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
-import type { SystemPromptSnapshot } from "./system-prompt-service";
-import { telemetry } from "./infrastructure/telemetry";
-import { timestamp } from "../utils/timestamp";
+import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../runtime-root";
+import type { SystemPromptSnapshot } from "../system-prompt-service";
+import { telemetry } from "../infrastructure/telemetry";
+import { timestamp } from "../../utils/timestamp";
 
 export interface ConversationState {
   key: string;

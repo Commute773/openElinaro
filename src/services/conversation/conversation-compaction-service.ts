@@ -5,13 +5,13 @@ import {
   type BaseMessage,
 } from "@langchain/core/messages";
 import { generateText } from "ai";
-import type { ProviderConnector } from "../connectors/provider-connector";
-import { extractTextFromMessage } from "./message-content-service";
-import { toModelMessages } from "./ai-sdk-message-service";
-import { MemoryService } from "./memory-service";
-import { ModelService } from "./models/model-service";
-import { telemetry } from "./infrastructure/telemetry";
-import { createTraceSpan } from "../utils/telemetry-helpers";
+import type { ProviderConnector } from "../../connectors/provider-connector";
+import { extractTextFromMessage } from "../message-content-service";
+import { toModelMessages } from "../ai-sdk-message-service";
+import { MemoryService } from "../memory-service";
+import { ModelService } from "../models/model-service";
+import { telemetry } from "../infrastructure/telemetry";
+import { createTraceSpan } from "../../utils/telemetry-helpers";
 
 const COMPACTION_TAIL_MESSAGES = 4;
 const COMPACTION_MAX_TOKENS = 10_000;

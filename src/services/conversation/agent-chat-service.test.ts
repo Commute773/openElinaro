@@ -5,10 +5,10 @@ import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { DynamicStructuredTool } from "@langchain/core/tools";
-import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
+import { ScriptedProviderConnector } from "../../test/scripted-provider-connector";
 import { AgentChatService } from "./agent-chat-service";
 import { ConversationStore } from "./conversation-store";
-import { SystemPromptService } from "./system-prompt-service";
+import { SystemPromptService } from "../system-prompt-service";
 
 let previousCwd = "";
 let previousRootDir = "";

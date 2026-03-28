@@ -62,9 +62,9 @@ type Harness = {
 };
 
 async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
-  const agentChatModule = await importFresh<typeof import("./agent-chat-service")>("src/services/agent-chat-service.ts");
-  const conversationStateTransitionModule = await importFresh<typeof import("./conversation-state-transition-service")>("src/services/conversation-state-transition-service.ts");
-  const conversationStoreModule = await importFresh<typeof import("./conversation-store")>("src/services/conversation-store.ts");
+  const agentChatModule = await importFresh<typeof import("./conversation/agent-chat-service")>("src/services/conversation/agent-chat-service.ts");
+  const conversationStateTransitionModule = await importFresh<typeof import("./conversation/conversation-state-transition-service")>("src/services/conversation/conversation-state-transition-service.ts");
+  const conversationStoreModule = await importFresh<typeof import("./conversation/conversation-store")>("src/services/conversation/conversation-store.ts");
   const memoryServiceModule = await importFresh<typeof import("./memory-service")>("src/services/memory-service.ts");
   const profileServiceModule = await importFresh<typeof import("./profiles/profile-service")>("src/services/profiles/profile-service.ts");
   const systemPromptModule = await importFresh<typeof import("./system-prompt-service")>("src/services/system-prompt-service.ts");

@@ -16,7 +16,7 @@ let tempRoot = "";
 
 let runtimeModule: typeof import("./runtime");
 let authStoreModule: typeof import("../auth/store");
-let conversationStoreModule: typeof import("../services/conversation-store");
+let conversationStoreModule: typeof import("../services/conversation/conversation-store");
 
 async function importFresh<T>(relativePath: string): Promise<T> {
   const absolutePath = path.join(repoRoot, relativePath);
@@ -160,7 +160,7 @@ async function main() {
 
   writeProfileRegistry(providerId);
   runtimeModule = await importFresh("src/app/runtime.ts");
-  conversationStoreModule = await importFresh("src/services/conversation-store.ts");
+  conversationStoreModule = await importFresh("src/services/conversation/conversation-store.ts");
 
   const app = new runtimeModule.OpenElinaroApp({ profileId: "root" });
 

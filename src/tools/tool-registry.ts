@@ -20,8 +20,8 @@ import {
   guardRuntimeContextSection,
 } from "./tool-output-pipeline";
 import type { AppProgressEvent } from "../domain/assistant";
-import { ConversationStore } from "../services/conversation-store";
-import { ConversationStateTransitionService } from "../services/conversation-state-transition-service";
+import { ConversationStore } from "../services/conversation/conversation-store";
+import { ConversationStateTransitionService } from "../services/conversation/conversation-state-transition-service";
 import { FinanceService } from "../services/finance-service";
 import {
   ElinaroTicketsService,

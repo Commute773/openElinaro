@@ -21,7 +21,7 @@ let tempRoot = "";
 let runtimeModule: typeof import("./runtime");
 let activeConnectorModule: typeof import("../connectors/active-model-connector");
 let memoryServiceModule: typeof import("../services/memory-service");
-let conversationMemoryModule: typeof import("../services/conversation-memory-service");
+let conversationMemoryModule: typeof import("../services/conversation/conversation-memory-service");
 
 let originalDoGenerate: typeof activeConnectorModule.ActiveModelConnector.prototype.doGenerate;
 let originalEnsureReady: typeof memoryServiceModule.MemoryService.prototype.ensureReady;
@@ -78,8 +78,8 @@ beforeAll(async () => {
   memoryServiceModule = await importFresh<typeof import("../services/memory-service")>(
     "src/services/memory-service.ts",
   );
-  conversationMemoryModule = await importFresh<typeof import("../services/conversation-memory-service")>(
-    "src/services/conversation-memory-service.ts",
+  conversationMemoryModule = await importFresh<typeof import("../services/conversation/conversation-memory-service")>(
+    "src/services/conversation/conversation-memory-service.ts",
   );
   runtimeModule = await importFresh<typeof import("./runtime")>("src/app/runtime.ts");
 
