@@ -24,14 +24,14 @@ let profileServiceModule: typeof import("../../services/profile-service");
 let projectsServiceModule: typeof import("../../services/projects-service");
 let accessControlModule: typeof import("../../services/access-control-service");
 let routinesServiceModule: typeof import("../../services/routines-service");
-let conversationStoreModule: typeof import("../../services/conversation-store");
+let conversationStoreModule: typeof import("../../services/conversation/conversation-store");
 let systemPromptModule: typeof import("../../services/system-prompt-service");
 let memoryServiceModule: typeof import("../../services/memory-service");
 let modelServiceModule: typeof import("../../services/model-service");
-let transitionServiceModule: typeof import("../../services/conversation-state-transition-service");
+let transitionServiceModule: typeof import("../../services/conversation/conversation-state-transition-service");
 let toolRegistryModule: typeof import("../../tools/tool-registry");
 let toolResolutionModule: typeof import("../../services/tool-resolution-service");
-let agentChatModule: typeof import("../../services/agent-chat-service");
+let agentChatModule: typeof import("../../services/conversation/agent-chat-service");
 
 const liveStateBefore = {
   authStore: readOptionalFile(path.join(machineTestRoot, "auth-store.json")),
@@ -678,14 +678,14 @@ if (RUN_CHILD_SUITE) {
     projectsServiceModule = await importFresh("src/services/projects-service.ts");
     accessControlModule = await importFresh("src/services/access-control-service.ts");
     routinesServiceModule = await importFresh("src/services/routines-service.ts");
-    conversationStoreModule = await importFresh("src/services/conversation-store.ts");
+    conversationStoreModule = await importFresh("src/services/conversation/conversation-store.ts");
     systemPromptModule = await importFresh("src/services/system-prompt-service.ts");
     memoryServiceModule = await importFresh("src/services/memory-service.ts");
     modelServiceModule = await importFresh("src/services/model-service.ts");
-    transitionServiceModule = await importFresh("src/services/conversation-state-transition-service.ts");
+    transitionServiceModule = await importFresh("src/services/conversation/conversation-state-transition-service.ts");
     toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
     toolResolutionModule = await importFresh("src/services/tool-resolution-service.ts");
-    agentChatModule = await importFresh("src/services/agent-chat-service.ts");
+    agentChatModule = await importFresh("src/services/conversation/agent-chat-service.ts");
   });
 
   afterAll(() => {

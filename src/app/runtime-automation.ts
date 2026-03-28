@@ -4,7 +4,7 @@ import type { ProfileRecord } from "../domain/profiles";
 import { resolveDiscordResponse } from "../services/discord-response-service";
 import { RecentThreadContextService, shouldIncludeRecentThreadContext } from "../services/recent-thread-context-service";
 import type { ProfileService } from "../services/profile-service";
-import type { ConversationStore } from "../services/conversation-store";
+import type { ConversationStore } from "../services/conversation/conversation-store";
 import { WorkPlanningService } from "../services/work-planning-service";
 import type { RoutinesService } from "../services/routines-service";
 import { telemetry } from "../services/telemetry";

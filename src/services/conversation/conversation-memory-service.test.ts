@@ -3,9 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
-import type { ProfileRecord } from "../domain/profiles";
+import type { ProfileRecord } from "../../domain/profiles";
 import { ConversationMemoryService } from "./conversation-memory-service";
-import type { MemorySearchMatch } from "./memory-service";
+import type { MemorySearchMatch } from "../memory-service";
 
 let tempRoot = "";
 let previousRootDirEnv: string | undefined;

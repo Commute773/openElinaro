@@ -4,19 +4,19 @@ import {
   ToolMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
-import type { ChatPromptContent } from "../domain/assistant";
-import type { ProfileRecord } from "../domain/profiles";
+import type { ChatPromptContent } from "../../domain/assistant";
+import type { ProfileRecord } from "../../domain/profiles";
 import { ConversationStore } from "./conversation-store";
-import { MemoryService, type MemorySearchMatch } from "./memory-service";
+import { MemoryService, type MemorySearchMatch } from "../memory-service";
 import {
   extractTextFromContent,
   extractTextFromMessage,
-} from "./message-content-service";
-import { approximateTextTokens } from "../utils/text-utils";
-import { ModelService } from "./model-service";
-import { ProfileService } from "./profile-service";
-import { telemetry } from "./telemetry";
-import { createTraceSpan } from "../utils/telemetry-helpers";
+} from "../message-content-service";
+import { approximateTextTokens } from "../../utils/text-utils";
+import { ModelService } from "../model-service";
+import { ProfileService } from "../profile-service";
+import { telemetry } from "../telemetry";
+import { createTraceSpan } from "../../utils/telemetry-helpers";
 
 const MEMORY_RECALL_LIMIT = 3;
 const MEMORY_RECALL_MIN_SCORE = 0.05;

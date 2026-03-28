@@ -3,11 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { ProfileRecord } from "../domain/profiles";
-import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
+import type { ProfileRecord } from "../../domain/profiles";
+import { ScriptedProviderConnector } from "../../test/scripted-provider-connector";
 import { ConversationCompactionService } from "./conversation-compaction-service";
-import { MemoryService } from "./memory-service";
-import { ProfileService } from "./profile-service";
+import { MemoryService } from "../memory-service";
+import { ProfileService } from "../profile-service";
 
 const ROOT_PROFILE: ProfileRecord = {
   id: "root",

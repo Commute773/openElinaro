@@ -3,11 +3,11 @@ import type { InferencePromptDriftWarning } from "../services/inference-prompt-d
 import type { ProfileRecord } from "../domain/profiles";
 import { AccessControlService } from "../services/access-control-service";
 import { ActiveModelConnector } from "../connectors/active-model-connector";
-import { AgentChatService } from "../services/agent-chat-service";
+import { AgentChatService } from "../services/conversation/agent-chat-service";
 import { AutonomousTimeService } from "../services/autonomous-time-service";
-import { ConversationMemoryService } from "../services/conversation-memory-service";
-import { ConversationStateTransitionService } from "../services/conversation-state-transition-service";
-import type { ConversationStore } from "../services/conversation-store";
+import { ConversationMemoryService } from "../services/conversation/conversation-memory-service";
+import { ConversationStateTransitionService } from "../services/conversation/conversation-state-transition-service";
+import type { ConversationStore } from "../services/conversation/conversation-store";
 import { FilesystemService } from "../services/filesystem-service";
 import { LocalFilesystemBackend } from "../services/filesystem-backend-local";
 import { SshFilesystemBackend } from "../services/filesystem-backend-ssh";

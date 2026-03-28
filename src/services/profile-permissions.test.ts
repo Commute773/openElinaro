@@ -20,11 +20,11 @@ let projectsModule: typeof import("../services/projects-service");
 let accessModule: typeof import("../services/access-control-service");
 let workspaceModule: typeof import("../services/project-workspace-service");
 let routinesModule: typeof import("../services/routines-service");
-let conversationsModule: typeof import("../services/conversation-store");
+let conversationsModule: typeof import("../services/conversation/conversation-store");
 let systemPromptsModule: typeof import("../services/system-prompt-service");
 let memoryModule: typeof import("../services/memory-service");
 let modelsModule: typeof import("../services/model-service");
-let transitionsModule: typeof import("../services/conversation-state-transition-service");
+let transitionsModule: typeof import("../services/conversation/conversation-state-transition-service");
 let toolRegistryModule: typeof import("../tools/tool-registry");
 let toolAuthModule: typeof import("../services/tool-authorization-service");
 
@@ -167,11 +167,11 @@ beforeAll(async () => {
   accessModule = await importFresh("src/services/access-control-service.ts");
   workspaceModule = await importFresh("src/services/project-workspace-service.ts");
   routinesModule = await importFresh("src/services/routines-service.ts");
-  conversationsModule = await importFresh("src/services/conversation-store.ts");
+  conversationsModule = await importFresh("src/services/conversation/conversation-store.ts");
   systemPromptsModule = await importFresh("src/services/system-prompt-service.ts");
   memoryModule = await importFresh("src/services/memory-service.ts");
   modelsModule = await importFresh("src/services/model-service.ts");
-  transitionsModule = await importFresh("src/services/conversation-state-transition-service.ts");
+  transitionsModule = await importFresh("src/services/conversation/conversation-state-transition-service.ts");
   toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
   toolAuthModule = await importFresh("src/services/tool-authorization-service.ts");
 });

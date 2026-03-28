@@ -5,7 +5,7 @@ import path from "node:path";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { ConversationHistoryService } from "./conversation-history-service";
 import { ConversationStore } from "./conversation-store";
-import { SystemPromptService } from "./system-prompt-service";
+import { SystemPromptService } from "../system-prompt-service";
 
 let tempRoot = "";
 let previousRootDirEnv: string | undefined;

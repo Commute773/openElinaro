@@ -25,9 +25,9 @@ let previousCwd = "";
 let previousRootDirEnv: string | undefined;
 let tempRoot = "";
 
-let agentChatModule: typeof import("./agent-chat-service");
-let conversationMemoryModule: typeof import("./conversation-memory-service");
-let conversationStoreModule: typeof import("./conversation-store");
+let agentChatModule: typeof import("./conversation/agent-chat-service");
+let conversationMemoryModule: typeof import("./conversation/conversation-memory-service");
+let conversationStoreModule: typeof import("./conversation/conversation-store");
 let memoryServiceModule: typeof import("./memory-service");
 let profileServiceModule: typeof import("./profile-service");
 let systemPromptModule: typeof import("./system-prompt-service");
@@ -271,9 +271,9 @@ beforeAll(async () => {
   copyMachineTestFile("memory/index.root.json");
   copyMachineTestDirectory("memory/documents/root");
 
-  agentChatModule = await importFresh<typeof import("./agent-chat-service")>("src/services/agent-chat-service.ts");
-  conversationMemoryModule = await importFresh<typeof import("./conversation-memory-service")>("src/services/conversation-memory-service.ts");
-  conversationStoreModule = await importFresh<typeof import("./conversation-store")>("src/services/conversation-store.ts");
+  agentChatModule = await importFresh<typeof import("./conversation/agent-chat-service")>("src/services/conversation/agent-chat-service.ts");
+  conversationMemoryModule = await importFresh<typeof import("./conversation/conversation-memory-service")>("src/services/conversation/conversation-memory-service.ts");
+  conversationStoreModule = await importFresh<typeof import("./conversation/conversation-store")>("src/services/conversation/conversation-store.ts");
   memoryServiceModule = await importFresh<typeof import("./memory-service")>("src/services/memory-service.ts");
   profileServiceModule = await importFresh<typeof import("./profile-service")>("src/services/profile-service.ts");
   systemPromptModule = await importFresh<typeof import("./system-prompt-service")>("src/services/system-prompt-service.ts");

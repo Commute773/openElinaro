@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { HumanMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { ConversationStore } from "./conversation-store";
+import { ConversationStore } from "./conversation/conversation-store";
 import { MemoryService } from "./memory-service";
 import { ProfileService } from "./profile-service";
 import { ReflectionService } from "./reflection-service";

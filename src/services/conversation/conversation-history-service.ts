@@ -3,7 +3,7 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import type { BaseMessage, StoredMessage } from "@langchain/core/messages";
 import { mapChatMessagesToStoredMessages } from "@langchain/core/messages";
-import { extractTextFromMessage } from "./message-content-service";
+import { extractTextFromMessage } from "../message-content-service";
 import {
   buildDocumentFrequencies,
   countTerms,
@@ -12,16 +12,16 @@ import {
   rankHybridMatches,
   scoreBm25,
   tokenize,
-} from "./hybrid-search";
-import { getDefaultProfileId } from "./profile-service";
-import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
-import { telemetry } from "./telemetry";
-import { createTraceSpan } from "../utils/telemetry-helpers";
+} from "../hybrid-search";
+import { getDefaultProfileId } from "../profile-service";
+import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../runtime-root";
+import { telemetry } from "../telemetry";
+import { createTraceSpan } from "../../utils/telemetry-helpers";
 import {
   EMBEDDING_MODEL_ID,
   embedTexts,
   isEmbeddingExtractorReady,
-} from "./text-embedding-service";
+} from "../text-embedding-service";
 
 const INDEX_VERSION = 2;
 const conversationHistoryTelemetry = telemetry.child({ component: "conversation_history" });

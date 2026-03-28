@@ -1,6 +1,6 @@
 import type { ProfileRecord } from "../domain/profiles";
 import type { RoutinesService } from "./routines-service";
-import { ConversationStore } from "./conversation-store";
+import { ConversationStore } from "./conversation/conversation-store";
 import { MemoryService } from "./memory-service";
 import { ModelService } from "./model-service";
 import { telemetry } from "./telemetry";

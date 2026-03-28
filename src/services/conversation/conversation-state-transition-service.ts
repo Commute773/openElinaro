@@ -1,18 +1,18 @@
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { generateText } from "ai";
-import type { ProviderConnector } from "../connectors/provider-connector";
+import type { ProviderConnector } from "../../connectors/provider-connector";
 import { ConversationCompactionService } from "./conversation-compaction-service";
 import { type ConversationState, ConversationStore } from "./conversation-store";
-import { toModelMessages } from "./ai-sdk-message-service";
-import { MemoryService } from "./memory-service";
-import { ModelService } from "./model-service";
+import { toModelMessages } from "../ai-sdk-message-service";
+import { MemoryService } from "../memory-service";
+import { ModelService } from "../model-service";
 import {
   composeSystemPrompt,
   SystemPromptService,
   type SystemPromptSnapshot,
-} from "./system-prompt-service";
-import { extractTextFromMessage } from "./message-content-service";
-import { telemetry } from "./telemetry";
+} from "../system-prompt-service";
+import { extractTextFromMessage } from "../message-content-service";
+import { telemetry } from "../telemetry";
 
 type ProgressReporter = (message: string) => Promise<void>;
 

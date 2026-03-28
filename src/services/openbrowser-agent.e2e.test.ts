@@ -12,10 +12,10 @@ const repoRoot = process.cwd();
 
 let previousCwd = "";
 let tempRoot = "";
-let conversationStoreModule: typeof import("./conversation-store");
-let transitionServiceModule: typeof import("./conversation-state-transition-service");
+let conversationStoreModule: typeof import("./conversation/conversation-store");
+let transitionServiceModule: typeof import("./conversation/conversation-state-transition-service");
 let accessControlModule: typeof import("./access-control-service");
-let agentChatModule: typeof import("./agent-chat-service");
+let agentChatModule: typeof import("./conversation/agent-chat-service");
 let memoryServiceModule: typeof import("./memory-service");
 let modelServiceModule: typeof import("./model-service");
 let profileServiceModule: typeof import("./profile-service");
@@ -331,10 +331,10 @@ describe("OpenBrowser agent e2e", () => {
       config.openbrowser.runnerScript = ensureStubRunner();
     });
 
-    conversationStoreModule = await importFresh("src/services/conversation-store.ts");
-    transitionServiceModule = await importFresh("src/services/conversation-state-transition-service.ts");
+    conversationStoreModule = await importFresh("src/services/conversation/conversation-store.ts");
+    transitionServiceModule = await importFresh("src/services/conversation/conversation-state-transition-service.ts");
     accessControlModule = await importFresh("src/services/access-control-service.ts");
-    agentChatModule = await importFresh("src/services/agent-chat-service.ts");
+    agentChatModule = await importFresh("src/services/conversation/agent-chat-service.ts");
     memoryServiceModule = await importFresh("src/services/memory-service.ts");
     modelServiceModule = await importFresh("src/services/model-service.ts");
     profileServiceModule = await importFresh("src/services/profile-service.ts");

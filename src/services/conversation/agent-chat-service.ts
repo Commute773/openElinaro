@@ -1,26 +1,26 @@
 import { AIMessage, HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import { generateText, stepCountIs } from "ai";
-import type { ProviderConnector } from "../connectors/provider-connector";
-import type { AppProgressEvent, ChatPromptContent, ChatPromptContentBlock } from "../domain/assistant";
+import type { ProviderConnector } from "../../connectors/provider-connector";
+import type { AppProgressEvent, ChatPromptContent, ChatPromptContentBlock } from "../../domain/assistant";
 import { ConversationStore } from "./conversation-store";
 import { ConversationStateTransitionService } from "./conversation-state-transition-service";
-import { appendResponseMessages, toModelMessages, toToolSet, toV3Usage } from "./ai-sdk-message-service";
-import { ModelService } from "./model-service";
-import { guardUntrustedText } from "./prompt-injection-guard-service";
-import { prependTextToChatPromptContent } from "./message-content-service";
-import { buildCurrentLocalTimePrefix } from "./local-time-service";
+import { appendResponseMessages, toModelMessages, toToolSet, toV3Usage } from "../ai-sdk-message-service";
+import { ModelService } from "../model-service";
+import { guardUntrustedText } from "../prompt-injection-guard-service";
+import { prependTextToChatPromptContent } from "../message-content-service";
+import { buildCurrentLocalTimePrefix } from "../local-time-service";
 import {
   composeSystemPrompt,
   formatSystemPromptWarning,
   SystemPromptService,
-} from "./system-prompt-service";
-import { ToolRegistry } from "../tools/tool-registry";
-import { telemetry } from "./telemetry";
-import { createTraceSpan } from "../utils/telemetry-helpers";
-import { ToolResultStore } from "./tool-result-store";
-import { ToolResolutionService } from "./tool-resolution-service";
+} from "../system-prompt-service";
+import { ToolRegistry } from "../../tools/tool-registry";
+import { telemetry } from "../telemetry";
+import { createTraceSpan } from "../../utils/telemetry-helpers";
+import { ToolResultStore } from "../tool-result-store";
+import { ToolResolutionService } from "../tool-resolution-service";
 import { ConversationMemoryService } from "./conversation-memory-service";
-import type { ReflectionService } from "./reflection-service";
+import type { ReflectionService } from "../reflection-service";
 
 const COMPACTION_THRESHOLD_PERCENT = 80;
 const QUEUED_WHILE_COMPACTING_MESSAGE = "message queued as we are currently compacting";

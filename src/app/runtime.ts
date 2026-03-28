@@ -1,7 +1,7 @@
 import type { AppProgressEvent, AppRequest, AppResponse } from "../domain/assistant";
 import type { ProfileRecord } from "../domain/profiles";
 import type { SubagentRun } from "../domain/subagent-run";
-import { ConversationStore } from "../services/conversation-store";
+import { ConversationStore } from "../services/conversation/conversation-store";
 import { FinanceService } from "../services/finance-service";
 import { HealthTrackingService } from "../services/health-tracking-service";
 import { ProfileService } from "../services/profile-service";
