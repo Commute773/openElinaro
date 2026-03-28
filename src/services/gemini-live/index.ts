@@ -16,6 +16,7 @@ import type { ServerWebSocket } from "bun";
 import { getRuntimeConfig } from "../../config/runtime-config";
 import { normalizeString } from "../../utils/text-utils";
 import { timestamp as nowIso } from "../../utils/timestamp";
+import { readWebhookPayload } from "../../utils/http-helpers";
 import {
   buildPhoneCallStartPrompt,
   buildPhoneCallSystemInstruction,
@@ -208,7 +209,7 @@ export class GeminiLivePhoneService {
   }
 
   async recordVoiceEventWebhook(request: Request) {
-    const payload = await this.readWebhookPayload(request);
+    const payload = await readWebhookPayload(request);
     return this.recordVoiceEventPayload(payload);
   }
 
@@ -1236,30 +1237,4 @@ export class GeminiLivePhoneService {
     return updated;
   }
 
-  private async readWebhookPayload(request: Request) {
-    const method = request.method.toUpperCase();
-    if (method === "GET") {
-      return Object.fromEntries(
-        new URL(request.url).searchParams.entries(),
-      );
-    }
-    const contentType =
-      request.headers.get("content-type")?.toLowerCase() ?? "";
-    if (contentType.includes("application/json")) {
-      return (await request.json()) as Record<string, unknown>;
-    }
-    if (contentType.includes("application/x-www-form-urlencoded")) {
-      const text = await request.text();
-      return Object.fromEntries(new URLSearchParams(text).entries());
-    }
-    const text = await request.text();
-    if (!text.trim()) {
-      return {};
-    }
-    try {
-      return JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      return { raw: text };
-    }
-  }
 }
