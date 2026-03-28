@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.29
+- Released at: 2026-03-28T16:59:22Z
+- Release id: 20260328T165922Z-0301641
+- Previous version: 2026.03.28.28
+- Trigger: ci/release workflow
+
+- fix: remove legacy media paths outside .openelinaro
+
 ## 2026.03.28.28
 - Released at: 2026-03-28T16:41:38Z
 - Release id: 20260328T164138Z-f455e51
