@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { MemoryService } from "./memory-service";
 import { ProfileService } from "./profiles";
-import { RoutinesService } from "./routines-service";
+import { RoutinesService } from "./scheduling/routines-service";
 import { SoulService } from "./soul-service";
 import { resolveAssistantContextPath } from "./runtime-user-content";
 

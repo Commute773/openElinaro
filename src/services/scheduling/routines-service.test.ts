@@ -2,9 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
-import { ProfileService } from "./profiles";
-import { ProjectsService } from "./projects-service";
+import { updateTestRuntimeConfig } from "../../test/runtime-config-test-helpers";
+import { ProfileService } from "../profiles";
+import { ProjectsService } from "../projects-service";
 import { RoutinesService } from "./routines-service";
 
 let runtimeRoot = "";
@@ -1022,7 +1022,7 @@ describe("RoutinesService", () => {
   });
 
   test("buildSchedule in routine tools passes days through for daily schedules", async () => {
-    const { buildSchedule } = await import("../functions/domains/routine-functions");
+    const { buildSchedule } = await import("../../functions/domains/routine-functions");
 
     const withDays = buildSchedule({
       scheduleKind: "daily",

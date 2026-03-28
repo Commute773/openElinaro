@@ -1,7 +1,7 @@
 import type { ProjectRecord, WorkPriority } from "../domain/projects";
 import type { RoutineItem, RoutineSchedule } from "../domain/routines";
 import { ProjectsService } from "./projects-service";
-import { RoutinesService } from "./routines-service";
+import { RoutinesService } from "./scheduling/routines-service";
 import { nowInTimezone, parseTime, startOfDay } from "../utils/time-helpers";
 
 type WorkMode = "work" | "sleep" | "personal";

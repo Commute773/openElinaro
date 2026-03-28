@@ -18,7 +18,7 @@ import { ModelService } from "../services/models/model-service";
 import type { ProfileService } from "../services/profiles";
 import { ProjectsService } from "../services/projects-service";
 import { ReflectionService } from "../services/reflection-service";
-import type { RoutinesService } from "../services/routines-service";
+import type { RoutinesService } from "../services/scheduling/routines-service";
 import { ServiceContainer } from "../services/container";
 import { ShellService } from "../services/shell-service";
 import { SshShellBackend } from "../services/shell-backend-ssh";

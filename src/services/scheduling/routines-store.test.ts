@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { RoutineStoreData } from "../domain/routines";
+import type { RoutineStoreData } from "../../domain/routines";
 import { RoutinesStore } from "./routines-store";
 
 let runtimeRoot = "";
