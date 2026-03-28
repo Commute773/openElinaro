@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.23
+- Released at: 2026-03-28T16:01:31Z
+- Release id: 20260328T160131Z-6fc0fa5
+- Previous version: 2026.03.28.22
+- Trigger: ci/release workflow
+
+- feat: add e2e CLI test suite with connector abstraction (#183)
+
 ## 2026.03.28.22
 - Released at: 2026-03-28T15:44:03Z
 - Release id: 20260328T154403Z-576f943
