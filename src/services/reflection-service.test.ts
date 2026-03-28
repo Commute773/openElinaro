@@ -12,6 +12,11 @@ import { resolveAssistantContextPath } from "./runtime-user-content";
 
 let runtimeRoot = "";
 let previousRootDirEnv: string | undefined;
+const TEST_REFLECTION_SELECTION = {
+  providerId: "claude" as const,
+  modelId: "claude-sonnet-4-5",
+  thinkingLevel: "minimal" as const,
+};
 
 function writeProfileRegistry(rootDir: string) {
   fs.mkdirSync(path.join(rootDir, ".openelinarotest", "profiles"), { recursive: true });
@@ -98,6 +103,9 @@ describe("ReflectionService", () => {
             bring_up_next_time: "",
           });
         },
+        getReflectionSelection() {
+          return TEST_REFLECTION_SELECTION;
+        },
       },
     );
 
@@ -130,6 +138,9 @@ describe("ReflectionService", () => {
             mood: "focused",
             bring_up_next_time: "finance onboarding flow",
           });
+        },
+        getReflectionSelection() {
+          return TEST_REFLECTION_SELECTION;
         },
       },
     );
@@ -171,6 +182,9 @@ describe("ReflectionService", () => {
               ? "tighten reminder cadence"
               : "",
           });
+        },
+        getReflectionSelection() {
+          return TEST_REFLECTION_SELECTION;
         },
       },
     );
@@ -219,6 +233,9 @@ describe("ReflectionService", () => {
             mood: "sharp",
             bring_up_next_time: "",
           });
+        },
+        getReflectionSelection() {
+          return TEST_REFLECTION_SELECTION;
         },
       },
       {

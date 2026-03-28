@@ -11,6 +11,11 @@ import { resolveRuntimePath } from "../runtime-root";
 import { DEFAULT_PROFILE_ID as DEFAULT_ROUTINE_PROFILE_ID } from "../../config/service-constants";
 import { writeJsonFileSecurely } from "../../utils/file-utils";
 
+type LegacyRoutineItem = RoutineItem & {
+  notes?: string;
+  state?: RoutineItem["state"] & { streak?: number };
+};
+
 function getStorePath() {
   return resolveRuntimePath("routines.json");
 }
@@ -46,11 +51,12 @@ function createEmptyStore(): RoutineStoreData {
   };
 }
 
-function normalizeItem(item: RoutineItem): RoutineItem {
+function normalizeItem(item: LegacyRoutineItem): RoutineItem {
   const status = item.status ?? "active";
   const profileId = normalizeProfileId(item);
   return {
     ...item,
+    description: item.description ?? item.notes,
     profileId,
     enabled: item.enabled ?? (status !== "paused" && status !== "archived" && status !== "completed"),
     status,
@@ -58,7 +64,6 @@ function normalizeItem(item: RoutineItem): RoutineItem {
       completionHistory: item.state?.completionHistory ?? [],
       skippedOccurrenceKeys: item.state?.skippedOccurrenceKeys ?? [],
       reminderCountForOccurrence: item.state?.reminderCountForOccurrence ?? 0,
-      streak: item.state?.streak ?? 0,
       lastCompletedAt: item.state?.lastCompletedAt,
       lastSkippedAt: item.state?.lastSkippedAt,
       snoozedUntil: item.state?.snoozedUntil,

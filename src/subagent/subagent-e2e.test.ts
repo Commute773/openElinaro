@@ -14,6 +14,8 @@ import {
 } from "./spawn";
 import type { SubagentEvent } from "./events";
 import type { SubagentRun } from "../domain/subagent-run";
+import { buildOpenElinaroCommandEnvironment } from "../services/shell-environment";
+import { summarizeAgentRun } from "../services/subagent-summary-service";
 
 /**
  * Real E2E tests that launch actual Claude Code and Codex subagents.
@@ -34,6 +36,7 @@ const TEST_SESSION = "openelinaro-e2e-test";
 const TEST_CWD = "/tmp";
 const SOCKET_PATH = `/tmp/openelinaro-e2e-sidecar-${process.pid}.sock`;
 const COMPLETION_TIMEOUT_MS = 120_000; // 2 minutes for real API calls
+const STRIPPED_PATH = "/usr/bin:/bin:/usr/sbin:/sbin";
 
 let tmux: TmuxManager;
 let sidecar: SubagentSidecar;
@@ -325,6 +328,150 @@ describeE2E("subagent E2E — codex", () => {
     cleanupHooksDir(runId);
     fs.rmSync(targetFile, { force: true });
   }, COMPLETION_TIMEOUT_MS + 10_000);
+
+  runTest("fails under a stripped PATH when node is unavailable to Codex dispatch", async () => {
+    const runId = `e2e-codex-path-fail-${Date.now()}`;
+
+    const notifyScriptPath = writeCodexNotifyConfig({
+      runId,
+      sidecarSocketPath: sidecar.socketPath,
+    });
+
+    const command = buildCodexSpawnCommand({
+      runId,
+      provider: "codex",
+      binaryPath: CODEX_BIN,
+      goal: "Print exactly 'path-failure-check' and exit.",
+      cwd: TEST_CWD,
+      profileId: "root",
+      sidecarSocketPath: sidecar.socketPath,
+      timeoutMs: COMPLETION_TIMEOUT_MS,
+      notifyScriptPath,
+    });
+
+    await tmux.runInWindow(runId, command, TEST_CWD, { PATH: STRIPPED_PATH });
+
+    const event = await waitForEvent(runId, "worker.failed", 30_000);
+    const pane = await tmux.readTerminal(runId);
+
+    expect(event.provider).toBe("codex");
+    expect(`${JSON.stringify(event.payload)}\n${pane}`.toLowerCase()).toMatch(/node|no such file|not found/);
+
+    await tmux.killWindow(runId);
+    cleanupHooksDir(runId);
+  }, 40_000);
+
+  runTest("launches Codex successfully under the same stripped PATH when the hardened env is applied", async () => {
+    const runId = `e2e-codex-path-pass-${Date.now()}`;
+    const targetFile = `/tmp/e2e-codex-path-pass-${Date.now()}.txt`;
+
+    const notifyScriptPath = writeCodexNotifyConfig({
+      runId,
+      sidecarSocketPath: sidecar.socketPath,
+    });
+
+    const command = buildCodexSpawnCommand({
+      runId,
+      provider: "codex",
+      binaryPath: CODEX_BIN,
+      goal: `Create a file at ${targetFile} containing exactly 'codex-path-ok'.`,
+      cwd: TEST_CWD,
+      profileId: "root",
+      sidecarSocketPath: sidecar.socketPath,
+      timeoutMs: COMPLETION_TIMEOUT_MS,
+      notifyScriptPath,
+    });
+
+    const env = buildOpenElinaroCommandEnvironment({ PATH: STRIPPED_PATH });
+    await tmux.runInWindow(runId, command, TEST_CWD, env);
+
+    const event = await waitForEvent(runId, "worker.completed");
+    expect(event.provider).toBe("codex");
+    expect(fs.existsSync(targetFile)).toBe(true);
+    expect(fs.readFileSync(targetFile, "utf8").trim()).toBe("codex-path-ok");
+
+    await tmux.killWindow(runId);
+    cleanupHooksDir(runId);
+    fs.rmSync(targetFile, { force: true });
+  }, COMPLETION_TIMEOUT_MS + 10_000);
+});
+
+describeE2E("subagent E2E — interactive terminal summary", () => {
+  const hasClaude = fs.existsSync(CLAUDE_BIN);
+  const runTest = hasClaude ? test : test.skip;
+
+  runTest("summarizes a live Claude run from the full terminal buffer", async () => {
+    const runId = `e2e-claude-summary-${Date.now()}`;
+
+    const { settingsPath } = writeClaudeHooksConfig({
+      runId,
+      worktreeCwd: TEST_CWD,
+      sidecarSocketPath: sidecar.socketPath,
+    });
+
+    const command = buildClaudeSpawnCommand({
+      runId,
+      provider: "claude",
+      binaryPath: CLAUDE_BIN,
+      goal: "Think about the phrase full-screen-summary-check, then wait for further instructions instead of exiting immediately.",
+      cwd: TEST_CWD,
+      profileId: "root",
+      sidecarSocketPath: sidecar.socketPath,
+      timeoutMs: COMPLETION_TIMEOUT_MS,
+      hooksSettingsPath: settingsPath,
+    });
+
+    await tmux.runInWindow(runId, command, TEST_CWD);
+
+    const run: SubagentRun = {
+      id: runId,
+      profileId: "root",
+      provider: "claude",
+      goal: "Think about the phrase full-screen-summary-check, then wait for further instructions instead of exiting immediately.",
+      status: "running",
+      tmuxSession: TEST_SESSION,
+      tmuxWindow: runId,
+      workspaceCwd: TEST_CWD,
+      createdAt: new Date().toISOString(),
+      launchDepth: 1,
+      timeoutMs: COMPLETION_TIMEOUT_MS,
+      eventLog: [],
+    };
+
+    let terminal = "";
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      terminal = await tmux.readTerminal(runId);
+      if (terminal.trim().length >= 120) {
+        break;
+      }
+      await Bun.sleep(1_000);
+    }
+
+    expect(terminal.trim().length).toBeGreaterThanOrEqual(120);
+
+    const summary = await summarizeAgentRun({
+      runId,
+      subagents: {
+        getAgentRun: (requestedRunId: string) => requestedRunId === runId ? run : undefined,
+        readAgentTerminal: async () => terminal,
+      },
+      models: {
+        summarizeToolResult: async ({ output }: { output: string }) =>
+          output.trim().length >= 120
+            ? "Captured alternate-screen terminal content from the running Claude session."
+            : "insufficient evidence",
+      } as never,
+    });
+
+    expect(summary).toBe("Captured alternate-screen terminal content from the running Claude session.");
+
+    if (await tmux.isWindowProcessAlive(runId)) {
+      await tmux.sendKeys(runId, "/exit");
+    }
+    await tmux.killWindow(runId);
+    cleanupHooksDir(runId);
+  }, 45_000);
 });
 
 describeE2E("subagent E2E — registry state tracking", () => {

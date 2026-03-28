@@ -29,6 +29,7 @@ const addRoutineSchema = z.object({
   profileId: z.string().min(1).optional(),
   priority: routinePrioritySchema.optional(),
   description: z.string().optional(),
+  notes: z.string().optional().describe("Legacy alias for description."),
   dose: z.string().optional(),
   labels: z.array(z.string()).optional(),
   jobId: z.string().min(1).optional(),
@@ -60,6 +61,7 @@ const updateRoutineSchema = z.object({
   kind: routineKindSchema.optional(),
   priority: routinePrioritySchema.optional(),
   description: z.string().optional(),
+  notes: z.string().optional().describe("Legacy alias for description."),
   labels: z.array(z.string()).optional(),
   jobId: z.string().min(1).optional(),
   projectId: z.string().min(1).optional(),
@@ -84,6 +86,7 @@ const updateRoutineSchema = z.object({
     || value.kind !== undefined
     || value.priority !== undefined
     || value.description !== undefined
+    || value.notes !== undefined
     || value.labels !== undefined
     || value.jobId !== undefined
     || value.projectId !== undefined
@@ -265,7 +268,8 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         kind: input.kind as RoutineItemKind,
         profileId: input.profileId,
         priority: input.priority as RoutinePriority | undefined,
-        description: input.description,
+        description: input.description ?? input.notes,
+        notes: input.notes,
         dose: input.dose,
         labels: input.labels,
         jobId: input.jobId,
@@ -296,11 +300,12 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         title: input.title,
         kind: input.kind as RoutineItemKind | undefined,
         priority: input.priority as RoutinePriority | undefined,
-        description: input.description,
+        description: input.description ?? input.notes,
         labels: input.labels,
         jobId: input.jobId,
         projectId: input.projectId,
         blockedBy: input.blockedBy,
+        notes: input.notes,
         schedule: input.scheduleKind
           ? buildSchedule({
               scheduleKind: input.scheduleKind,

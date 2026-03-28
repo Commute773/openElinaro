@@ -17,6 +17,7 @@ import { ModelService } from "../models/model-service";
 import { ProfileService } from "../profiles";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
+import { wrapInjectedMessage } from "../injected-message-service";
 import { MEMORY_RECALL_LIMIT } from "../../config/service-constants";
 const MEMORY_RECALL_MIN_SCORE = 0.05;
 const MEMORY_RECALL_MIN_QUERY_TOKENS = 2;
@@ -76,6 +77,7 @@ const EXPLICIT_RECALL_PATTERNS = [
   /\bcontext\b/i,
 ];
 const INTERNAL_AUTOMATION_PATTERNS = [
+  /^<injected_message\b/i,
   /^this is a healthcheck\b/i,
   /^automated heartbeat trigger\./i,
   /^background subagent completion update\./i,
@@ -297,7 +299,7 @@ export class ConversationMemoryService {
           { level: "debug" },
         );
 
-        return recallContext;
+        return wrapInjectedMessage("memory_recall", recallContext);
       },
       {
         attributes: {

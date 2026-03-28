@@ -2,7 +2,13 @@ import os from "node:os";
 import path from "node:path";
 
 const COMMON_BINARY_PATHS = [
+  "/opt/homebrew/opt/node/bin",
+  "/opt/homebrew/opt/node@22/bin",
+  "/opt/homebrew/opt/node@20/bin",
   "/opt/homebrew/bin",
+  "/usr/local/opt/node/bin",
+  "/usr/local/opt/node@22/bin",
+  "/usr/local/opt/node@20/bin",
   "/usr/local/bin",
   "/usr/bin",
   "/bin",

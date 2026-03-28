@@ -25,7 +25,7 @@ All G2 responses include permissive CORS headers (`Access-Control-Allow-Origin: 
 
 ### GET /api/g2/home
 
-Dashboard summary: time context, active agent count, best routine streak, next upcoming routine, and pending notification count.
+Dashboard summary: time context, active agent count, next upcoming routine, and pending notification count.
 
 ```sh
 curl http://localhost:3000/api/g2/home
@@ -37,7 +37,6 @@ Response:
 {
   "timeContext": "Friday morning, 2026-03-27",
   "activeAgentCount": 2,
-  "streak": 5,
   "nextRoutine": { "name": "Morning review", "time": "08:00", "type": "routine" },
   "pendingNotificationCount": 1
 }
@@ -86,6 +85,23 @@ Response:
 {
   "runId": "abc123",
   "output": ["line 1", "line 2", "..."]
+}
+```
+
+### GET /api/g2/agents/:id/summary
+
+Summarize a running or recently completed agent. The runtime prefers the full tmux terminal buffer and falls back to stored run metadata when the window is already gone.
+
+```sh
+curl http://localhost:3000/api/g2/agents/abc123/summary
+```
+
+Response:
+
+```json
+{
+  "runId": "abc123",
+  "summary": "The agent is still running tests and is currently in the interactive Claude UI."
 }
 ```
 

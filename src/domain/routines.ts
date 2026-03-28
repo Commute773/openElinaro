@@ -36,7 +36,6 @@ export interface RoutineState {
   lastRemindedAt?: string;
   activeOccurrenceKey?: string;
   reminderCountForOccurrence: number;
-  streak: number;
 }
 
 export interface RoutineItem {

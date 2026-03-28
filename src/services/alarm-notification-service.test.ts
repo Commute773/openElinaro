@@ -71,6 +71,7 @@ describe("AlarmNotificationService", () => {
 
     const message = service.buildInjectedMessage(alarm, reference);
 
+    expect(message).toContain("<INJECTED_MESSAGE generated_by=\"alarm\">");
     expect(message).toContain("Automated alarm notification trigger");
     expect(message).toContain("Triggered at: 2026-03-20T09:00:00.000Z");
     expect(message).toContain("Kind: alarm");

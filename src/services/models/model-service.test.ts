@@ -245,6 +245,36 @@ describe("ModelService.getMemorySelection", () => {
   });
 });
 
+describe("ModelService.getReflectionSelection", () => {
+  test("defaults Claude reflection away from Haiku", () => {
+    const service = new ModelService({
+      ...TEST_PROFILE,
+      preferredProvider: "claude",
+    });
+
+    expect(service.getReflectionSelection()).toEqual({
+      providerId: "claude",
+      modelId: "claude-sonnet-4-5",
+      thinkingLevel: "minimal",
+    });
+  });
+
+  test("uses explicit reflection profile overrides when present", () => {
+    const service = new ModelService({
+      ...TEST_PROFILE,
+      preferredProvider: "claude",
+      reflectionProvider: "openai-codex",
+      reflectionModelId: "gpt-5.4",
+    });
+
+    expect(service.getReflectionSelection()).toEqual({
+      providerId: "openai-codex",
+      modelId: "gpt-5.4",
+      thinkingLevel: "minimal",
+    });
+  });
+});
+
 describe("resolveListedModelIdentifier", () => {
   test("resolves human Claude model labels to the canonical live id", () => {
     const resolved = resolveListedModelIdentifier("opus 4 6", [

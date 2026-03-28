@@ -47,7 +47,6 @@ export function createInitialState(): RoutineState {
     completionHistory: [],
     skippedOccurrenceKeys: [],
     reminderCountForOccurrence: 0,
-    streak: 0,
   };
 }
 
@@ -367,82 +366,6 @@ export function shouldSuppressForContext(
     return false;
   }
   return state === "upcoming" || item.priority === "low";
-}
-
-export function updateStreak(item: RoutineItem, completedAt: Date) {
-  const lastCompleted = parseIso(item.state.lastCompletedAt);
-  if (!lastCompleted) {
-    return 1;
-  }
-
-  const deltaDays = Math.floor(
-    (startOfDay(completedAt).getTime() - startOfDay(lastCompleted).getTime()) / 86400000,
-  );
-  if (item.schedule.kind === "daily") {
-    const maxGap = item.schedule.days && item.schedule.days.length > 0 ? 7 : 1;
-    if (deltaDays <= maxGap) {
-      return item.state.streak + 1;
-    }
-    return 1;
-  }
-  if (item.schedule.kind === "weekly" && deltaDays <= 7) {
-    return item.state.streak + 1;
-  }
-  if (item.schedule.kind === "interval" && deltaDays <= item.schedule.everyDays + 1) {
-    return item.state.streak + 1;
-  }
-  if (item.schedule.kind === "monthly" && deltaDays <= 35) {
-    return item.state.streak + 1;
-  }
-  return 1;
-}
-
-export function isStreakContinuation(item: RoutineItem, previous: Date, next: Date) {
-  const deltaDays = Math.floor(
-    (startOfDay(next).getTime() - startOfDay(previous).getTime()) / 86400000,
-  );
-  if (item.schedule.kind === "daily") {
-    const maxGap = item.schedule.days && item.schedule.days.length > 0 ? 7 : 1;
-    return deltaDays <= maxGap;
-  }
-  if (item.schedule.kind === "weekly") {
-    return deltaDays <= 7;
-  }
-  if (item.schedule.kind === "interval") {
-    return deltaDays <= item.schedule.everyDays + 1;
-  }
-  if (item.schedule.kind === "monthly") {
-    return deltaDays <= 35;
-  }
-  return false;
-}
-
-export function computeStreakFromHistory(item: RoutineItem) {
-  const completionDates = item.state.completionHistory
-    .map((value) => parseIso(value))
-    .filter((value): value is Date => value instanceof Date && !Number.isNaN(value.getTime()))
-    .sort((a, b) => a.getTime() - b.getTime());
-
-  if (completionDates.length === 0) {
-    return 0;
-  }
-
-  if (
-    item.schedule.kind === "manual" ||
-    item.schedule.kind === "once" ||
-    completionDates.length === 1
-  ) {
-    return 1;
-  }
-
-  let streak = 1;
-  for (let index = completionDates.length - 1; index > 0; index -= 1) {
-    if (!isStreakContinuation(item, completionDates[index - 1]!, completionDates[index]!)) {
-      break;
-    }
-    streak += 1;
-  }
-  return streak;
 }
 
 export function sortAssessments(items: RoutineAssessment[]) {

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { HeartbeatReminderSnapshot } from "../domain/routines";
 import { formatLocalTime } from "./local-time-service";
+import { wrapInjectedMessage } from "./injected-message-service";
 import { getAssistantContextRoot } from "./runtime-user-content";
 import { timestamp } from "../utils/timestamp";
 
@@ -109,7 +110,7 @@ export class HeartbeatService {
         workFocus,
       ].join("\n"));
     }
-    return sections.join("\n\n");
+    return wrapInjectedMessage("heartbeat", sections.join("\n\n"));
   }
 
   normalizeAssistantReply(message: string | undefined) {

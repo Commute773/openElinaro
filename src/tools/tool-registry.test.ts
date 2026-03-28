@@ -378,6 +378,7 @@ function createHarnessWithOptions(options?: {
     conversations,
     systemPrompts,
     finance,
+    routines,
     registry,
     resolver: new ToolResolutionService(registry),
   };
@@ -1782,6 +1783,107 @@ describe("ToolRegistry tool catalog", () => {
     });
 
     expect(String(updated)).toContain(`blocked-by:${blockerId}`);
+  });
+
+  test("routine_add accepts legacy notes as a description alias", async () => {
+    const harness = createHarness();
+
+    const result = await harness.registry.invoke("routine_add", {
+      title: "Legacy notes item",
+      kind: "todo",
+      priority: "medium",
+      scheduleKind: "manual",
+      notes: "Imported from an older routines payload.",
+    });
+
+    const id = String(result).match(/Saved routine item ([^:]+):/)?.[1];
+    expect(id).toBeTruthy();
+    expect(harness.routines.getItem(id!)?.description).toBe("Imported from an older routines payload.");
+  });
+
+  test("routine_update accepts legacy notes as a description alias", async () => {
+    const harness = createHarness();
+
+    const created = String(await harness.registry.invoke("routine_add", {
+      title: "Legacy update item",
+      kind: "todo",
+      priority: "medium",
+      scheduleKind: "manual",
+    }));
+    const id = created.match(/Saved routine item ([^:]+):/)?.[1];
+    if (!id) {
+      throw new Error("Failed to parse routine id for legacy notes update.");
+    }
+
+    const result = await harness.registry.invoke("routine_update", {
+      id,
+      notes: "Updated from a legacy notes field.",
+    });
+
+    expect(String(result)).toContain(`Updated routine item ${id}`);
+    expect(harness.routines.getItem(id)?.description).toBe("Updated from a legacy notes field.");
+  });
+
+  test("agent_summary is available and summarizes terminal output", async () => {
+    const harness = createHarness();
+    const registry = harness.registry;
+    (registry as any).subagents.getAgentRun = () => ({
+      id: "workflow-test-run",
+      profileId: "root",
+      provider: "codex",
+      goal: "test goal",
+      status: "running",
+      tmuxSession: "openelinaro",
+      tmuxWindow: "workflow-test-run",
+      workspaceCwd: "/tmp/test",
+      createdAt: new Date(0).toISOString(),
+      launchDepth: 1,
+      timeoutMs: 300_000,
+      eventLog: [],
+    });
+    (registry as any).subagents.readAgentTerminal = async () => "running tests\nFINAL_STATUS=green";
+    (registry as any).models.summarizeToolResult = async () => "Agent is still running tests and looks healthy.";
+
+    expect(registry.getToolNames()).toContain("agent_summary");
+
+    const result = await registry.invoke("agent_summary", {
+      runId: "workflow-test-run",
+    });
+
+    expect(String(result)).toContain("Agent is still running tests and looks healthy.");
+  });
+
+  test("agent_summary falls back to stored run state when no terminal buffer is available", async () => {
+    const harness = createHarness();
+    const registry = harness.registry;
+    (registry as any).subagents.getAgentRun = () => ({
+      id: "workflow-test-run",
+      profileId: "root",
+      provider: "codex",
+      goal: "test goal",
+      status: "failed",
+      tmuxSession: "openelinaro",
+      tmuxWindow: "workflow-test-run",
+      workspaceCwd: "/tmp/test",
+      createdAt: new Date(0).toISOString(),
+      launchDepth: 1,
+      timeoutMs: 300_000,
+      error: "node not found",
+      eventLog: [
+        { kind: "worker.failed", timestamp: new Date(0).toISOString(), summary: "node not found" },
+      ],
+    });
+    (registry as any).subagents.readAgentTerminal = async () => "(tmux window no longer exists)";
+    (registry as any).models.summarizeToolResult = async (params: { output: string }) => {
+      expect(params.output).toContain("node not found");
+      return "The agent failed before it could start.";
+    };
+
+    const result = await registry.invoke("agent_summary", {
+      runId: "workflow-test-run",
+    });
+
+    expect(String(result)).toContain("The agent failed before it could start.");
   });
 
   test("supports brief, verbose, and full context usage modes", async () => {

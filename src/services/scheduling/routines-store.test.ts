@@ -72,7 +72,6 @@ describe("RoutinesStore", () => {
         completionHistory: [],
         skippedOccurrenceKeys: [],
         reminderCountForOccurrence: 0,
-        streak: 0,
       },
     };
     store.save(data);
@@ -100,7 +99,6 @@ describe("RoutinesStore", () => {
         completionHistory: [],
         skippedOccurrenceKeys: [],
         reminderCountForOccurrence: 0,
-        streak: 0,
       },
     };
     store.save(data1);
@@ -121,7 +119,6 @@ describe("RoutinesStore", () => {
         completionHistory: [],
         skippedOccurrenceKeys: [],
         reminderCountForOccurrence: 0,
-        streak: 0,
       },
     };
     store.save(data2);
@@ -159,10 +156,39 @@ describe("RoutinesStore", () => {
     expect(item.state.completionHistory).toEqual([]);
     expect(item.state.skippedOccurrenceKeys).toEqual([]);
     expect(item.state.reminderCountForOccurrence).toBe(0);
-    expect(item.state.streak).toBe(0);
+    expect("streak" in item.state).toBe(false);
     expect(item.enabled).toBe(true);
     expect(item.status).toBe("active");
     expect(item.profileId).toBe("root");
+  });
+
+  test("load maps legacy notes onto description", () => {
+    const storePath = path.join(runtimeRoot, ".openelinarotest", "routines.json");
+    fs.mkdirSync(path.dirname(storePath), { recursive: true });
+    fs.writeFileSync(
+      storePath,
+      JSON.stringify({
+        settings: { timezone: "UTC" },
+        calendarEvents: [],
+        items: {
+          "legacy-notes": {
+            id: "legacy-notes",
+            title: "Legacy item",
+            kind: "todo",
+            priority: "medium",
+            schedule: { kind: "manual" },
+            reminder: { followUpMinutes: 60, maxReminders: 1, escalate: false },
+            notes: "Older item notes field.",
+            state: {},
+          },
+        },
+      }),
+    );
+
+    const store = new RoutinesStore();
+    const data = store.load();
+    const item = data.items["legacy-notes"]!;
+    expect(item.description).toBe("Older item notes field.");
   });
 
   test("load normalizes paused items as disabled", () => {

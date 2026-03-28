@@ -116,7 +116,7 @@ afterEach(() => {
 });
 
 describe("RoutinesService", () => {
-  test("marks todos as completed instead of tracking streaks and excludes them by default", () => {
+  test("marks todos as completed and keeps recurring completion history without streaks", () => {
     const service = new RoutinesService();
     const todo = service.addItem({
       title: "Ship patch",
@@ -134,9 +134,9 @@ describe("RoutinesService", () => {
 
     expect(completedTodo.status).toBe("completed");
     expect(completedTodo.enabled).toBe(false);
-    expect(completedTodo.state.streak).toBe(0);
+    expect(completedTodo.state.completionHistory).toHaveLength(1);
     expect(completedHabit.status).toBe("active");
-    expect(completedHabit.state.streak).toBe(1);
+    expect(completedHabit.state.completionHistory).toHaveLength(1);
     expect(service.listItems().map((item) => item.id)).toEqual([habit.id]);
     expect(service.listItems({ status: "all" }).map((item) => item.id)).toContain(todo.id);
 
@@ -605,7 +605,7 @@ describe("RoutinesService", () => {
     expect(formatted).not.toContain("mon");
   });
 
-  test("daily-with-days streak continues across non-matching days", () => {
+  test("daily-with-days preserves completion history across non-matching days", () => {
     const service = new RoutinesService();
     service.saveData({
       ...service.loadData(),
@@ -619,18 +619,18 @@ describe("RoutinesService", () => {
 
     // Complete on Monday 2026-03-16
     service.markDone(item.id, new Date("2026-03-16T09:30:00.000Z"));
-    expect(service.getItem(item.id)?.state.streak).toBe(1);
+    expect(service.getItem(item.id)?.state.completionHistory).toHaveLength(1);
 
     // Complete on Wednesday 2026-03-18 — 2 days gap but within tolerance (7)
     service.markDone(item.id, new Date("2026-03-18T09:30:00.000Z"));
-    expect(service.getItem(item.id)?.state.streak).toBe(2);
+    expect(service.getItem(item.id)?.state.completionHistory).toHaveLength(2);
 
     // Complete on Friday 2026-03-20 — another 2 days gap
     service.markDone(item.id, new Date("2026-03-20T09:30:00.000Z"));
-    expect(service.getItem(item.id)?.state.streak).toBe(3);
+    expect(service.getItem(item.id)?.state.completionHistory).toHaveLength(3);
   });
 
-  test("daily streak increments on each markDone", () => {
+  test("daily routines append a completion-history entry on each markDone", () => {
     const service = new RoutinesService();
     service.saveData({
       ...service.loadData(),
@@ -643,13 +643,13 @@ describe("RoutinesService", () => {
     });
 
     service.markDone(item.id, new Date("2026-03-16T21:30:00.000Z"));
-    expect(service.getItem(item.id)?.state.streak).toBe(1);
+    expect(service.getItem(item.id)?.state.completionHistory).toHaveLength(1);
 
     service.markDone(item.id, new Date("2026-03-17T21:30:00.000Z"));
-    expect(service.getItem(item.id)?.state.streak).toBe(2);
+    expect(service.getItem(item.id)?.state.completionHistory).toHaveLength(2);
 
     service.markDone(item.id, new Date("2026-03-18T21:30:00.000Z"));
-    expect(service.getItem(item.id)?.state.streak).toBe(3);
+    expect(service.getItem(item.id)?.state.completionHistory).toHaveLength(3);
   });
 
   test("heartbeat snapshot includes daily-with-days items that are due", () => {
@@ -726,11 +726,10 @@ describe("RoutinesService", () => {
     const done = service.markDone(item.id, new Date("2026-03-17T07:15:00.000Z"));
     expect(done.status).toBe("active");
     expect(done.state.lastCompletedAt).toBeTruthy();
-    expect(done.state.streak).toBe(1);
+    expect(done.state.completionHistory).toHaveLength(1);
 
     const undone = service.undoDone(item.id);
     expect(undone.state.lastCompletedAt).toBeUndefined();
-    expect(undone.state.streak).toBe(0);
     expect(undone.state.completionHistory).toEqual([]);
   });
 
