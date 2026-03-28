@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.13
+- Released at: 2026-03-28T01:51:35Z
+- Release id: 20260328T015135Z-37b7c3c
+- Previous version: 2026.03.28.12
+- Trigger: ci/release workflow
+
+- refactor: centralize scattered magic constants into service-constants.ts
+
 ## 2026.03.28.12
 - Released at: 2026-03-28T01:45:31Z
 - Release id: 20260328T014531Z-be0c747
