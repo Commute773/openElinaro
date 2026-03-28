@@ -6,6 +6,7 @@ This directory is the documentation graph for the repository. Use it for progres
 
 - Agent/runtime docs: [assistant/README.md](assistant/README.md)
 - Research notes: [research/README.md](research/README.md)
+- E2E CLI test suite: [../src/e2e/README.md](../src/e2e/README.md)
 
 ## Generated Inventory
 <!-- docs-index:start:inventory -->
