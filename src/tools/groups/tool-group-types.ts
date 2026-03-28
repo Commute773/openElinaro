@@ -3,7 +3,7 @@ import type { FinanceService } from "../../services/finance-service";
 import type { HealthTrackingService } from "../../services/health-tracking-service";
 import type { RoutinesService } from "../../services/routines-service";
 import type { MemoryService } from "../../services/memory-service";
-import type { ModelService } from "../../services/model-service";
+import type { ModelService, ActiveExtendedContextStatus } from "../../services/model-service";
 import type { ProjectsService } from "../../services/projects-service";
 import type { MediaService } from "../../services/media-service";
 import type { EmailService } from "../../services/email-service";
@@ -77,4 +77,48 @@ export interface ToolBuildContext {
   resolvePhoneCallBackend: (requestedBackend?: string) => PhoneCallBackend;
   createWebSearchService: () => WebSearchService | null;
   requestManagedServiceRestart: (source: "config_edit" | "feature_manage" | "manual") => Promise<string>;
+}
+
+export function formatDurationMs(durationMs: number | null) {
+  if (durationMs === null) {
+    return "n/a";
+  }
+  if (durationMs >= 1_000) {
+    return `${(durationMs / 1_000).toFixed(2)}s`;
+  }
+  return `${durationMs.toFixed(2)}ms`;
+}
+
+export function renderShellExecResult(result: Awaited<ReturnType<ShellRuntime["exec"]>>) {
+  return [
+    `$ ${result.command}`,
+    `cwd: ${result.cwd}`,
+    `effectiveUser: ${result.effectiveUser}`,
+    `timeoutMs: ${result.timeoutMs}`,
+    `sudo: ${result.sudo ? "yes" : "no"}`,
+    `exitCode: ${result.exitCode}`,
+    result.stdout ? `stdout:\n${result.stdout}` : "stdout:\n",
+    result.stderr ? `stderr:\n${result.stderr}` : "stderr:\n",
+  ].join("\n");
+}
+
+export function formatTokenCount(value: number | undefined) {
+  return value === undefined ? "n/a" : new Intl.NumberFormat("en-US").format(value);
+}
+
+export function renderExtendedContextStatus(status: ActiveExtendedContextStatus) {
+  if (!status.supported) {
+    return [
+      "Extended context: unsupported",
+      `Active model: ${status.providerId}/${status.modelId}`,
+    ];
+  }
+
+  return [
+    `Extended context: ${status.enabled ? "enabled" : "disabled"}`,
+    `Active model: ${status.providerId}/${status.modelId}`,
+    `Configured context window: ${formatTokenCount(status.activeContextWindow)} tokens`,
+    `Standard window: ${formatTokenCount(status.standardContextWindow)} tokens`,
+    `Extended window: ${formatTokenCount(status.extendedContextWindow)} tokens`,
+  ];
 }

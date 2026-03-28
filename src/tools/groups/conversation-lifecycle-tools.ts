@@ -14,7 +14,7 @@ import type { ToolProgramService } from "../../services/tool-program-service";
 import type { AccessControlService } from "../../services/access-control-service";
 import type { AgentToolScope, ToolCatalogCard } from "../../domain/tool-catalog";
 import type { ToolLibraryDefinition } from "../../services/tool-library-service";
-import { renderExtendedContextStatus, formatTokenCount } from "./system-tools";
+import { renderExtendedContextStatus, formatTokenCount } from "./tool-group-types";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { telemetry } from "../../services/telemetry";
 import type { AppProgressEvent } from "../../domain/assistant";
