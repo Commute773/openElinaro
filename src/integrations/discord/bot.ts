@@ -1,15 +1,11 @@
-import path from "node:path";
 import {
-  AttachmentBuilder,
-  ChannelType,
   Client,
   Events,
   GatewayIntentBits,
-  type Interaction,
   MessageFlags,
   Partials,
-  type Attachment,
   type ChatInputCommandInteraction,
+  type Interaction,
   type Message,
 } from "discord.js";
 import { OpenElinaroApp } from "../../app/runtime";
@@ -19,26 +15,12 @@ import type {
   AppProgressEvent,
   AppRequest,
   AppResponse,
-  AppResponseAttachment,
-  ChatPromptContentBlock,
 } from "../../domain/assistant";
 import type { Weekday } from "../../domain/routines";
 import type { ModelProviderId } from "../../services/models/model-service";
-import { buildChatPromptContent } from "../../services/message-content-service";
 import { AgentHealthcheckService } from "../../services/agent-healthcheck-service";
-import {
-  DISCORD_MAX_ATTACHMENT_BYTES as MAX_IMAGE_ATTACHMENT_BYTES,
-  DISCORD_MAX_TEXT_ATTACHMENT_BYTES as MAX_TEXT_ATTACHMENT_BYTES,
-  DISCORD_MESSAGE_LIMIT,
-  DISCORD_TYPING_REFRESH_MS,
-  DISCORD_DM_BATCH_TIMEOUT_MS,
-  DISCORD_MAX_TEXT_ATTACHMENT_CHARS,
-  DISCORD_CONTINUED_SUFFIX,
-} from "../../config/service-constants";
-import { sanitizeDiscordText } from "../../services/discord-response-service";
 import { SecretStoreService } from "../../services/infrastructure/secret-store-service";
 import { telemetry } from "../../services/infrastructure/telemetry";
-import { compressImageForApi } from "../../utils/image-compression";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { DiscordAuthSessionManager } from "./auth-session-manager";
 import {
@@ -57,9 +39,59 @@ import {
   syncSlashCommands,
 } from "./slash-commands";
 
-const MAX_TEXT_ATTACHMENT_CHARS = DISCORD_MAX_TEXT_ATTACHMENT_CHARS;
+// Re-export submodules so existing imports from "./bot" keep working
+export {
+  createDiscordDmMessageBatcher,
+  type DiscordBatchedDirectMessage,
+  nextRequestId,
+  buildMessageRequest,
+  buildAttachmentBlocks,
+  isStopCommandContent,
+  isDirectMessage,
+} from "./message-handler";
+export {
+  splitIntoChunks,
+  deferInteractionReply,
+  buildDiscordFiles,
+  buildDiscordAttachmentFiles,
+  normalizeDiscordProgressUpdate,
+  replyWithChunks,
+  replyWithAppResponse,
+  replyToMessageWithChunks,
+  replyToMessageWithAppResponse,
+  sendAppResponseToChannel,
+} from "./response-formatter";
+export {
+  createConversationTypingTracker,
+  withTypingIndicator,
+} from "./typing-manager";
+
+// Import from submodules for internal use
+import {
+  createDiscordDmMessageBatcher,
+  type DiscordBatchedDirectMessage,
+  nextRequestId,
+  buildMessageRequest,
+  isStopCommandContent,
+  isDirectMessage,
+} from "./message-handler";
+import {
+  deferInteractionReply,
+  normalizeDiscordProgressUpdate,
+  replyWithChunks,
+  replyWithAppResponse,
+  replyToMessageWithChunks,
+  replyToMessageWithAppResponse,
+  sendAppResponseToChannel,
+} from "./response-formatter";
+import { createConversationTypingTracker } from "./typing-manager";
+
 const discordTelemetry = telemetry.child({ component: "discord" });
 const traceSpan = createTraceSpan(discordTelemetry);
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
 
 export interface DiscordAppRuntime {
   noteDiscordUser(userId: string): void;
@@ -86,268 +118,9 @@ export interface DiscordAppRuntime {
   listAgentRuns(): ReturnType<OpenElinaroApp["listAgentRuns"]>;
 }
 
-export interface DiscordBatchedDirectMessage {
-  message: Message;
-  content: string;
-  attachments: Attachment[];
-  reason: "completed" | "timeout";
-}
-
-interface PendingDiscordDirectMessageBatch {
-  message: Message;
-  parts: string[];
-  attachments: Attachment[];
-  timer?: ReturnType<typeof setTimeout>;
-}
-
-function nextRequestId(prefix: string) {
-  return `${prefix}-${Date.now()}`;
-}
-
-function isDirectMessage(message: Message): boolean {
-  return message.channel.type === ChannelType.DM;
-}
-
-function getDiscordDirectMessageBatchKey(message: Pick<Message, "author" | "channelId">) {
-  return `${message.author.id}:${message.channelId}`;
-}
-
-function splitContinuedDiscordMessage(text: string) {
-  const trimmed = text.trim();
-  if (!trimmed.toLowerCase().endsWith(DISCORD_CONTINUED_SUFFIX)) {
-    return {
-      content: trimmed,
-      continued: false,
-    };
-  }
-
-  return {
-    content: trimmed.slice(0, trimmed.length - DISCORD_CONTINUED_SUFFIX.length).trimEnd(),
-    continued: true,
-  };
-}
-
-function joinDiscordMessageBatchParts(parts: string[]) {
-  return parts.filter((part) => part.length > 0).join("\n");
-}
-
-export function createDiscordDmMessageBatcher(params: {
-  onDispatch: (message: DiscordBatchedDirectMessage) => Promise<void>;
-  timeoutMs?: number;
-  scheduleTimeout?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
-  clearScheduledTimeout?: (timer: ReturnType<typeof setTimeout>) => void;
-}) {
-  const batches = new Map<string, PendingDiscordDirectMessageBatch>();
-  const timeoutMs = params.timeoutMs ?? DISCORD_DM_BATCH_TIMEOUT_MS;
-  const scheduleTimeout = params.scheduleTimeout ?? ((callback: () => void, delayMs: number) =>
-    setTimeout(callback, delayMs));
-  const clearScheduledTimeout = params.clearScheduledTimeout ?? ((timer: ReturnType<typeof setTimeout>) =>
-    clearTimeout(timer));
-
-  const clearBatchTimer = (batch: PendingDiscordDirectMessageBatch) => {
-    if (!batch.timer) {
-      return;
-    }
-    clearScheduledTimeout(batch.timer);
-    batch.timer = undefined;
-  };
-
-  const dispatchBatch = async (batchKey: string, reason: DiscordBatchedDirectMessage["reason"]) => {
-    const batch = batches.get(batchKey);
-    if (!batch) {
-      return false;
-    }
-
-    batches.delete(batchKey);
-    clearBatchTimer(batch);
-
-    const content = joinDiscordMessageBatchParts(batch.parts);
-    if (!content && batch.attachments.length === 0) {
-      return false;
-    }
-
-    await params.onDispatch({
-      message: batch.message,
-      content,
-      attachments: [...batch.attachments],
-      reason,
-    });
-    return true;
-  };
-
-  const scheduleBatchTimeout = (batchKey: string, batch: PendingDiscordDirectMessageBatch) => {
-    clearBatchTimer(batch);
-    batch.timer = scheduleTimeout(() => {
-      void dispatchBatch(batchKey, "timeout").catch((error) => {
-        discordTelemetry.recordError(error, {
-          batchKey,
-          eventName: "discord.message.batch_timeout_dispatch",
-        });
-      });
-    }, timeoutMs);
-  };
-
-  return {
-    async handleMessage(message: Message) {
-      const batchKey = getDiscordDirectMessageBatchKey(message);
-      const { content, continued } = splitContinuedDiscordMessage(message.content);
-      const attachments = [...message.attachments.values()];
-      const existingBatch = batches.get(batchKey);
-
-      if (!continued && !existingBatch) {
-        await params.onDispatch({
-          message,
-          content,
-          attachments,
-          reason: "completed",
-        });
-        return "dispatched" as const;
-      }
-
-      const batch = existingBatch ?? {
-        message,
-        parts: [],
-        attachments: [],
-      };
-      if (!existingBatch) {
-        batches.set(batchKey, batch);
-      }
-
-      batch.message = message;
-      if (content) {
-        batch.parts.push(content);
-      }
-      batch.attachments.push(...attachments);
-
-      if (continued) {
-        scheduleBatchTimeout(batchKey, batch);
-        return "buffered" as const;
-      }
-
-      await dispatchBatch(batchKey, "completed");
-      return "dispatched" as const;
-    },
-    clear(message: Pick<Message, "author" | "channelId">) {
-      const batchKey = getDiscordDirectMessageBatchKey(message);
-      const batch = batches.get(batchKey);
-      if (!batch) {
-        return false;
-      }
-
-      batches.delete(batchKey);
-      clearBatchTimer(batch);
-      return true;
-    },
-    hasPending(message: Pick<Message, "author" | "channelId">) {
-      return batches.has(getDiscordDirectMessageBatchKey(message));
-    },
-  };
-}
-
-export function createConversationTypingTracker() {
-  const states = new Map<string, {
-    channel?: {
-      sendTyping: () => Promise<unknown>;
-    };
-    active: boolean;
-    timer?: ReturnType<typeof setTimeout>;
-  }>();
-
-  const scheduleNextPulse = (conversationKey: string, state: {
-    channel?: { sendTyping: () => Promise<unknown> };
-    active: boolean;
-    timer?: ReturnType<typeof setTimeout>;
-  }) => {
-    state.timer = setTimeout(() => {
-      void pulse(conversationKey);
-    }, DISCORD_TYPING_REFRESH_MS);
-  };
-
-  const pulse = async (conversationKey: string) => {
-    const state = states.get(conversationKey);
-    if (!state?.active || !state.channel) {
-      return;
-    }
-
-    try {
-      await state.channel.sendTyping();
-    } catch (error) {
-      discordTelemetry.event(
-        "discord.typing_indicator.error",
-        {
-          conversationKey,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        { level: "debug", outcome: "error" },
-      );
-    }
-
-    if (state.active) {
-      scheduleNextPulse(conversationKey, state);
-    }
-  };
-
-  return {
-    noteChannel(conversationKey: string, message: Message) {
-      if (!("sendTyping" in message.channel) || typeof message.channel.sendTyping !== "function") {
-        return;
-      }
-
-      const existing = states.get(conversationKey);
-      if (existing) {
-        existing.channel = message.channel;
-        if (existing.active && !existing.timer) {
-          void pulse(conversationKey);
-        }
-        return;
-      }
-
-      const state: {
-        channel?: {
-          sendTyping: () => Promise<unknown>;
-        };
-        active: boolean;
-        timer?: ReturnType<typeof setTimeout>;
-      } = {
-        channel: message.channel,
-        active: false,
-      };
-      states.set(conversationKey, state);
-      if (state.active && !state.timer) {
-        void pulse(conversationKey);
-      }
-    },
-    async setActive(conversationKey: string, active: boolean) {
-      const state = states.get(conversationKey) ?? {
-        active: false,
-      };
-      states.set(conversationKey, state);
-
-      if (state.active === active) {
-        return;
-      }
-
-      state.active = active;
-      if (!active) {
-        if (state.timer) {
-          clearTimeout(state.timer);
-          state.timer = undefined;
-        }
-        return;
-      }
-
-      if (!state.channel) {
-        return;
-      }
-
-      if (state.timer) {
-        clearTimeout(state.timer);
-        state.timer = undefined;
-      }
-      await pulse(conversationKey);
-    },
-  };
-}
+// ---------------------------------------------------------------------------
+// Bot entry point
+// ---------------------------------------------------------------------------
 
 export async function startDiscordBot(options?: { app?: OpenElinaroApp }) {
   const config = getRuntimeConfig();
@@ -485,6 +258,10 @@ export async function startDiscordBot(options?: { app?: OpenElinaroApp }) {
 
   await client.login(token);
 }
+
+// ---------------------------------------------------------------------------
+// Event handlers
+// ---------------------------------------------------------------------------
 
 export function createDiscordEventHandlers(params: {
   app: DiscordAppRuntime;
@@ -645,6 +422,10 @@ export function createDiscordEventHandlers(params: {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Slash command handling
+// ---------------------------------------------------------------------------
 
 async function handleSlashCommand(params: {
   interaction: ChatInputCommandInteraction;
@@ -917,6 +698,10 @@ async function handleSlashCommand(params: {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Slash command helpers
+// ---------------------------------------------------------------------------
+
 async function handleRoutineCommand(
   interaction: ChatInputCommandInteraction,
   app: DiscordAppRuntime,
@@ -1046,475 +831,4 @@ function parseWeekdays(value: string | null): Weekday[] | undefined {
     }
   }
   return Array.from(new Set(days)) as Weekday[];
-}
-
-function formatAttachmentSize(sizeBytes: number | undefined) {
-  if (!sizeBytes || sizeBytes <= 0) {
-    return "unknown size";
-  }
-
-  if (sizeBytes < 1_024) {
-    return `${sizeBytes} B`;
-  }
-
-  if (sizeBytes < 1_024 * 1_024) {
-    return `${(sizeBytes / 1_024).toFixed(1)} KB`;
-  }
-
-  return `${(sizeBytes / (1_024 * 1_024)).toFixed(1)} MB`;
-}
-
-function normalizeAttachmentMimeType(attachment: Pick<Attachment, "contentType" | "name">) {
-  const normalized = attachment.contentType?.split(";")[0]?.trim().toLowerCase();
-  if (normalized) {
-    return normalized;
-  }
-
-  const name = attachment.name?.toLowerCase() ?? "";
-  if (/\.(png)$/.test(name)) {
-    return "image/png";
-  }
-  if (/\.(jpe?g)$/.test(name)) {
-    return "image/jpeg";
-  }
-  if (/\.(gif)$/.test(name)) {
-    return "image/gif";
-  }
-  if (/\.(webp)$/.test(name)) {
-    return "image/webp";
-  }
-  if (/\.(md|markdown)$/.test(name)) {
-    return "text/markdown";
-  }
-  if (/\.(txt|log|csv|json|ya?ml|xml|html?|css|js|jsx|ts|tsx|py|rs|go|java|c|cc|cpp|h|hpp|sh)$/.test(name)) {
-    return "text/plain";
-  }
-  return undefined;
-}
-
-function isImageAttachment(attachment: Pick<Attachment, "contentType" | "name">) {
-  return normalizeAttachmentMimeType(attachment)?.startsWith("image/") ?? false;
-}
-
-function detectImageMimeType(bytes: Uint8Array) {
-  if (
-    bytes.length >= 8 &&
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47 &&
-    bytes[4] === 0x0d &&
-    bytes[5] === 0x0a &&
-    bytes[6] === 0x1a &&
-    bytes[7] === 0x0a
-  ) {
-    return "image/png";
-  }
-
-  if (
-    bytes.length >= 3 &&
-    bytes[0] === 0xff &&
-    bytes[1] === 0xd8 &&
-    bytes[2] === 0xff
-  ) {
-    return "image/jpeg";
-  }
-
-  if (
-    bytes.length >= 6 &&
-    bytes[0] === 0x47 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x38 &&
-    (bytes[4] === 0x37 || bytes[4] === 0x39) &&
-    bytes[5] === 0x61
-  ) {
-    return "image/gif";
-  }
-
-  if (
-    bytes.length >= 12 &&
-    bytes[0] === 0x52 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x46 &&
-    bytes[8] === 0x57 &&
-    bytes[9] === 0x45 &&
-    bytes[10] === 0x42 &&
-    bytes[11] === 0x50
-  ) {
-    return "image/webp";
-  }
-
-  return undefined;
-}
-
-function isTextAttachment(attachment: Pick<Attachment, "contentType" | "name">) {
-  const mimeType = normalizeAttachmentMimeType(attachment);
-  if (!mimeType) {
-    return false;
-  }
-
-  return (
-    mimeType.startsWith("text/") ||
-    [
-      "application/json",
-      "application/ld+json",
-      "application/xml",
-      "application/javascript",
-      "application/typescript",
-      "application/x-sh",
-      "application/x-httpd-php",
-    ].includes(mimeType)
-  );
-}
-
-function buildAttachmentDescriptor(attachment: Pick<Attachment, "name" | "size" | "contentType">) {
-  const name = attachment.name ?? "attachment";
-  const mimeType = normalizeAttachmentMimeType(attachment) ?? "unknown";
-  return `${name} (${mimeType}, ${formatAttachmentSize(attachment.size)})`;
-}
-
-async function downloadAttachment(attachment: Pick<Attachment, "url" | "name">) {
-  const response = await fetch(attachment.url);
-  if (!response.ok) {
-    throw new Error(`download failed with ${response.status}`);
-  }
-  return new Uint8Array(await response.arrayBuffer());
-}
-
-function truncateAttachmentText(text: string) {
-  if (text.length <= MAX_TEXT_ATTACHMENT_CHARS) {
-    return {
-      text,
-      truncated: false,
-    };
-  }
-
-  return {
-    text: `${text.slice(0, MAX_TEXT_ATTACHMENT_CHARS)}\n[truncated]`,
-    truncated: true,
-  };
-}
-
-async function buildAttachmentBlocks(
-  attachments: IterableIterator<Attachment>,
-): Promise<ChatPromptContentBlock[]> {
-  const resolved = await Promise.all(
-    [...attachments].map(async (attachment) => {
-      const descriptor = buildAttachmentDescriptor(attachment);
-
-      try {
-        if (isImageAttachment(attachment)) {
-          if ((attachment.size ?? 0) > MAX_IMAGE_ATTACHMENT_BYTES) {
-            return [{
-              type: "text" as const,
-              text: `Attached image: ${descriptor}. Skipped because it exceeds the ${formatAttachmentSize(MAX_IMAGE_ATTACHMENT_BYTES)} inline limit.`,
-            }];
-          }
-
-          const bytes = await downloadAttachment(attachment);
-          const compressed = await compressImageForApi(bytes);
-          const mimeType = compressed.compressed
-            ? compressed.mimeType
-            : detectImageMimeType(bytes) ?? normalizeAttachmentMimeType(attachment) ?? "image/png";
-          return [
-            {
-              type: "text" as const,
-              text: `Attached image: ${descriptor}.`,
-            },
-            {
-              type: "image" as const,
-              data: Buffer.from(compressed.data).toString("base64"),
-              mimeType,
-              sourceUrl: attachment.url,
-            },
-          ];
-        }
-
-        if (isTextAttachment(attachment)) {
-          if ((attachment.size ?? 0) > MAX_TEXT_ATTACHMENT_BYTES) {
-            return [{
-              type: "text" as const,
-              text: `Attached file: ${descriptor}. Skipped because it exceeds the ${formatAttachmentSize(MAX_TEXT_ATTACHMENT_BYTES)} inline limit.`,
-            }];
-          }
-
-          const bytes = await downloadAttachment(attachment);
-          const decoded = new TextDecoder().decode(bytes);
-          const { text, truncated } = truncateAttachmentText(decoded);
-          return [{
-            type: "text" as const,
-            text: [
-              `Attached file: ${descriptor}.${truncated ? " The inlined contents were truncated." : ""}`,
-              "--- file contents start ---",
-              text,
-              "--- file contents end ---",
-            ].join("\n"),
-          }];
-        }
-
-        return [{
-          type: "text" as const,
-          text: `Attached file: ${descriptor}. Binary content was not inlined.`,
-        }];
-      } catch (error) {
-        return [{
-          type: "text" as const,
-          text: `Attached file: ${descriptor}. It could not be downloaded: ${error instanceof Error ? error.message : String(error)}.`,
-        }];
-      }
-    }),
-  );
-
-  return resolved.flat();
-}
-
-async function buildMessageRequest(
-  conversationKey: string,
-  text: string,
-  attachments: IterableIterator<Attachment>,
-): Promise<AppRequest> {
-  if (text.toLowerCase().startsWith("todo ")) {
-    const title = text.slice(5).trim();
-    return {
-      id: nextRequestId("todo"),
-      kind: "todo",
-      text,
-      conversationKey,
-      todoTitle: title,
-    };
-  }
-
-  if (text.toLowerCase().startsWith("med ")) {
-    return {
-      id: nextRequestId("med"),
-      kind: "medication",
-      text,
-      conversationKey,
-      medicationName: text.slice(4).trim(),
-    };
-  }
-
-  const attachmentBlocks = await buildAttachmentBlocks(attachments);
-  const chatContent = attachmentBlocks.length > 0
-    ? buildChatPromptContent({ text, blocks: attachmentBlocks })
-    : undefined;
-
-  return {
-    id: nextRequestId("chat"),
-    kind: "chat",
-    text,
-    chatContent,
-    conversationKey,
-  };
-}
-
-function isStopCommandContent(text: string) {
-  return text.trim().toLowerCase() === "/stop";
-}
-
-async function withTypingIndicator<T>(message: Message, run: () => Promise<T>) {
-  if (!("sendTyping" in message.channel)) {
-    return run();
-  }
-
-  let isActive = true;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  const scheduleNextPulse = () => {
-    timer = setTimeout(() => {
-      void pulseTyping();
-    }, DISCORD_TYPING_REFRESH_MS);
-  };
-
-  const pulseTyping = async () => {
-    if (!isActive) {
-      return;
-    }
-
-    try {
-      if ("sendTyping" in message.channel && typeof message.channel.sendTyping === "function") {
-        await message.channel.sendTyping();
-      }
-    } catch (error) {
-      discordTelemetry.event(
-        "discord.typing_indicator.error",
-        {
-          userId: message.author.id,
-          channelId: message.channelId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        { level: "debug", outcome: "error" },
-      );
-      return;
-    }
-
-    if (isActive) {
-      scheduleNextPulse();
-    }
-  };
-
-  await pulseTyping();
-
-  try {
-    return await run();
-  } finally {
-    isActive = false;
-    if (timer) {
-      clearTimeout(timer);
-    }
-  }
-}
-
-function splitIntoChunks(text: string) {
-  if (text.length <= DISCORD_MESSAGE_LIMIT) {
-    return [text];
-  }
-
-  const chunks: string[] = [];
-  let remaining = text;
-  while (remaining.length > DISCORD_MESSAGE_LIMIT) {
-    const candidate = remaining.slice(0, DISCORD_MESSAGE_LIMIT);
-    const splitIndex = Math.max(candidate.lastIndexOf("\n"), candidate.lastIndexOf(" "));
-    const safeIndex = splitIndex > 0 ? splitIndex : DISCORD_MESSAGE_LIMIT;
-    chunks.push(remaining.slice(0, safeIndex).trimEnd());
-    remaining = remaining.slice(safeIndex).trimStart();
-  }
-  if (remaining.length > 0) {
-    chunks.push(remaining);
-  }
-  return chunks;
-}
-
-async function deferInteractionReply(
-  interaction: ChatInputCommandInteraction,
-  options?: { ephemeral?: boolean },
-) {
-  if (interaction.replied || interaction.deferred) {
-    return;
-  }
-
-  await interaction.deferReply({
-    flags: options?.ephemeral ? MessageFlags.Ephemeral : undefined,
-  });
-}
-
-function buildDiscordFiles(response: AppResponse) {
-  return buildDiscordAttachmentFiles(response.attachments);
-}
-
-function buildDiscordAttachmentFiles(attachments: AppResponseAttachment[] | undefined) {
-  return (attachments ?? []).map((attachment) =>
-    new AttachmentBuilder(attachment.path, {
-      name: attachment.name ?? path.basename(attachment.path),
-    })
-  );
-}
-
-function normalizeDiscordProgressUpdate(event: AppProgressEvent) {
-  if (typeof event === "string") {
-    return {
-      message: event,
-      files: undefined,
-    };
-  }
-
-  return {
-    message: event.message,
-    files: buildDiscordAttachmentFiles(event.attachments),
-  };
-}
-
-async function replyWithChunks(
-  interaction: ChatInputCommandInteraction,
-  text: string,
-  options?: { ephemeral?: boolean; files?: AttachmentBuilder[] },
-) {
-  const chunks = splitIntoChunks(sanitizeDiscordText(text));
-  const [firstChunk, ...rest] = chunks;
-  if (!interaction.replied && !interaction.deferred) {
-    await interaction.reply({
-      content: firstChunk,
-      files: options?.files,
-      flags: options?.ephemeral ? MessageFlags.Ephemeral : undefined,
-    });
-  } else if (interaction.deferred && !interaction.replied) {
-    await interaction.editReply({ content: firstChunk, files: options?.files });
-  } else {
-    await interaction.followUp({
-      content: firstChunk,
-      files: options?.files,
-      flags: options?.ephemeral ? MessageFlags.Ephemeral : undefined,
-    });
-  }
-  for (const chunk of rest) {
-    await interaction.followUp({
-      content: chunk,
-      flags: options?.ephemeral ? MessageFlags.Ephemeral : undefined,
-    });
-  }
-}
-
-async function replyWithAppResponse(
-  interaction: ChatInputCommandInteraction,
-  response: AppResponse,
-  options?: { ephemeral?: boolean },
-) {
-  await replyWithChunks(interaction, response.message, {
-    ...options,
-    files: buildDiscordFiles(response),
-  });
-  for (const warning of response.warnings ?? []) {
-    await replyWithChunks(interaction, warning, options);
-  }
-}
-
-async function replyToMessageWithChunks(
-  message: Message,
-  text: string,
-  options?: { files?: AttachmentBuilder[] },
-) {
-  if (!message.channel.isSendable()) {
-    throw new Error("Discord message channel is not sendable.");
-  }
-
-  const chunks = splitIntoChunks(sanitizeDiscordText(text));
-  const [firstChunk, ...rest] = chunks;
-  await message.channel.send({
-    content: firstChunk,
-    files: options?.files,
-  });
-  for (const chunk of rest) {
-    await message.channel.send(chunk);
-  }
-}
-
-async function replyToMessageWithAppResponse(message: Message, response: AppResponse) {
-  await replyToMessageWithChunks(message, response.message, {
-    files: buildDiscordFiles(response),
-  });
-  for (const warning of response.warnings ?? []) {
-    await replyToMessageWithChunks(message, warning);
-  }
-}
-
-async function sendAppResponseToChannel(
-  channel: { send: (payload: string | { content: string; files?: AttachmentBuilder[] }) => Promise<unknown> },
-  response: AppResponse,
-) {
-  const chunks = splitIntoChunks(response.message);
-  const [firstChunk, ...rest] = chunks;
-  await channel.send({
-    content: firstChunk ?? "(no content)",
-    files: buildDiscordFiles(response),
-  });
-  for (const chunk of rest) {
-    await channel.send(chunk);
-  }
-  for (const warning of response.warnings ?? []) {
-    for (const chunk of splitIntoChunks(warning)) {
-      await channel.send(chunk);
-    }
-  }
 }
