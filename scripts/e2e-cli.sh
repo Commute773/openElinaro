@@ -83,19 +83,22 @@ if [[ "${OPENELINARO_ENABLE_LIVE_MODEL_E2E:-}" == "0" ]]; then
   exit 0
 fi
 
-AUTH_FIXTURE="$REPO_ROOT/src/test/fixtures/auth-store.json"
-AUTH_LIVE="$HOME/.openelinarotest/auth-store.json"
-SECRET_FIXTURE="$REPO_ROOT/src/test/fixtures/secret-store.json"
-SECRET_LIVE="$HOME/.openelinarotest/secret-store.json"
-
 HAS_AUTH=false
-if [[ -f "$AUTH_FIXTURE" ]] || [[ -f "$AUTH_LIVE" ]] || [[ -f "$SECRET_FIXTURE" ]] || [[ -f "$SECRET_LIVE" ]]; then
-  HAS_AUTH=true
-fi
+for cred_file in \
+  "$REPO_ROOT/src/test/fixtures/auth-store.json" \
+  "$REPO_ROOT/src/test/fixtures/secret-store.json" \
+  "$HOME/.openelinaro/secret-store.json" \
+  "$HOME/.openelinaro/auth-store.json" \
+  "$HOME/.openelinarotest/secret-store.json" \
+  "$HOME/.openelinarotest/auth-store.json"; do
+  if [[ -f "$cred_file" ]]; then
+    HAS_AUTH=true
+    break
+  fi
+done
 
 if ! $HAS_AUTH; then
   echo "ERROR: No auth credentials found."
-  echo "Checked: $AUTH_FIXTURE, $AUTH_LIVE, $SECRET_FIXTURE, $SECRET_LIVE"
   echo "Configure root provider auth before running e2e tests."
   exit 1
 fi
@@ -113,7 +116,10 @@ if [[ -n "$TAG_FILTER" ]]; then
 fi
 
 CASES_JSON=$(bun run "$LIST_HELPER" "${DISCOVER_ARGS[@]+"${DISCOVER_ARGS[@]}"}")
-mapfile -t CASES < <(echo "$CASES_JSON" | jq -r '.[]')
+CASES=()
+while IFS= read -r line; do
+  CASES+=("$line")
+done < <(echo "$CASES_JSON" | jq -r '.[]')
 
 if [[ ${#CASES[@]} -eq 0 ]]; then
   echo "No test cases matched the filter."

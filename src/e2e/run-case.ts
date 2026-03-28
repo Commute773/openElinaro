@@ -67,11 +67,16 @@ function copyFile(relativePath: string, tempRoot: string) {
 function copyLiveCredentials(tempRoot: string) {
   const dest = path.join(tempRoot, TEST_ROOT_NAME);
   fs.mkdirSync(dest, { recursive: true });
+  const prodRoot = path.join(os.homedir(), ".openelinaro");
+
   for (const name of ["auth-store.json", "secret-store.json"]) {
-    // Prefer src/test/fixtures, fall back to ~/.openelinarotest
-    const fixtureSrc = path.join(MACHINE_TEST_ROOT, name);
-    const liveSrc = path.join(MACHINE_LIVE_ROOT, name);
-    const src = fs.existsSync(fixtureSrc) ? fixtureSrc : fs.existsSync(liveSrc) ? liveSrc : null;
+    // Priority: src/test/fixtures → ~/.openelinaro (prod) → ~/.openelinarotest
+    const candidates = [
+      path.join(MACHINE_TEST_ROOT, name),
+      path.join(prodRoot, name),
+      path.join(MACHINE_LIVE_ROOT, name),
+    ];
+    const src = candidates.find((p) => fs.existsSync(p));
     if (src) {
       fs.copyFileSync(src, path.join(dest, name));
     }
