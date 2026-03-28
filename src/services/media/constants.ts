@@ -37,15 +37,6 @@ export function getDefaultCatalogPath() {
 }
 
 export const DEFAULT_SPEAKER_CONFIG_PATH = resolveRuntimePath("media", "speakers.json");
-export const LEGACY_SPEAKER_CONFIG_PATH = path.join(
-  os.homedir(),
-  ".openclaw",
-  "workspace",
-  "skills",
-  "play-sound",
-  "references",
-  "speakers.json",
-);
 export const DEFAULT_STATE_ROOT = resolveRuntimePath("media");
 export const DEFAULT_SOCKET_ROOT = path.join(
   os.tmpdir(),

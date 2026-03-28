@@ -29,7 +29,6 @@ import {
   EOF_POLL_INTERVAL_MS,
   getDefaultCatalogPath,
   getDefaultMediaRoots,
-  LEGACY_SPEAKER_CONFIG_PATH,
 } from "./media/constants";
 
 import {
@@ -37,7 +36,6 @@ import {
   defaultRunCommand,
   defaultSignalProcess,
   defaultSpawnDetached,
-  resolveSpeakerConfigPath,
   slugify,
   uniqueStrings,
 } from "./media/utils";
@@ -149,7 +147,7 @@ export class MediaService {
     ));
     this.catalogPath = path.resolve(options?.catalogPath ?? getDefaultCatalogPath());
     this.speakerConfigPath = path.resolve(
-      options?.speakerConfigPath ?? resolveSpeakerConfigPath(DEFAULT_SPEAKER_CONFIG_PATH, LEGACY_SPEAKER_CONFIG_PATH),
+      options?.speakerConfigPath ?? DEFAULT_SPEAKER_CONFIG_PATH,
     );
     this.stateRoot = path.resolve(options?.stateRoot ?? DEFAULT_STATE_ROOT);
     this.socketsRoot = path.resolve(options?.socketRoot ?? DEFAULT_SOCKET_ROOT);
