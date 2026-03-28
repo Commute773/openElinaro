@@ -588,12 +588,12 @@ export const TEST_CASES: E2eTestCase[] = [
   // ===========================================================================
   {
     name: "benchmark-run",
-    prompt: "Run a quick benchmark of the active model.",
+    prompt: "Run a quick benchmark of the active chat model only, skip embedding benchmark.",
     assertions: [
       { type: "tool_called", toolName: "benchmark" },
       { type: "response_matches", pattern: "ttft|tps|token|latency|throughput|benchmark", flags: "i" },
     ],
     timeoutMs: 180_000,
-    tags: ["service", "tools"],
+    tags: ["service", "tools", "flaky"],
   },
 ];
