@@ -6,9 +6,9 @@ import type { ModelMessage, ToolResultOutput } from "@ai-sdk/provider-utils";
 import { extractTextFromMessage, normalizeChatPromptContent, resolveRemoteImageUrl } from "./message-content-service";
 import { ToolResultStore } from "./tool-result-store";
 import { normalizeString } from "../utils/text-utils";
+import { TOOL_RESULT_INLINE_CHAR_THRESHOLD } from "../config/service-constants";
 
 const MAX_BASE64_IMAGE_BYTES = 5 * 1024 * 1024;
-const TOOL_RESULT_INLINE_CHAR_THRESHOLD = 1_000;
 const TOOL_RESULT_REFERENCE_ELIGIBLE_TOOLS = new Set([
   "read_file",
   "list_dir",

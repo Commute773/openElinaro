@@ -21,14 +21,13 @@ import { ToolResultStore } from "../tool-result-store";
 import { ToolResolutionService } from "../tool-resolution-service";
 import { ConversationMemoryService } from "./conversation-memory-service";
 import type { ReflectionService } from "../reflection-service";
+import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS } from "../../config/service-constants";
 
-const COMPACTION_THRESHOLD_PERCENT = 80;
 const QUEUED_WHILE_COMPACTING_MESSAGE = "message queued as we are currently compacting";
 const STEERING_ACCEPTED_MESSAGE = "message accepted and will steer the current agent at the next turn";
 const BACKGROUND_ACCEPTED_MESSAGE = "message accepted into the background queue";
 const STOPPED_MESSAGE = "Current agent halted.";
 const QUEUED_STOPPED_MESSAGE = "Queued request cancelled because the conversation was stopped.";
-const CHAT_MAX_STEPS = 24;
 const agentChatTelemetry = telemetry.child({ component: "agent_chat" });
 
 const traceSpan = createTraceSpan(agentChatTelemetry);

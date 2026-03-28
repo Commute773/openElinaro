@@ -26,7 +26,15 @@ import type { Weekday } from "../../domain/routines";
 import type { ModelProviderId } from "../../services/models/model-service";
 import { buildChatPromptContent } from "../../services/message-content-service";
 import { AgentHealthcheckService } from "../../services/agent-healthcheck-service";
-import { DISCORD_MAX_ATTACHMENT_BYTES as MAX_IMAGE_ATTACHMENT_BYTES, DISCORD_MAX_TEXT_ATTACHMENT_BYTES as MAX_TEXT_ATTACHMENT_BYTES } from "../../config/service-constants";
+import {
+  DISCORD_MAX_ATTACHMENT_BYTES as MAX_IMAGE_ATTACHMENT_BYTES,
+  DISCORD_MAX_TEXT_ATTACHMENT_BYTES as MAX_TEXT_ATTACHMENT_BYTES,
+  DISCORD_MESSAGE_LIMIT,
+  DISCORD_TYPING_REFRESH_MS,
+  DISCORD_DM_BATCH_TIMEOUT_MS,
+  DISCORD_MAX_TEXT_ATTACHMENT_CHARS,
+  DISCORD_CONTINUED_SUFFIX,
+} from "../../config/service-constants";
 import { sanitizeDiscordText } from "../../services/discord-response-service";
 import { SecretStoreService } from "../../services/infrastructure/secret-store-service";
 import { telemetry } from "../../services/infrastructure/telemetry";
@@ -49,11 +57,7 @@ import {
   syncSlashCommands,
 } from "./slash-commands";
 
-const DISCORD_MESSAGE_LIMIT = 1_900;
-const DISCORD_TYPING_REFRESH_MS = 8_000;
-const DISCORD_DM_BATCH_TIMEOUT_MS = 5 * 60 * 1000;
-const MAX_TEXT_ATTACHMENT_CHARS = 32_000;
-const DISCORD_CONTINUED_SUFFIX = "/continued";
+const MAX_TEXT_ATTACHMENT_CHARS = DISCORD_MAX_TEXT_ATTACHMENT_CHARS;
 const discordTelemetry = telemetry.child({ component: "discord" });
 const traceSpan = createTraceSpan(discordTelemetry);
 
