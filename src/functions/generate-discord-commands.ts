@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import type { FunctionDefinition } from "./define-function";
+import type { FeatureId } from "../services/feature-config-service";
 
 // ---------------------------------------------------------------------------
 // Discord command descriptor (platform-agnostic representation)
@@ -37,13 +38,18 @@ export interface DiscordCommandOption {
  * Check whether a Zod schema has simple enough top-level fields to
  * auto-generate Discord command options (max 5 primitive fields).
  */
-function canAutoGenerateOptions(schema: any): boolean {
+/** Access Zod internal `_def` property (no public API for schema introspection). */
+function zodDef(schema: z.ZodType): Record<string, unknown> {
+  return (schema as unknown as Record<string, unknown>)._def as Record<string, unknown>;
+}
+
+function canAutoGenerateOptions(schema: z.ZodType): boolean {
   if (!(schema instanceof z.ZodObject)) return false;
-  const shape = schema.shape;
+  const shape = schema.shape as Record<string, z.ZodType>;
   const keys = Object.keys(shape);
   if (keys.length > 5) return false;
   return keys.every((k: string) => {
-    const field = unwrapOptional(shape[k]);
+    const field = unwrapOptional(shape[k]!);
     return (
       field instanceof z.ZodString ||
       field instanceof z.ZodNumber ||
@@ -53,29 +59,29 @@ function canAutoGenerateOptions(schema: any): boolean {
   });
 }
 
-function unwrapOptional(field: any): any {
-  if (field instanceof z.ZodOptional) return field.unwrap();
-  if (field instanceof z.ZodDefault) return unwrapOptional(field.removeDefault());
+function unwrapOptional(field: z.ZodType): z.ZodType {
+  if (field instanceof z.ZodOptional) return unwrapOptional(zodDef(field).innerType as z.ZodType);
+  if (field instanceof z.ZodDefault) return unwrapOptional(zodDef(field).innerType as z.ZodType);
   return field;
 }
 
-function zodToDiscordType(field: any): DiscordCommandOption["type"] {
+function zodToDiscordType(field: z.ZodType): DiscordCommandOption["type"] {
   const inner = unwrapOptional(field);
   if (inner instanceof z.ZodNumber) {
-    // Check if it has int() check
-    const checks = (inner as any)._def?.checks ?? [];
-    const hasInt = checks.some((c: any) => c.kind === "int");
+    // Access Zod internals to check for int() constraint (no public API for this)
+    const checks = (zodDef(inner).checks ?? []) as { kind: string }[];
+    const hasInt = checks.some((c) => c.kind === "int");
     return hasInt ? "integer" : "number";
   }
   if (inner instanceof z.ZodBoolean) return "boolean";
   return "string"; // string, enum, and fallback
 }
 
-function isRequired(field: any): boolean {
+function isRequired(field: z.ZodType): boolean {
   return !(field instanceof z.ZodOptional) && !(field instanceof z.ZodDefault);
 }
 
-function extractEnumChoices(field: any): { name: string; value: string }[] | undefined {
+function extractEnumChoices(field: z.ZodType): { name: string; value: string }[] | undefined {
   const inner = unwrapOptional(field);
   if (inner instanceof z.ZodEnum) {
     const values = inner.options as string[];
@@ -100,7 +106,7 @@ export function generateDiscordCommand(def: FunctionDefinition): DiscordCommandD
   const options: DiscordCommandOption[] = [];
 
   if (def.input instanceof z.ZodObject && canAutoGenerateOptions(def.input)) {
-    const shape = (def.input as any).shape;
+    const shape = def.input.shape as Record<string, z.ZodType>;
     for (const [key, field] of Object.entries(shape)) {
       options.push({
         name: key,
@@ -110,7 +116,7 @@ export function generateDiscordCommand(def: FunctionDefinition): DiscordCommandD
         choices: extractEnumChoices(field),
       });
     }
-  } else if (!(def.input instanceof z.ZodObject) || Object.keys((def.input as any).shape ?? {}).length > 0) {
+  } else if (!(def.input instanceof z.ZodObject) || Object.keys((def.input.shape ?? {}) as Record<string, unknown>).length > 0) {
     // Complex schema: fall back to generic JSON input option
     options.push({
       name: "input",
@@ -133,7 +139,7 @@ export function generateDiscordCommand(def: FunctionDefinition): DiscordCommandD
  */
 export function generateDiscordCommands(
   definitions: FunctionDefinition[],
-  featureChecker?: (featureId: string) => boolean,
+  featureChecker?: (featureId: FeatureId) => boolean,
 ): DiscordCommandDescriptor[] {
   const commands: DiscordCommandDescriptor[] = [];
   for (const def of definitions) {

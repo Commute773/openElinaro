@@ -350,9 +350,9 @@ describe("generateOpenApiSpec", () => {
     test("excludes function when featureGate check returns false", () => {
       const def = makeDef({
         name: "gated",
-        featureGate: "premium-feature",
+        featureGate: "tickets",
       });
-      const checker = (id: string) => id !== "premium-feature";
+      const checker = (id: string) => id !== "tickets";
       const spec = generateOpenApiSpec([def], checker);
       expect((spec.paths as any)["/api/gated"]).toBeUndefined();
     });
@@ -360,7 +360,7 @@ describe("generateOpenApiSpec", () => {
     test("includes function when featureGate check returns true", () => {
       const def = makeDef({
         name: "gated",
-        featureGate: "premium-feature",
+        featureGate: "tickets",
       });
       const checker = (_id: string) => true;
       const spec = generateOpenApiSpec([def], checker);
@@ -370,7 +370,7 @@ describe("generateOpenApiSpec", () => {
     test("includes function when no featureChecker is provided", () => {
       const def = makeDef({
         name: "gated",
-        featureGate: "premium-feature",
+        featureGate: "tickets",
       });
       const spec = generateOpenApiSpec([def]);
       expect((spec.paths as any)["/api/gated"]).toBeDefined();
