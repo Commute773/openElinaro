@@ -95,7 +95,7 @@ function writeTestConfig(publicBaseUrl: string) {
     "  geminiLive:",
     "    apiKeySecretRef: gemini.apiKey",
     "    secretProfileId: root",
-    "    model: gemini-2.5-flash-native-audio-preview-12-2025",
+    "    model: gemini-3.1-flash-native-audio-preview-12-2025",
     '    voiceName: ""',
     "    prefixPaddingMs: 20",
     "    silenceDurationMs: 100",
