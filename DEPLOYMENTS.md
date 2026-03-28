@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.27
+- Released at: 2026-03-28T16:34:07Z
+- Release id: 20260328T163407Z-d67a48e
+- Previous version: 2026.03.28.26
+- Trigger: ci/release workflow
+
+- fix: stabilize e2e assertions from first full run (#187)
+
 ## 2026.03.28.26
 - Released at: 2026-03-28T16:29:56Z
 - Release id: 20260328T162956Z-591e113
