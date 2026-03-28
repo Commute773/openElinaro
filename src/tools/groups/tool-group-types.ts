@@ -3,7 +3,7 @@ import type { FinanceService } from "../../services/finance-service";
 import type { HealthTrackingService } from "../../services/health-tracking-service";
 import type { RoutinesService } from "../../services/routines-service";
 import type { MemoryService } from "../../services/memory-service";
-import type { ModelService, ActiveExtendedContextStatus } from "../../services/model-service";
+import type { ModelService, ActiveExtendedContextStatus } from "../../services/models/model-service";
 import type { ProjectsService } from "../../services/projects-service";
 import type { MediaService } from "../../services/media-service";
 import type { EmailService } from "../../services/email-service";

@@ -10,7 +10,7 @@ import { ConversationStore } from "../services/conversation-store";
 import { FinanceService } from "../services/finance-service";
 import { HealthTrackingService } from "../services/health-tracking-service";
 import { MemoryService } from "../services/memory-service";
-import { ModelService } from "../services/model-service";
+import { ModelService } from "../services/models/model-service";
 import { ProfileService } from "../services/profile-service";
 import { ProjectsService } from "../services/projects-service";
 import { RoutinesService } from "../services/routines-service";

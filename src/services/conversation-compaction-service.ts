@@ -9,7 +9,7 @@ import type { ProviderConnector } from "../connectors/provider-connector";
 import { extractTextFromMessage } from "./message-content-service";
 import { toModelMessages } from "./ai-sdk-message-service";
 import { MemoryService } from "./memory-service";
-import { ModelService } from "./model-service";
+import { ModelService } from "./models/model-service";
 import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 

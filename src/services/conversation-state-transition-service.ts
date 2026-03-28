@@ -5,7 +5,7 @@ import { ConversationCompactionService } from "./conversation-compaction-service
 import { type ConversationState, ConversationStore } from "./conversation-store";
 import { toModelMessages } from "./ai-sdk-message-service";
 import { MemoryService } from "./memory-service";
-import { ModelService } from "./model-service";
+import { ModelService } from "./models/model-service";
 import {
   composeSystemPrompt,
   SystemPromptService,

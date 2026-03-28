@@ -17,7 +17,7 @@ let transitionServiceModule: typeof import("./conversation-state-transition-serv
 let accessControlModule: typeof import("./access-control-service");
 let agentChatModule: typeof import("./agent-chat-service");
 let memoryServiceModule: typeof import("./memory-service");
-let modelServiceModule: typeof import("./model-service");
+let modelServiceModule: typeof import("./models/model-service");
 let profileServiceModule: typeof import("./profile-service");
 let projectsServiceModule: typeof import("./projects-service");
 let routinesServiceModule: typeof import("./routines-service");
@@ -336,7 +336,7 @@ describe("OpenBrowser agent e2e", () => {
     accessControlModule = await importFresh("src/services/access-control-service.ts");
     agentChatModule = await importFresh("src/services/agent-chat-service.ts");
     memoryServiceModule = await importFresh("src/services/memory-service.ts");
-    modelServiceModule = await importFresh("src/services/model-service.ts");
+    modelServiceModule = await importFresh("src/services/models/model-service.ts");
     profileServiceModule = await importFresh("src/services/profile-service.ts");
     projectsServiceModule = await importFresh("src/services/projects-service.ts");
     routinesServiceModule = await importFresh("src/services/routines-service.ts");

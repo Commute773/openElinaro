@@ -14,7 +14,7 @@ import { SshFilesystemBackend } from "../services/filesystem-backend-ssh";
 import type { FinanceService } from "../services/finance-service";
 import type { HealthTrackingService } from "../services/health-tracking-service";
 import { MemoryService } from "../services/memory-service";
-import { ModelService } from "../services/model-service";
+import { ModelService } from "../services/models/model-service";
 import type { ProfileService } from "../services/profile-service";
 import { ProjectsService } from "../services/projects-service";
 import { ReflectionService } from "../services/reflection-service";
