@@ -1,8 +1,5 @@
 import type { OpenElinaroApp } from "../../../app/runtime";
 import { CORS_HEADERS } from "./helpers";
-import { homeRoutes } from "./home";
-import { agentRoutes } from "./agents";
-import { notificationRoutes } from "./notifications";
 import { chatRoutes } from "./chat";
 import { toolRoutes } from "./tools";
 import { dataRoutes } from "./data";
@@ -60,9 +57,6 @@ function compileRoute(def: RouteDefinition): CompiledRoute {
  * generated from function definitions instead.
  */
 const staticRoutes: RouteDefinition[] = [
-  ...homeRoutes,
-  ...agentRoutes,
-  ...notificationRoutes,
   ...chatRoutes,
   ...toolRoutes,
   ...dataRoutes,

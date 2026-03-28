@@ -19,6 +19,9 @@ import { buildFilesystemFunctions } from "./filesystem-functions";
 import { buildZigbee2MqttFunctions } from "./zigbee2mqtt-functions";
 import { buildSubagentFunctions } from "./subagent-functions";
 import { buildConversationLifecycleFunctions } from "./conversation-lifecycle-functions";
+import { buildDashboardFunctions } from "./dashboard-functions";
+import { buildAgentApiFunctions } from "./agent-api-functions";
+import { buildNotificationFunctions } from "./notification-functions";
 
 /**
  * All domain builders, including subagent and conversation-lifecycle tools.
@@ -40,4 +43,7 @@ export const ALL_FUNCTION_BUILDERS: FunctionDomainBuilder[] = [
   buildZigbee2MqttFunctions,
   buildSubagentFunctions,
   buildConversationLifecycleFunctions,
+  buildDashboardFunctions,
+  buildAgentApiFunctions,
+  buildNotificationFunctions,
 ];
