@@ -142,9 +142,9 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
     modelHelpers as any,
     systemPrompts,
   );
-  const service = new agentChatModule.AgentChatService(
+  const service = new agentChatModule.AgentChatService({
     connector,
-    {
+    routineTools: {
       consumePendingBackgroundExecNotifications() {
         return [];
       },
@@ -152,7 +152,7 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
         return null;
       },
     } as any,
-    {
+    toolResolver: {
       resolveAllForChat() {
         return { entries: [] };
       },
@@ -163,10 +163,8 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
     transitions,
     conversations,
     systemPrompts,
-    modelHelpers as any,
-    undefined,
-    undefined,
-  );
+    models: modelHelpers as any,
+  });
 
   return {
     service,

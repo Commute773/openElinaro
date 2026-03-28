@@ -374,20 +374,20 @@ function createDiscordAppHarness(options?: {
     access,
   );
   const toolResolver = new toolResolutionModule.ToolResolutionService(toolRegistry);
-  const chat = new agentChatModule.AgentChatService(
+  const chat = new agentChatModule.AgentChatService({
     connector,
-    toolRegistry,
+    routineTools: toolRegistry,
     toolResolver,
     transitions,
     conversations,
     systemPrompts,
     models,
-    {
+    memory: {
       async buildRecallContext() {
         return "";
       },
     },
-  );
+  });
 
   return {
     profile,

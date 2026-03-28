@@ -167,9 +167,9 @@ function createHarness(options: {
     return new AIMessage(`E2E reply: ${humanMessages.at(-1) ?? ""}`);
   }, { providerId: "scripted-memory-e2e" });
 
-  const chat = new agentChatModule.AgentChatService(
+  const chat = new agentChatModule.AgentChatService({
     connector,
-    {
+    routineTools: {
       consumePendingBackgroundExecNotifications() {
         return [];
       },
@@ -177,7 +177,7 @@ function createHarness(options: {
         return null;
       },
     } as any,
-    {
+    toolResolver: {
       resolveAllForChat() {
         return { entries: [] };
       },
@@ -185,14 +185,14 @@ function createHarness(options: {
         return { entries: [], tools: [] };
       },
     } as any,
-    {
+    transitions: {
       async compactForContinuation() {
         throw new Error("Compaction should not run in memory e2e tests.");
       },
     } as any,
     conversations,
     systemPrompts,
-    {
+    models: {
       async inspectContextWindowUsage() {
         return {
           usedTokens: 128,
@@ -203,7 +203,7 @@ function createHarness(options: {
         };
       },
     } as any,
-    {
+    memory: {
       async buildRecallContext(params: {
         conversationKey: string;
         userContent: string;
@@ -216,7 +216,7 @@ function createHarness(options: {
         return recallService.buildRecallContext(params);
       },
     } as any,
-  );
+  });
 
   return {
     chat: new Proxy(chat, {

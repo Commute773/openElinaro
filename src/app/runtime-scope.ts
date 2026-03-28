@@ -205,15 +205,17 @@ export function createRuntimeScope(ctx: {
     { component: "tool_resolution", profileId },
   );
   const chat = new AgentChatService(
-    connector,
-    routineTools,
-    toolResolver,
-    transitions,
-    conversations,
-    systemPrompts,
-    models,
-    mode === "subagent" || automaticConversationMemoryDisabled ? undefined : conversationMemory,
-    reflection,
+    {
+      connector,
+      routineTools,
+      toolResolver,
+      transitions,
+      conversations,
+      systemPrompts,
+      models,
+      memory: mode === "subagent" || automaticConversationMemoryDisabled ? undefined : conversationMemory,
+      reflection,
+    },
     mode === "interactive" && profile.id === "root",
     ctx.onConversationActivityChange
       ? (params) => {
