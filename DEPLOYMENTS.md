@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.30
+- Released at: 2026-03-28T17:15:06Z
+- Release id: 20260328T171506Z-e4e44bc
+- Previous version: 2026.03.28.29
+- Trigger: ci/release workflow
+
+- feat: add Reddit tools (reddit_posts, reddit_search, reddit_comments)
+
 ## 2026.03.28.29
 - Released at: 2026-03-28T16:59:22Z
 - Release id: 20260328T165922Z-0301641
