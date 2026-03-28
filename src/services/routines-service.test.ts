@@ -1022,7 +1022,7 @@ describe("RoutinesService", () => {
   });
 
   test("buildSchedule in routine tools passes days through for daily schedules", async () => {
-    const { buildSchedule } = await import("../tools/groups/routine-tools");
+    const { buildSchedule } = await import("../functions/domains/routine-functions");
 
     const withDays = buildSchedule({
       scheduleKind: "daily",

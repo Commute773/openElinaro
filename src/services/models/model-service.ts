@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { ConfigurationError, NotFoundError, ValidationError } from "../domain/errors";
+import { ConfigurationError, NotFoundError, ValidationError } from "../../domain/errors";
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import {
@@ -15,31 +15,31 @@ import {
   type Usage,
 } from "@mariozechner/pi-ai";
 import { getOAuthApiKey, type OAuthCredentials } from "@mariozechner/pi-ai/oauth";
-import { approximateTextTokens } from "../utils/text-utils";
+import { approximateTextTokens } from "../../utils/text-utils";
 import { z } from "zod";
 import {
   approximateContentTokens,
   extractTextFromMessage,
   normalizeChatPromptContent,
   resolveRemoteImageUrl,
-} from "./message-content-service";
+} from "../message-content-service";
 import {
   UsageTrackingService,
   type UsagePromptDiagnostics,
-} from "./usage-tracking-service";
-import { CacheMissMonitor, type CacheMissWarning } from "./cache-miss-monitor";
+} from "../usage-tracking-service";
+import { CacheMissMonitor, type CacheMissWarning } from "../cache-miss-monitor";
 import {
   ModelUsageService,
   type RecordedUsageInspection,
   type RecordedUsageDailyInspection,
 } from "./model-usage-service";
-import { getClaudeSetupToken, getCodexCredentials, saveCodexCredentials } from "../auth/store";
-import type { ProfileRecord } from "../domain/profiles";
-import { getRuntimeConfig } from "../config/runtime-config";
-import { resolveRuntimePath } from "./runtime-root";
-import { telemetry } from "./infrastructure/telemetry";
-import { createTraceSpan } from "../utils/telemetry-helpers";
-import { timestamp } from "../utils/timestamp";
+import { getClaudeSetupToken, getCodexCredentials, saveCodexCredentials } from "../../auth/store";
+import type { ProfileRecord } from "../../domain/profiles";
+import { getRuntimeConfig } from "../../config/runtime-config";
+import { resolveRuntimePath } from "../runtime-root";
+import { telemetry } from "../infrastructure/telemetry";
+import { createTraceSpan } from "../../utils/telemetry-helpers";
+import { timestamp } from "../../utils/timestamp";
 import { SecondaryModelDispatch, type ResolvedRuntimeModel } from "./secondary-model-dispatch";
 
 export type { RecordedUsageInspection, RecordedUsageDailyInspection } from "./model-usage-service";

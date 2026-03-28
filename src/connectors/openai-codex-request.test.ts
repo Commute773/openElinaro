@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { stream, type Context, type Model } from "@mariozechner/pi-ai";
 import type { ProfileRecord } from "../domain/profiles";
-import type { ActiveModelSelection } from "../services/model-service";
-import { ModelService } from "../services/model-service";
+import type { ActiveModelSelection } from "../services/models/model-service";
+import { ModelService } from "../services/models/model-service";
 
 const TEST_PROFILE: ProfileRecord = {
   id: "test-profile",

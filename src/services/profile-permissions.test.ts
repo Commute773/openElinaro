@@ -23,7 +23,7 @@ let routinesModule: typeof import("../services/routines-service");
 let conversationsModule: typeof import("../services/conversation-store");
 let systemPromptsModule: typeof import("../services/system-prompt-service");
 let memoryModule: typeof import("../services/memory-service");
-let modelsModule: typeof import("../services/model-service");
+let modelsModule: typeof import("../services/models/model-service");
 let transitionsModule: typeof import("../services/conversation-state-transition-service");
 let toolRegistryModule: typeof import("../tools/tool-registry");
 let toolAuthModule: typeof import("../services/tool-authorization-service");
@@ -170,7 +170,7 @@ beforeAll(async () => {
   conversationsModule = await importFresh("src/services/conversation-store.ts");
   systemPromptsModule = await importFresh("src/services/system-prompt-service.ts");
   memoryModule = await importFresh("src/services/memory-service.ts");
-  modelsModule = await importFresh("src/services/model-service.ts");
+  modelsModule = await importFresh("src/services/models/model-service.ts");
   transitionsModule = await importFresh("src/services/conversation-state-transition-service.ts");
   toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
   toolAuthModule = await importFresh("src/services/tool-authorization-service.ts");

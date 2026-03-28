@@ -3,7 +3,7 @@ import {
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { RoutineItemKind, RoutinePriority } from "../../domain/routines";
-import type { ModelProviderId } from "../../services/model-service";
+import type { ModelProviderId } from "../../services/models/model-service";
 import { getAuthStatus } from "../../auth/store";
 import { ProfileService } from "../../services/profile-service";
 

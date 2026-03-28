@@ -165,7 +165,7 @@ describe("ActiveModelConnector", () => {
   });
 
   test("falls back to the default transport when websocket setup fails", async () => {
-    const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
+    const modelModule = await importFresh<typeof import("../services/models/model-service")>("src/services/models/model-service.ts");
     const connectorModule = await importFresh<typeof import("./active-model-connector")>("src/connectors/active-model-connector.ts");
 
     const modelService = new modelModule.ModelService({
@@ -201,7 +201,7 @@ describe("ActiveModelConnector", () => {
       config.core.assistant.displayName = "Llvind";
     });
 
-    const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
+    const modelModule = await importFresh<typeof import("../services/models/model-service")>("src/services/models/model-service.ts");
     const connectorModule = await importFresh<typeof import("./active-model-connector")>("src/connectors/active-model-connector.ts");
 
     const modelService = new modelModule.ModelService({
@@ -236,7 +236,7 @@ describe("ActiveModelConnector", () => {
   });
 
   test("converts AI SDK v3 file-type image parts to pi-ai image blocks", async () => {
-    const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
+    const modelModule = await importFresh<typeof import("../services/models/model-service")>("src/services/models/model-service.ts");
     const connectorModule = await importFresh<typeof import("./active-model-connector")>("src/connectors/active-model-connector.ts");
 
     const modelService = new modelModule.ModelService({
@@ -312,7 +312,7 @@ describe("ActiveModelConnector", () => {
       },
     }));
 
-    const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
+    const modelModule = await importFresh<typeof import("../services/models/model-service")>("src/services/models/model-service.ts");
     const connectorModule = await importFresh<typeof import("./active-model-connector")>("src/connectors/active-model-connector.ts");
 
     const modelService = new modelModule.ModelService({
@@ -359,7 +359,7 @@ describe("ActiveModelConnector", () => {
       },
     }));
 
-    const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
+    const modelModule = await importFresh<typeof import("../services/models/model-service")>("src/services/models/model-service.ts");
     const connectorModule = await importFresh<typeof import("./active-model-connector")>("src/connectors/active-model-connector.ts");
 
     const modelService = new modelModule.ModelService({
@@ -390,7 +390,7 @@ describe("ActiveModelConnector", () => {
   });
 
   test("records prompt diagnostics in the usage ledger", async () => {
-    const modelModule = await importFresh<typeof import("../services/model-service")>("src/services/model-service.ts");
+    const modelModule = await importFresh<typeof import("../services/models/model-service")>("src/services/models/model-service.ts");
     const connectorModule = await importFresh<typeof import("./active-model-connector")>("src/connectors/active-model-connector.ts");
 
     const modelService = new modelModule.ModelService({

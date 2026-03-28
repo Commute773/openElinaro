@@ -34,7 +34,7 @@ import { MediaService } from "../services/media-service";
 import { MemoryService } from "../services/memory-service";
 import {
   ModelService,
-} from "../services/model-service";
+} from "../services/models/model-service";
 import { ProjectsService } from "../services/projects-service";
 import type { ReflectionService } from "../services/reflection-service";
 import { RoutinesService } from "../services/routines-service";

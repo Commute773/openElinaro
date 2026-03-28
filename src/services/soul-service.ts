@@ -1,6 +1,6 @@
 import type { ProfileRecord } from "../domain/profiles";
 import { MemoryService } from "./memory-service";
-import { ModelService } from "./model-service";
+import { ModelService } from "./models/model-service";
 import { ReflectionPromptService } from "./reflection-prompt-service";
 import { ReflectionStateService } from "./reflection-state-service";
 import type { RoutinesService } from "./routines-service";

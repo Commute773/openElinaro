@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
-import type { ModelProviderId, ActiveExtendedContextStatus } from "../../services/model-service";
+import type { ModelProviderId, ActiveExtendedContextStatus } from "../../services/models/model-service";
 import { SECRET_STORE_KINDS } from "../../services/infrastructure/secret-store-service";
 import type { FeatureId } from "../../services/feature-config-service";
 import { parseFeatureValue } from "../../services/feature-config-service";

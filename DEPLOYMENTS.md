@@ -1,5 +1,21 @@
 # Deployments
 
+## 2026.03.28.2
+- Released at: 2026-03-28T00:48:21Z
+- Release id: 20260328T004821Z-ac373ee
+- Previous version: 2026.03.28
+- Trigger: ci/release workflow
+
+- test: add unit tests for generate-tools function layer (#151)
+
+## 2026.03.28
+- Released at: 2026-03-28T00:46:51Z
+- Release id: 20260328T004651Z-91c3d9a
+- Previous version: 2026.03.27.40
+- Trigger: ci/release workflow
+
+- docs: add function layer architecture decision record (#150)
+
 ## 2026.03.27.40
 - Released at: 2026-03-27T22:07:17Z
 - Release id: 20260327T220717Z-d634657
