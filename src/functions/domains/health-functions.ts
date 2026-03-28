@@ -37,6 +37,11 @@ const healthLogCheckinSchema = z.object({
 const HEALTH_AUTH = { access: "anyone" as const, behavior: "uniform" as const };
 const HEALTH_SCOPES: ("chat" | "direct")[] = ["chat", "direct"];
 const HEALTH_DOMAINS = ["health"];
+const HEALTH_UNTRUSTED = {
+  sourceType: "other",
+  sourceName: "health summary",
+  notes: "Health notes and check-ins are user-managed personal data.",
+};
 
 // ---------------------------------------------------------------------------
 // Domain builder
@@ -55,6 +60,8 @@ export const buildHealthFunctions: FunctionDomainBuilder = (ctx) => [
     auth: HEALTH_AUTH,
     domains: HEALTH_DOMAINS,
     agentScopes: HEALTH_SCOPES,
+    examples: ["show health summary", "check recent health trend"],
+    untrustedOutput: HEALTH_UNTRUSTED,
   }),
 
   // -----------------------------------------------------------------------
@@ -70,6 +77,12 @@ export const buildHealthFunctions: FunctionDomainBuilder = (ctx) => [
     auth: HEALTH_AUTH,
     domains: HEALTH_DOMAINS,
     agentScopes: HEALTH_SCOPES,
+    examples: ["list health check-ins", "show recent imported health notes"],
+    untrustedOutput: {
+      sourceType: "other",
+      sourceName: "health history",
+      notes: "Health notes and check-ins are user-managed personal data.",
+    },
   }),
 
   // -----------------------------------------------------------------------
@@ -99,6 +112,12 @@ export const buildHealthFunctions: FunctionDomainBuilder = (ctx) => [
     auth: HEALTH_AUTH,
     domains: HEALTH_DOMAINS,
     agentScopes: HEALTH_SCOPES,
+    examples: ["log a health check-in", "record anxiety and energy"],
     mutatesState: true,
+    untrustedOutput: {
+      sourceType: "other",
+      sourceName: "health check-in result",
+      notes: "Health notes and check-ins are user-managed personal data.",
+    },
   }),
 ];

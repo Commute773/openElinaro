@@ -18,6 +18,7 @@ import {
   wrapToolOutput,
   getToolInputSchema,
   guardRuntimeContextSection,
+  initUntrustedOutputMap,
 } from "./tool-output-pipeline";
 import type { AppProgressEvent } from "../domain/assistant";
 import { ConversationStore } from "../services/conversation-store";
@@ -274,7 +275,11 @@ const BASE_USER_FACING_TOOL_NAMES = [
   "cancel_agent",
 ] as const;
 
-const BASE_AGENT_DEFAULT_VISIBLE_TOOL_NAMES: Record<AgentToolScope, readonly string[]> = {
+/**
+ * Default-visible tool names for dynamic/legacy tools that are not in the function layer.
+ * Function-layer tools carry their own defaultVisibleScopes in their definitions.
+ */
+const DYNAMIC_TOOL_DEFAULT_VISIBLE_SCOPES: Record<AgentToolScope, readonly string[]> = {
   chat: [
     "load_tool_library",
     "tool_result_read",
@@ -286,39 +291,16 @@ const BASE_AGENT_DEFAULT_VISIBLE_TOOL_NAMES: Record<AgentToolScope, readonly str
     "compact",
     "reload",
     "new_chat",
-    "exec_command",
-    "exec_status",
-    "exec_output",
   ],
   "coding-planner": [
     "load_tool_library",
     "tool_result_read",
     "run_tool_program",
-    "read_file",
-    "list_dir",
-    "glob",
-    "grep",
-    "stat_path",
   ],
   "coding-worker": [
     "load_tool_library",
     "tool_result_read",
     "run_tool_program",
-    "read_file",
-    "write_file",
-    "edit_file",
-    "apply_patch",
-    "list_dir",
-    "glob",
-    "grep",
-    "stat_path",
-    "mkdir",
-    "move_path",
-    "copy_path",
-    "delete_path",
-    "exec_command",
-    "exec_status",
-    "exec_output",
   ],
   direct: [
     "load_tool_library",
@@ -331,11 +313,60 @@ const BASE_AGENT_DEFAULT_VISIBLE_TOOL_NAMES: Record<AgentToolScope, readonly str
     "compact",
     "reload",
     "new_chat",
-    "exec_command",
-    "exec_status",
-    "exec_output",
   ],
 };
+
+/** Hardcoded catalog metadata for dynamic tools not in the function layer. */
+const DYNAMIC_TOOL_CATALOG: Record<string, Partial<ToolCatalogCard>> = {
+  load_tool_library: { domains: ["meta", "tooling"], agentScopes: ["chat", "coding-planner", "coding-worker", "direct"], examples: ["load the web_research library", "load filesystem_read tools"] },
+  tool_result_read: { domains: ["meta", "tooling", "session"], agentScopes: ["chat", "coding-planner", "coding-worker", "direct"], examples: ["reopen a stored tool result", "summarize a saved tool output by ref"] },
+  run_tool_program: { domains: ["meta", "orchestration", "tooling"], agentScopes: ["chat", "coding-planner", "coding-worker", "direct"], examples: ["loop over many tool calls", "aggregate repeated search results"] },
+  context: { domains: ["system", "session"], agentScopes: ["chat", "direct"], examples: ["show context usage", "show context full"] },
+  usage_summary: { domains: ["observability", "usage", "session"], agentScopes: ["chat", "direct"], examples: ["show today's model spend", "show this thread cost"] },
+  model: { domains: ["system", "session"], agentScopes: ["chat", "direct"], examples: ["list models for the current provider", "set thinking high on the active model"], mutatesState: true },
+  reflect: { domains: ["system", "session"], agentScopes: ["chat", "direct"], examples: [] },
+  compact: { domains: ["system", "session"], agentScopes: ["chat", "direct"], examples: ["compact this conversation", "shrink chat history"] },
+  reload: { domains: ["system", "session"], agentScopes: ["chat", "direct"], examples: ["reload system prompt", "refresh instructions"], mutatesState: true },
+  new_chat: { domains: ["system", "session"], agentScopes: ["chat", "direct"], examples: ["start a fresh conversation", "force a fresh chat without durable memory"], mutatesState: true },
+  launch_agent: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["launch background coding task", "run longer code workflow"], supportsBackground: true, mutatesState: true },
+  resume_agent: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["send follow-up to returned subagent", "resume an existing coding run"], supportsBackground: true, mutatesState: true },
+  steer_agent: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["tell the subagent to focus tests first", "send a new instruction to a running agent"], mutatesState: true },
+  cancel_agent: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["stop run-123", "abort a running coding agent"], mutatesState: true },
+  agent_status: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["spot-check coding agent run", "list recent workflows"] },
+  read_agent_terminal: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["read agent terminal output", "see what an agent is doing"] },
+};
+
+function buildDynamicToolCatalogCard(entry: StructuredToolInterface): ToolCatalogCard {
+  const meta = DYNAMIC_TOOL_CATALOG[entry.name] ?? {};
+  const authorization = getToolAuthorizationDeclaration(entry.name);
+  const defaultVisibleScopes = (Object.entries(DYNAMIC_TOOL_DEFAULT_VISIBLE_SCOPES) as Array<[AgentToolScope, readonly string[]]>)
+    .filter(([, toolNames]) => toolNames.includes(entry.name))
+    .map(([scope]) => scope);
+  const tags = entry.name
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .split(/[_\s]+/g)
+    .concat(entry.description.toLowerCase().match(/[a-z0-9-]+/g) ?? [])
+    .filter((value, index, values) => Boolean(value?.trim()) && values.indexOf(value) === index);
+
+  return {
+    name: entry.name,
+    description: entry.description,
+    examples: meta.examples ?? [],
+    canonicalName: entry.name,
+    domains: meta.domains ?? ["general"],
+    tags,
+    agentScopes: meta.agentScopes ?? ["chat", "direct"],
+    defaultVisibleScopes,
+    defaultVisibleToMainAgent: defaultVisibleScopes.some((scope) => scope === "chat" || scope === "direct"),
+    defaultVisibleToSubagent: defaultVisibleScopes.some((scope) =>
+      scope === "coding-planner" || scope === "coding-worker"
+    ),
+    supportsBackground: meta.supportsBackground ?? false,
+    mutatesState: meta.mutatesState ?? false,
+    readsWorkspace: meta.readsWorkspace ?? false,
+    authorization,
+  };
+}
 
 export function getRuntimeUserFacingToolNames(runtimePlatform = resolveRuntimePlatform()) {
   return BASE_USER_FACING_TOOL_NAMES.filter((name) =>
@@ -345,17 +376,18 @@ export function getRuntimeUserFacingToolNames(runtimePlatform = resolveRuntimePl
 
 export function getRuntimeAgentDefaultVisibleToolNames(
   agentScope: AgentToolScope,
+  functionRegistry: FunctionRegistry,
   runtimePlatform = resolveRuntimePlatform(),
 ) {
-  return BASE_AGENT_DEFAULT_VISIBLE_TOOL_NAMES[agentScope].filter((name) =>
+  // Collect default-visible tool names from function definitions
+  const fromFunctions = functionRegistry.getDefinitions({ surface: "agent" })
+    .filter((def) => (def.defaultVisibleScopes ?? []).includes(agentScope))
+    .map((def) => def.name);
+  // Merge with dynamic tool defaults
+  const combined = [...DYNAMIC_TOOL_DEFAULT_VISIBLE_SCOPES[agentScope], ...fromFunctions];
+  return combined.filter((name) =>
     runtimePlatform.supportsMedia || !name.startsWith("media_")
   );
-}
-
-function inferDefaultVisibleScopes(name: string): AgentToolScope[] {
-  return (Object.entries(BASE_AGENT_DEFAULT_VISIBLE_TOOL_NAMES) as Array<[AgentToolScope, readonly string[]]>)
-    .filter(([, toolNames]) => toolNames.includes(name))
-    .map(([scope]) => scope);
 }
 
 export type ToolContext = {
@@ -366,528 +398,6 @@ export type ToolContext = {
   getActiveToolNames?: () => string[];
   subagentDepth?: number;
 };
-
-const TOOL_SCOPE_DEFAULTS: Record<string, AgentToolScope[]> = {
-  load_tool_library: ["chat", "coding-planner", "coding-worker", "direct"],
-  tool_result_read: ["chat", "coding-planner", "coding-worker", "direct"],
-  run_tool_program: ["chat", "coding-planner", "coding-worker", "direct"],
-  exec_command: ["chat", "coding-planner", "coding-worker", "direct"],
-  exec_status: ["chat", "coding-planner", "coding-worker", "direct"],
-  exec_output: ["chat", "coding-planner", "coding-worker", "direct"],
-  service_version: ["chat", "coding-planner", "coding-worker", "direct"],
-  service_changelog_since_version: ["chat", "coding-planner", "coding-worker", "direct"],
-  tickets_list: ["chat", "coding-planner", "coding-worker", "direct"],
-  tickets_get: ["chat", "coding-planner", "coding-worker", "direct"],
-  tickets_create: ["chat", "coding-planner", "coding-worker", "direct"],
-  tickets_update: ["chat", "coding-planner", "coding-worker", "direct"],
-  launch_agent: ["chat", "direct"],
-  resume_agent: ["chat", "direct"],
-  steer_agent: ["chat", "direct"],
-  cancel_agent: ["chat", "direct"],
-  agent_status: ["chat", "direct"],
-  context: ["chat", "direct"],
-  usage_summary: ["chat", "direct"],
-  email: ["chat", "direct"],
-  communications_status: ["chat", "direct"],
-  make_phone_call: ["chat", "direct"],
-  call_list: ["chat", "direct"],
-  call_get: ["chat", "direct"],
-  call_control: ["chat", "direct"],
-  message_send: ["chat", "direct"],
-  message_list: ["chat", "direct"],
-  message_get: ["chat", "direct"],
-  compact: ["chat", "direct"],
-  reload: ["chat", "direct"],
-  new_chat: ["chat", "direct"],
-  model: ["chat", "direct"],
-  web_fetch: ["chat", "coding-planner", "coding-worker", "direct"],
-  media_list: ["chat", "direct"],
-  media_list_speakers: ["chat", "direct"],
-  media_play: ["chat", "direct"],
-  media_pause: ["chat", "direct"],
-  media_stop: ["chat", "direct"],
-  media_set_volume: ["chat", "direct"],
-  media_status: ["chat", "direct"],
-  openbrowser: ["chat", "coding-planner", "coding-worker", "direct"],
-  secret_list: ["chat", "direct"],
-  secret_import_file: ["chat", "direct"],
-  secret_generate_password: ["chat", "direct"],
-  secret_delete: ["chat", "direct"],
-  config_edit: ["chat", "direct"],
-  feature_manage: ["chat", "direct"],
-  apply_patch: ["chat", "coding-planner", "coding-worker", "direct"],
-};
-
-function uniqueStrings(values: Array<string | undefined>) {
-  return Array.from(new Set(values.filter((value): value is string => Boolean(value && value.trim()))));
-}
-
-function inferToolDomains(name: string) {
-  if (name === "load_tool_library") {
-    return ["meta", "tooling"];
-  }
-  if (name === "tool_result_read") {
-    return ["meta", "tooling", "session"];
-  }
-  if (name === "job_list" || name === "job_get" || name === "work_summary") {
-    return ["projects", "planning", "work"];
-  }
-  if (name.startsWith("finance_")) {
-    return ["finance", "personal-ops"];
-  }
-  if (name.startsWith("tickets_")) {
-    return ["tickets", "planning", "work"];
-  }
-  if (name.startsWith("health_")) {
-    return ["health", "personal-ops"];
-  }
-  if (name === "email") {
-    return ["communications", "email", "personal-ops"];
-  }
-  if (name === "communications_status" || name === "make_phone_call" || name.startsWith("call_") || name.startsWith("message_")) {
-    return ["communications", "telephony", "personal-ops"];
-  }
-  if (name === "run_tool_program") {
-    return ["meta", "orchestration", "tooling"];
-  }
-  if (name.startsWith("routine_")) {
-    return ["routines", "personal-ops"];
-  }
-  if (name.startsWith("project_")) {
-    return ["projects", "knowledge"];
-  }
-  if (name.startsWith("conversation_")) {
-    return ["conversations", "knowledge"];
-  }
-  if (name.startsWith("profile_")) {
-    return ["profiles", "agents"];
-  }
-  if (name === "usage_summary") {
-    return ["observability", "usage", "session"];
-  }
-  if (["model", "context", "reload", "new_chat"].includes(name)) {
-    return ["system", "session"];
-  }
-  if (["memory_search", "memory_reindex", "memory_import"].includes(name)) {
-    return ["memory", "knowledge"];
-  }
-  if (name.startsWith("media_")) {
-    return ["media", "audio", "devices"];
-  }
-  if (name.startsWith("lights_")) {
-    return ["lights", "devices", "home-automation"];
-  }
-  if (name === "telemetry_query") {
-    return ["observability", "logs", "tracing"];
-  }
-  if (name === "web_search") {
-    return ["web", "research"];
-  }
-  if (name === "web_fetch") {
-    return ["web", "retrieval", "research"];
-  }
-  if (name === "openbrowser") {
-    return ["browser", "automation", "web"];
-  }
-  if (name.startsWith("secret_")) {
-    return ["security", "secrets", "automation"];
-  }
-  if (name === "benchmark") {
-    return ["observability", "performance"];
-  }
-  if (name === "update" || name === "update_preview") {
-    return ["operations", "deployment", "system"];
-  }
-  if (name.startsWith("service_")) {
-    return ["operations", "deployment", "system"];
-  }
-  if (name.startsWith("exec_")) {
-    return ["shell", "execution"];
-  }
-  if (
-    [
-      "read_file",
-      "write_file",
-      "edit_file",
-      "apply_patch",
-      "list_dir",
-      "glob",
-      "grep",
-      "stat_path",
-      "mkdir",
-      "move_path",
-      "copy_path",
-      "delete_path",
-    ].includes(name)
-  ) {
-    return ["filesystem", "code"];
-  }
-  if (["launch_agent", "resume_agent", "steer_agent", "cancel_agent", "agent_status", "read_agent_terminal"].includes(name)) {
-    return ["workflow", "agents"];
-  }
-  return ["general"];
-}
-
-function inferToolTags(name: string, description: string) {
-  return uniqueStrings(
-    name
-      .replace(/([a-z])([A-Z])/g, "$1 $2")
-      .split(/[_\s]+/g)
-      .concat(description.toLowerCase().match(/[a-z0-9-]+/g) ?? []),
-  );
-}
-
-function inferToolExamples(name: string) {
-  switch (name) {
-    case "load_tool_library":
-      return ["load the web_research library", "load filesystem_read tools"];
-    case "tool_result_read":
-      return ["reopen a stored tool result", "summarize a saved tool output by ref"];
-    case "run_tool_program":
-      return ["loop over many tool calls", "aggregate repeated search results"];
-    case "project_list":
-      return ["list active projects", "show paused projects"];
-    case "project_get":
-      return ["open project state", "inspect project roadmap"];
-    case "job_list":
-      return ["list active jobs", "show paused clients"];
-    case "job_get":
-      return ["inspect a restricted job", "show client availability"];
-    case "work_summary":
-      return ["what should I work on now", "show current work focus"];
-    case "profile_list_launchable":
-      return ["list launchable profiles", "which subprofiles can I launch"];
-    case "profile_set_defaults":
-      return ["set a profile thinking level", "update profile model defaults"];
-    case "conversation_search":
-      return ["search past chats", "find an old conversation excerpt"];
-    case "routine_check":
-      return ["what needs attention now", "check overdue meds"];
-    case "routine_list":
-      return ["list active routines", "show paused todos"];
-    case "routine_get":
-      return ["show routine details", "inspect routine by id"];
-    case "routine_add":
-      return ["add a weekly workout", "create a deadline reminder"];
-    case "routine_update":
-      return ["rename a todo", "change a routine schedule"];
-    case "routine_delete":
-      return ["delete a routine", "remove a stale todo"];
-    case "set_alarm":
-      return ["set an alarm for 07:30", "set an alarm for 2026-03-16T09:00:00-04:00"];
-    case "set_timer":
-      return ["set a 10m timer", "set a 2h timer"];
-    case "alarm_list":
-      return ["list pending alarms", "show delivered timers"];
-    case "alarm_cancel":
-      return ["cancel alarm-123", "cancel a timer by id"];
-    case "tickets_list":
-      return ["list open tickets", "show high-priority blocked tickets"];
-    case "tickets_get":
-      return ["show ticket ET-001", "inspect one ticket"];
-    case "tickets_create":
-      return ["create a ticket for a regression", "add a backend work item"];
-    case "tickets_update":
-      return ["mark ticket in progress", "move a ticket to done"];
-    case "finance_summary":
-      return ["show finance summary", "check budget and receivables"];
-    case "finance_budget":
-      return ["show weekly budget", "check spending pace"];
-    case "finance_history":
-      return ["list recent transactions", "show review-only transactions"];
-    case "finance_review":
-      return ["show finance review queue", "categorize reviewed transactions"];
-    case "finance_import":
-      return ["import from the finance sheet", "dry-run the transaction import"];
-    case "finance_manage":
-      return ["add a payable", "refresh recurring expenses"];
-    case "finance_forecast":
-      return ["show forecast summary", "render cashflow forecast"];
-    case "health_summary":
-      return ["show health summary", "check recent health trend"];
-    case "health_history":
-      return ["list health check-ins", "show recent imported health notes"];
-    case "health_log_checkin":
-      return ["log a health check-in", "record anxiety and energy"];
-    case "routine_done":
-      return ["mark routine done", "complete today's task"];
-    case "routine_undo_done":
-      return ["undo a completion", "reopen completed routine"];
-    case "routine_snooze":
-      return ["snooze for 30 minutes", "delay this reminder"];
-    case "routine_skip":
-      return ["skip today's occurrence", "skip this reminder"];
-    case "routine_pause":
-      return ["pause this routine", "stop reminders for now"];
-    case "routine_resume":
-      return ["resume this routine", "restart reminders"];
-    case "model":
-      return ["list models for the current provider", "set thinking high on the active model"];
-    case "steer_agent":
-      return ["tell the subagent to focus tests first", "send a new instruction to a running agent"];
-    case "cancel_agent":
-      return ["stop run-123", "abort a running coding agent"];
-    case "context":
-      return ["show context usage", "show context full"];
-    case "usage_summary":
-      return ["show today's model spend", "show this thread cost"];
-    case "email":
-      return ["list unread email", "read email 1", "send email to apple@example.com"];
-    case "communications_status":
-      return ["show Vonage webhook settings", "check communications setup"];
-    case "make_phone_call":
-      return ["make a phone call and let Gemini handle it", "place a live AI phone call with instructions"];
-    case "call_list":
-      return ["list recent calls", "show outbound calls"];
-    case "call_get":
-      return ["show call UUID-123", "inspect one call"];
-    case "call_control":
-      return ["talk into a live call", "stream audio into a call"];
-    case "message_send":
-      return ["send an SMS", "send a WhatsApp message"];
-    case "message_list":
-      return ["list recent messages", "show inbound WhatsApp messages"];
-    case "message_get":
-      return ["show message UUID-123", "inspect one message"];
-    case "read_file":
-      return ["read package.json", "open src/index.ts"];
-    case "write_file":
-      return ["create notes.md", "overwrite config file"];
-    case "edit_file":
-      return ["replace one string", "patch a small file"];
-    case "apply_patch":
-      return ["apply a structured patch", "update multiple files with a patch"];
-    case "list_dir":
-      return ["list src recursively", "show project files"];
-    case "glob":
-      return ["find all *.test.ts", "match docs/**/*.md"];
-    case "grep":
-      return ["search for load_tool_library", "find TODO lines"];
-    case "stat_path":
-      return ["check file size", "inspect path metadata"];
-    case "mkdir":
-      return ["create tmp/output", "make nested folders"];
-    case "move_path":
-      return ["rename config file", "move a folder"];
-    case "copy_path":
-      return ["copy template file", "duplicate a directory"];
-    case "delete_path":
-      return ["remove temp file", "delete old artifacts"];
-    case "memory_import":
-      return ["import notes folder", "load markdown into memory"];
-    case "memory_search":
-      return ["search saved notes", "find memory about auth"];
-    case "media_list":
-      return ["list songs and ambience", "find thunder audio"];
-    case "media_list_speakers":
-      return ["list speakers", "check if B06HD is available"];
-    case "media_play":
-      return ["play thunder on bedroom speaker", "start a song on B06HD"];
-    case "media_pause":
-      return ["pause the speaker", "pause current audio"];
-    case "media_stop":
-      return ["stop the speaker", "stop current audio"];
-    case "media_set_volume":
-      return ["set volume to 60", "turn down current audio"];
-    case "media_status":
-      return ["what is playing now", "show current speaker playback"];
-    case "telemetry_query":
-      return ["search recent errors", "find stderr entries"];
-    case "web_search":
-      return ["search the web", "look up current docs"];
-    case "web_fetch":
-      return ["fetch a docs page", "turn a URL into markdown"];
-    case "openbrowser":
-      return [
-        "open page and screenshot",
-        "reuse the current browser session and fill a form with { secretRef: \"prepaid_card.number\" }",
-      ];
-    case "secret_list":
-      return ["list stored browser secrets", "show available secret field names"];
-    case "secret_import_file":
-      return ["import a prepaid card json file", "store browser payment details from disk"];
-    case "secret_generate_password":
-      return ["generate a password for github_credentials", "rotate app_login.password"];
-    case "secret_delete":
-      return ["delete prepaid_card", "remove a stored secret"];
-    case "memory_reindex":
-      return ["rebuild memory index", "refresh memory embeddings"];
-    case "compact":
-      return ["compact this conversation", "shrink chat history"];
-    case "reload":
-      return ["reload system prompt", "refresh instructions"];
-    case "new_chat":
-      return ["start a fresh conversation", "force a fresh chat without durable memory"];
-    case "benchmark":
-      return ["benchmark model latency", "compare provider performance"];
-    case "exec_command":
-      return ["run bun test", "execute a shell command"];
-    case "exec_status":
-      return ["check command status", "list background jobs"];
-    case "exec_output":
-      return ["show command output", "tail process logs"];
-    case "service_version":
-      return ["show deployed version", "inspect current release metadata"];
-    case "service_changelog_since_version":
-      return ["show changelog since version", "list deploy notes after a version"];
-    case "service_healthcheck":
-      return ["run service healthcheck", "verify the live agent is up"];
-    case "update_preview":
-      return ["sync source checkout without deploying", "show pending deploy notes after pulling"];
-    case "update":
-      return ["deploy prepared update", "apply the latest prepared service version"];
-    case "service_rollback":
-      return ["roll back the service", "restore the previous deployed version"];
-    case "launch_agent":
-      return ["launch background coding task", "run longer code workflow"];
-    case "resume_agent":
-      return ["send follow-up to returned subagent", "resume an existing coding run"];
-    case "agent_status":
-      return ["spot-check coding agent run", "list recent workflows"];
-    case "read_agent_terminal":
-      return ["read agent terminal output", "see what an agent is doing"];
-    default:
-      return [];
-  }
-}
-
-function inferToolScopes(name: string): AgentToolScope[] {
-  const scoped = TOOL_SCOPE_DEFAULTS[name];
-  if (scoped) {
-    return scoped;
-  }
-  if (name.startsWith("routine_")) {
-    return ["chat", "direct"];
-  }
-  if (name.startsWith("project_")) {
-    return ["chat", "coding-planner", "coding-worker", "direct"];
-  }
-  if (["memory_search", "web_search", "telemetry_query"].includes(name)) {
-    return ["chat", "coding-planner", "coding-worker", "direct"];
-  }
-  if (name === "openbrowser") {
-    return ["chat", "coding-planner", "coding-worker", "direct"];
-  }
-  if (["benchmark", "memory_reindex", "memory_import"].includes(name)) {
-    return ["direct"];
-  }
-  if (name.startsWith("exec_")) {
-    return ["coding-planner", "coding-worker", "direct"];
-  }
-  if (
-    [
-      "read_file",
-      "write_file",
-      "edit_file",
-      "apply_patch",
-      "list_dir",
-      "glob",
-      "grep",
-      "stat_path",
-      "mkdir",
-      "move_path",
-      "copy_path",
-      "delete_path",
-    ].includes(name)
-  ) {
-    return ["chat", "coding-planner", "coding-worker", "direct"];
-  }
-  return ["chat", "direct"];
-}
-
-function buildToolCatalogCard(entry: StructuredToolInterface): ToolCatalogCard {
-  const canonicalName = entry.name;
-  const domains = inferToolDomains(entry.name);
-  const tags = inferToolTags(entry.name, entry.description);
-  const examples = inferToolExamples(canonicalName);
-  const authorization = getToolAuthorizationDeclaration(entry.name);
-  const defaultVisibleScopes = inferDefaultVisibleScopes(canonicalName);
-
-  return {
-    name: entry.name,
-    description: entry.description,
-    examples,
-    canonicalName,
-    domains,
-    tags,
-    agentScopes: inferToolScopes(entry.name),
-    defaultVisibleScopes,
-    defaultVisibleToMainAgent: defaultVisibleScopes.some((scope) => scope === "chat" || scope === "direct"),
-    defaultVisibleToSubagent: defaultVisibleScopes.some((scope) =>
-      scope === "coding-planner" || scope === "coding-worker"
-    ),
-    supportsBackground:
-      entry.name === "exec_command"
-      || entry.name === "launch_agent"
-      || entry.name === "resume_agent",
-    mutatesState:
-      [
-        "routine_add",
-        "routine_update",
-        "routine_delete",
-        "set_alarm",
-        "set_timer",
-        "alarm_cancel",
-        "routine_done",
-        "routine_undo_done",
-        "routine_snooze",
-        "routine_skip",
-        "routine_pause",
-        "routine_resume",
-        "write_file",
-        "edit_file",
-        "mkdir",
-        "move_path",
-        "copy_path",
-        "delete_path",
-        "launch_agent",
-        "resume_agent",
-        "steer_agent",
-        "cancel_agent",
-        "profile_set_defaults",
-        "reload",
-        "new_chat",
-        "model",
-        "memory_import",
-        "memory_reindex",
-        "media_play",
-        "media_pause",
-        "media_stop",
-        "media_set_volume",
-        "openbrowser",
-        "secret_import_file",
-        "secret_generate_password",
-        "secret_delete",
-        "update",
-        "service_rollback",
-      ].includes(entry.name),
-    readsWorkspace:
-      [
-        "read_file",
-        "list_dir",
-        "glob",
-        "grep",
-        "stat_path",
-        "memory_search",
-        "project_list",
-        "project_get",
-        "web_search",
-        "media_list",
-        "media_list_speakers",
-        "media_status",
-        "secret_import_file",
-        "exec_command",
-        "exec_status",
-        "exec_output",
-        "update_preview",
-        "update",
-        "service_healthcheck",
-        "service_rollback",
-        "service_changelog_since_version",
-      ].includes(entry.name),
-    authorization,
-  };
-}
 
 function shellQuote(value: string) {
   return `'${value.replaceAll("'", "'\\''")}'`;
@@ -1016,6 +526,7 @@ export class ToolRegistry {
     this.functionRegistry = new FunctionRegistry(ALL_FUNCTION_BUILDERS);
     this.functionRegistry.build(toolBuildContext);
     registerAuthDeclarations(this.functionRegistry.generateAuthDeclarations());
+    initUntrustedOutputMap(this.functionRegistry.generateUntrustedOutputMap());
 
     // All tool definitions come from the unified function layer
     const fnResolveServices = () => toolBuildContext;
@@ -1073,7 +584,13 @@ export class ToolRegistry {
   }
 
   getToolCatalog(context?: ToolContext): ToolCatalogCard[] {
-    return this.getRawTools(context).map((entry) => buildToolCatalogCard(entry));
+    const fnCards = this.functionRegistry.generateCatalog();
+    const fnCardsByName = new Map(fnCards.map((card) => [card.name, card]));
+    return this.getRawTools(context).map((entry) => {
+      const fnCard = fnCardsByName.get(entry.name);
+      if (fnCard) return fnCard;
+      return buildDynamicToolCatalogCard(entry);
+    });
   }
 
   getToolJsonSchema(name: string): Record<string, unknown> | null {
@@ -1202,7 +719,7 @@ export class ToolRegistry {
   }
 
   getAgentDefaultVisibleToolNames(agentScope: AgentToolScope) {
-    return getRuntimeAgentDefaultVisibleToolNames(agentScope, this.runtimePlatform)
+    return getRuntimeAgentDefaultVisibleToolNames(agentScope, this.functionRegistry, this.runtimePlatform)
       .filter((name) => this.featureConfig.isActive("finance") || !name.startsWith("finance_"));
   }
 

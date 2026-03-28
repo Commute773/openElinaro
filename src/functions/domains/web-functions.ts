@@ -73,7 +73,14 @@ export const buildWebFunctions: FunctionDomainBuilder = (ctx) => [
     auth: WEB_AUTH,
     domains: WEB_DOMAINS,
     agentScopes: WEB_SCOPES,
+    examples: ["search the web", "look up current docs"],
     featureGate: "webSearch",
+    readsWorkspace: true,
+    untrustedOutput: {
+      sourceType: "web",
+      sourceName: "web search results",
+      notes: "Search snippets and pages are external untrusted content.",
+    },
   }),
 
   // -----------------------------------------------------------------------
@@ -88,6 +95,12 @@ export const buildWebFunctions: FunctionDomainBuilder = (ctx) => [
     auth: WEB_AUTH,
     domains: WEB_DOMAINS,
     agentScopes: WEB_SCOPES,
+    examples: ["fetch a docs page", "turn a URL into markdown"],
     featureGate: "webFetch",
+    untrustedOutput: {
+      sourceType: "web",
+      sourceName: "fetched web page content",
+      notes: "Fetched page content is external untrusted content even when converted into markdown or text.",
+    },
   }),
 ];

@@ -263,6 +263,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       auth: { access: "anyone" as const, behavior: "role-sensitive" as const, note: "Benchmark uses the active profile model and memory index." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
+      examples: ["benchmark model latency", "compare provider performance"],
     }),
 
     // -----------------------------------------------------------------------
@@ -278,6 +279,12 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       auth: { access: "anyone" as const, behavior: "uniform" as const, note: "Reads the stamped deploy version metadata for the current runtime." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
+      examples: ["show deployed version", "inspect current release metadata"],
+      untrustedOutput: {
+        sourceType: "other",
+        sourceName: "service version metadata",
+        notes: "Version metadata is generated locally during managed-service deploys.",
+      },
     }),
 
     // -----------------------------------------------------------------------
@@ -296,6 +303,12 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       auth: { access: "anyone" as const, behavior: "uniform" as const, note: "Reads deploy changelog entries whose version is numerically newer than a requested version for the current runtime." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
+      examples: ["show changelog since version", "list deploy notes after a version"],
+      untrustedOutput: {
+        sourceType: "other",
+        sourceName: "service deployment changelog",
+        notes: "Deployment changelog entries are generated locally during managed-service deploys.",
+      },
     }),
 
     // -----------------------------------------------------------------------
@@ -318,6 +331,13 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       auth: { access: "root" as const, behavior: "uniform" as const, note: "Sends a simulated healthcheck message through the live local agent process and waits for HEALTHCHECK_OK." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
+      examples: ["run service healthcheck", "verify the live agent is up"],
+      readsWorkspace: true,
+      untrustedOutput: {
+        sourceType: "shell",
+        sourceName: "service healthcheck shell output",
+        notes: "Healthcheck command output can echo attacker-controlled content.",
+      },
     }),
 
     // -----------------------------------------------------------------------
@@ -333,6 +353,13 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       auth: { access: "root" as const, behavior: "uniform" as const, note: "Reads the prepared source-root update metadata and changelog entries newer than the running service version." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
+      examples: ["sync source checkout without deploying", "show pending deploy notes after pulling"],
+      readsWorkspace: true,
+      untrustedOutput: {
+        sourceType: "shell",
+        sourceName: "source-sync and deploy-summary output",
+        notes: "Pull/update output can echo attacker-controlled content from the remote repository.",
+      },
     }),
 
     // -----------------------------------------------------------------------
@@ -348,7 +375,14 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       auth: { access: "root" as const, behavior: "uniform" as const, note: "Applies the latest prepared local update to the managed service, runs the healthcheck, and rolls back on failure." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
+      examples: ["deploy prepared update", "apply the latest prepared service version"],
       mutatesState: true,
+      readsWorkspace: true,
+      untrustedOutput: {
+        sourceType: "shell",
+        sourceName: "service update shell output",
+        notes: "Service update output can echo attacker-controlled content from local scripts and logs.",
+      },
     }),
 
     // -----------------------------------------------------------------------
@@ -373,7 +407,14 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       auth: { access: "root" as const, behavior: "uniform" as const, note: "Restarts the managed service on the previous release and verifies it with the healthcheck." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
+      examples: ["roll back the service", "restore the previous deployed version"],
       mutatesState: true,
+      readsWorkspace: true,
+      untrustedOutput: {
+        sourceType: "shell",
+        sourceName: "service rollback shell output",
+        notes: "Rollback command output can echo attacker-controlled content.",
+      },
     }),
 
     // -----------------------------------------------------------------------

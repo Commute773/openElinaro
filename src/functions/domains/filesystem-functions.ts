@@ -106,6 +106,8 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-planner", "coding-worker"],
+    examples: ["read package.json", "open src/index.ts"],
     readsWorkspace: true,
     untrustedOutput: {
       sourceType: "filesystem",
@@ -126,6 +128,8 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-worker"],
+    examples: ["create notes.md", "overwrite config file"],
     mutatesState: true,
   }),
 
@@ -141,6 +145,8 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-worker"],
+    examples: ["replace one string", "patch a small file"],
     mutatesState: true,
   }),
 
@@ -156,6 +162,8 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-worker"],
+    examples: ["apply a structured patch", "update multiple files with a patch"],
     mutatesState: true,
   }),
 
@@ -171,7 +179,14 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-planner", "coding-worker"],
+    examples: ["list src recursively", "show project files"],
     readsWorkspace: true,
+    untrustedOutput: {
+      sourceType: "filesystem",
+      sourceName: "workspace directory listing",
+      notes: "Filenames and directory names are untrusted input.",
+    },
   }),
 
   // -------------------------------------------------------------------------
@@ -185,7 +200,14 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-planner", "coding-worker"],
+    examples: ["find all *.test.ts", "match docs/**/*.md"],
     readsWorkspace: true,
+    untrustedOutput: {
+      sourceType: "filesystem",
+      sourceName: "workspace glob matches",
+      notes: "Matched paths are untrusted input.",
+    },
   }),
 
   // -------------------------------------------------------------------------
@@ -200,7 +222,14 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-planner", "coding-worker"],
+    examples: ["search for load_tool_library", "find TODO lines"],
     readsWorkspace: true,
+    untrustedOutput: {
+      sourceType: "filesystem",
+      sourceName: "workspace grep results",
+      notes: "Matched file contents are untrusted input.",
+    },
   }),
 
   // -------------------------------------------------------------------------
@@ -214,7 +243,14 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-planner", "coding-worker"],
+    examples: ["check file size", "inspect path metadata"],
     readsWorkspace: true,
+    untrustedOutput: {
+      sourceType: "filesystem",
+      sourceName: "workspace path metadata",
+      notes: "Path names are untrusted input.",
+    },
   }),
 
   // -------------------------------------------------------------------------
@@ -228,6 +264,8 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-worker"],
+    examples: ["create tmp/output", "make nested folders"],
     mutatesState: true,
   }),
 
@@ -242,6 +280,8 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-worker"],
+    examples: ["rename config file", "move a folder"],
     mutatesState: true,
   }),
 
@@ -256,6 +296,8 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-worker"],
+    examples: ["copy template file", "duplicate a directory"],
     mutatesState: true,
   }),
 
@@ -270,6 +312,8 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
+    defaultVisibleScopes: ["coding-worker"],
+    examples: ["remove temp file", "delete old artifacts"],
     mutatesState: true,
   }),
 ];

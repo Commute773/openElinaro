@@ -265,6 +265,7 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
     auth: CONFIG_AUTH_ANYONE,
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
+    examples: ["list models for the current provider", "set thinking high on the active model"],
     mutatesState: true,
   }),
 
@@ -300,6 +301,12 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { access: "root" as const, behavior: "uniform" as const, note: "Lists local secret-store metadata for the active root profile without revealing secret values." },
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
+    examples: ["list stored browser secrets", "show available secret field names"],
+    untrustedOutput: {
+      sourceType: "other",
+      sourceName: "local encrypted secret metadata",
+      notes: "This tool only returns secret names, field names, and timestamps. It never returns raw secret values.",
+    },
   }),
 
   // -----------------------------------------------------------------------
@@ -317,7 +324,14 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { access: "root" as const, behavior: "uniform" as const, note: "Imports a flat JSON secret payload from a local file into the local secret store." },
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
+    examples: ["import a prepaid card json file", "store browser payment details from disk"],
     mutatesState: true,
+    readsWorkspace: true,
+    untrustedOutput: {
+      sourceType: "filesystem",
+      sourceName: "local secret import file",
+      notes: "Secret import reads a local operator-provided JSON file and stores encrypted values without echoing them back.",
+    },
   }),
 
   // -----------------------------------------------------------------------
@@ -342,7 +356,13 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { access: "root" as const, behavior: "uniform" as const, note: "Generates a strong password server-side and stores it in the local secret store without returning the raw password." },
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
+    examples: ["generate a password for github_credentials", "rotate app_login.password"],
     mutatesState: true,
+    untrustedOutput: {
+      sourceType: "other",
+      sourceName: "local encrypted secret metadata",
+      notes: "Password generation happens server-side and only returns metadata about where the password was stored.",
+    },
   }),
 
   // -----------------------------------------------------------------------
@@ -359,7 +379,13 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { access: "root" as const, behavior: "uniform" as const, note: "Deletes one stored secret from the local secret store." },
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
+    examples: ["delete prepaid_card", "remove a stored secret"],
     mutatesState: true,
+    untrustedOutput: {
+      sourceType: "other",
+      sourceName: "local encrypted secret metadata",
+      notes: "Deletes one stored secret without returning secret values.",
+    },
   }),
 
   // -----------------------------------------------------------------------
@@ -438,6 +464,11 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
     mutatesState: true,
+    untrustedOutput: {
+      sourceType: "other",
+      sourceName: "local runtime config",
+      notes: "Reads and writes ~/.openelinaro/config.yaml, validates the result against the runtime schema, and may request a managed-service restart.",
+    },
   }),
 
   // -----------------------------------------------------------------------
@@ -498,5 +529,10 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
     mutatesState: true,
+    untrustedOutput: {
+      sourceType: "other",
+      sourceName: "local feature config",
+      notes: "Reads and writes feature blocks in ~/.openelinaro/config.yaml and may request a managed-service restart.",
+    },
   }),
 ];

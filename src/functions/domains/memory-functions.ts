@@ -83,6 +83,7 @@ export const buildMemoryFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEMORY_AUTH_ROLE_SENSITIVE, note: "Memory is written under the active profile namespace." },
     domains: MEMORY_DOMAINS,
     agentScopes: MEMORY_SCOPES,
+    examples: ["import notes folder", "load markdown into memory"],
     mutatesState: true,
   }),
 
@@ -98,6 +99,12 @@ export const buildMemoryFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEMORY_AUTH_ROLE_SENSITIVE, note: "Memory results are limited to the active profile namespace." },
     domains: MEMORY_DOMAINS,
     agentScopes: MEMORY_SCOPES,
+    examples: ["search saved notes", "find memory about auth"],
+    untrustedOutput: {
+      sourceType: "memory",
+      sourceName: "imported memory search results",
+      notes: "Imported memory documents can contain arbitrary text.",
+    },
   }),
 
   // -----------------------------------------------------------------------
@@ -112,6 +119,7 @@ export const buildMemoryFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEMORY_AUTH_ROLE_SENSITIVE, note: "Results are limited to the append-only conversation archive for the active profile." },
     domains: MEMORY_DOMAINS,
     agentScopes: MEMORY_SCOPES,
+    examples: ["search past chats", "find an old conversation excerpt"],
   }),
 
   // -----------------------------------------------------------------------
@@ -126,6 +134,12 @@ export const buildMemoryFunctions: FunctionDomainBuilder = (ctx) => [
     auth: MEMORY_AUTH_ROOT,
     domains: MEMORY_DOMAINS,
     agentScopes: MEMORY_SCOPES,
+    examples: ["search recent errors", "find stderr entries"],
+    untrustedOutput: {
+      sourceType: "logs",
+      sourceName: "application and system logs",
+      notes: "Logs may contain attacker-controlled text and stack traces.",
+    },
   }),
 
   // -----------------------------------------------------------------------
@@ -148,6 +162,7 @@ export const buildMemoryFunctions: FunctionDomainBuilder = (ctx) => [
     auth: { ...MEMORY_AUTH_ROLE_SENSITIVE, note: "Reindexing only sees memory visible to the active profile." },
     domains: MEMORY_DOMAINS,
     agentScopes: MEMORY_SCOPES,
+    examples: ["rebuild memory index", "refresh memory embeddings"],
     mutatesState: true,
   }),
 ];
