@@ -74,25 +74,6 @@ export function readJsonFile<T>(filePath: string): T | null {
   }
 }
 
-export function resolveSpeakerConfigPath(
-  defaultPath: string,
-  legacyPath: string,
-): string {
-  if (existsSync(defaultPath)) {
-    return defaultPath;
-  }
-  if (existsSync(legacyPath)) {
-    telemetry.event("media.legacy_speaker_config", {
-      legacyPath,
-      expectedPath: defaultPath,
-    }, {
-      level: "warn",
-      outcome: "ok",
-    });
-    return legacyPath;
-  }
-  return defaultPath;
-}
 
 export async function defaultRunCommand(params: {
   file: string;

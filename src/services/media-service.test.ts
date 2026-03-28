@@ -797,7 +797,7 @@ describe("MediaService", () => {
 
     const tempRoot = createTempRoot();
     try {
-      const repoThunder = path.resolve("media", "ambience", "thunder.mp3");
+      const repoThunder = path.join(os.homedir(), ".openelinaro", "media", "ambience", "thunder.mp3");
       if (!fs.existsSync(repoThunder)) {
         return;
       }
