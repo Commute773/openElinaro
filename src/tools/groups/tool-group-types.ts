@@ -1,7 +1,7 @@
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { FinanceService } from "../../services/finance-service";
 import type { HealthTrackingService } from "../../services/health-tracking-service";
-import type { RoutinesService } from "../../services/routines-service";
+import type { RoutinesService } from "../../services/scheduling/routines-service";
 import type { MemoryService } from "../../services/memory-service";
 import type { ModelService, ActiveExtendedContextStatus } from "../../services/models/model-service";
 import type { ProjectsService } from "../../services/projects-service";

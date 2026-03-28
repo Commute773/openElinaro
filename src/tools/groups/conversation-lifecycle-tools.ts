@@ -3,7 +3,7 @@ import type { BaseMessage } from "@langchain/core/messages";
 import { defineTool } from "../define-tool";
 import { z } from "zod";
 import type { ModelService, ActiveExtendedContextStatus, ContextWindowUsage, ModelProviderId, RecordedUsageDailyInspection, RecordedUsageInspection } from "../../services/models/model-service";
-import type { RoutinesService } from "../../services/routines-service";
+import type { RoutinesService } from "../../services/scheduling/routines-service";
 import type { ConversationStore } from "../../services/conversation-store";
 import type { ConversationStateTransitionService } from "../../services/conversation-state-transition-service";
 import type { SystemPromptService } from "../../services/system-prompt-service";

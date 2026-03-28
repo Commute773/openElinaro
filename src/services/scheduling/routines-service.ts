@@ -10,14 +10,14 @@ import type {
   RoutineState,
   RoutineStatus,
   RoutineStoreData,
-} from "../domain/routines";
-import { AuthorizationError, NotFoundError, ValidationError } from "../domain/errors";
-import { ProfileService } from "./profiles";
-import { ProjectsService } from "./projects-service";
+} from "../../domain/routines";
+import { AuthorizationError, NotFoundError, ValidationError } from "../../domain/errors";
+import { ProfileService } from "../profiles";
+import { ProjectsService } from "../projects-service";
 import { RoutinesStore } from "./routines-store";
-import { formatLocalTime } from "./local-time-service";
-import { telemetry } from "./infrastructure/telemetry";
-import { nowInTimezone, parseIso, toIso } from "../utils/time-helpers";
+import { formatLocalTime } from "../local-time-service";
+import { telemetry } from "../infrastructure/telemetry";
+import { nowInTimezone, parseIso, toIso } from "../../utils/time-helpers";
 import {
   trimHistory,
   defaultReminderPolicy,
@@ -41,7 +41,7 @@ import {
   sortAssessments,
   toHeartbeatReminderCandidate,
   formatSchedule,
-} from "./scheduling/routine-helpers";
+} from "./routine-helpers";
 
 
 export class RoutinesService {

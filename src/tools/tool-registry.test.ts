@@ -13,7 +13,7 @@ import { MemoryService } from "../services/memory-service";
 import { ModelService } from "../services/models/model-service";
 import { ProfileService } from "../services/profiles";
 import { ProjectsService } from "../services/projects-service";
-import { RoutinesService } from "../services/routines-service";
+import { RoutinesService } from "../services/scheduling/routines-service";
 import { SecretStoreService } from "../services/infrastructure/secret-store-service";
 import { ToolResultStore } from "../services/tool-result-store";
 import type { ElinaroTicket, ElinaroTicketsService } from "../services/elinaro-tickets-service";

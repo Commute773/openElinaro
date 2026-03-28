@@ -1,5 +1,5 @@
 import type { ProfileRecord } from "../domain/profiles";
-import type { RoutinesService } from "./routines-service";
+import type { RoutinesService } from "./scheduling/routines-service";
 import { ConversationStore } from "./conversation-store";
 import { MemoryService } from "./memory-service";
 import { ModelService } from "./models/model-service";
