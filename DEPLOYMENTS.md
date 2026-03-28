@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.28
+- Released at: 2026-03-28T16:41:38Z
+- Release id: 20260328T164138Z-f455e51
+- Previous version: 2026.03.28.27
+- Trigger: ci/release workflow
+
+- fix: guard countAnthropicTokens against empty messages array
+
 ## 2026.03.28.27
 - Released at: 2026-03-28T16:34:07Z
 - Release id: 20260328T163407Z-d67a48e
