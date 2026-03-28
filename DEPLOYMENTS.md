@@ -1,5 +1,15 @@
 # Deployments
 
+## 2026.03.28.15
+- Released at: 2026-03-28T02:14:00Z
+- Release id: 20260328T021400Z-363c964
+- Previous version: 2026.03.28.14
+- Trigger: ci/release workflow
+
+- refactor: split discord bot.ts into focused modules
+- refactor: split media-service.ts into focused modules under src/services/media/
+- refactor: extract session-manager and vonage-bridge from gemini-live index
+
 ## 2026.03.28.14
 - Released at: 2026-03-28T01:52:56Z
 - Release id: 20260328T015256Z-97708e9
