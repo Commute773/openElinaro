@@ -1,9 +1,12 @@
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
-import { generateText } from "ai";
-import type { ProviderConnector } from "../../connectors/provider-connector";
+import { complete } from "@mariozechner/pi-ai";
+import type { AssistantMessage } from "../../messages/types";
+import {
+  assistantTextMessage,
+  extractAssistantText,
+  userMessage,
+} from "../../messages/types";
 import { ConversationCompactionService } from "./conversation-compaction-service";
 import { type ConversationState, ConversationStore } from "./conversation-store";
-import { toModelMessages } from "../ai-sdk-message-service";
 import { MemoryService } from "../memory-service";
 import { ModelService } from "../models/model-service";
 import {
@@ -11,7 +14,6 @@ import {
   SystemPromptService,
   type SystemPromptSnapshot,
 } from "../system-prompt-service";
-import { extractTextFromMessage } from "../message-content-service";
 import { telemetry } from "../infrastructure/telemetry";
 
 type ProgressReporter = (message: string) => Promise<void>;
@@ -25,7 +27,7 @@ export interface ConversationContinuationResult {
 export interface FreshConversationResult {
   conversation: ConversationState;
   openingLine: string;
-  openingMessage: AIMessage;
+  openingMessage: AssistantMessage;
   memoryFilePath: string | null;
   memoryFlushSkipped: boolean;
   systemPrompt: SystemPromptSnapshot;
@@ -35,13 +37,12 @@ export class ConversationStateTransitionService {
   private readonly compaction: ConversationCompactionService;
 
   constructor(
-    private readonly connector: ProviderConnector,
+    private readonly models: ModelService,
     private readonly conversations: ConversationStore,
     memory: MemoryService,
-    models: Pick<ModelService, "generateMemoryText">,
     private readonly systemPrompts: SystemPromptService,
   ) {
-    this.compaction = new ConversationCompactionService(this.connector, memory, models);
+    this.compaction = new ConversationCompactionService(this.models, memory);
   }
 
   async compactForContinuation(params: {
@@ -115,8 +116,8 @@ export class ConversationStateTransitionService {
       params.conversationKey,
       activeSnapshot,
     );
-    const openingLine = this.extractAssistantText(openingMessage)
-      || this.fallbackConversationOpening();
+    const openingLine = extractAssistantText(openingMessage).trim()
+      || this.fallbackConversationOpeningText();
     const savedConversation = await this.saveConversationState(
       params.conversationKey,
       conversation.messages.length,
@@ -145,44 +146,29 @@ export class ConversationStateTransitionService {
     });
   }
 
-  private extractAssistantText(message: AIMessage) {
-    return extractTextFromMessage(message).trim();
+  private fallbackConversationOpeningText(): string {
+    return "What do you want to work on next?";
   }
 
-  private fallbackConversationOpening() {
-    return "What do you want to work on next?";
+  private fallbackConversationOpening(): AssistantMessage {
+    return assistantTextMessage("What do you want to work on next?");
   }
 
   private async buildConversationOpening(
     conversationKey: string,
     snapshot: SystemPromptSnapshot,
-  ) {
+  ): Promise<AssistantMessage> {
     try {
-      const response = await generateText({
-        model: this.connector,
-        system: composeSystemPrompt(
-          snapshot.text,
-        ).text,
-        messages: toModelMessages([
-          new HumanMessage(
-            [
-              "A fresh conversation was just created.",
-              "Reply with exactly one short opening line.",
-              "Invite the user to continue.",
-              "Do not mention resets, memory, compaction, system prompts, or tools.",
-            ].join(" "),
+      const resolved = await this.models.resolveModelForPurpose("conversation_opening");
+      const response = await complete(resolved.runtimeModel, {
+        systemPrompt: composeSystemPrompt(snapshot.text).text,
+        messages: [
+          userMessage(
+            "A fresh conversation was just created. Reply with exactly one short opening line. Invite the user to continue. Do not mention resets, memory, compaction, system prompts, or tools.",
           ),
-        ]),
-        providerOptions: {
-          openelinaro: {
-            sessionId: `${conversationKey}:new:${Date.now()}`,
-            conversationKey,
-            usagePurpose: "conversation_opening",
-          },
-        },
-      });
-      const text = response.text.trim() || this.fallbackConversationOpening();
-      return new AIMessage(text);
+        ],
+      }, { apiKey: resolved.apiKey });
+      return response;
     } catch (error) {
       telemetry.event("conversation.transition.opening_generation_failed", {
         conversationKey,
@@ -191,7 +177,7 @@ export class ConversationStateTransitionService {
         level: "warn",
         outcome: "error",
       });
-      return new AIMessage(this.fallbackConversationOpening());
+      return this.fallbackConversationOpening();
     }
   }
 }

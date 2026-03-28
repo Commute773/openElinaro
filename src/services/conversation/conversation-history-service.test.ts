@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ConversationHistoryService } from "./conversation-history-service";
+import { userMessage, assistantTextMessage } from "../../messages/types";
+import type { Message } from "../../messages/types";
 
 let tempRoot = "";
 let previousRootDirEnv: string | undefined;
@@ -45,7 +46,7 @@ describe("ConversationHistoryService", () => {
       const service = makeService();
       service.recordAppendedMessages({
         conversationKey: "conv-1",
-        messages: [new HumanMessage("hello"), new AIMessage("hi there")],
+        messages: [userMessage("hello"), assistantTextMessage("hi there")],
         startingIndex: 0,
         occurredAt: "2025-01-01T00:00:00Z",
       });
@@ -85,9 +86,8 @@ describe("ConversationHistoryService", () => {
       service.recordAppendedMessages({
         conversationKey: "conv-1",
         messages: [
-          new HumanMessage("from user"),
-          new AIMessage("from assistant"),
-          new SystemMessage("from system"),
+          userMessage("from user"),
+          assistantTextMessage("from assistant"),
         ],
         startingIndex: 0,
         occurredAt: "2025-01-01T00:00:00Z",
@@ -97,14 +97,13 @@ describe("ConversationHistoryService", () => {
 
       expect(JSON.parse(lines[0]!).role).toBe("user");
       expect(JSON.parse(lines[1]!).role).toBe("assistant");
-      expect(JSON.parse(lines[2]!).role).toBe("system");
     });
 
     test("uses startingIndex offset for messageIndex", () => {
       const service = makeService();
       service.recordAppendedMessages({
         conversationKey: "conv-1",
-        messages: [new HumanMessage("msg")],
+        messages: [userMessage("msg")],
         startingIndex: 5,
         occurredAt: "2025-01-01T00:00:00Z",
       });
@@ -171,8 +170,8 @@ describe("ConversationHistoryService", () => {
       service.recordAppendedMessages({
         conversationKey: "conv-1",
         messages: [
-          new HumanMessage("Tell me about graph databases"),
-          new AIMessage("Graph databases store nodes and edges"),
+          userMessage("Tell me about graph databases"),
+          assistantTextMessage("Graph databases store nodes and edges"),
         ],
         startingIndex: 0,
         occurredAt: "2025-01-01T00:00:00Z",
@@ -188,7 +187,7 @@ describe("ConversationHistoryService", () => {
       for (let i = 0; i < 10; i++) {
         service.recordAppendedMessages({
           conversationKey: `conv-${i}`,
-          messages: [new HumanMessage(`Message about topic alpha ${i}`)],
+          messages: [userMessage(`Message about topic alpha ${i}`)],
           startingIndex: 0,
           occurredAt: `2025-01-${String(i + 1).padStart(2, "0")}T00:00:00Z`,
         });
@@ -211,13 +210,13 @@ describe("ConversationHistoryService", () => {
       const service = makeService();
       service.recordAppendedMessages({
         conversationKey: "conv-1",
-        messages: [new HumanMessage("first message")],
+        messages: [userMessage("first message")],
         startingIndex: 0,
         occurredAt: "2025-01-01T00:00:00Z",
       });
       service.recordAppendedMessages({
         conversationKey: "conv-2",
-        messages: [new HumanMessage("second message")],
+        messages: [userMessage("second message")],
         startingIndex: 0,
         occurredAt: "2025-01-02T00:00:00Z",
       });
@@ -232,13 +231,13 @@ describe("ConversationHistoryService", () => {
       const service = makeService();
       service.recordAppendedMessages({
         conversationKey: "conv-1",
-        messages: [new HumanMessage("in conv 1")],
+        messages: [userMessage("in conv 1")],
         startingIndex: 0,
         occurredAt: "2025-01-01T00:00:00Z",
       });
       service.recordAppendedMessages({
         conversationKey: "conv-2",
-        messages: [new HumanMessage("in conv 2")],
+        messages: [userMessage("in conv 2")],
         startingIndex: 0,
         occurredAt: "2025-01-02T00:00:00Z",
       });
@@ -252,13 +251,13 @@ describe("ConversationHistoryService", () => {
       const service = makeService();
       service.recordAppendedMessages({
         conversationKey: "conv-1",
-        messages: [new HumanMessage("old message")],
+        messages: [userMessage("old message")],
         startingIndex: 0,
         occurredAt: "2025-01-01T00:00:00Z",
       });
       service.recordAppendedMessages({
         conversationKey: "conv-2",
-        messages: [new HumanMessage("new message")],
+        messages: [userMessage("new message")],
         startingIndex: 0,
         occurredAt: "2025-06-01T00:00:00Z",
       });
@@ -273,7 +272,7 @@ describe("ConversationHistoryService", () => {
       for (let i = 0; i < 5; i++) {
         service.recordAppendedMessages({
           conversationKey: `conv-${i}`,
-          messages: [new HumanMessage(`message ${i}`)],
+          messages: [userMessage(`message ${i}`)],
           startingIndex: 0,
           occurredAt: `2025-01-${String(i + 1).padStart(2, "0")}T00:00:00Z`,
         });
@@ -287,13 +286,13 @@ describe("ConversationHistoryService", () => {
       const service = makeService();
       service.recordAppendedMessages({
         conversationKey: "conv-1",
-        messages: [new HumanMessage("   ")],
+        messages: [userMessage("   ")],
         startingIndex: 0,
         occurredAt: "2025-01-01T00:00:00Z",
       });
       service.recordAppendedMessages({
         conversationKey: "conv-2",
-        messages: [new HumanMessage("visible")],
+        messages: [userMessage("visible")],
         startingIndex: 0,
         occurredAt: "2025-01-02T00:00:00Z",
       });
@@ -311,13 +310,13 @@ describe("ConversationHistoryService", () => {
 
       serviceA.recordAppendedMessages({
         conversationKey: "conv-1",
-        messages: [new HumanMessage("from profile A")],
+        messages: [userMessage("from profile A")],
         startingIndex: 0,
         occurredAt: "2025-01-01T00:00:00Z",
       });
       serviceB.recordAppendedMessages({
         conversationKey: "conv-2",
-        messages: [new HumanMessage("from profile B")],
+        messages: [userMessage("from profile B")],
         startingIndex: 0,
         occurredAt: "2025-01-01T00:00:00Z",
       });

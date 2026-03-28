@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
 import type { AppProgressEvent, AppProgressUpdate } from "../domain/assistant";
 import { buildToolErrorEnvelope } from "../services/tool-error-service";
@@ -277,12 +276,6 @@ export function buildOpenBrowserProgressUpdates(result: unknown): AppProgressUpd
   });
 }
 
-export function getToolInputSchema(entry: StructuredToolInterface) {
-  return entry.schema instanceof z.ZodObject
-    ? entry.schema.safeExtend(TOOL_CALL_BEHAVIOR_SCHEMA.shape)
-    : entry.schema;
-}
-
 export function normalizeToolFailure(name: string, error: unknown) {
   if (error instanceof MissingSecretStoreKeyError) {
     const message = error instanceof Error ? error.message : String(error);
@@ -424,62 +417,3 @@ export async function reportProgress(context: ToolContext | undefined, summary: 
   }
 }
 
-export function wrapToolWithDefaultCwd(
-  entry: StructuredToolInterface,
-  defaultCwd: string | undefined,
-): StructuredToolInterface {
-  if (!defaultCwd) {
-    return entry;
-  }
-
-  return tool(
-    async (input) => {
-      if (!input || typeof input !== "object" || Array.isArray(input)) {
-        try {
-          return await (entry as { invoke: (arg: unknown) => Promise<unknown> }).invoke(input);
-        } catch (error) {
-          return normalizeToolFailure(entry.name, error);
-        }
-      }
-      const nextInput = "cwd" in input && (input as { cwd?: string }).cwd
-        ? input
-        : { ...(input as Record<string, unknown>), cwd: defaultCwd };
-      try {
-        return await (entry as { invoke: (arg: unknown) => Promise<unknown> }).invoke(nextInput);
-      } catch (error) {
-        return normalizeToolFailure(entry.name, error);
-      }
-    },
-    {
-      name: entry.name,
-      description: entry.description,
-      schema: getToolInputSchema(entry),
-    },
-  );
-}
-
-export function wrapToolOutput(
-  entry: StructuredToolInterface,
-  toolResults: ToolResultStore,
-  injectToolContext: (name: string, input: unknown, context?: ToolContext) => unknown,
-  context?: ToolContext,
-): StructuredToolInterface {
-  return tool(
-    async (input) => {
-      const nextInput = injectToolContext(entry.name, input, context);
-      try {
-        const result = await (entry as { invoke: (arg: unknown) => Promise<unknown> }).invoke(
-          stripToolControlInput(nextInput),
-        );
-        return await finalizeToolResult(result, entry.name, input, toolResults);
-      } catch (error) {
-        return await normalizeToolResult(normalizeToolFailure(entry.name, error));
-      }
-    },
-    {
-      name: entry.name,
-      description: entry.description,
-      schema: getToolInputSchema(entry),
-    },
-  );
-}

@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { assistantTextMessage, isAssistantMessage, userMessage } from "../messages/types";
 import { AccessControlService } from "../services/profiles";
 import { ConversationHistoryService } from "../services/conversation/conversation-history-service";
 import { ConversationStateTransitionService } from "../services/conversation/conversation-state-transition-service";
@@ -21,7 +21,6 @@ import type { ShellService } from "../services/infrastructure/shell-service";
 import { SystemPromptService } from "../services/system-prompt-service";
 import { ToolResolutionService } from "../services/tool-resolution-service";
 import { resolveRuntimePlatform, type RuntimePlatform } from "../services/infrastructure/runtime-platform";
-import { ScriptedProviderConnector } from "../test/scripted-provider-connector";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
 import { getRuntimeConfig } from "../config/runtime-config";
 import {
@@ -335,10 +334,9 @@ function createHarnessWithOptions(options?: {
   const memory = new MemoryService(profile, profiles);
   const models = options?.models ?? new ModelService(profile);
   const transitions = new ConversationStateTransitionService(
-    new ScriptedProviderConnector(() => new AIMessage(""), { providerId: "stub" }),
+    models,
     conversations,
     memory,
-    models,
     systemPrompts,
   );
   const tickets = options?.tickets ?? {
@@ -712,7 +710,7 @@ describe("ToolRegistry tool catalog", () => {
     await harness.conversations.rollbackAndAppend(
       conversationKey,
       (await harness.conversations.get(conversationKey)).messages.length,
-      [new HumanMessage("hello before reset")],
+      [userMessage("hello before reset")],
     );
 
     const result = await harness.registry.invoke("new_chat", { conversationKey, force: true });
@@ -721,7 +719,7 @@ describe("ToolRegistry tool catalog", () => {
     expect(result).toContain(`Started a new conversation for ${conversationKey}.`);
     expect(result).toContain("Durable memory flush was intentionally skipped.");
     expect(storedConversation.messages).toHaveLength(1);
-    expect(storedConversation.messages[0]).toBeInstanceOf(AIMessage);
+    expect(isAssistantMessage(storedConversation.messages[0]!)).toBe(true);
   });
 
   test("conversation_search queries the append-only conversation archive", async () => {
@@ -737,8 +735,8 @@ describe("ToolRegistry tool catalog", () => {
           }),
       }),
     });
-    await conversations.appendMessages("thread-1", [new HumanMessage("cache graph regression")]);
-    await conversations.appendMessages("thread-2", [new HumanMessage("older note about graph memory")]);
+    await conversations.appendMessages("thread-1", [userMessage("cache graph regression")]);
+    await conversations.appendMessages("thread-2", [userMessage("older note about graph memory")]);
 
     const harness = createHarnessWithOptions({ conversations });
     const result = await harness.registry.invoke("conversation_search", {
@@ -1888,7 +1886,7 @@ describe("ToolRegistry tool catalog", () => {
 
   test("supports brief, verbose, and full context usage modes", async () => {
     const conversations = new ConversationStore();
-    await conversations.appendMessages("chat-1", [new HumanMessage("How full is this conversation?")]);
+    await conversations.appendMessages("chat-1", [userMessage("How full is this conversation?")]);
     const models = {
       async inspectContextWindowUsage() {
         return {
@@ -1996,7 +1994,7 @@ describe("ToolRegistry tool catalog", () => {
 
   test("reports conversation and local-day usage costs", async () => {
     const conversations = new ConversationStore();
-    await conversations.appendMessages("chat-1", [new HumanMessage("How much has this thread cost today?")]);
+    await conversations.appendMessages("chat-1", [userMessage("How much has this thread cost today?")]);
     const models = {
       getActiveModel() {
         return {

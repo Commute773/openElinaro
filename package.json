@@ -44,13 +44,10 @@
     "vite": "^8.0.0"
   },
   "dependencies": {
-    "@ai-sdk/provider": "^3.0.8",
     "@google/genai": "1.44.0",
-    "@langchain/core": "^1.1.32",
     "@mariozechner/pi-ai": "0.58.1",
     "@mariozechner/pi-coding-agent": "^0.63.1",
     "@xenova/transformers": "^2.17.2",
-    "ai": "^6.0.116",
     "discord.js": "^14.25.1",
     "imapflow": "^1.2.16",
     "nodemailer": "^8.0.3",

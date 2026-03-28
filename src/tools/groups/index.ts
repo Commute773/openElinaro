@@ -1,4 +1,3 @@
-export type { SubagentController, SubagentToolBuildContext } from "./subagent-tools";
-export type { ConversationLifecycleToolBuildContext } from "./conversation-lifecycle-tools";
+export type { SubagentController } from "../../app/runtime-subagent";
 export type { ToolBuildContext, ShellRuntime, FilesystemRuntime, TicketsRuntime } from "./tool-group-types";
 export { formatDurationMs, renderShellExecResult, formatTokenCount, renderExtendedContextStatus } from "./tool-group-types";

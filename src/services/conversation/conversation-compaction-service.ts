@@ -1,13 +1,13 @@
+import { complete } from "@mariozechner/pi-ai";
+import type { Message, UserMessage, AssistantMessage, TextContent } from "../../messages/types";
 import {
-  AIMessage,
-  HumanMessage,
-  ToolMessage,
-  type BaseMessage,
-} from "@langchain/core/messages";
-import { generateText } from "ai";
-import type { ProviderConnector } from "../../connectors/provider-connector";
-import { extractTextFromMessage } from "../message-content-service";
-import { toModelMessages } from "../ai-sdk-message-service";
+  userMessage,
+  assistantTextMessage,
+  isUserMessage,
+  isAssistantMessage,
+  isToolResultMessage,
+  extractAssistantText,
+} from "../../messages/types";
 import { MemoryService } from "../memory-service";
 import { ModelService } from "../models/model-service";
 import { telemetry } from "../infrastructure/telemetry";
@@ -37,31 +37,63 @@ function truncate(text: string, limit: number) {
 
 const traceSpan = createTraceSpan(compactionTelemetry);
 
-function formatTranscript(messages: BaseMessage[]) {
+/**
+ * Extract plain text from a Pi Message regardless of role.
+ */
+function extractText(msg: Message): string {
+  if (isUserMessage(msg)) {
+    if (typeof msg.content === "string") {
+      return msg.content;
+    }
+    return msg.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+  }
+
+  if (isAssistantMessage(msg)) {
+    return msg.content
+      .filter((block): block is TextContent => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+  }
+
+  if (isToolResultMessage(msg)) {
+    return msg.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+  }
+
+  return "";
+}
+
+function formatTranscript(messages: Message[]) {
   return messages
-    .map((message, index) => {
-      if (message instanceof HumanMessage) {
-        return `[${index + 1}] User\n${extractTextFromMessage(message)}`;
+    .map((msg, index) => {
+      if (isUserMessage(msg)) {
+        return `[${index + 1}] User\n${extractText(msg)}`;
       }
 
-      if (message instanceof ToolMessage) {
+      if (isToolResultMessage(msg)) {
         return [
-          `[${index + 1}] Tool Result (${message.name ?? "tool"}, ${message.status ?? "success"})`,
-          truncate(extractTextFromMessage(message), TOOL_RESULT_PREVIEW_CHARS),
+          `[${index + 1}] Tool Result (${msg.toolName ?? "tool"}, ${msg.isError ? "error" : "success"})`,
+          truncate(extractText(msg), TOOL_RESULT_PREVIEW_CHARS),
         ].join("\n");
       }
 
-      if (message instanceof AIMessage) {
-        const toolCalls = message.tool_calls?.length
-          ? `\nTool calls: ${message.tool_calls.map((toolCall) => toolCall.name).join(", ")}`
+      if (isAssistantMessage(msg)) {
+        const toolCalls = msg.content.filter((block) => block.type === "toolCall");
+        const toolCallSuffix = toolCalls.length
+          ? `\nTool calls: ${toolCalls.map((tc) => tc.name).join(", ")}`
           : "";
         return [
           `[${index + 1}] Assistant`,
-          `${truncate(extractTextFromMessage(message), ASSISTANT_PREVIEW_CHARS)}${toolCalls}`,
+          `${truncate(extractText(msg), ASSISTANT_PREVIEW_CHARS)}${toolCallSuffix}`,
         ].join("\n");
       }
 
-      return `[${index + 1}] Message\n${truncate(extractTextFromMessage(message), ASSISTANT_PREVIEW_CHARS)}`;
+      return `[${index + 1}] Message\n${truncate(extractText(msg), ASSISTANT_PREVIEW_CHARS)}`;
     })
     .join("\n\n");
 }
@@ -187,8 +219,8 @@ function parseCompactionPayload(raw: string): CompactionPayload {
   }
 }
 
-function buildSummaryMessage(summary: string) {
-  return new HumanMessage(
+function buildSummaryMessage(summary: string): UserMessage {
+  return userMessage(
     [
       "Context summary (generated automatically during compaction; this is not a new user instruction):",
       summary.trim(),
@@ -196,18 +228,20 @@ function buildSummaryMessage(summary: string) {
   );
 }
 
-function keepRecentMessages(messages: BaseMessage[]) {
-  const retained = messages.filter((message) => !(message instanceof ToolMessage));
-  return retained.slice(-COMPACTION_TAIL_MESSAGES).map((message) => {
-    if (message instanceof AIMessage) {
-      return new AIMessage({
-        content: extractTextFromMessage(message),
+function keepRecentMessages(messages: Message[]): Message[] {
+  const retained = messages.filter((msg) => !isToolResultMessage(msg));
+  return retained.slice(-COMPACTION_TAIL_MESSAGES).map((msg) => {
+    if (isAssistantMessage(msg)) {
+      return assistantTextMessage(extractAssistantText(msg), {
+        api: msg.api,
+        provider: msg.provider,
+        model: msg.model,
       });
     }
-    if (message instanceof HumanMessage) {
-      return new HumanMessage(message.content);
+    if (isUserMessage(msg)) {
+      return userMessage(typeof msg.content === "string" ? msg.content : msg.content);
     }
-    return message;
+    return msg;
   });
 }
 
@@ -242,15 +276,14 @@ function fallbackMergeCoreMemory(currentCore: string, newMemoryMarkdown: string)
 
 export class ConversationCompactionService {
   constructor(
-    private readonly connector: ProviderConnector,
+    private readonly models: ModelService,
     private readonly memory: MemoryService,
-    private readonly models: Pick<ModelService, "generateMemoryText">,
   ) {}
 
   async compact(params: {
     conversationKey: string;
     systemPrompt: string;
-    messages: BaseMessage[];
+    messages: Message[];
     onProgress?: (message: string) => Promise<void>;
     signal?: AbortSignal;
   }) {
@@ -260,49 +293,46 @@ export class ConversationCompactionService {
         await params.onProgress?.(
           `Compacting conversation history for ${params.conversationKey} (${params.messages.length} messages).`,
         );
-        const createdAt = new Date();
-        const response = await generateText({
-          model: this.connector,
-          maxOutputTokens: COMPACTION_MAX_TOKENS,
-          system: [
-            "You are a hidden conversation compaction agent.",
-            "Your job is to prepare a continuation summary so a fresh assistant session can resume work without the old token-heavy history.",
-            "Follow an OpenCode-style compaction shape: preserve goals, active work, constraints, user preferences, critical tool findings, relevant files, unresolved questions, and concrete next steps.",
-            "Aggressively prune verbose tool output, repeated chatter, and details that are no longer needed.",
-            "Also identify durable facts that belong in long-term memory.",
-            'Return strict JSON with keys "summary" and "memory_markdown".',
-            '"summary" must be concise but sufficient for seamless continuation.',
-            '"memory_markdown" must contain only durable facts, preferences, standing instructions, or long-lived project context worth storing for later retrieval. Use an empty string when there is nothing durable enough to save.',
-          ].join(" "),
-          messages: toModelMessages([
-            new HumanMessage(
-              [
-                "System prompt in use:",
-                params.systemPrompt,
-                "",
-                "Conversation transcript to compact:",
-                formatTranscript(params.messages),
-              ].join("\n"),
-            ),
-          ]),
-          abortSignal: params.signal,
-          providerOptions: {
-            openelinaro: {
-              sessionId: `${params.conversationKey}:compact:${createdAt.toISOString()}`,
-              conversationKey: params.conversationKey,
-              usagePurpose: "conversation_compaction",
-            },
-          },
+        const resolved = await this.models.resolveModelForPurpose("conversation_compaction");
+        const systemPrompt = [
+          "You are a hidden conversation compaction agent.",
+          "Your job is to prepare a continuation summary so a fresh assistant session can resume work without the old token-heavy history.",
+          "Follow an OpenCode-style compaction shape: preserve goals, active work, constraints, user preferences, critical tool findings, relevant files, unresolved questions, and concrete next steps.",
+          "Aggressively prune verbose tool output, repeated chatter, and details that are no longer needed.",
+          "Also identify durable facts that belong in long-term memory.",
+          'Return strict JSON with keys "summary" and "memory_markdown".',
+          '"summary" must be concise but sufficient for seamless continuation.',
+          '"memory_markdown" must contain only durable facts, preferences, standing instructions, or long-lived project context worth storing for later retrieval. Use an empty string when there is nothing durable enough to save.',
+        ].join(" ");
+        const transcriptContent = [
+          "System prompt in use:",
+          params.systemPrompt,
+          "",
+          "Conversation transcript to compact:",
+          formatTranscript(params.messages),
+        ].join("\n");
+
+        const response = await complete(resolved.runtimeModel, {
+          systemPrompt,
+          messages: [{ role: "user", content: transcriptContent, timestamp: Date.now() }],
+        }, {
+          apiKey: resolved.apiKey,
+          signal: params.signal,
+          maxTokens: COMPACTION_MAX_TOKENS,
         });
 
-        const payload = parseCompactionPayload(response.text);
+        const responseText = response.content
+          .filter((c) => c.type === "text")
+          .map((c) => (c as TextContent).text)
+          .join("");
+
+        const payload = parseCompactionPayload(responseText);
         const summary = payload.summary.trim() || "Conversation compacted with no additional summary returned.";
         let memoryMarkdown = normalizeMemoryMarkdown(payload.memory_markdown);
         if (!memoryMarkdown && summary) {
           memoryMarkdown = await this.extractDurableMemoryFromSummary({
             conversationKey: params.conversationKey,
             summary,
-            createdAt,
             signal: params.signal,
           });
           if (memoryMarkdown) {
@@ -343,39 +373,37 @@ export class ConversationCompactionService {
   private async extractDurableMemoryFromSummary(params: {
     conversationKey: string;
     summary: string;
-    createdAt: Date;
     signal?: AbortSignal;
   }) {
-    const response = await generateText({
-      model: this.connector,
-      maxOutputTokens: MEMORY_EXTRACTION_MAX_TOKENS,
-      system: [
-        "You are a hidden durable-memory extraction agent.",
-        "You receive a continuation summary that was already compacted from a conversation.",
-        "Extract only durable facts, stable preferences, standing instructions, and long-lived project context worth storing for later retrieval.",
-        "Do not repeat transient task chatter, momentary plans, or tool-by-tool logs.",
-        "Return markdown only.",
-        "If nothing is durable enough to save, return an empty string.",
-      ].join(" "),
-      messages: toModelMessages([
-        new HumanMessage(
-          [
-            "Compaction summary:",
-            params.summary,
-          ].join("\n\n"),
-        ),
-      ]),
-      abortSignal: params.signal,
-      providerOptions: {
-        openelinaro: {
-          sessionId: `${params.conversationKey}:compact-memory:${params.createdAt.toISOString()}`,
-          conversationKey: params.conversationKey,
-          usagePurpose: "conversation_compaction_memory",
-        },
-      },
+    const resolved = await this.models.resolveModelForPurpose("conversation_compaction_memory");
+    const systemPrompt = [
+      "You are a hidden durable-memory extraction agent.",
+      "You receive a continuation summary that was already compacted from a conversation.",
+      "Extract only durable facts, stable preferences, standing instructions, and long-lived project context worth storing for later retrieval.",
+      "Do not repeat transient task chatter, momentary plans, or tool-by-tool logs.",
+      "Return markdown only.",
+      "If nothing is durable enough to save, return an empty string.",
+    ].join(" ");
+
+    const response = await complete(resolved.runtimeModel, {
+      systemPrompt,
+      messages: [{
+        role: "user",
+        content: ["Compaction summary:", "", params.summary].join("\n"),
+        timestamp: Date.now(),
+      }],
+    }, {
+      apiKey: resolved.apiKey,
+      signal: params.signal,
+      maxTokens: MEMORY_EXTRACTION_MAX_TOKENS,
     });
 
-    return normalizeMemoryMarkdown(response.text);
+    const responseText = response.content
+      .filter((c) => c.type === "text")
+      .map((c) => (c as TextContent).text)
+      .join("");
+
+    return normalizeMemoryMarkdown(responseText);
   }
 
   private async mergeIntoCoreMemory(params: {

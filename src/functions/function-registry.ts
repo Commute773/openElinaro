@@ -1,20 +1,19 @@
 /**
  * Central registry for all function definitions. Generates all three surfaces:
- * - Agent tools (StructuredToolInterface[])
+ * - Agent tools (pi-ai Tool[] + handler map)
  * - HTTP API routes (RouteDefinition[])
  * - Discord commands (DiscordCommandDescriptor[])
  * - OpenAPI spec
  * - Auth declarations (for compile-time coverage assertion)
  * - Tool catalog cards (for catalog metadata)
  */
-import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { FunctionDefinition, FunctionDomainBuilder } from "./define-function";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
 import type { RouteDefinition } from "../integrations/http/g2/router";
 import type { ToolAuthorizationDeclaration, ToolCatalogCard, AgentToolScope } from "../domain/tool-catalog";
 import type { FeatureId } from "../services/feature-config-service";
-import { generateAgentTools, type FunctionContextExtras } from "./generate-tools";
+import { generateAgentTools, type FunctionContextExtras, type PiToolEntry } from "./generate-tools";
 import { generateApiRoutes } from "./generate-api-routes";
 import { generateDiscordCommands, type DiscordCommandDescriptor } from "./generate-discord-commands";
 import { generateOpenApiSpec } from "./generate-openapi";
@@ -81,13 +80,13 @@ export class FunctionRegistry {
   // Surface generators
   // -------------------------------------------------------------------------
 
-  /** Generate StructuredToolInterface[] for the agent tool surface. */
+  /** Generate pi-ai Tool entries (schema + handler) for the agent tool surface. */
   generateAgentTools(
     resolveServices: () => ToolBuildContext,
     resolveToolContext?: () => ToolContext | undefined,
     featureChecker?: (featureId: FeatureId) => boolean,
     resolveExtras?: () => FunctionContextExtras,
-  ): StructuredToolInterface[] {
+  ): PiToolEntry[] {
     return generateAgentTools(
       [...this.definitions.values()],
       resolveServices,

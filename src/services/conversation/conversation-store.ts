@@ -1,14 +1,6 @@
 import { mkdir, chmod } from "node:fs/promises";
 import path from "node:path";
-import {
-  AIMessage,
-  HumanMessage,
-  ToolMessage,
-  mapChatMessagesToStoredMessages,
-  mapStoredMessagesToChatMessages,
-  type BaseMessage,
-  type StoredMessage,
-} from "@langchain/core/messages";
+import type { Message } from "../../messages/types";
 import { ConversationHistoryService } from "./conversation-history-service";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../runtime-root";
 import type { SystemPromptSnapshot } from "../system-prompt-service";
@@ -17,7 +9,7 @@ import { timestamp } from "../../utils/timestamp";
 
 export interface ConversationState {
   key: string;
-  messages: BaseMessage[];
+  messages: Message[];
   updatedAt: string;
   systemPrompt?: SystemPromptSnapshot;
 }
@@ -28,7 +20,7 @@ type ConversationStoreOptions = {
 
 type StoredConversationState = {
   key: string;
-  messages: StoredMessage[] | LegacyMessage[];
+  messages: Message[];
   updatedAt: string;
   systemPrompt?: SystemPromptSnapshot;
 };
@@ -36,38 +28,6 @@ type StoredConversationState = {
 type ConversationStoreShape = {
   conversations: Record<string, StoredConversationState>;
 };
-
-type LegacyTextBlock = {
-  type: "text";
-  text: string;
-};
-
-type LegacyToolCallBlock = {
-  type: "toolCall";
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
-};
-
-type LegacyMessage =
-  | {
-      role: "user";
-      content: string | LegacyTextBlock[];
-      timestamp?: number;
-    }
-  | {
-      role: "assistant";
-      content: Array<LegacyTextBlock | LegacyToolCallBlock>;
-      timestamp?: number;
-    }
-  | {
-      role: "toolResult";
-      toolCallId: string;
-      toolName: string;
-      content: LegacyTextBlock[];
-      isError?: boolean;
-      timestamp?: number;
-    };
 
 function getStorePath() {
   return resolveRuntimePath("conversations.json");
@@ -95,76 +55,7 @@ async function writeStore(store: ConversationStoreShape) {
   await chmod(storePath, 0o600);
 }
 
-function encodeMessages(messages: BaseMessage[]) {
-  return mapChatMessagesToStoredMessages(messages);
-}
-
-function extractLegacyText(
-  content: string | Array<LegacyTextBlock | LegacyToolCallBlock> | undefined,
-) {
-  if (typeof content === "string") {
-    return content;
-  }
-  return (content ?? [])
-    .filter((block): block is LegacyTextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("");
-}
-
-function isStoredMessage(value: StoredMessage | LegacyMessage): value is StoredMessage {
-  return typeof (value as StoredMessage).type === "string";
-}
-
-function convertLegacyMessage(message: LegacyMessage): BaseMessage {
-  if (message.role === "user") {
-    return new HumanMessage(extractLegacyText(message.content));
-  }
-
-  if (message.role === "toolResult") {
-    return new ToolMessage({
-      content: extractLegacyText(message.content),
-      tool_call_id: message.toolCallId,
-      name: message.toolName,
-      status: message.isError ? "error" : "success",
-    });
-  }
-
-  return new AIMessage({
-    content: extractLegacyText(message.content),
-    tool_calls: message.content
-      .filter((block): block is LegacyToolCallBlock => block.type === "toolCall")
-      .map((block) => ({
-        id: block.id,
-        name: block.name,
-        args: block.arguments,
-        type: "tool_call" as const,
-      })),
-  });
-}
-
-function decodeMessages(rawMessages: StoredMessage[] | LegacyMessage[], key: string): BaseMessage[] {
-  if (rawMessages.length === 0) {
-    return [];
-  }
-
-  if (isStoredMessage(rawMessages[0] as StoredMessage | LegacyMessage)) {
-    return mapStoredMessagesToChatMessages(rawMessages as StoredMessage[]);
-  }
-
-  telemetry.event("conversation_store.legacy_migration", {
-    conversationKey: key,
-    messageCount: rawMessages.length,
-    entityType: "conversation",
-    entityId: key,
-  });
-  return (rawMessages as LegacyMessage[]).map(convertLegacyMessage);
-}
-
-function normalizeStoredMessages(rawMessages: StoredMessage[] | LegacyMessage[], key: string) {
-  return encodeMessages(decodeMessages(rawMessages, key));
-}
-
-function areStoredMessagesEqual(left: StoredMessage[], right: StoredMessage[]) {
+function areMessagesEqual(left: Message[], right: Message[]) {
   if (left.length !== right.length) {
     return false;
   }
@@ -172,7 +63,7 @@ function areStoredMessagesEqual(left: StoredMessage[], right: StoredMessage[]) {
   return left.every((message, index) => JSON.stringify(message) === JSON.stringify(right[index]));
 }
 
-function isStoredMessagePrefix(prefix: StoredMessage[], full: StoredMessage[]) {
+function isMessagePrefix(prefix: Message[], full: Message[]) {
   if (prefix.length > full.length) {
     return false;
   }
@@ -180,16 +71,16 @@ function isStoredMessagePrefix(prefix: StoredMessage[], full: StoredMessage[]) {
   return prefix.every((message, index) => JSON.stringify(message) === JSON.stringify(full[index]));
 }
 
-function describeMutation(current: StoredMessage[], next: StoredMessage[]) {
-  if (areStoredMessagesEqual(current, next)) {
+function describeMutation(current: Message[], next: Message[]) {
+  if (areMessagesEqual(current, next)) {
     return "unchanged";
   }
 
-  if (isStoredMessagePrefix(current, next)) {
+  if (isMessagePrefix(current, next)) {
     return `append-only (+${next.length - current.length} messages)`;
   }
 
-  if (isStoredMessagePrefix(next, current)) {
+  if (isMessagePrefix(next, current)) {
     return `rollback-only (-${current.length - next.length} messages)`;
   }
 
@@ -208,7 +99,7 @@ export class ConversationStore {
     return Object.values(store.conversations)
       .map((entry) => ({
         key: entry.key,
-        messages: decodeMessages(entry.messages, entry.key),
+        messages: entry.messages ?? [],
         updatedAt: entry.updatedAt,
         systemPrompt: entry.systemPrompt,
       }))
@@ -231,19 +122,9 @@ export class ConversationStore {
       };
     }
 
-    const messages = decodeMessages(existing.messages, key);
-    const normalized: StoredConversationState = {
-      key,
-      messages: mapChatMessagesToStoredMessages(messages),
-      updatedAt: existing.updatedAt,
-      systemPrompt: existing.systemPrompt,
-    };
-    store.conversations[key] = normalized;
-    await writeStore(store);
-
     return {
       key,
-      messages,
+      messages: existing.messages ?? [],
       updatedAt: existing.updatedAt,
       systemPrompt: existing.systemPrompt,
     };
@@ -252,25 +133,23 @@ export class ConversationStore {
   private async save(state: ConversationState): Promise<ConversationState> {
     const store = await readStore();
     const existing = store.conversations[state.key];
-    const nextMessages = encodeMessages(state.messages);
-    let currentMessages: StoredMessage[] = [];
+    const currentMessages: Message[] = existing?.messages ?? [];
 
     if (existing) {
-      currentMessages = normalizeStoredMessages(existing.messages, state.key);
       if (
-        !areStoredMessagesEqual(currentMessages, nextMessages)
-        && !isStoredMessagePrefix(currentMessages, nextMessages)
-        && !isStoredMessagePrefix(nextMessages, currentMessages)
+        !areMessagesEqual(currentMessages, state.messages)
+        && !isMessagePrefix(currentMessages, state.messages)
+        && !isMessagePrefix(state.messages, currentMessages)
       ) {
         throw new Error(
-          `Refusing non-append conversation mutation for ${state.key}; use appendMessages(), rollbackMessages(), or rollbackAndAppend(). Existing=${describeMutation(currentMessages, nextMessages)}.`,
+          `Refusing non-append conversation mutation for ${state.key}; use appendMessages(), rollbackMessages(), or rollbackAndAppend(). Existing=${describeMutation(currentMessages, state.messages)}.`,
         );
       }
     }
 
     const nextState: StoredConversationState = {
       key: state.key,
-      messages: nextMessages,
+      messages: state.messages,
       updatedAt: timestamp(),
       systemPrompt: state.systemPrompt ?? existing?.systemPrompt,
     };
@@ -278,7 +157,7 @@ export class ConversationStore {
     await writeStore(store);
 
     try {
-      if (isStoredMessagePrefix(currentMessages, nextMessages) && nextMessages.length > currentMessages.length) {
+      if (isMessagePrefix(currentMessages, state.messages) && state.messages.length > currentMessages.length) {
         this.history.recordAppendedMessages({
           conversationKey: state.key,
           messages: state.messages.slice(currentMessages.length),
@@ -286,12 +165,12 @@ export class ConversationStore {
           occurredAt: nextState.updatedAt,
         });
       } else if (
-        isStoredMessagePrefix(nextMessages, currentMessages) &&
-        currentMessages.length > nextMessages.length
+        isMessagePrefix(state.messages, currentMessages) &&
+        currentMessages.length > state.messages.length
       ) {
         this.history.recordRollback({
           conversationKey: state.key,
-          removedCount: currentMessages.length - nextMessages.length,
+          removedCount: currentMessages.length - state.messages.length,
           occurredAt: nextState.updatedAt,
         });
       }
@@ -314,7 +193,7 @@ export class ConversationStore {
 
   async appendMessages(
     key: string,
-    messages: BaseMessage[],
+    messages: Message[],
     options?: { systemPrompt?: SystemPromptSnapshot },
   ): Promise<ConversationState> {
     if (messages.length === 0) {
@@ -353,7 +232,7 @@ export class ConversationStore {
   async rollbackAndAppend(
     key: string,
     rollbackCount: number,
-    messages: BaseMessage[],
+    messages: Message[],
     options?: { systemPrompt?: SystemPromptSnapshot },
   ): Promise<ConversationState> {
     const rolledBack = await this.rollbackMessages(key, rollbackCount, options);

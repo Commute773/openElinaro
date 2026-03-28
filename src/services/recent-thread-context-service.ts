@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
+import type { Message } from "../messages/types";
 import type { ProfileRecord } from "../domain/profiles";
 import { ProfileService } from "./profiles";
 import { ProjectsService } from "./projects-service";
@@ -116,8 +116,8 @@ function isReflectionIdentityPath(relativePath: string) {
   return relativePath.includes("/identity/") || relativePath.endsWith("/identity");
 }
 
-export function shouldIncludeRecentThreadContext(messages: BaseMessage[]) {
-  return messages.every((message) => !(message instanceof HumanMessage));
+export function shouldIncludeRecentThreadContext(messages: Message[]) {
+  return messages.every((message) => message.role !== "user");
 }
 
 export class RecentThreadContextService {

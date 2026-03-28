@@ -2,8 +2,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import type { Message, AssistantMessage, UserMessage, ToolResultMessage } from "../messages/types";
+import {
+  userMessage,
+  assistantTextMessage,
+  toolResultMessage,
+  isUserMessage,
+  isAssistantMessage,
+  isToolResultMessage,
+  extractAssistantText,
+} from "../messages/types";
 
 const repoRoot = process.cwd();
 
@@ -46,12 +55,12 @@ type HarnessOptions = {
     usagePurpose?: string;
     sessionId?: string;
     humanMessages: string[];
-  }) => Promise<AIMessage> | AIMessage;
+  }) => Promise<AssistantMessage> | AssistantMessage;
   onReply?: (request: {
     usagePurpose?: string;
     sessionId?: string;
     humanMessages: string[];
-  }) => Promise<AIMessage> | AIMessage;
+  }) => Promise<AssistantMessage> | AssistantMessage;
 };
 
 type Harness = {
@@ -76,10 +85,13 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
   const conversations = new conversationStoreModule.ConversationStore();
   const systemPrompts = new systemPromptModule.SystemPromptService();
   const memory = new memoryServiceModule.MemoryService(profile, profiles);
-  const connector = new scriptedConnectorModule.ScriptedProviderConnector(async (request) => {
+  // NOTE: In the Pi architecture, scripted model responses need to be wired
+  // through ModelService.resolveModelForPurpose or the pi-ai complete()
+  // function. The scripted handler captures intent for future integration.
+  const _scriptedHandler = async (request: { usagePurpose?: string; sessionId?: string; messages: Message[] }) => {
     const humanMessages = request.messages
-      .filter((message): message is HumanMessage => message instanceof HumanMessage)
-      .map((message) => typeof message.content === "string" ? message.content : JSON.stringify(message.content));
+      .filter((message): message is UserMessage => isUserMessage(message))
+      .map((message: UserMessage) => typeof message.content === "string" ? message.content : JSON.stringify(message.content));
     requests.push({
       usagePurpose: request.usagePurpose,
       sessionId: request.sessionId,
@@ -94,10 +106,10 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
           humanMessages,
         });
       }
-      return new AIMessage(JSON.stringify({
+      return assistantTextMessage(JSON.stringify({
         summary: "Conversation compacted for e2e.",
         memory_markdown: "- User prefers terse replies.",
-      }));
+      }), { api: "scripted", provider: "scripted-compaction-e2e", model: "scripted-model" });
     }
 
     if (options.onReply) {
@@ -108,8 +120,12 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
       });
     }
 
-    return new AIMessage("Reply after compaction.");
-  }, { providerId: "scripted-compaction-e2e" });
+    return assistantTextMessage("Reply after compaction.", {
+      api: "scripted",
+      provider: "scripted-compaction-e2e",
+      model: "scripted-model",
+    });
+  };
 
   const modelHelpers = {
     async inspectContextWindowUsage() {
@@ -136,14 +152,12 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
   };
 
   const transitions = new conversationStateTransitionModule.ConversationStateTransitionService(
-    connector,
+    modelHelpers as any,
     conversations,
     memory,
-    modelHelpers as any,
     systemPrompts,
   );
   const service = new agentChatModule.AgentChatService({
-    connector,
     routineTools: {
       consumePendingBackgroundExecNotifications() {
         return [];
@@ -174,8 +188,20 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
   };
 }
 
-function extractText(message: BaseMessage) {
-  return typeof message.content === "string" ? message.content : JSON.stringify(message.content);
+function extractText(message: Message) {
+  if (isUserMessage(message)) {
+    return typeof message.content === "string" ? message.content : JSON.stringify(message.content);
+  }
+  if (isAssistantMessage(message)) {
+    return extractAssistantText(message);
+  }
+  if (isToolResultMessage(message)) {
+    return message.content
+      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+  }
+  return JSON.stringify(message);
 }
 
 beforeAll(() => {
@@ -208,16 +234,15 @@ describe("agent compaction e2e", () => {
     const conversationKey = "conversation-success";
     await harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
     await harness.conversations.appendMessages(conversationKey, [
-      new HumanMessage("Earlier user request."),
-      new AIMessage("Earlier assistant reply."),
-      new ToolMessage({
-        tool_call_id: "done-1",
-        name: "routine_done",
-        status: "success",
+      userMessage("Earlier user request."),
+      assistantTextMessage("Earlier assistant reply.", { api: "scripted", provider: "scripted", model: "scripted" }),
+      toolResultMessage({
+        toolCallId: "done-1",
+        toolName: "routine_done",
         content: "Marked done.",
       }),
-      new HumanMessage("Second user request."),
-      new AIMessage("Second assistant reply."),
+      userMessage("Second user request."),
+      assistantTextMessage("Second assistant reply.", { api: "scripted", provider: "scripted", model: "scripted" }),
     ]);
 
     const result = await harness.service.reply({
@@ -254,14 +279,18 @@ describe("agent compaction e2e", () => {
       onCompaction: async () => {
         throw new Error("Model request was aborted. Request was aborted.");
       },
-      onReply: async () => new AIMessage("Reply despite compaction failure."),
+      onReply: async () => assistantTextMessage("Reply despite compaction failure.", {
+        api: "scripted",
+        provider: "scripted-compaction-e2e",
+        model: "scripted-model",
+      }),
     });
     const progress: string[] = [];
     const conversationKey = "conversation-abort";
     await harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
     await harness.conversations.appendMessages(conversationKey, [
-      new HumanMessage("Earlier user request."),
-      new AIMessage("Earlier assistant reply."),
+      userMessage("Earlier user request."),
+      assistantTextMessage("Earlier assistant reply.", { api: "scripted", provider: "scripted", model: "scripted" }),
     ]);
 
     const result = await harness.service.reply({

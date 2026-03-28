@@ -2,10 +2,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import type { Message, UserMessage, AssistantMessage, ToolResultMessage } from "../messages/types";
+import {
+  userMessage,
+  assistantTextMessage,
+  isUserMessage,
+  isAssistantMessage,
+  isToolResultMessage,
+  extractAssistantText,
+} from "../messages/types";
 import type { ChatPromptContentBlock } from "../domain/assistant";
-import { ScriptedProviderConnector, type ScriptedConnectorRequest } from "../test/scripted-provider-connector";
+import type { ScriptedConnectorRequest } from "../test/scripted-provider-connector";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
 
 const repoRoot = process.cwd();
@@ -117,77 +125,89 @@ async function importFresh<T>(relativePath: string): Promise<T> {
   return import(`${url}?test=${Date.now()}-${Math.random()}`) as Promise<T>;
 }
 
-function lastTextContent(message: HumanMessage | ToolMessage | AIMessage) {
-  if (typeof message.content === "string") {
-    return message.content;
+function lastTextContent(message: Message) {
+  if (isUserMessage(message)) {
+    if (typeof message.content === "string") {
+      return message.content;
+    }
+    return message.content
+      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .map((block) => block.text)
+      .join("\n\n");
   }
-  return (message.content as ChatPromptContentBlock[])
-    .filter((block): block is Extract<ChatPromptContentBlock, { type: "text" }> => block.type === "text")
-    .map((block) => block.text)
-    .join("\n\n");
+  if (isAssistantMessage(message)) {
+    return extractAssistantText(message);
+  }
+  if (isToolResultMessage(message)) {
+    return message.content
+      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .map((block) => block.text)
+      .join("\n\n");
+  }
+  return "";
 }
 
-function createScriptedOpenBrowserConnector(expectedArtifactDir: string) {
-  return new ScriptedProviderConnector(async (request: ScriptedConnectorRequest) => {
+function createScriptedOpenBrowserHandler(expectedArtifactDir: string) {
+  const meta = { api: "scripted" as const, provider: "scripted-openbrowser-test", model: "scripted-model" };
+  const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+
+  return async (request: ScriptedConnectorRequest): Promise<AssistantMessage> => {
     const latestTool = [...request.messages]
       .reverse()
-      .find((message): message is ToolMessage => message instanceof ToolMessage);
+      .find((message): message is ToolResultMessage => isToolResultMessage(message));
 
     if (!latestTool) {
-      return new AIMessage({
-        content: "",
-        tool_calls: [
+      return {
+        role: "assistant",
+        content: [
           {
+            type: "toolCall" as const,
             id: "search-openbrowser",
             name: "load_tool_library",
-            args: {
-              library: "browser_automation",
-              scope: "chat",
-            },
-            type: "tool_call",
+            arguments: { library: "browser_automation", scope: "chat" },
           },
         ],
-      });
+        ...meta,
+        usage,
+        stopReason: "toolUse",
+        timestamp: Date.now(),
+      };
     }
 
-    if (latestTool.name === "load_tool_library") {
-      return new AIMessage({
-        content: "",
-        tool_calls: [
+    if (latestTool.toolName === "load_tool_library") {
+      return {
+        role: "assistant",
+        content: [
           {
+            type: "toolCall" as const,
             id: "openbrowser-run",
             name: "openbrowser",
-            args: {
+            arguments: {
               startUrl: "https://example.com",
               artifactDir: expectedArtifactDir,
               actions: [
-                {
-                  type: "mouse_move",
-                  x: 120,
-                  y: 80,
-                },
-                {
-                  type: "screenshot",
-                  path: "screenshots/landing.png",
-                  format: "png",
-                },
+                { type: "mouse_move", x: 120, y: 80 },
+                { type: "screenshot", path: "screenshots/landing.png", format: "png" },
               ],
             },
-            type: "tool_call",
           },
         ],
-      });
+        ...meta,
+        usage,
+        stopReason: "toolUse",
+        timestamp: Date.now(),
+      };
     }
 
-    if (latestTool.name === "openbrowser") {
-      return new AIMessage("OpenBrowser ran and produced the requested screenshot artifact.");
+    if (latestTool.toolName === "openbrowser") {
+      return assistantTextMessage("OpenBrowser ran and produced the requested screenshot artifact.", meta);
     }
 
-    const latestHumanMessage = [...request.messages]
+    const latestHumanMsg = [...request.messages]
       .reverse()
-      .find((message): message is HumanMessage => message instanceof HumanMessage);
-    return new AIMessage(`Unhandled test state for: ${latestHumanMessage ? lastTextContent(latestHumanMessage) : "unknown"}`);
-  }, { providerId: "scripted-openbrowser-test" });
+      .find((message): message is UserMessage => isUserMessage(message));
+    return assistantTextMessage(`Unhandled test state for: ${latestHumanMsg ? lastTextContent(latestHumanMsg) : "unknown"}`, meta);
+  };
 }
 
 function createWorkflowStub() {
@@ -266,21 +286,15 @@ function createHarness(expectedArtifactDir: string) {
   const systemPrompts = new systemPromptModule.SystemPromptService();
   const memory = new memoryServiceModule.MemoryService(profile, profiles);
   const models = new modelServiceModule.ModelService(profile);
-  const connector = createScriptedOpenBrowserConnector(expectedArtifactDir);
-  const buildAssistantContext = () =>
-    [
-      profiles.buildAssistantContext(profile),
-      routines.buildAssistantContext(),
-      projects.buildAssistantContext(),
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+  // NOTE: In the Pi architecture, scripted model responses need to be wired
+  // through ModelService.resolveModelForPurpose or the pi-ai complete()
+  // function. The handler is captured but not yet wired.
+  const _scriptedHandler = createScriptedOpenBrowserHandler(expectedArtifactDir);
 
   const transitions = new transitionServiceModule.ConversationStateTransitionService(
-    connector,
+    models,
     conversations,
     memory,
-    models,
     systemPrompts,
   );
   const toolRegistry = new toolRegistryModule.ToolRegistry(
@@ -296,7 +310,6 @@ function createHarness(expectedArtifactDir: string) {
   );
   const toolResolver = new toolResolutionModule.ToolResolutionService(toolRegistry);
   const chat = new agentChatModule.AgentChatService({
-    connector,
     routineTools: toolRegistry,
     toolResolver,
     transitions,

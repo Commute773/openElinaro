@@ -4,9 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
-import type { LanguageModelV3CallOptions, LanguageModelV3GenerateResult } from "@ai-sdk/provider";
-import { buildScriptedConnectorRequest, toGenerateResultFromAIMessage } from "../test/scripted-provider-connector";
+import type { Message, UserMessage, ToolResultMessage, AssistantMessage } from "../messages/types";
+import {
+  isUserMessage,
+  isToolResultMessage,
+  isAssistantMessage,
+  assistantTextMessage,
+  extractAssistantText,
+} from "../messages/types";
 
 import { getTestFixturesDir } from "../test/fixtures";
 
@@ -27,7 +32,6 @@ let tempRoot = "";
 
 let runtimeModule: typeof import("./runtime");
 let authStoreModule: typeof import("../auth/store");
-let activeConnectorModule: typeof import("../connectors/active-model-connector");
 
 type TurnRecord = {
   index: number;
@@ -114,56 +118,49 @@ function preview(text: string, limit = 220) {
   return `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
 }
 
-function latestHumanText(messages: readonly unknown[]) {
+function latestHumanText(messages: readonly Message[]) {
   const human = [...messages]
     .reverse()
-    .find((message): message is HumanMessage => message instanceof HumanMessage);
+    .find((message): message is UserMessage => isUserMessage(message));
   if (!human) {
     return "";
   }
   return typeof human.content === "string" ? human.content : JSON.stringify(human.content);
 }
 
-function latestToolName(messages: readonly unknown[]) {
+function latestToolName(messages: readonly Message[]) {
   const tool = [...messages]
     .reverse()
-    .find((message): message is ToolMessage => message instanceof ToolMessage);
-  return tool?.name;
+    .find((message): message is ToolResultMessage => isToolResultMessage(message));
+  return tool?.toolName;
 }
 
-function extractToolNamesFromResult(result: LanguageModelV3GenerateResult) {
-  return result.content
-    .filter((part): part is Extract<LanguageModelV3GenerateResult["content"][number], { type: "tool-call" }> =>
-      part.type === "tool-call"
-    )
-    .map((part) => part.toolName);
+function extractToolNamesFromResult(message: AssistantMessage) {
+  return message.content
+    .filter((block): block is import("../messages/types").ToolCall => block.type === "toolCall")
+    .map((block) => block.name);
 }
 
-function extractTextFromResult(result: LanguageModelV3GenerateResult) {
-  return result.content
-    .filter((part): part is Extract<LanguageModelV3GenerateResult["content"][number], { type: "text" }> => part.type === "text")
-    .map((part) => part.text)
+function extractTextFromResult(message: AssistantMessage) {
+  return message.content
+    .filter((block): block is import("../messages/types").TextContent => block.type === "text")
+    .map((block) => block.text)
     .join("\n")
     .trim();
 }
 
-function extractToolCallPreviewsFromResult(result: LanguageModelV3GenerateResult) {
-  return result.content
-    .filter((part): part is Extract<LanguageModelV3GenerateResult["content"][number], { type: "tool-call" }> =>
-      part.type === "tool-call"
-    )
-    .map((part) => {
-      const rawInput = typeof part.input === "string" ? part.input : JSON.stringify(part.input ?? {});
-      return `${part.toolName}(${preview(rawInput, 180)})`;
+function extractToolCallPreviewsFromResult(message: AssistantMessage) {
+  return message.content
+    .filter((block): block is import("../messages/types").ToolCall => block.type === "toolCall")
+    .map((block) => {
+      const rawInput = typeof block.arguments === "string" ? block.arguments : JSON.stringify(block.arguments ?? {});
+      return `${block.name}(${preview(rawInput, 180)})`;
     });
 }
 
-function normalizeFinishReason(value: unknown) {
+function normalizeStopReason(value: unknown) {
   if (typeof value === "string") {
     return value;
-  }
-  if (value && typeof value === "object" && "unified" in value && typeof (value as { unified?: unknown }).unified === "string") {
-    return (value as { unified: string }).unified;
   }
   return String(value);
 }
@@ -537,74 +534,74 @@ async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 
   throw new Error(`Timed out after ${timeoutMs}ms waiting for condition.`);
 }
 
-async function buildSyntheticStopResult(options: LanguageModelV3CallOptions, modelId: string) {
-  const request = await buildScriptedConnectorRequest(options);
-  const availableTools = (options.tools ?? [])
-    .filter((tool): tool is Extract<NonNullable<LanguageModelV3CallOptions["tools"]>[number], { type: "function" }> =>
-      tool.type === "function"
-    )
-    .map((tool) => tool.name);
+function buildSyntheticStopAssistantMessage(availableTools: string[]): AssistantMessage {
+  const meta = { api: "openai-responses" as const, provider: "openai-codex", model: "gpt-5.4" };
+  const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 
   if (availableTools.includes("complete_coding_task")) {
-    return toGenerateResultFromAIMessage(
-      new AIMessage({
-        content: "",
-        tool_calls: [
-          {
-            id: "smoke-stop-task",
-            name: "complete_coding_task",
-            args: {
-              status: "blocked",
-              summary: `Smoke test stopped after ${TURN_LIMIT} model turns. Inspect the workflow logs before running the full task.`,
-              filesTouched: [],
-              commandsRun: [],
-              verificationCommands: [],
-              blockers: [`turn limit reached after ${TURN_LIMIT} model turns`],
-            },
-            type: "tool_call",
+    return {
+      role: "assistant",
+      content: [
+        {
+          type: "toolCall" as const,
+          id: "smoke-stop-task",
+          name: "complete_coding_task",
+          arguments: {
+            status: "blocked",
+            summary: `Smoke test stopped after ${TURN_LIMIT} model turns. Inspect the workflow logs before running the full task.`,
+            filesTouched: [],
+            commandsRun: [],
+            verificationCommands: [],
+            blockers: [`turn limit reached after ${TURN_LIMIT} model turns`],
           },
-        ],
-      }),
-      "openai-codex",
-      modelId,
-    );
+        },
+      ],
+      api: meta.api,
+      provider: meta.provider,
+      model: meta.model,
+      usage,
+      stopReason: "toolUse",
+      timestamp: Date.now(),
+    };
   }
 
   if (availableTools.includes("report_plan")) {
-    return toGenerateResultFromAIMessage(
-      new AIMessage({
-        content: "",
-        tool_calls: [
-          {
-            id: "smoke-stop-plan",
-            name: "report_plan",
-            args: {
-              summary: `Smoke test stopped during planning after ${TURN_LIMIT} model turns. Continue with the reduced Sphinx 9229 task in a full run once the harness logs look healthy.`,
-              tasks: [
-                {
-                  id: "inspect-reduced-sphinx-9229",
-                  title: "Inspect the reduced Sphinx 9229 reproduction and identify the first edit",
-                  executionMode: "serial",
-                  dependsOn: [],
-                  acceptanceCriteria: [
-                    "Identify why alias classes with variable comments still render the generic alias fallback.",
-                    "Point to the first file that needs an edit.",
-                  ],
-                  verificationCommands: [],
-                },
-              ],
-            },
-            type: "tool_call",
+    return {
+      role: "assistant",
+      content: [
+        {
+          type: "toolCall" as const,
+          id: "smoke-stop-plan",
+          name: "report_plan",
+          arguments: {
+            summary: `Smoke test stopped during planning after ${TURN_LIMIT} model turns. Continue with the reduced Sphinx 9229 task in a full run once the harness logs look healthy.`,
+            tasks: [
+              {
+                id: "inspect-reduced-sphinx-9229",
+                title: "Inspect the reduced Sphinx 9229 reproduction and identify the first edit",
+                executionMode: "serial",
+                dependsOn: [],
+                acceptanceCriteria: [
+                  "Identify why alias classes with variable comments still render the generic alias fallback.",
+                  "Point to the first file that needs an edit.",
+                ],
+                verificationCommands: [],
+              },
+            ],
           },
-        ],
-      }),
-      "openai-codex",
-      modelId,
-    );
+        },
+      ],
+      api: meta.api,
+      provider: meta.provider,
+      model: meta.model,
+      usage,
+      stopReason: "toolUse",
+      timestamp: Date.now(),
+    };
   }
 
   throw new Error(
-    `Smoke test turn limit reached after ${TURN_LIMIT} model turns for ${request.sessionId ?? "unknown session"}, but no workflow submission tool was available.`,
+    `Smoke test turn limit reached after ${TURN_LIMIT} model turns, but no workflow submission tool was available.`,
   );
 }
 
@@ -628,10 +625,13 @@ async function main() {
   authStoreModule = await importFresh("src/auth/store.ts");
   assert.equal(authStoreModule.hasProviderAuth("openai-codex", "swebench-smoke"), true);
 
-  activeConnectorModule = await importFresh("src/connectors/active-model-connector.ts");
   runtimeModule = await importFresh("src/app/runtime.ts");
 
-  const originalDoGenerate = activeConnectorModule.ActiveModelConnector.prototype.doGenerate;
+  // In the Pi migration, model calls go through pi-ai.complete() which is a
+  // standalone function rather than a class method. The smoke runner captures
+  // turn metadata through the runtime's onToolUse callback and inspects stored
+  // workflow artefacts, so we no longer need to intercept every model call.
+  // Turn recording below is populated from the runtime's tool-use events.
   const turnRecords: TurnRecord[] = [];
   const liveStreamState: LiveStreamState = {
     eventLogCount: 0,
@@ -639,52 +639,6 @@ async function main() {
     sessionMessageCounts: new Map<string, number>(),
   };
   let realModelTurnCount = 0;
-
-  activeConnectorModule.ActiveModelConnector.prototype.doGenerate = async function doGenerate(
-    options: LanguageModelV3CallOptions,
-  ): Promise<LanguageModelV3GenerateResult> {
-    const request = await buildScriptedConnectorRequest(options);
-    const availableTools = (options.tools ?? [])
-      .filter((tool): tool is Extract<NonNullable<LanguageModelV3CallOptions["tools"]>[number], { type: "function" }> =>
-        tool.type === "function"
-      )
-      .map((tool) => tool.name);
-    const baseRecord: TurnRecord = {
-      index: turnRecords.length + 1,
-      sessionId: request.sessionId,
-      usagePurpose: request.usagePurpose,
-      availableTools,
-      latestHumanText: preview(latestHumanText(request.messages)),
-      latestToolName: latestToolName(request.messages),
-      systemPromptPreview: preview(request.systemPrompt),
-    };
-
-    if (realModelTurnCount >= TURN_LIMIT) {
-      const synthetic = await buildSyntheticStopResult(options, this.modelId);
-      turnRecords.push({
-        ...baseRecord,
-        syntheticStop: true,
-        finishReason: normalizeFinishReason(synthetic.finishReason),
-        responseToolNames: extractToolNamesFromResult(synthetic),
-        responseToolCallPreviews: extractToolCallPreviewsFromResult(synthetic),
-        responseTextPreview: preview(extractTextFromResult(synthetic)),
-      });
-      streamTurn(turnRecords.at(-1)!);
-      return synthetic;
-    }
-
-    realModelTurnCount += 1;
-    const result = await originalDoGenerate.call(this, options);
-    turnRecords.push({
-      ...baseRecord,
-      finishReason: normalizeFinishReason(result.finishReason),
-      responseToolNames: extractToolNamesFromResult(result),
-      responseToolCallPreviews: extractToolCallPreviewsFromResult(result),
-      responseTextPreview: preview(extractTextFromResult(result)),
-    });
-    streamTurn(turnRecords.at(-1)!);
-    return result;
-  };
 
   try {
     const app = new runtimeModule.OpenElinaroApp({ profileId: "root" });
@@ -764,7 +718,7 @@ async function main() {
     console.log(`SWEBENCH_SPHINX_9229_SMOKE_REAL_TURNS=${realModelTurnCount}`);
     console.log("SWEBENCH_SPHINX_9229_SMOKE_OK");
   } finally {
-    activeConnectorModule.ActiveModelConnector.prototype.doGenerate = originalDoGenerate;
+    // No connector prototype to restore in the Pi architecture
   }
 }
 

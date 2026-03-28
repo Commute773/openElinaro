@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
-import type { BaseMessage, StoredMessage } from "@langchain/core/messages";
-import { mapChatMessagesToStoredMessages } from "@langchain/core/messages";
+import type { Message } from "../../messages/types";
 import { extractTextFromMessage } from "../message-content-service";
 import {
   buildDocumentFrequencies,
@@ -45,7 +44,7 @@ type ConversationHistoryMessageEntry = {
   messageType: string;
   role: string;
   text: string;
-  storedMessage: StoredMessage;
+  storedMessage: Message;
 };
 
 type ConversationHistoryRollbackEntry = {
@@ -115,18 +114,16 @@ function normalizeProfileId(profileId?: string) {
   return profileId?.trim() || getDefaultProfileId();
 }
 
-function roleFromStoredMessageType(type: string) {
-  switch (type) {
-    case "human":
+function roleFromMessageRole(role: string) {
+  switch (role) {
+    case "user":
       return "user";
-    case "ai":
+    case "assistant":
       return "assistant";
-    case "tool":
+    case "toolResult":
       return "tool";
-    case "system":
-      return "system";
     default:
-      return type;
+      return role;
   }
 }
 
@@ -201,7 +198,7 @@ export class ConversationHistoryService {
 
   recordAppendedMessages(params: {
     conversationKey: string;
-    messages: BaseMessage[];
+    messages: Message[];
     startingIndex: number;
     occurredAt: string;
   }) {
@@ -209,9 +206,7 @@ export class ConversationHistoryService {
       return;
     }
 
-    const storedMessages = mapChatMessagesToStoredMessages(params.messages);
-    const lines = storedMessages.map((storedMessage, index) => {
-      const message = params.messages[index];
+    const lines = params.messages.map((message, index) => {
       const entry: ConversationHistoryMessageEntry = {
         version: INDEX_VERSION,
         kind: "message",
@@ -219,10 +214,10 @@ export class ConversationHistoryService {
         conversationKey: params.conversationKey,
         occurredAt: params.occurredAt,
         messageIndex: params.startingIndex + index + 1,
-        messageType: storedMessage.type,
-        role: roleFromStoredMessageType(storedMessage.type),
-        text: message ? extractTextFromMessage(message).trim() : "",
-        storedMessage,
+        messageType: message.role,
+        role: roleFromMessageRole(message.role),
+        text: extractTextFromMessage(message).trim(),
+        storedMessage: message,
       };
       return JSON.stringify(entry);
     });

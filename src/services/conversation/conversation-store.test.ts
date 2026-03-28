@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { ConversationHistoryService } from "./conversation-history-service";
 import { ConversationStore } from "./conversation-store";
 import { SystemPromptService } from "../system-prompt-service";
+import { userMessage, assistantTextMessage } from "../../messages/types";
+import type { Message } from "../../messages/types";
 
 let tempRoot = "";
 let previousRootDirEnv: string | undefined;
@@ -53,45 +54,48 @@ describe("ConversationStore", () => {
   });
 
   test("supports append-only writes", async () => {
-    await store.appendMessages("thread-1", [new HumanMessage("hello")], {
+    await store.appendMessages("thread-1", [userMessage("hello")], {
       systemPrompt: await systemPrompts.load(),
     });
 
-    const conversation = await store.appendMessages("thread-1", [new AIMessage("world")]);
+    const conversation = await store.appendMessages("thread-1", [assistantTextMessage("world")]);
 
     expect(conversation.messages).toHaveLength(2);
-    expect(conversation.messages[1]).toBeInstanceOf(AIMessage);
+    expect(conversation.messages[1]!.role).toBe("assistant");
   });
 
   test("supports explicit rollback plus append", async () => {
     await store.appendMessages("thread-1", [
-      new HumanMessage("first"),
-      new AIMessage("second"),
-      new HumanMessage("third"),
+      userMessage("first"),
+      assistantTextMessage("second"),
+      userMessage("third"),
     ], { systemPrompt: await systemPrompts.load() });
 
-    const conversation = await store.rollbackAndAppend("thread-1", 2, [new AIMessage("replacement")]);
+    const conversation = await store.rollbackAndAppend("thread-1", 2, [assistantTextMessage("replacement")]);
 
     expect(conversation.messages).toHaveLength(2);
-    expect((conversation.messages[0] as HumanMessage).content).toBe("first");
-    expect((conversation.messages[1] as AIMessage).content).toBe("replacement");
+    expect((conversation.messages[0] as Message & { content: string }).content).toBe("first");
+    // AssistantMessage content is an array of content blocks
+    const assistantMsg = conversation.messages[1] as Message & { content: any };
+    expect(assistantMsg.role).toBe("assistant");
+    expect(assistantMsg.content[0].text).toBe("replacement");
   });
 
   test("preserves image mime types across store round-trips", async () => {
-    await store.appendMessages("thread-1", [new HumanMessage([
+    await store.appendMessages("thread-1", [userMessage([
       { type: "text", text: "what is this?" },
       { type: "image", data: "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=", mimeType: "image/webp" },
     ])], { systemPrompt: await systemPrompts.load() });
 
     const conversation = await store.get("thread-1");
-    const message = conversation.messages[0] as HumanMessage;
-    const blocks = message.content as Array<{ type: string; mimeType?: string }>;
+    const message = conversation.messages[0];
+    const blocks = (message as any).content as Array<{ type: string; mimeType?: string }>;
 
     expect(blocks.some((block) => block.type === "image" && block.mimeType === "image/webp")).toBe(true);
   });
 
   test("journals appended conversation messages to JSONL as they are saved", async () => {
-    await store.appendMessages("thread-1", [new HumanMessage("hello graph cache"), new AIMessage("world")], {
+    await store.appendMessages("thread-1", [userMessage("hello graph cache"), assistantTextMessage("world")], {
       systemPrompt: await systemPrompts.load(),
     });
 
@@ -118,10 +122,10 @@ describe("ConversationStore", () => {
   });
 
   test("searches archived conversation history with hybrid ranking and recency output", async () => {
-    await store.appendMessages("thread-1", [new HumanMessage("We need to fix the cache miss issue in graph search.")], {
+    await store.appendMessages("thread-1", [userMessage("We need to fix the cache miss issue in graph search.")], {
       systemPrompt: await systemPrompts.load(),
     });
-    await store.appendMessages("thread-2", [new HumanMessage("Graph compaction is still weird but cache is fine.")], {
+    await store.appendMessages("thread-2", [userMessage("Graph compaction is still weird but cache is fine.")], {
       systemPrompt: await systemPrompts.load(),
     });
 
@@ -153,7 +157,7 @@ describe("ConversationStore", () => {
 
     for (let index = 0; index < 40; index += 1) {
       await boundedStore.appendMessages(`thread-${index + 1}`, [
-        new HumanMessage(
+        userMessage(
           index === 39 ? "Newest cache graph regression note." : `Background note ${index + 1}.`,
         ),
       ], { systemPrompt: await systemPrompts.load() });

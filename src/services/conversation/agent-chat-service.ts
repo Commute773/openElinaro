@@ -1,10 +1,15 @@
-import { AIMessage, HumanMessage, type BaseMessage } from "@langchain/core/messages";
-import { generateText, stepCountIs } from "ai";
-import type { ProviderConnector } from "../../connectors/provider-connector";
+import type { Tool, ToolCall } from "@mariozechner/pi-ai";
+import type { Message, AssistantMessage } from "../../messages/types";
+import {
+  userMessage,
+  assistantTextMessage,
+  extractAssistantText,
+  isAssistantMessage,
+} from "../../messages/types";
 import type { AppProgressEvent, ChatPromptContent, ChatPromptContentBlock } from "../../domain/assistant";
 import { ConversationStore } from "./conversation-store";
 import { ConversationStateTransitionService } from "./conversation-state-transition-service";
-import { appendResponseMessages, toModelMessages, toToolSet, toV3Usage } from "../ai-sdk-message-service";
+import { runAgentLoop, type ToolExecutor } from "./agent-loop";
 import { ModelService } from "../models/model-service";
 import { guardUntrustedText } from "../prompt-injection-guard-service";
 import { prependTextToChatPromptContent } from "../message-content-service";
@@ -17,7 +22,6 @@ import {
 import { ToolRegistry } from "../../tools/tool-registry";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
-import { ToolResultStore } from "../tool-result-store";
 import { ToolResolutionService } from "../tool-resolution-service";
 import { ConversationMemoryService } from "./conversation-memory-service";
 import type { ReflectionService } from "../reflection-service";
@@ -105,22 +109,6 @@ class AgentRunStoppedError extends Error {
   }
 }
 
-function extractAssistantText(message: AIMessage): string {
-  if (typeof message.content === "string") {
-    return message.content.trim();
-  }
-  return JSON.stringify(message.content);
-}
-
-function extractResponseWarnings(message: AIMessage): string[] {
-  const warnings = message.response_metadata?.warnings;
-  if (!Array.isArray(warnings)) {
-    return [];
-  }
-
-  return warnings.filter((warning): warning is string => typeof warning === "string" && warning.trim().length > 0);
-}
-
 function toPromptBlocks(content: ChatPromptContent) {
   if (typeof content === "string") {
     return [{ type: "text" as const, text: content }];
@@ -158,8 +146,15 @@ function buildCombinedTurnContent(
   return combineQueuedChatContents([baseContent, ...pendingContent]);
 }
 
+function chatPromptContentToString(content: ChatPromptContent): string {
+  if (typeof content === "string") return content;
+  return content
+    .filter((block): block is { type: "text"; text: string } => block.type === "text")
+    .map((block) => block.text)
+    .join("\n");
+}
+
 export type ChatDependencies = {
-  connector: ProviderConnector;
   routineTools: ToolRegistry;
   toolResolver: ToolResolutionService;
   transitions: ConversationStateTransitionService;
@@ -172,7 +167,6 @@ export type ChatDependencies = {
 
 export class AgentChatService {
   private readonly sessions = new Map<string, ConversationSessionState>();
-  private readonly toolResults = new ToolResultStore();
   private timezoneProvider?: () => string;
 
   constructor(
@@ -381,14 +375,15 @@ export class AgentChatService {
     onToolUse: ((event: AppProgressEvent) => Promise<void>) | undefined,
   ) {
     const context = this.buildChatToolContext(conversationKey, session, onToolUse);
-    const structuredTools = this.deps.toolResolver.resolveAllForChat({ context }).entries;
+    const allTools = this.deps.toolResolver.resolveAllForChat({ context }).entries;
     return {
-      tools: toToolSet(structuredTools),
+      tools: allTools,
       getActiveTools: () =>
         this.deps.toolResolver.resolveForChat({
           activatedToolNames: [...session.activatedToolNames],
           context,
         }).tools,
+      context,
     };
   }
 
@@ -526,29 +521,12 @@ export class AgentChatService {
     const systemPrompt = composeSystemPrompt(
       conversation.systemPrompt?.text ?? systemPromptSnapshot.text,
     );
-    const resolvedTools = this.deps.toolResolver.resolveForChat({
-      activatedToolNames: [...session.activatedToolNames],
-      context: {
-        conversationKey: job.conversationKey,
-        invocationSource: "chat",
-        getActiveToolNames: () => [...session.activatedToolNames],
-        activateToolNames: (toolNames) => {
-          for (const name of toolNames) {
-            session.activatedToolNames.add(name);
-          }
-        },
-      },
-    });
+
     const usage = await this.deps.models.inspectContextWindowUsage({
       conversationKey: job.conversationKey,
       systemPrompt: systemPrompt.text,
-      messages: conversation.messages.concat(new HumanMessage(
-        buildCombinedTurnContent(
-          job.content,
-          session.pendingSteeringMessages.map((entry) => entry.content),
-        ),
-      )),
-      tools: resolvedTools.entries,
+      messages: conversation.messages,
+      tools: this.deps.routineTools.getToolDefinitions(),
     });
 
     const projectedReplyReserve = Math.min(
@@ -625,7 +603,9 @@ export class AgentChatService {
       job.conversationKey,
       await this.deps.systemPrompts.load(),
     );
-    await this.deps.conversations.appendMessages(job.conversationKey, [new AIMessage(job.message)]);
+    await this.deps.conversations.appendMessages(job.conversationKey, [
+      assistantTextMessage(job.message),
+    ]);
     job.resolve();
   }
 
@@ -666,10 +646,22 @@ export class AgentChatService {
           combinedUserContent,
           enableMemoryRecall: job.execution.enableMemoryRecall,
         });
-        const pendingTurnMessages: BaseMessage[] = backgroundExecMessages.concat(
-          new HumanMessage(combinedUserContent),
-        );
+
+        const userMessageText = chatPromptContentToString(userContentWithAutomaticContext);
+        const pendingTurnMessages: Message[] = [
+          ...backgroundExecMessages,
+          userMessage(userMessageText),
+        ];
+
         const toolSet = this.buildChatToolSet(job.conversationKey, session, job.onToolUse);
+
+        // Build the tool executor that delegates to ToolRegistry
+        const toolExecutor: ToolExecutor = async (toolCall, signal) => {
+          return this.deps.routineTools.executeTool(toolCall, toolSet.context, signal);
+        };
+
+        // Resolve the model for this turn
+        const resolved = await this.deps.models.resolveModelForPurpose(job.execution.usagePurpose);
 
         agentChatTelemetry.event(
           "agent_chat.run_turn",
@@ -689,84 +681,31 @@ export class AgentChatService {
           { level: "debug" },
         );
         this.throwIfStopRequested(session);
-        const inputMessages = conversation.messages
-          .concat(backgroundExecMessages)
-          .concat(new HumanMessage(userContentWithAutomaticContext));
-        this.deps.connector.setThinkingCallback?.(
-          job.conversationKey,
-          this.superagentMode && job.onToolUse
-            ? async (message: string) => {
-                await job.onToolUse?.(message);
-              }
-            : undefined,
-        );
+
+        const inputMessages: Message[] = [
+          ...conversation.messages,
+          ...backgroundExecMessages,
+          userMessage(userMessageText),
+        ];
+
         try {
           const result = await this.runAbortableModelCall(session, (signal) =>
-            generateText({
-              model: this.deps.connector,
-              system: systemPrompt.text,
-              messages: toModelMessages(inputMessages),
+            runAgentLoop({
+              model: resolved.runtimeModel,
+              systemPrompt: systemPrompt.text,
+              messages: inputMessages,
               tools: toolSet.tools,
-              activeTools: toolSet.getActiveTools(),
-              prepareStep: () => ({
-                activeTools: toolSet.getActiveTools(),
-              }),
-              stopWhen: stepCountIs(CHAT_MAX_STEPS),
-              abortSignal: signal,
+              executeTool: toolExecutor,
+              maxSteps: CHAT_MAX_STEPS,
+              signal,
+              apiKey: resolved.apiKey,
               providerOptions: {
-                openelinaro: {
-                  sessionId: job.execution.providerSessionId ?? job.conversationKey,
-                  conversationKey: job.execution.providerSessionId ?? job.conversationKey,
-                  usagePurpose: job.execution.usagePurpose,
-
-                },
+                sessionId: job.execution.providerSessionId ?? job.conversationKey,
               },
             })
           );
-          const warnings = (result.warnings ?? [])
-            .map((warning) => warning.type === "other" ? warning.message : warning.details ?? warning.feature)
-            .filter((warning): warning is string => Boolean(warning && warning.trim()));
-          const responseMessages = await appendResponseMessages(
-            [],
-            result.response.messages,
-            {
-              warnings,
-              usage: toV3Usage(result.totalUsage),
-              modelId: result.response.modelId,
-              provider: this.deps.connector.providerId,
-              finishReason: {
-                unified: result.finishReason,
-                raw: result.rawFinishReason,
-              },
-              toolResultStore: this.toolResults,
-              toolResultNamespace: job.conversationKey,
-            },
-          );
 
-          const toolCallCount = responseMessages
-            .filter((message): message is AIMessage => message instanceof AIMessage)
-            .reduce((count, message) => count + (message.tool_calls?.length ?? 0), 0);
-          const toolResultCount = responseMessages.filter(
-            (message) => message._getType() === "tool",
-          ).length;
-
-          if (toolCallCount > 0 || toolResultCount > 0) {
-            agentChatTelemetry.event(
-              "agent_chat.response_messages",
-              {
-                conversationKey: job.conversationKey,
-                totalMessages: responseMessages.length,
-                toolCallCount,
-                toolResultCount,
-                persistConversation: job.execution.persistConversation,
-              },
-              { level: "debug" },
-            );
-          }
-
-          // Check pending conversation reset before persistence — a pending
-          // reset means the conversation was already replaced by
-          // startFreshConversation, so appending would re-add stale messages.
+          // Check pending conversation reset before persistence
           const pendingResetMessage = this.deps.routineTools.consumePendingConversationReset(
             job.conversationKey,
           );
@@ -778,35 +717,24 @@ export class AgentChatService {
             };
           }
 
-          // Persist response messages BEFORE checking stop so that tool calls
-          // that have already executed are never silently lost.  Without this,
-          // a stop request would discard the response messages even though their
-          // side-effects already happened, leaving the model unable to see its
-          // own tool invocations on the next turn.
-          let finalMessage = [...responseMessages]
-            .reverse()
-            .find((message): message is AIMessage => message instanceof AIMessage);
+          // Persist response messages BEFORE checking stop
           if (job.execution.persistConversation) {
-            const appendedMessages = pendingTurnMessages.concat(responseMessages);
-            const savedConversation = await this.deps.conversations.appendMessages(
+            await this.deps.conversations.appendMessages(
               job.conversationKey,
-              appendedMessages,
+              [...pendingTurnMessages, ...result.newMessages],
             );
-            finalMessage = [...savedConversation.messages]
-              .reverse()
-              .find((message): message is AIMessage => message instanceof AIMessage);
           }
 
-          // Check stop AFTER persistence — the model's work (including tool
-          // calls and their results) is already recorded, so the next turn
-          // will see them even if we bail here.
+          // Check stop AFTER persistence
           this.throwIfStopRequested(session);
 
-          const combinedWarnings = [
-            ...(promptWarning ? [promptWarning] : []),
-            ...(finalMessage ? extractResponseWarnings(finalMessage) : []),
-          ].filter((warning, index, all) => all.indexOf(warning) === index);
-          if (!finalMessage) {
+          const responseText = result.finalMessage
+            ? extractAssistantText(result.finalMessage)
+            : "";
+
+          const combinedWarnings = promptWarning ? [promptWarning] : [];
+
+          if (!responseText) {
             return {
               mode: "immediate" as const,
               message: "The assistant did not return a reply.",
@@ -815,12 +743,11 @@ export class AgentChatService {
           }
           return {
             mode: "immediate" as const,
-            message:
-              extractAssistantText(finalMessage) || "The assistant responded without text output.",
+            message: responseText,
             warnings: combinedWarnings,
           };
         } finally {
-          this.deps.connector.setThinkingCallback?.(job.conversationKey);
+          // No thinking callback cleanup needed — pi-ai doesn't have this
         }
       },
       {
@@ -839,7 +766,7 @@ export class AgentChatService {
   private async buildUserContentWithAutomaticContext(params: {
     conversationKey: string;
     systemContext?: string;
-    conversationMessages: BaseMessage[];
+    conversationMessages: Message[];
     combinedUserContent: ChatPromptContent;
     enableMemoryRecall: boolean;
   }) {
@@ -867,13 +794,13 @@ export class AgentChatService {
     return prependTextToChatPromptContent(params.combinedUserContent, automaticContext);
   }
 
-  private buildBackgroundExecMessages(notifications: string[]) {
+  private buildBackgroundExecMessages(notifications: string[]): Message[] {
     if (notifications.length === 0) {
-      return [] as HumanMessage[];
+      return [];
     }
 
     return [
-      new HumanMessage(
+      userMessage(
         wrapInjectedMessage("background_exec", [
           "Background exec notifications (automatic runtime note, not a new user instruction):",
           ...notifications.map((notification) =>
@@ -899,7 +826,7 @@ export class AgentChatService {
     }
 
     const pending = this.consumePendingSteeringMessages(session);
-      const newest = pending[pending.length - 1];
+    const newest = pending[pending.length - 1];
     if (!newest) {
       return;
     }

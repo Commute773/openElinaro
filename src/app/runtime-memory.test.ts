@@ -2,14 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
-import type { LanguageModelV3CallOptions, LanguageModelV3GenerateResult } from "@ai-sdk/provider";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import {
-  buildScriptedConnectorRequest,
-  toGenerateResultFromAIMessage,
-  type ScriptedConnectorRequest,
-} from "../test/scripted-provider-connector";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
 
 const repoRoot = process.cwd();
@@ -19,11 +12,9 @@ let previousCwd = "";
 let tempRoot = "";
 
 let runtimeModule: typeof import("./runtime");
-let activeConnectorModule: typeof import("../connectors/active-model-connector");
 let memoryServiceModule: typeof import("../services/memory-service");
 let conversationMemoryModule: typeof import("../services/conversation/conversation-memory-service");
 
-let originalDoGenerate: typeof activeConnectorModule.ActiveModelConnector.prototype.doGenerate;
 let originalEnsureReady: typeof memoryServiceModule.MemoryService.prototype.ensureReady;
 let originalBuildRecallContext: typeof conversationMemoryModule.ConversationMemoryService.prototype.buildRecallContext;
 
@@ -61,10 +52,10 @@ function writeRuntimeFixture() {
   fs.mkdirSync(path.join(tempRoot, ".openelinarotest", "memory/documents/root"), { recursive: true });
 }
 
-function latestHumanText(request: ScriptedConnectorRequest) {
-  const message = [...request.messages]
+function latestHumanText(messages: import("../messages/types").Message[]) {
+  const message = [...messages]
     .reverse()
-    .find((entry): entry is HumanMessage => entry instanceof HumanMessage);
+    .find((entry): entry is import("../messages/types").UserMessage => entry.role === "user");
   if (!message) {
     return "";
   }
@@ -72,9 +63,6 @@ function latestHumanText(request: ScriptedConnectorRequest) {
 }
 
 beforeAll(async () => {
-  activeConnectorModule = await importFresh<typeof import("../connectors/active-model-connector")>(
-    "src/connectors/active-model-connector.ts",
-  );
   memoryServiceModule = await importFresh<typeof import("../services/memory-service")>(
     "src/services/memory-service.ts",
   );
@@ -83,27 +71,15 @@ beforeAll(async () => {
   );
   runtimeModule = await importFresh<typeof import("./runtime")>("src/app/runtime.ts");
 
-  originalDoGenerate = activeConnectorModule.ActiveModelConnector.prototype.doGenerate;
   originalEnsureReady = memoryServiceModule.MemoryService.prototype.ensureReady;
   originalBuildRecallContext = conversationMemoryModule.ConversationMemoryService.prototype.buildRecallContext;
 
   memoryServiceModule.MemoryService.prototype.ensureReady = async function ensureReady() {
     return {} as Awaited<ReturnType<typeof originalEnsureReady>>;
   };
-  activeConnectorModule.ActiveModelConnector.prototype.doGenerate = async function doGenerate(
-    options: LanguageModelV3CallOptions,
-  ): Promise<LanguageModelV3GenerateResult> {
-    const request = await buildScriptedConnectorRequest(options);
-    return toGenerateResultFromAIMessage(
-      new AIMessage(`Acknowledged: ${latestHumanText(request)}`),
-      "active-model-router",
-      "scripted-model",
-    );
-  };
 });
 
 afterAll(() => {
-  activeConnectorModule.ActiveModelConnector.prototype.doGenerate = originalDoGenerate;
   memoryServiceModule.MemoryService.prototype.ensureReady = originalEnsureReady;
   conversationMemoryModule.ConversationMemoryService.prototype.buildRecallContext = originalBuildRecallContext;
 

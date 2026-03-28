@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { ProfileRecord } from "../../domain/profiles";
+import { userMessage, assistantTextMessage } from "../../messages/types";
 import { ConversationMemoryService } from "./conversation-memory-service";
 import type { MemorySearchMatch } from "../memory-service";
 
@@ -174,8 +174,8 @@ describe("ConversationMemoryService", () => {
         conversationKey: "conv-1",
         userContent: "what do I remember about programming?",
         conversationMessages: [
-          new HumanMessage("Tell me about TypeScript and Rust programming"),
-          new AIMessage("Sure, those are great languages for different purposes"),
+          userMessage("Tell me about TypeScript and Rust programming"),
+          assistantTextMessage("Sure, those are great languages for different purposes"),
         ],
       });
 

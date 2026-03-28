@@ -66,7 +66,7 @@ try {
   }
 
   // Verify each tool has name and description
-  const missingMeta = tools.filter((t) => !t.name || !t.description);
+  const missingMeta = tools.filter((t) => !t.tool.name || !t.tool.description);
   if (missingMeta.length > 0) {
     console.log(`FNLAYER_AGENT_TOOLS_WARN: ${missingMeta.length} tools missing name/description`);
   }

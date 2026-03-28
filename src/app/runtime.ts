@@ -936,18 +936,6 @@ export class OpenElinaroApp {
           });
         });
       },
-      onPromptDriftWarning: (warning) => {
-        if (!this.onPromptDriftWarning) {
-          return;
-        }
-        void Promise.resolve(this.onPromptDriftWarning(warning)).catch((error) => {
-          this.appTelemetry.recordError(error, {
-            profileId,
-            sessionId: warning.sessionId,
-            operation: "app.prompt_drift_warning_notifier",
-          });
-        });
-      },
       onConversationActivityChange: this.onConversationActivityChange
         ? (params) => {
             void Promise.resolve(this.onConversationActivityChange?.(params)).catch((error) => {
