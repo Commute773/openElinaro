@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, test } from "bun:test";
 import { getRuntimeConfig, saveRuntimeConfig, type RuntimeConfig } from "../config/runtime-config";
 import { OpenBrowserService } from "./openbrowser-service";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import { SecretStoreService } from "./infrastructure/secret-store-service";
 import { buildToolErrorEnvelope } from "./tool-error-service";
 

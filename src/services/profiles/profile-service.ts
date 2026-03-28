@@ -1,19 +1,19 @@
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
-import { AuthorizationError, ConfigurationError, NotFoundError } from "../domain/errors";
+import { AuthorizationError, ConfigurationError, NotFoundError } from "../../domain/errors";
 import type { ThinkingLevel } from "@mariozechner/pi-ai";
-import type { ProjectRecord } from "../domain/projects";
+import type { ProjectRecord } from "../../domain/projects";
 import {
   DEFAULT_MAX_SUBAGENT_DEPTH,
   type ProfileRecord,
   ProfileRegistrySchema,
-} from "../domain/profiles";
-import { getRuntimeConfig } from "../config/runtime-config";
-import { resolveRuntimePath, resolveServicePath, resolveUserDataPath } from "./runtime-root";
-import { SecretStoreService } from "./infrastructure/secret-store-service";
-import { telemetry } from "./infrastructure/telemetry";
-import { DEFAULT_PROFILE_ID } from "../config/service-constants";
+} from "../../domain/profiles";
+import { getRuntimeConfig } from "../../config/runtime-config";
+import { resolveRuntimePath, resolveServicePath, resolveUserDataPath } from "../runtime-root";
+import { SecretStoreService } from "../infrastructure/secret-store-service";
+import { telemetry } from "../infrastructure/telemetry";
+import { DEFAULT_PROFILE_ID } from "../../config/service-constants";
 const SHARED_PROFILE_TMP_ROOT = path.join("/tmp", "openelinaro-profile-tmp");
 const PROFILE_SSH_SECRET_PREFIX = "profile_ssh_keypair";
 

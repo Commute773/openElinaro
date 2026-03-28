@@ -124,7 +124,7 @@ function userProfile(extra: Partial<ProfileRecord> = {}): ProfileRecord {
 }
 
 // Import after mocks
-import { AccessControlService } from "./access-control-service";
+import { AccessControlService } from "./profiles";
 
 // ---------------------------------------------------------------------------
 // Tests

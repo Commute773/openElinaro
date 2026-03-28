@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { ProfileRecord } from "../domain/profiles";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import type { ShellService } from "./infrastructure/shell-service";
 import type {
   FilesystemBackend,

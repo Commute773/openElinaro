@@ -154,21 +154,25 @@ function buildCombinedTurnContent(
   return combineQueuedChatContents([baseContent, ...pendingContent]);
 }
 
+export type ChatDependencies = {
+  connector: ProviderConnector;
+  routineTools: ToolRegistry;
+  toolResolver: ToolResolutionService;
+  transitions: ConversationStateTransitionService;
+  conversations: ConversationStore;
+  systemPrompts: SystemPromptService;
+  models: ModelService;
+  memory?: Pick<ConversationMemoryService, "buildRecallContext">;
+  reflection?: Pick<ReflectionService, "queueCompactionReflection">;
+};
+
 export class AgentChatService {
   private readonly sessions = new Map<string, ConversationSessionState>();
   private readonly toolResults = new ToolResultStore();
   private timezoneProvider?: () => string;
 
   constructor(
-    private readonly connector: ProviderConnector,
-    private readonly routineTools: ToolRegistry,
-    private readonly toolResolver: ToolResolutionService,
-    private readonly transitions: ConversationStateTransitionService,
-    private readonly conversations: ConversationStore,
-    private readonly systemPrompts: SystemPromptService,
-    private readonly models: ModelService,
-    private readonly conversationMemory?: Pick<ConversationMemoryService, "buildRecallContext">,
-    private readonly reflection?: Pick<ReflectionService, "queueCompactionReflection">,
+    private readonly deps: ChatDependencies,
     private readonly superagentMode = false,
     private conversationActivityNotifier?: (params: { conversationKey: string; active: boolean }) => void,
   ) {}
@@ -373,11 +377,11 @@ export class AgentChatService {
     onToolUse: ((event: AppProgressEvent) => Promise<void>) | undefined,
   ) {
     const context = this.buildChatToolContext(conversationKey, session, onToolUse);
-    const structuredTools = this.toolResolver.resolveAllForChat({ context }).entries;
+    const structuredTools = this.deps.toolResolver.resolveAllForChat({ context }).entries;
     return {
       tools: toToolSet(structuredTools),
       getActiveTools: () =>
-        this.toolResolver.resolveForChat({
+        this.deps.toolResolver.resolveForChat({
           activatedToolNames: [...session.activatedToolNames],
           context,
         }).tools,
@@ -506,8 +510,8 @@ export class AgentChatService {
     }
 
     this.throwIfStopRequested(session);
-    const systemPromptSnapshot = await this.systemPrompts.load();
-    const conversation = await this.conversations.ensureSystemPrompt(
+    const systemPromptSnapshot = await this.deps.systemPrompts.load();
+    const conversation = await this.deps.conversations.ensureSystemPrompt(
       job.conversationKey,
       systemPromptSnapshot,
     );
@@ -518,7 +522,7 @@ export class AgentChatService {
     const systemPrompt = composeSystemPrompt(
       conversation.systemPrompt?.text ?? systemPromptSnapshot.text,
     );
-    const resolvedTools = this.toolResolver.resolveForChat({
+    const resolvedTools = this.deps.toolResolver.resolveForChat({
       activatedToolNames: [...session.activatedToolNames],
       context: {
         conversationKey: job.conversationKey,
@@ -531,7 +535,7 @@ export class AgentChatService {
         },
       },
     });
-    const usage = await this.models.inspectContextWindowUsage({
+    const usage = await this.deps.models.inspectContextWindowUsage({
       conversationKey: job.conversationKey,
       systemPrompt: systemPrompt.text,
       messages: conversation.messages.concat(new HumanMessage(
@@ -566,7 +570,7 @@ export class AgentChatService {
       let compacted;
       try {
         compacted = await this.runAbortableModelCall(session, (signal) =>
-          this.transitions.compactForContinuation({
+          this.deps.transitions.compactForContinuation({
             conversationKey: job.conversationKey,
             onProgress: job.onToolUse,
             signal,
@@ -598,7 +602,7 @@ export class AgentChatService {
         queuedMessages: session.queue.length,
         utilizationPercent: effectiveUtilizationPercent,
       });
-      this.reflection?.queueCompactionReflection({
+      this.deps.reflection?.queueCompactionReflection({
         summary: compacted.summary,
         conversationKey: job.conversationKey,
       });
@@ -613,11 +617,11 @@ export class AgentChatService {
   }
 
   private async appendAssistantMessage(job: QueuedAssistantMessageJob) {
-    await this.conversations.ensureSystemPrompt(
+    await this.deps.conversations.ensureSystemPrompt(
       job.conversationKey,
-      await this.systemPrompts.load(),
+      await this.deps.systemPrompts.load(),
     );
-    await this.conversations.appendMessages(job.conversationKey, [new AIMessage(job.message)]);
+    await this.deps.conversations.appendMessages(job.conversationKey, [new AIMessage(job.message)]);
     job.resolve();
   }
 
@@ -629,9 +633,9 @@ export class AgentChatService {
         session.stopRequested = false;
         const conversation = await this.loadConversationForJob(job);
         const backgroundExecNotifications = job.execution.includeBackgroundExecNotifications
-          ? this.routineTools.consumePendingBackgroundExecNotifications(job.conversationKey)
+          ? this.deps.routineTools.consumePendingBackgroundExecNotifications(job.conversationKey)
           : [];
-        const promptSnapshot = await this.systemPrompts.load();
+        const promptSnapshot = await this.deps.systemPrompts.load();
         const systemPrompt = composeSystemPrompt(
           conversation.systemPrompt?.text ?? promptSnapshot.text,
         );
@@ -684,7 +688,7 @@ export class AgentChatService {
         const inputMessages = conversation.messages
           .concat(backgroundExecMessages)
           .concat(new HumanMessage(userContentWithAutomaticContext));
-        this.connector.setThinkingCallback?.(
+        this.deps.connector.setThinkingCallback?.(
           job.conversationKey,
           this.superagentMode && job.onToolUse
             ? async (message: string) => {
@@ -695,7 +699,7 @@ export class AgentChatService {
         try {
           const result = await this.runAbortableModelCall(session, (signal) =>
             generateText({
-              model: this.connector,
+              model: this.deps.connector,
               system: systemPrompt.text,
               messages: toModelMessages(inputMessages),
               tools: toolSet.tools,
@@ -725,7 +729,7 @@ export class AgentChatService {
               warnings,
               usage: toV3Usage(result.totalUsage),
               modelId: result.response.modelId,
-              provider: this.connector.providerId,
+              provider: this.deps.connector.providerId,
               finishReason: {
                 unified: result.finishReason,
                 raw: result.rawFinishReason,
@@ -759,7 +763,7 @@ export class AgentChatService {
           // Check pending conversation reset before persistence — a pending
           // reset means the conversation was already replaced by
           // startFreshConversation, so appending would re-add stale messages.
-          const pendingResetMessage = this.routineTools.consumePendingConversationReset(
+          const pendingResetMessage = this.deps.routineTools.consumePendingConversationReset(
             job.conversationKey,
           );
           if (pendingResetMessage) {
@@ -780,7 +784,7 @@ export class AgentChatService {
             .find((message): message is AIMessage => message instanceof AIMessage);
           if (job.execution.persistConversation) {
             const appendedMessages = pendingTurnMessages.concat(responseMessages);
-            const savedConversation = await this.conversations.appendMessages(
+            const savedConversation = await this.deps.conversations.appendMessages(
               job.conversationKey,
               appendedMessages,
             );
@@ -812,7 +816,7 @@ export class AgentChatService {
             warnings: combinedWarnings,
           };
         } finally {
-          this.connector.setThinkingCallback?.(job.conversationKey);
+          this.deps.connector.setThinkingCallback?.(job.conversationKey);
         }
       },
       {
@@ -840,8 +844,8 @@ export class AgentChatService {
       sections.push(params.systemContext.trim());
     }
 
-    if (params.enableMemoryRecall && this.conversationMemory) {
-      const memoryContext = await this.conversationMemory.buildRecallContext({
+    if (params.enableMemoryRecall && this.deps.memory) {
+      const memoryContext = await this.deps.memory.buildRecallContext({
         conversationKey: params.conversationKey,
         userContent: params.combinedUserContent,
         conversationMessages: params.conversationMessages,
@@ -953,15 +957,15 @@ export class AgentChatService {
   }
 
   private async loadConversationForJob(job: QueuedChatJob) {
-    const systemPromptSnapshot = await this.systemPrompts.load();
+    const systemPromptSnapshot = await this.deps.systemPrompts.load();
     if (job.execution.persistConversation) {
-      return this.conversations.ensureSystemPrompt(
+      return this.deps.conversations.ensureSystemPrompt(
         job.conversationKey,
         systemPromptSnapshot,
       );
     }
 
-    const conversation = await this.conversations.get(job.contextConversationKey ?? job.conversationKey);
+    const conversation = await this.deps.conversations.get(job.contextConversationKey ?? job.conversationKey);
     return {
       ...conversation,
       systemPrompt: conversation.systemPrompt ?? systemPromptSnapshot,

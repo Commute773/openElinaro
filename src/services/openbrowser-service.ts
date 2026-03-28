@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import { getRuntimeConfig } from "../config/runtime-config";
-import { ProfileService } from "./profile-service";
+import { ProfileService } from "./profiles";
 import {
   assertSharedPythonRuntimeReady,
   getOpenBrowserPythonModules,

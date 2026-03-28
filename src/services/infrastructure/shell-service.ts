@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { AccessControlService } from "../access-control-service";
+import { AccessControlService } from "../profiles";
 import { LocalShellBackend } from "../shell-backend-local";
 import type { ShellBackend } from "../shell-backend";
 import { resolveRuntimePath } from "../runtime-root";

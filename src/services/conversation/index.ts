@@ -2,7 +2,7 @@
  * Conversation domain barrel exports.
  * Re-exports services that manage chat, memory, history, and state transitions.
  */
-export { AgentChatService } from "../agent-chat-service";
+export { AgentChatService, type ChatDependencies } from "../agent-chat-service";
 export { ConversationStore } from "../conversation-store";
 export { ConversationMemoryService } from "../conversation-memory-service";
 export { ConversationStateTransitionService } from "../conversation-state-transition-service";
