@@ -19,7 +19,7 @@ let profilesModule: typeof import("../services/profiles/profile-service");
 let projectsModule: typeof import("../services/projects-service");
 let accessModule: typeof import("../services/profiles/access-control-service");
 let workspaceModule: typeof import("../services/project-workspace-service");
-let routinesModule: typeof import("../services/routines-service");
+let routinesModule: typeof import("../services/scheduling/routines-service");
 let conversationsModule: typeof import("../services/conversation/conversation-store");
 let systemPromptsModule: typeof import("../services/system-prompt-service");
 let memoryModule: typeof import("../services/memory-service");
@@ -166,7 +166,7 @@ beforeAll(async () => {
   projectsModule = await importFresh("src/services/projects-service.ts");
   accessModule = await importFresh("src/services/profiles/access-control-service.ts");
   workspaceModule = await importFresh("src/services/project-workspace-service.ts");
-  routinesModule = await importFresh("src/services/routines-service.ts");
+  routinesModule = await importFresh("src/services/scheduling/routines-service.ts");
   conversationsModule = await importFresh("src/services/conversation/conversation-store.ts");
   systemPromptsModule = await importFresh("src/services/system-prompt-service.ts");
   memoryModule = await importFresh("src/services/memory-service.ts");

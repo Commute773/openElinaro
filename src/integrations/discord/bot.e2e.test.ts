@@ -23,7 +23,7 @@ let authSessionManagerModule: typeof import("./auth-session-manager");
 let profileServiceModule: typeof import("../../services/profiles/profile-service");
 let projectsServiceModule: typeof import("../../services/projects-service");
 let accessControlModule: typeof import("../../services/profiles/access-control-service");
-let routinesServiceModule: typeof import("../../services/routines-service");
+let routinesServiceModule: typeof import("../../services/scheduling/routines-service");
 let conversationStoreModule: typeof import("../../services/conversation/conversation-store");
 let systemPromptModule: typeof import("../../services/system-prompt-service");
 let memoryServiceModule: typeof import("../../services/memory-service");
@@ -677,7 +677,7 @@ if (RUN_CHILD_SUITE) {
     profileServiceModule = await importFresh("src/services/profiles/profile-service.ts");
     projectsServiceModule = await importFresh("src/services/projects-service.ts");
     accessControlModule = await importFresh("src/services/profiles/access-control-service.ts");
-    routinesServiceModule = await importFresh("src/services/routines-service.ts");
+    routinesServiceModule = await importFresh("src/services/scheduling/routines-service.ts");
     conversationStoreModule = await importFresh("src/services/conversation/conversation-store.ts");
     systemPromptModule = await importFresh("src/services/system-prompt-service.ts");
     memoryServiceModule = await importFresh("src/services/memory-service.ts");

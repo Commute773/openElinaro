@@ -1,6 +1,6 @@
 import type { CalendarHintEvent } from "../domain/routines";
 import { getRuntimeConfig } from "../config/runtime-config";
-import { RoutinesService } from "./routines-service";
+import { RoutinesService } from "./scheduling/routines-service";
 import { telemetry } from "./telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { CalendarSyncStateService } from "./calendar-sync-state-service";

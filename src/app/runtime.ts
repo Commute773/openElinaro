@@ -9,7 +9,7 @@ import { ProjectWorkspaceService } from "../services/project-workspace-service";
 import { HeartbeatService } from "../services/heartbeat-service";
 import type { CacheMissWarning } from "../services/cache-miss-monitor";
 import type { InferencePromptDriftWarning } from "../services/inference-prompt-drift-monitor";
-import { RoutinesService } from "../services/routines-service";
+import { RoutinesService } from "../services/scheduling/routines-service";
 import { ServiceRestartNoticeService } from "../services/service-restart-notice-service";
 import { SystemPromptService } from "../services/system-prompt-service";
 import { telemetry } from "../services/telemetry";

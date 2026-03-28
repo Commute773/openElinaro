@@ -6,7 +6,7 @@ import { RecentThreadContextService, shouldIncludeRecentThreadContext } from "..
 import type { ProfileService } from "../services/profiles";
 import type { ConversationStore } from "../services/conversation/conversation-store";
 import { WorkPlanningService } from "../services/work-planning-service";
-import type { RoutinesService } from "../services/routines-service";
+import type { RoutinesService } from "../services/scheduling/routines-service";
 import { telemetry } from "../services/telemetry";
 import type { RuntimeScope } from "./runtime-scope";
 

@@ -20,7 +20,7 @@ let memoryServiceModule: typeof import("./memory-service");
 let modelServiceModule: typeof import("./models/model-service");
 let profileServiceModule: typeof import("./profiles/profile-service");
 let projectsServiceModule: typeof import("./projects-service");
-let routinesServiceModule: typeof import("./routines-service");
+let routinesServiceModule: typeof import("./scheduling/routines-service");
 let systemPromptModule: typeof import("./system-prompt-service");
 let toolResolutionModule: typeof import("./tool-resolution-service");
 let toolRegistryModule: typeof import("../tools/tool-registry");
@@ -339,7 +339,7 @@ describe("OpenBrowser agent e2e", () => {
     modelServiceModule = await importFresh("src/services/models/model-service.ts");
     profileServiceModule = await importFresh("src/services/profiles/profile-service.ts");
     projectsServiceModule = await importFresh("src/services/projects-service.ts");
-    routinesServiceModule = await importFresh("src/services/routines-service.ts");
+    routinesServiceModule = await importFresh("src/services/scheduling/routines-service.ts");
     systemPromptModule = await importFresh("src/services/system-prompt-service.ts");
     toolResolutionModule = await importFresh("src/services/tool-resolution-service.ts");
     toolRegistryModule = await importFresh("src/tools/tool-registry.ts");

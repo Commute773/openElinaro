@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.4
+- Released at: 2026-03-28T00:57:35Z
+- Release id: 20260328T005735Z-16db973
+- Previous version: 2026.03.28.3
+- Trigger: ci/release workflow
+
+- refactor: move scheduling services into domain subdirectory
+
 ## 2026.03.28.3
 - Released at: 2026-03-28T00:55:39Z
 - Release id: 20260328T005539Z-af796a2
