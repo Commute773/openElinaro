@@ -19,7 +19,7 @@ import {
   AmbiguousModelIdentifierError,
   ModelService,
   type ModelProviderId,
-} from "../../services/model-service";
+} from "../../services/models/model-service";
 import type { ThinkingLevel } from "@mariozechner/pi-ai";
 
 // ---------------------------------------------------------------------------

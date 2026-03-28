@@ -27,7 +27,7 @@ let routinesServiceModule: typeof import("../../services/routines-service");
 let conversationStoreModule: typeof import("../../services/conversation-store");
 let systemPromptModule: typeof import("../../services/system-prompt-service");
 let memoryServiceModule: typeof import("../../services/memory-service");
-let modelServiceModule: typeof import("../../services/model-service");
+let modelServiceModule: typeof import("../../services/models/model-service");
 let transitionServiceModule: typeof import("../../services/conversation-state-transition-service");
 let toolRegistryModule: typeof import("../../tools/tool-registry");
 let toolResolutionModule: typeof import("../../services/tool-resolution-service");
@@ -681,7 +681,7 @@ if (RUN_CHILD_SUITE) {
     conversationStoreModule = await importFresh("src/services/conversation-store.ts");
     systemPromptModule = await importFresh("src/services/system-prompt-service.ts");
     memoryServiceModule = await importFresh("src/services/memory-service.ts");
-    modelServiceModule = await importFresh("src/services/model-service.ts");
+    modelServiceModule = await importFresh("src/services/models/model-service.ts");
     transitionServiceModule = await importFresh("src/services/conversation-state-transition-service.ts");
     toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
     toolResolutionModule = await importFresh("src/services/tool-resolution-service.ts");

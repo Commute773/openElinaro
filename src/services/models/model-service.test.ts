@@ -3,10 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { HumanMessage } from "@langchain/core/messages";
 import { describe, expect, test } from "bun:test";
-import type { ProfileRecord } from "../domain/profiles";
+import type { ProfileRecord } from "../../domain/profiles";
 import type { ActiveModelSelection } from "./model-service";
 import { ModelService, resolveListedModelIdentifier, resolveRuntimeModelIdentifier } from "./model-service";
-import { UsageTrackingService } from "./usage-tracking-service";
+import { UsageTrackingService } from "../usage-tracking-service";
 
 const TEST_PROFILE: ProfileRecord = {
   id: "test-profile",
