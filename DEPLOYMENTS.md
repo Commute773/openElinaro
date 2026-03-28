@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.11
+- Released at: 2026-03-28T01:33:40Z
+- Release id: 20260328T013340Z-84a9245
+- Previous version: 2026.03.28.10
+- Trigger: ci/release workflow
+
+- test: add unit tests for generate-discord-commands (#152)
+
 ## 2026.03.28.10
 - Released at: 2026-03-28T01:31:42Z
 - Release id: 20260328T013142Z-5ab6462
