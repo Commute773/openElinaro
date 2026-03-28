@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.28.12
+- Released at: 2026-03-28T01:45:31Z
+- Release id: 20260328T014531Z-be0c747
+- Previous version: 2026.03.28.11
+- Trigger: ci/release workflow
+
+- refactor: extract FileStateService base class to eliminate state service duplication
+- refactor: extract shared readWebhookPayload into src/utils/http-helpers.ts
+
 ## 2026.03.28.11
 - Released at: 2026-03-28T01:33:40Z
 - Release id: 20260328T013340Z-84a9245
