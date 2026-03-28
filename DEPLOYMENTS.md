@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.18
+- Released at: 2026-03-28T03:36:26Z
+- Release id: 20260328T033626Z-77392da
+- Previous version: 2026.03.28.17
+- Trigger: ci/release workflow
+
+- refactor: replace lights_set natural-language parser with direct RGB/WC channel input
+
 ## 2026.03.28.17
 - Released at: 2026-03-28T02:25:20Z
 - Release id: 20260328T022520Z-fdd516d
