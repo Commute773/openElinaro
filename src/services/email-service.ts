@@ -6,6 +6,7 @@ import { getRuntimeConfig } from "../config/runtime-config";
 import { SecretStoreService } from "./infrastructure/secret-store-service";
 import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
+import { DEFAULT_EMAIL_TIMEOUT_MS, DEFAULT_EMAIL_LIST_LIMIT } from "../config/service-constants";
 
 const DEFAULT_EMAIL_PROVIDER = "IMAP/SMTP";
 const DEFAULT_EMAIL_USERNAME = "";
@@ -19,8 +20,6 @@ const DEFAULT_EMAIL_SMTP_SECURE = true;
 const DEFAULT_EMAIL_API_BASE_URL = "";
 const DEFAULT_EMAIL_PASSWORD_SECRET_REF = "email.password";
 const DEFAULT_EMAIL_API_KEY_SECRET_REF = "email.apiKey";
-const DEFAULT_EMAIL_TIMEOUT_MS = 20_000;
-const DEFAULT_EMAIL_LIST_LIMIT = 10;
 const DEFAULT_EMAIL_MAX_BODY_CHARS = 12_000;
 
 const emailTelemetry = telemetry.child({ component: "email" });

@@ -15,13 +15,14 @@ import {
 import type { ToolResultStore } from "../services/tool-result-store";
 import { telemetry } from "../services/infrastructure/telemetry";
 import type { ToolContext } from "./tool-registry";
+import {
+  TOOL_SUMMARY_KEY_LIMIT,
+  TOOL_SUMMARY_LIST_LIMIT,
+  TOOL_SUMMARY_TEXT_LIMIT,
+  TOOL_OUTPUT_CHAR_LIMIT,
+} from "../config/service-constants";
 
 const toolRegistryTelemetry = telemetry.child({ component: "tool" });
-
-const TOOL_SUMMARY_KEY_LIMIT = 4;
-const TOOL_SUMMARY_LIST_LIMIT = 2;
-const TOOL_SUMMARY_TEXT_LIMIT = 40;
-export const TOOL_OUTPUT_CHAR_LIMIT = 10_000;
 export const TOOL_CALL_BEHAVIOR_SCHEMA = z.object({
   silent: z.boolean().optional(),
 });

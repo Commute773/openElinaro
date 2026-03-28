@@ -11,6 +11,7 @@ import {
 } from "./python-runtime";
 import { resolveRuntimePath } from "./runtime-root";
 import { telemetry as rootTelemetry, type TelemetryService } from "./infrastructure/telemetry";
+import { WEB_FETCH_DEFAULT_TIMEOUT_MS, WEB_FETCH_MAX_TIMEOUT_MS } from "../config/service-constants";
 
 export type WebFetchParams = {
   url: string;
@@ -39,8 +40,6 @@ type WebFetchRunnerPayload = {
   artifactDir: string;
 };
 
-const DEFAULT_TIMEOUT_MS = 30_000;
-const MAX_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_CHARS = 12_000;
 const MAX_MAX_CHARS = 40_000;
 
@@ -72,7 +71,7 @@ export class WebFetchService {
 
   async fetch(params: WebFetchParams): Promise<WebFetchResult> {
     const format = params.format ?? "markdown";
-    const timeoutMs = Math.min(Math.max(params.timeoutMs ?? DEFAULT_TIMEOUT_MS, 1_000), MAX_TIMEOUT_MS);
+    const timeoutMs = Math.min(Math.max(params.timeoutMs ?? WEB_FETCH_DEFAULT_TIMEOUT_MS, 1_000), WEB_FETCH_MAX_TIMEOUT_MS);
     const maxChars = Math.min(Math.max(params.maxChars ?? DEFAULT_MAX_CHARS, 500), MAX_MAX_CHARS);
     const url = params.url.trim();
 
