@@ -223,6 +223,14 @@ Request body: `{ "action": "done" | "snooze" | "dismiss" }`. Defaults to `dismis
 
 Response: `{ "ok": true }`
 
+## Generated Routes (Function Layer)
+
+Service-level API routes are generated automatically from function definitions in [`src/functions/domains/`](../../src/functions/domains/). Each function that includes an `http` annotation and lists `api` in its `surfaces` array gets an auto-generated route at startup. Input validation, path/query parameter parsing, and error formatting are handled by the generation layer in [`src/functions/`](../../src/functions/).
+
+The `GET /api/g2/openapi.json` endpoint merges the static OpenAPI spec (covering the hand-written routes above) with a spec generated from these function definitions, so all routes appear in a single schema.
+
+To add a new API endpoint, define a function with an `http` annotation in `src/functions/domains/` rather than hand-writing a route. The function layer takes care of route registration, input validation, and OpenAPI documentation.
+
 ## Error Responses
 
 All errors return JSON with an `error` field:
