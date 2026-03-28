@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import type { ProfileRecord } from "../domain/profiles";
 import type { SubagentProvider, SubagentRun } from "../domain/subagent-run";
-import type { ProfileService } from "../services/profile-service";
+import type { ProfileService } from "../services/profiles";
 import type { ProjectWorkspaceService } from "../services/project-workspace-service";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath } from "../services/runtime-root";

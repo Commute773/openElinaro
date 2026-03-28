@@ -36,7 +36,7 @@ The current platform is close, but it does not yet have a first-class workspace-
 
 - [`src/domain/projects.ts`](../../src/domain/projects.ts) defines a project with one `workspacePath`
 - [`src/domain/workflow-run.ts`](../../src/domain/workflow-run.ts) stores only `workspaceCwd?: string`
-- [`src/services/access-control-service.ts`](../../src/services/access-control-service.ts) authorizes project paths against `project.workspacePath`, which will not automatically include linked worktrees outside that path
+- [`src/services/profiles/access-control-service.ts`](../../src/services/profiles/access-control-service.ts) authorizes project paths against `project.workspacePath`, which will not automatically include linked worktrees outside that path
 - [`src/tools/tool-registry.ts`](../../src/tools/tool-registry.ts) launches coding agents with raw `cwd`
 
 So the main gap is architectural, not Git capability.

@@ -5,7 +5,7 @@ import {
 import type { RoutineItemKind, RoutinePriority } from "../../domain/routines";
 import type { ModelProviderId } from "../../services/models/model-service";
 import { getAuthStatus } from "../../auth/store";
-import { ProfileService } from "../../services/profile-service";
+import { ProfileService } from "../../services/profiles";
 
 export const ROUTINE_KIND_CHOICES: { name: string; value: RoutineItemKind }[] = [
   { name: "todo", value: "todo" },

@@ -58,9 +58,9 @@ Where to look:
 - `~/.openelinaro/projects/registry.json`
 - `src/domain/profiles.ts`
 - `src/domain/projects.ts`
-- `src/services/profile-service.ts`
+- `src/services/profiles/profile-service.ts`
 - `src/services/projects-service.ts`
-- `src/services/access-control-service.ts`
+- `src/services/profiles/access-control-service.ts`
 
 ## 6. Project Context Is Deliberately Separate From Platform Code
 

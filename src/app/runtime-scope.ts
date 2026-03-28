@@ -1,7 +1,7 @@
 import type { CacheMissWarning } from "../services/cache-miss-monitor";
 import type { InferencePromptDriftWarning } from "../services/inference-prompt-drift-monitor";
 import type { ProfileRecord } from "../domain/profiles";
-import { AccessControlService } from "../services/access-control-service";
+import { AccessControlService } from "../services/profiles";
 import { ActiveModelConnector } from "../connectors/active-model-connector";
 import { AgentChatService } from "../services/agent-chat-service";
 import { AutonomousTimeService } from "../services/autonomous-time-service";
@@ -15,7 +15,7 @@ import type { FinanceService } from "../services/finance-service";
 import type { HealthTrackingService } from "../services/health-tracking-service";
 import { MemoryService } from "../services/memory-service";
 import { ModelService } from "../services/models/model-service";
-import type { ProfileService } from "../services/profile-service";
+import type { ProfileService } from "../services/profiles";
 import { ProjectsService } from "../services/projects-service";
 import { ReflectionService } from "../services/reflection-service";
 import type { RoutinesService } from "../services/routines-service";
