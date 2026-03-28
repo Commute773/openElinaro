@@ -1,4 +1,4 @@
-import { telemetry } from "./services/telemetry";
+import { telemetry } from "./services/infrastructure/telemetry";
 import { startHttpServer } from "./integrations/http/server";
 import { startDiscordBot } from "./integrations/discord/bot";
 import { startLocalVoiceSidecarRuntime } from "./services/local-voice-sidecar-runtime";

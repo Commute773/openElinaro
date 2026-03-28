@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import { getRuntimeConfig } from "../../config/runtime-config";
 import { getRuntimeUserFacingToolNames } from "../../tools/tool-registry";
-import { telemetry } from "../../services/telemetry";
+import { telemetry } from "../../services/infrastructure/telemetry";
 import {
   MODEL_PROVIDER_CHOICES,
   PROFILE_ACTION_CHOICES,

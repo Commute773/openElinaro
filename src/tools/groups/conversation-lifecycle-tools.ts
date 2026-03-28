@@ -16,7 +16,7 @@ import type { AgentToolScope, ToolCatalogCard } from "../../domain/tool-catalog"
 import type { ToolLibraryDefinition } from "../../services/tool-library-service";
 import { renderExtendedContextStatus, formatTokenCount } from "./tool-group-types";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
-import { telemetry } from "../../services/telemetry";
+import { telemetry } from "../../services/infrastructure/telemetry";
 import type { AppProgressEvent } from "../../domain/assistant";
 import type { ToolContext } from "../tool-registry";
 

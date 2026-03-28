@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.5
+- Released at: 2026-03-28T01:01:33Z
+- Release id: 20260328T010133Z-de3e7fd
+- Previous version: 2026.03.28.4
+- Trigger: ci/release workflow
+
+- refactor: move infrastructure services into domain subdirectory
+
 ## 2026.03.28.4
 - Released at: 2026-03-28T00:57:35Z
 - Release id: 20260328T005735Z-16db973

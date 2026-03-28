@@ -7,7 +7,7 @@ import type { RouteDefinition } from "../integrations/http/g2/router";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import { CORS_HEADERS, json, error } from "../integrations/http/g2/helpers";
 import { createTraceSpan } from "../utils/telemetry-helpers";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 
 const apiTelemetry = telemetry.child({ component: "function_api" });
 const traceSpan = createTraceSpan(apiTelemetry);

@@ -1,4 +1,4 @@
-import type { TelemetryService } from "../services/telemetry";
+import type { TelemetryService } from "../services/infrastructure/telemetry";
 
 /**
  * Creates a bound `traceSpan` helper scoped to a telemetry child instance.

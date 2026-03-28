@@ -4,12 +4,12 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { NotFoundError, ValidationError } from "../domain/errors";
-import { getLocalEnv } from "../config/local-env";
-import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
+import { NotFoundError, ValidationError } from "../../domain/errors";
+import { getLocalEnv } from "../../config/local-env";
+import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../runtime-root";
 import { telemetry } from "./telemetry";
-import { DEFAULT_PROFILE_ID as DEFAULT_SECRET_STORE_PROFILE_ID } from "../config/service-constants";
-import { timestamp as nowIso } from "../utils/timestamp";
+import { DEFAULT_PROFILE_ID as DEFAULT_SECRET_STORE_PROFILE_ID } from "../../config/service-constants";
+import { timestamp as nowIso } from "../../utils/timestamp";
 
 export const SECRET_STORE_KINDS = ["generic", "payment_card", "password"] as const;
 export type SecretStoreKind = (typeof SECRET_STORE_KINDS)[number];

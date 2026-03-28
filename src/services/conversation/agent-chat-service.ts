@@ -15,7 +15,7 @@ import {
   SystemPromptService,
 } from "../system-prompt-service";
 import { ToolRegistry } from "../../tools/tool-registry";
-import { telemetry } from "../telemetry";
+import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { ToolResultStore } from "../tool-result-store";
 import { ToolResolutionService } from "../tool-resolution-service";

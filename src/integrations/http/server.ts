@@ -1,6 +1,6 @@
 import type { Server, ServerWebSocket } from "bun";
 import { getRuntimeConfig } from "../../config/runtime-config";
-import { telemetry } from "../../services/telemetry";
+import { telemetry } from "../../services/infrastructure/telemetry";
 import {
   GeminiLivePhoneService,
   type GeminiLivePhoneSocketData,

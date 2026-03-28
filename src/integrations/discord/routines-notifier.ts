@@ -5,7 +5,7 @@ import { DocsIndexService } from "../../services/docs-index-service";
 import { DocsIndexStateService } from "../../services/docs-index-state-service";
 import { HeartbeatStateService } from "../../services/heartbeat-state-service";
 import { getLocalTimezone } from "../../services/local-time-service";
-import { telemetry } from "../../services/telemetry";
+import { telemetry } from "../../services/infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 
 const HEARTBEAT_INTERVAL_MS = 55 * 60 * 1000;

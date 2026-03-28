@@ -21,7 +21,7 @@ afterEach(() => {
 
 describe("TelemetryService", () => {
   test("writes spans and events to the sqlite telemetry store", async () => {
-    const { TelemetryStore } = await import("./telemetry-store");
+    const { TelemetryStore } = await import("../telemetry-store");
     const { TelemetryService } = await import("./telemetry");
 
     const store = new TelemetryStore(path.join(tempRoot, ".openelinarotest", "telemetry.sqlite"));
@@ -53,7 +53,7 @@ describe("TelemetryService", () => {
   });
 
   test("auto-instruments public methods through a proxy", async () => {
-    const { TelemetryStore } = await import("./telemetry-store");
+    const { TelemetryStore } = await import("../telemetry-store");
     const { TelemetryService } = await import("./telemetry");
 
     class ExampleService {

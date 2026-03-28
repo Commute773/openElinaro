@@ -4,7 +4,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
-import { SecretStoreService } from "../services/secret-store-service";
+import { SecretStoreService } from "../services/infrastructure/secret-store-service";
 
 const repoRoot = process.cwd();
 

@@ -3,7 +3,7 @@ import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath, resolveServicePath } from "./runtime-root";
-import { telemetry } from "./telemetry";
+import { telemetry } from "./infrastructure/telemetry";
 
 const log = telemetry.child({ component: "zigbee" });
 const BRIDGE_PORT = 8085;

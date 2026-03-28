@@ -9,7 +9,7 @@ import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
 import { TOOL_CALL_BEHAVIOR_SCHEMA } from "../tools/tool-output-pipeline";
 import { createTraceSpan } from "../utils/telemetry-helpers";
-import { telemetry } from "../services/telemetry";
+import { telemetry } from "../services/infrastructure/telemetry";
 
 const fnTelemetry = telemetry.child({ component: "function" });
 const traceSpan = createTraceSpan(fnTelemetry);
