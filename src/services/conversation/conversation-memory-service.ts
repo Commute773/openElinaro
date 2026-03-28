@@ -17,8 +17,7 @@ import { ModelService } from "../models/model-service";
 import { ProfileService } from "../profiles";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
-
-const MEMORY_RECALL_LIMIT = 3;
+import { MEMORY_RECALL_LIMIT } from "../../config/service-constants";
 const MEMORY_RECALL_MIN_SCORE = 0.05;
 const MEMORY_RECALL_MIN_QUERY_TOKENS = 2;
 const MEMORY_RECALL_MIN_TOP_SCORE = 0.09;
