@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.9
+- Released at: 2026-03-28T01:20:37Z
+- Release id: 20260328T012037Z-eb9e6d9
+- Previous version: 2026.03.28.8
+- Trigger: ci/release workflow
+
+- refactor: migrate subagent and conversation-lifecycle tools to function layer
+
 ## 2026.03.28.8
 - Released at: 2026-03-28T01:18:51Z
 - Release id: 20260328T011851Z-43cc2f5
