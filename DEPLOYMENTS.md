@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.28.6
+- Released at: 2026-03-28T01:05:59Z
+- Release id: 20260328T010559Z-6111537
+- Previous version: 2026.03.28.5
+- Trigger: ci/release workflow
+
+- refactor: move conversation services into domain subdirectory
+
 ## 2026.03.28.5
 - Released at: 2026-03-28T01:01:33Z
 - Release id: 20260328T010133Z-de3e7fd
