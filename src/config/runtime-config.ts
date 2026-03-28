@@ -24,12 +24,18 @@ const DEFAULT_CORE_SUBAGENT = {
   timeoutGraceMs: 30_000,
   sidecarSocketPath: "",
 };
+const DEFAULT_CORE_HEARTBEAT = {
+  model: "",
+  provider: "",
+  contextMode: "isolated" as const,
+};
 const DEFAULT_CORE_APP = {
   automaticConversationMemoryEnabled: true,
   heartbeatEnabled: true,
   docsIndexerEnabled: false,
   cacheMissMonitor: DEFAULT_CORE_CACHE_MISS,
   subagent: DEFAULT_CORE_SUBAGENT,
+  heartbeat: DEFAULT_CORE_HEARTBEAT,
 };
 const DEFAULT_CORE_HTTP = { host: "0.0.0.0", port: 3000, apiKey: "" };
 const DEFAULT_CORE = {
@@ -142,6 +148,11 @@ export const RuntimeConfigSchema = z.object({
         timeoutGraceMs: z.number().int().nonnegative().default(30_000),
         sidecarSocketPath: z.string().default(""),
       }).default(DEFAULT_CORE_SUBAGENT),
+      heartbeat: z.object({
+        model: z.string().default(""),
+        provider: z.string().default(""),
+        contextMode: z.enum(["isolated", "full"]).default("isolated"),
+      }).default(DEFAULT_CORE_HEARTBEAT),
     }).default(DEFAULT_CORE_APP),
     http: z.object({
       host: z.string().min(1).default("0.0.0.0"),
