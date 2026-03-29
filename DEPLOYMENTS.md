@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.16
+- Released at: 2026-03-29T23:03:46Z
+- Release id: 20260329T230346Z-3734460
+- Previous version: 2026.03.29.15
+- Trigger: ci/release workflow
+
+- feat: add LLM-based memory recall running in parallel with vector+BM25
+
 ## 2026.03.29.15
 - Released at: 2026-03-29T22:41:39Z
 - Release id: 20260329T224139Z-198eb41
