@@ -704,6 +704,19 @@ export class ModelService {
     return this.secondaryDispatch.getMemorySelection();
   }
 
+  getMemoryRecallSelection(): MemoryModelSelection {
+    return this.secondaryDispatch.getMemoryRecallSelection();
+  }
+
+  async resolveMemoryRecallModel(): Promise<ResolvedRuntimeModel> {
+    const selection = this.getMemoryRecallSelection();
+    return this.secondaryDispatch.resolveRuntimeModelForSelection({
+      ...selection,
+      extendedContextEnabled: false,
+      updatedAt: timestamp(),
+    });
+  }
+
   getHeartbeatSelection(): HeartbeatModelSelection {
     return this.secondaryDispatch.getHeartbeatSelection();
   }
