@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.19
+- Released at: 2026-03-29T23:52:26Z
+- Release id: 20260329T235226Z-24d505d
+- Previous version: 2026.03.29.18
+- Trigger: ci/release workflow
+
+- simplify: LLM recall loads all memory md files without caps or priority ordering
+
 ## 2026.03.29.18
 - Released at: 2026-03-29T23:19:25Z
 - Release id: 20260329T231925Z-e428b2d
