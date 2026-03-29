@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29
+- Released at: 2026-03-29T15:08:49Z
+- Release id: 20260329T150849Z-ac82da9
+- Previous version: 2026.03.28.32
+- Trigger: ci/release workflow
+
+- feat: genericize API — extract path prefix, migrate static routes, add client codegen (#192)
+
 ## 2026.03.28.32
 - Released at: 2026-03-28T17:56:14Z
 - Release id: 20260328T175614Z-5c37f95
