@@ -12,6 +12,8 @@ import { SshFilesystemBackend } from "../services/filesystem-backend-ssh";
 import type { FinanceService } from "../services/finance-service";
 import type { HealthTrackingService } from "../services/health-tracking-service";
 import { MemoryService } from "../services/memory-service";
+import { MemoryManagementAgent } from "../services/memory/memory-management-agent";
+import { StructuredMemoryManager } from "../services/memory/structured-memory-manager";
 import { ModelService } from "../services/models/model-service";
 import type { ProfileService } from "../services/profiles";
 import { ProjectsService } from "../services/projects-service";
@@ -75,6 +77,8 @@ const K = {
   filesystemBackend: "filesystemBackend",
   filesystem: "filesystem",
   transitions: "transitions",
+  structuredMemoryManager: "structuredMemoryManager",
+  memoryManagementAgent: "memoryManagementAgent",
   routineTools: "routineTools",
   toolResolver: "toolResolver",
   chat: "chat",
@@ -241,6 +245,21 @@ export function createRuntimeScope(ctx: {
     ),
   );
 
+  c.register<StructuredMemoryManager>(K.structuredMemoryManager, () =>
+    new StructuredMemoryManager(
+      c.resolve<ProfileRecord>(K.profile),
+      c.resolve<MemoryService>(K.memory),
+      profiles,
+    ),
+  );
+
+  c.register<MemoryManagementAgent>(K.memoryManagementAgent, () =>
+    new MemoryManagementAgent(
+      c.resolve<StructuredMemoryManager>(K.structuredMemoryManager),
+      c.resolve<ModelService>(K.models),
+    ),
+  );
+
   c.register<ToolRegistry>(K.routineTools, () =>
     new ToolRegistry(
       routines,
@@ -282,6 +301,9 @@ export function createRuntimeScope(ctx: {
           ? undefined
           : c.resolve<ConversationMemoryService>(K.conversationMemory),
         reflection: c.resolve<ReflectionService>(K.reflection),
+        structuredMemory: mode === "subagent" || automaticConversationMemoryDisabled
+          ? undefined
+          : c.resolve<MemoryManagementAgent>(K.memoryManagementAgent),
       },
       mode === "interactive" && profile.id === "root",
       ctx.onConversationActivityChange

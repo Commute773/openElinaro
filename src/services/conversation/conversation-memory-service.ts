@@ -157,6 +157,7 @@ function isInternalAutomationMessage(text: string) {
 
 function isPreferredRecallPath(relativePath: string) {
   return relativePath.includes("/core/") ||
+    relativePath.includes("/structured/") ||
     relativePath.endsWith("/shahara-psychology.md") ||
     relativePath.endsWith("/shahara-substances.md") ||
     relativePath.endsWith("/health.md");
@@ -165,6 +166,9 @@ function isPreferredRecallPath(relativePath: string) {
 function recallPathBonus(relativePath: string) {
   if (relativePath.endsWith(`/${CORE_MEMORY_RELATIVE_PATH}`)) {
     return 0.025;
+  }
+  if (relativePath.includes("/structured/")) {
+    return 0.015;
   }
   if (
     relativePath.endsWith("/shahara-psychology.md") ||
@@ -310,6 +314,7 @@ export class ConversationMemoryService {
     const namespace = this.profiles.getWriteMemoryNamespace(this.profile);
     return [
       path.posix.join(namespace, "core"),
+      path.posix.join(namespace, "structured"),
       path.posix.join(namespace, "legacy", "USER.md"),
       path.posix.join(namespace, "legacy", "MEMORY.md"),
       path.posix.join(namespace, "shahara-psychology.md"),
