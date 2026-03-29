@@ -25,6 +25,7 @@ import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { ToolResolutionService } from "../tool-resolution-service";
 import { ConversationMemoryService } from "./conversation-memory-service";
 import type { ReflectionService } from "../reflection-service";
+import type { MemoryManagementAgent } from "../memory/memory-management-agent";
 import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS } from "../../config/service-constants";
 import { wrapInjectedMessage } from "../injected-message-service";
 
@@ -163,6 +164,7 @@ export type ChatDependencies = {
   models: ModelService;
   memory?: Pick<ConversationMemoryService, "buildRecallContext">;
   reflection?: Pick<ReflectionService, "queueCompactionReflection">;
+  structuredMemory?: Pick<MemoryManagementAgent, "processTranscript">;
 };
 
 export class AgentChatService {
@@ -588,6 +590,19 @@ export class AgentChatService {
         summary: compacted.summary,
         conversationKey: job.conversationKey,
       });
+      // Fire structured memory management in the background — never block the chat turn
+      if (this.deps.structuredMemory) {
+        this.deps.structuredMemory.processTranscript({
+          transcript: compacted.summary,
+          conversationKey: job.conversationKey,
+          source: "compaction",
+        }).catch((error) => {
+          agentChatTelemetry.event("agent_chat.structured_memory.failed", {
+            conversationKey: job.conversationKey,
+            error: error instanceof Error ? error.message : String(error),
+          }, { level: "warn", outcome: "error" });
+        });
+      }
       await job.onToolUse?.(
         compacted.memoryFilePath
           ? `Compaction finished. Durable memory saved to ${compacted.memoryFilePath}.`
