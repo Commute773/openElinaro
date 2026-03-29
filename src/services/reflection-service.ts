@@ -49,6 +49,29 @@ function extractJsonObject(text: string) {
   return cleaned;
 }
 
+const MOOD_WORDS = ["happy", "sad", "anxious", "calm", "excited", "frustrated",
+  "curious", "content", "thoughtful", "reflective", "uncertain", "hopeful",
+  "tired", "energetic", "grateful", "melancholy", "optimistic", "overwhelmed"];
+
+/**
+ * Parse model response text into a ReflectionResponse.
+ * Falls back to heuristic extraction when JSON parsing fails.
+ * Returns null if the response is empty.
+ */
+export function parseReflectionText(responseText: string): ReflectionResponse | null {
+  try {
+    return JSON.parse(extractJsonObject(responseText)) as ReflectionResponse;
+  } catch {
+    const heuristicBody = responseText.trim();
+    if (!heuristicBody) {
+      return null;
+    }
+    const lowerText = heuristicBody.toLowerCase();
+    const detectedMood = MOOD_WORDS.find((w) => lowerText.includes(w)) || "uncertain";
+    return { body: heuristicBody, mood: detectedMood };
+  }
+}
+
 function compactText(text: string, maxChars: number) {
   const normalized = text.replace(/\s+/g, " ").trim();
   if (normalized.length <= maxChars) {
@@ -307,7 +330,24 @@ export class ReflectionService {
           selection: this.models.getReflectionSelection(),
         });
 
-        const parsed = JSON.parse(extractJsonObject(responseText)) as ReflectionResponse;
+        const parsed = parseReflectionText(responseText);
+        if (!parsed) {
+          reflectionTelemetry.event("reflection.parse_failed", {
+            reason: "empty_response",
+            responseLength: responseText.length,
+          });
+          return null;
+        }
+        // Log when heuristic fallback was used (no valid JSON found)
+        try {
+          JSON.parse(extractJsonObject(responseText));
+        } catch {
+          reflectionTelemetry.event("reflection.parse_failed", {
+            reason: "non_json_response",
+            responseLength: responseText.length,
+            heuristicMood: parsed.mood || "uncertain",
+          });
+        }
         const body = parsed.body?.trim();
         if (!body) {
           return null;
