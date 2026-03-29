@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.18
+- Released at: 2026-03-29T23:19:25Z
+- Release id: 20260329T231925Z-e428b2d
+- Previous version: 2026.03.29.17
+- Trigger: ci/release workflow
+
+- fix: LLM recall — remove TTL cache, use mtime staleness check, raise corpus cap to 600K
+
 ## 2026.03.29.17
 - Released at: 2026-03-29T23:07:11Z
 - Release id: 20260329T230711Z-8603500
