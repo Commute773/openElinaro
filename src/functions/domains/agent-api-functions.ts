@@ -4,6 +4,7 @@
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
 import { summarizeAgentRun } from "../../services/subagent-summary-service";
+import { formatAgent } from "../formatters";
 
 const AGENT_API_AUTH = { access: "anyone" as const, behavior: "uniform" as const };
 
@@ -40,13 +41,16 @@ export const buildAgentApiFunctions: FunctionDomainBuilder = (_ctx) => [
       const active = runs.filter(
         (r) => r.status === "running" || r.status === "starting",
       );
-      return active.map((r) => ({
-        id: r.id,
-        status: r.status.toUpperCase(),
-        host: r.tmuxSession,
-        uptime: formatUptime(r.startedAt, r.createdAt),
-        goal_truncated: truncateGoal(r.goal),
-      }));
+      return active.map((r) => {
+        const entry = {
+          id: r.id,
+          status: r.status.toUpperCase(),
+          host: r.tmuxSession,
+          uptime: formatUptime(r.startedAt, r.createdAt),
+          goal_truncated: truncateGoal(r.goal),
+        };
+        return { ...entry, display: formatAgent(entry) };
+      });
     },
     auth: AGENT_API_AUTH,
     domains: ["agents"],

@@ -15,6 +15,7 @@ import type {
   Weekday,
 } from "../../domain/routines";
 import type { ScheduledAlarm } from "../../services/alarm-service";
+import { formatRoutineItem, formatCheckItem, formatAlarm } from "../formatters";
 
 // ---------------------------------------------------------------------------
 // Shared schemas (same as routine-tools.ts)
@@ -214,8 +215,8 @@ interface SerializedAlarm {
 // Helpers for structured → agent-string formatting
 // ---------------------------------------------------------------------------
 
-const fmtItem = (r: SerializedRoutineItem) => `${r.id}: [${r.profileId}] ${r.title} (${r.kind}, ${r.priority}, ${r.status})`;
-const fmtAlarm = (a: SerializedAlarm) => `${a.id}: ${a.kind}/${a.name} triggerAt=${a.triggerAt} state=${a.state}`;
+const fmtItem = (r: SerializedRoutineItem) => formatRoutineItem(r);
+const fmtAlarm = (a: SerializedAlarm) => formatAlarm(a);
 
 function serializeItem(item: RoutineItem): SerializedRoutineItem {
   return {
@@ -260,22 +261,23 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       return {
         context: assessment.context,
         actionableCount: actionable.length,
-        items: actionable.map((a) => ({
-          id: a.item.id,
-          title: a.item.title,
-          kind: a.item.kind,
-          priority: a.item.priority,
-          state: a.state,
-          overdueMinutes: a.overdueMinutes,
-          dueAt: a.dueAt,
-        })),
+        items: actionable.map((a) => {
+          const item = {
+            id: a.item.id,
+            title: a.item.title,
+            kind: a.item.kind,
+            priority: a.item.priority,
+            state: a.state,
+            overdueMinutes: a.overdueMinutes,
+            dueAt: a.dueAt,
+          };
+          return { ...item, display: formatCheckItem(item) };
+        }),
       };
     },
     agentFormat: (result) => {
       if (result.actionableCount === 0) return `Nothing needs active attention right now. Context: ${result.context.mode}.`;
-      return `Context: ${result.context.mode}\n` + result.items.map((i) =>
-        `- ${i.id}: [${i.kind}] ${i.title} (${i.state}, ${i.overdueMinutes}m overdue)`,
-      ).join("\n");
+      return result.items.map((i) => i.display).join("\n");
     },
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
@@ -302,11 +304,14 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         limit: input.limit,
         all: input.all,
       });
-      return items.map(serializeItem);
+      return items.map((item) => {
+        const s = serializeItem(item);
+        return { ...s, display: formatRoutineItem(s) };
+      });
     },
     agentFormat: (result) => {
       if (result.length === 0) return "No routine items matched.";
-      return result.map((item) => `- ${fmtItem(item)}`).join("\n");
+      return result.map((item) => item.display).join("\n");
     },
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
@@ -334,9 +339,10 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     handler: async (input, fnCtx) => {
       const item = fnCtx.services.routines.getItem(input.id);
       if (!item) throw new Error(`Routine item not found: ${input.id}`);
-      return serializeItem(item);
+      const s = serializeItem(item);
+      return { ...s, display: formatRoutineItem(s) };
     },
-    agentFormat: (result) => fmtItem(result),
+    agentFormat: (result) => result.display,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -592,11 +598,14 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     input: listAlarmSchema,
     handler: async (input, fnCtx) => {
       const alarms = fnCtx.services.alarms.listAlarms({ state: input.state, limit: input.limit });
-      return alarms.map(serializeAlarm);
+      return alarms.map((a) => {
+        const s = serializeAlarm(a);
+        return { ...s, display: formatAlarm(s) };
+      });
     },
     agentFormat: (result) => {
       if (result.length === 0) return "No alarms or timers matched.";
-      return result.map((a) => `- ${fmtAlarm(a)}`).join("\n");
+      return result.map((a) => a.display).join("\n");
     },
     auth: ROUTINE_AUTH,
     domains: ["routines", "alarms"],

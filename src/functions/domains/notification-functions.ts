@@ -3,6 +3,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatNotification } from "../formatters";
 
 const NOTIFICATION_AUTH = { access: "anyone" as const, behavior: "uniform" as const };
 
@@ -25,6 +26,7 @@ export const buildNotificationFunctions: FunctionDomainBuilder = (_ctx) => [
         title: string;
         body: string;
         actions: string[];
+        display: string;
       }> = [];
 
       for (const entry of assessment.items
@@ -36,23 +38,25 @@ export const buildNotificationFunctions: FunctionDomainBuilder = (_ctx) => [
             : entry.state === "upcoming"
               ? `due in ${entry.minutesUntilDue}m`
               : "due now";
-        notifications.push({
+        const notif = {
           id: `routine:${entry.item.id}`,
           type: "routine",
           title: entry.item.title,
-          body: `${entry.item.kind} — ${timing}`,
+          body: `${entry.item.kind} \u2014 ${timing}`,
           actions: ["done", "snooze", "dismiss"],
-        });
+        };
+        notifications.push({ ...notif, display: formatNotification(notif) });
       }
 
       for (const alarm of dueAlarms.slice(0, 5)) {
-        notifications.push({
+        const alarmNotif = {
           id: `alarm:${alarm.id}`,
           type: alarm.kind,
           title: alarm.name,
           body: `${alarm.kind === "timer" ? "Timer" : "Alarm"}: ${alarm.originalSpec}`,
           actions: ["done", "snooze", "dismiss"],
-        });
+        };
+        notifications.push({ ...alarmNotif, display: formatNotification(alarmNotif) });
       }
 
       return notifications;
