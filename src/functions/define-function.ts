@@ -94,6 +94,16 @@ export interface FunctionDefinition<
   agentScopes: AgentToolScope[];
   defaultVisibleScopes?: AgentToolScope[];
 
+  // -- Surface formatting ----------------------------------------------------
+
+  /**
+   * Format the handler result as a string for the agent tool surface.
+   * When set, the handler returns structured data and this function converts
+   * it to a human-readable string for the model. If not set, the handler
+   * result is used directly (backwards-compatible with string-returning handlers).
+   */
+  agentFormat?: (result: unknown) => string;
+
   // -- Behavioral flags ------------------------------------------------------
 
   mutatesState?: boolean;
