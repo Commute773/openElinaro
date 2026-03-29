@@ -2,6 +2,7 @@
  * Generates HTTP route definitions from FunctionDefinitions.
  * The output is compatible with the existing G2 router's RouteDefinition interface.
  */
+import { z } from "zod";
 import type { FunctionDefinition, FunctionContext } from "./define-function";
 import { API_PATH_PREFIX } from "./define-function";
 import type { RouteDefinition } from "../integrations/http/g2/router";
@@ -41,6 +42,33 @@ function parseQueryParams(request: Request): Record<string, string> {
 }
 
 /**
+ * Coerce string query param values to match expected Zod schema types.
+ * Query params are always strings, but schemas may expect boolean/number.
+ */
+function coerceQueryParams(
+  params: Record<string, string>,
+  schema: z.ZodType,
+): Record<string, unknown> {
+  if (!(schema instanceof z.ZodObject)) return params;
+  const shape = (schema as z.ZodObject<Record<string, z.ZodType>>).shape as Record<string, z.ZodType>;
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params)) {
+    const fieldSchema = shape[key];
+    const inner = fieldSchema instanceof z.ZodOptional || fieldSchema instanceof z.ZodDefault
+      ? (fieldSchema as any)._def.innerType as z.ZodType | undefined
+      : fieldSchema;
+    if (inner instanceof z.ZodBoolean) {
+      result[key] = value === "true" || value === "1";
+    } else if (inner instanceof z.ZodNumber) {
+      result[key] = Number(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/**
  * Build handler input by merging path params, query params, and/or request body.
  */
 async function buildInput(
@@ -51,9 +79,10 @@ async function buildInput(
   const method = def.http!.method;
 
   if (method === "GET") {
-    // Merge path params + query params
+    // Merge path params + query params, coercing types
     const queryParams = parseQueryParams(request);
-    return { ...queryParams, ...pathParams };
+    const coerced = coerceQueryParams(queryParams, def.input);
+    return { ...coerced, ...pathParams };
   }
 
   // POST/PUT/PATCH/DELETE: merge path params + request body
