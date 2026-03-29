@@ -14,7 +14,7 @@ import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 
 const COMPACTION_TAIL_MESSAGES = 4;
-const COMPACTION_MAX_TOKENS = 10_000;
+const COMPACTION_MAX_TOKENS = 16_000;
 const MEMORY_EXTRACTION_MAX_TOKENS = 2_048;
 const CORE_MEMORY_SOFT_CAP_CHARS = 16_000;
 const CORE_MEMORY_HARD_CAP_CHARS = 24_000;
@@ -327,6 +327,17 @@ export class ConversationCompactionService {
           .join("");
 
         const payload = parseCompactionPayload(responseText);
+        if (
+          payload.summary.trim().length < 50 &&
+          params.messages.length > 10
+        ) {
+          compactionTelemetry.event("conversation.compact.summary_too_short", {
+            responseTextLength: responseText.length,
+            messageCount: params.messages.length,
+            maxTokens: COMPACTION_MAX_TOKENS,
+            summaryLength: payload.summary.trim().length,
+          });
+        }
         const summary = payload.summary.trim() || "Conversation compacted with no additional summary returned.";
         let memoryMarkdown = normalizeMemoryMarkdown(payload.memory_markdown);
         if (!memoryMarkdown && summary) {
