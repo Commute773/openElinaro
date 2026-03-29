@@ -20,9 +20,16 @@ export type FunctionSurface = "api" | "discord" | "agent";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
+/**
+ * API path prefix prepended to all generated routes.
+ * Function definitions use relative paths (e.g. "/routines/:id/done")
+ * and this prefix is applied during route and OpenAPI generation.
+ */
+export const API_PATH_PREFIX = "/api/g2";
+
 export interface FunctionHttpAnnotation {
   method: HttpMethod;
-  /** Express-style path, e.g. "/api/g2/routines/:id/done". */
+  /** Relative path (e.g. "/routines/:id/done"). The API_PATH_PREFIX is prepended at generation time. */
   path: string;
   /** Optional Zod schema for query params (GET requests). */
   queryParams?: z.ZodObject<any>;

@@ -45,6 +45,90 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
     auth: DASHBOARD_AUTH,
     domains: ["dashboard"],
     agentScopes: [],
-    http: { method: "GET", path: "/api/g2/home" },
+    http: { method: "GET", path: "/home" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // api_health — migrated from static route in g2/data.ts
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "api_health",
+    description: "Health summary and recent check-ins.",
+    input: z.object({
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+    }),
+    surfaces: ["api"],
+    handler: async (input, fnCtx) => {
+      const { health } = fnCtx.services;
+      const limit = input.limit ?? 10;
+      const summary = health.summary();
+      const checkins = health.listCheckins(limit).map((c) => ({
+        id: c.id,
+        observedAt: c.observedAt,
+        kind: c.kind ?? "checkin",
+        energy: c.energy,
+        mood: c.mood,
+        sleepHours: c.sleepHours,
+        anxiety: c.anxiety,
+      }));
+      return { summary, checkins };
+    },
+    auth: DASHBOARD_AUTH,
+    domains: ["dashboard", "health"],
+    agentScopes: [],
+    http: {
+      method: "GET",
+      path: "/health",
+      queryParams: z.object({
+        limit: z.coerce.number().int().min(1).max(100).optional(),
+      }),
+    },
+  }),
+
+  // -----------------------------------------------------------------------
+  // api_projects — migrated from static route in g2/data.ts
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "api_projects",
+    description: "List project summaries with status, priority, and tags.",
+    input: z.object({}),
+    surfaces: ["api"],
+    handler: async (_input, fnCtx) => {
+      const projects = fnCtx.services.projects.listProjects({ status: "all" });
+      return projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        priority: p.priority,
+        summary: p.summary,
+        tags: p.tags,
+      }));
+    },
+    auth: DASHBOARD_AUTH,
+    domains: ["dashboard", "projects"],
+    agentScopes: [],
+    http: { method: "GET", path: "/projects" },
+  }),
+
+  // -----------------------------------------------------------------------
+  // api_conversations — migrated from static route in g2/data.ts
+  // -----------------------------------------------------------------------
+  defineFunction({
+    name: "api_conversations",
+    description: "List conversation summaries with message counts.",
+    input: z.object({}),
+    surfaces: ["api"],
+    handler: async (_input, fnCtx) => {
+      const conversations = await fnCtx.services.conversations.list();
+      return conversations.map((c) => ({
+        key: c.key,
+        messageCount: c.messages.length,
+        updatedAt: c.updatedAt,
+      }));
+    },
+    auth: DASHBOARD_AUTH,
+    domains: ["dashboard", "conversations"],
+    agentScopes: [],
+    http: { method: "GET", path: "/conversations" },
   }),
 ];

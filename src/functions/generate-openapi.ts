@@ -4,6 +4,7 @@
  */
 import { z } from "zod";
 import type { FunctionDefinition } from "./define-function";
+import { API_PATH_PREFIX } from "./define-function";
 import type { FeatureId } from "../services/feature-config-service";
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,11 @@ function zodToJsonSchema(schema: z.ZodType): Record<string, unknown> {
     const value = zodDef(schema).value;
     return { type: typeof value, const: value };
   }
-  if (schema instanceof z.ZodEnum) return { type: "string", enum: zodDef(schema).values as string[] };
+  if (schema instanceof z.ZodEnum) {
+    const entries = zodDef(schema).entries as Record<string, string> | undefined;
+    const values = entries ? Object.values(entries) : (schema as any).options as string[];
+    return { type: "string", enum: values };
+  }
   if (schema instanceof z.ZodArray) return { type: "array", items: zodToJsonSchema(zodDef(schema).type as z.ZodType) };
   if (schema instanceof z.ZodOptional) return zodToJsonSchema(zodDef(schema).innerType as z.ZodType);
   if (schema instanceof z.ZodDefault) return zodToJsonSchema(zodDef(schema).innerType as z.ZodType);
@@ -110,8 +115,12 @@ export function generateOpenApiSpec(
     if (def.featureGate && featureChecker && !featureChecker(def.featureGate)) continue;
 
     const method = def.http.method.toLowerCase();
+    // Resolve full path: relative paths get the prefix prepended
+    const rawPath = def.http.path.startsWith("/api/")
+      ? def.http.path
+      : `${API_PATH_PREFIX}${def.http.path}`;
     // Convert Express :param to OpenAPI {param}
-    const path = def.http.path.replace(/:([^/]+)/g, "{$1}");
+    const path = rawPath.replace(/:([^/]+)/g, "{$1}");
 
     const operation: Record<string, unknown> = {
       operationId: def.name,

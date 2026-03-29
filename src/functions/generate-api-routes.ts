@@ -3,6 +3,7 @@
  * The output is compatible with the existing G2 router's RouteDefinition interface.
  */
 import type { FunctionDefinition, FunctionContext } from "./define-function";
+import { API_PATH_PREFIX } from "./define-function";
 import type { RouteDefinition } from "../integrations/http/g2/router";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { FeatureId } from "../services/feature-config-service";
@@ -81,9 +82,13 @@ export function generateApiRoute(
   if (!surfaces.includes("api")) return null;
   if (!def.http) return null;
 
+  const fullPath = def.http.path.startsWith("/api/")
+    ? def.http.path                            // already absolute (legacy)
+    : `${API_PATH_PREFIX}${def.http.path}`;    // relative → prepend prefix
+
   return {
     method: def.http.method,
-    pattern: def.http.path,
+    pattern: fullPath,
     handler: async (request, params, _app) => {
       return traceSpan(`api.${def.name}`, async () => {
         // 1. Build input from request

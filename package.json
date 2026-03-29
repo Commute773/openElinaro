@@ -33,7 +33,8 @@
     "service:update-detached": "./scripts/service-update-detached.sh",
     "service:update": "./scripts/service-update.sh",
     "service:rollback-detached": "./scripts/service-rollback-detached.sh",
-    "service:rollback": "./scripts/service-rollback.sh"
+    "service:rollback": "./scripts/service-rollback.sh",
+    "generate:client": "bun src/functions/generate-client.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

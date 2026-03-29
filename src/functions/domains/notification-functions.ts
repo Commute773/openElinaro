@@ -60,7 +60,7 @@ export const buildNotificationFunctions: FunctionDomainBuilder = (_ctx) => [
     auth: NOTIFICATION_AUTH,
     domains: ["routines", "notifications"],
     agentScopes: [],
-    http: { method: "GET", path: "/api/g2/notifications" },
+    http: { method: "GET", path: "/notifications" },
   }),
 
   // -------------------------------------------------------------------------
@@ -98,6 +98,6 @@ export const buildNotificationFunctions: FunctionDomainBuilder = (_ctx) => [
     domains: ["routines", "notifications"],
     agentScopes: [],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/notifications/:id/action" },
+    http: { method: "POST", path: "/notifications/:id/action" },
   }),
 ];

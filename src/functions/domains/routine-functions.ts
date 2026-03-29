@@ -191,7 +191,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
     examples: ["check routines", "what's due now"],
-    http: { method: "GET", path: "/api/g2/routines/check" },
+    http: { method: "GET", path: "/routines/check" },
   }),
 
   // -----------------------------------------------------------------------
@@ -221,7 +221,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     examples: ["list active routines", "show paused todos"],
     http: {
       method: "GET",
-      path: "/api/g2/routines",
+      path: "/routines",
       queryParams: z.object({
         status: z.string().optional(),
         kind: z.string().optional(),
@@ -252,7 +252,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
     examples: ["show routine details", "inspect routine by id"],
-    http: { method: "GET", path: "/api/g2/routines/:id" },
+    http: { method: "GET", path: "/routines/:id" },
   }),
 
   // -----------------------------------------------------------------------
@@ -284,7 +284,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["add a weekly workout", "create a deadline reminder"],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/routines", successStatus: 201 },
+    http: { method: "POST", path: "/routines", successStatus: 201 },
   }),
 
   // -----------------------------------------------------------------------
@@ -324,7 +324,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["rename a todo", "change a routine schedule"],
     mutatesState: true,
-    http: { method: "PATCH", path: "/api/g2/routines/:id" },
+    http: { method: "PATCH", path: "/routines/:id" },
   }),
 
   // -----------------------------------------------------------------------
@@ -343,7 +343,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["delete a routine", "remove a stale todo"],
     mutatesState: true,
-    http: { method: "DELETE", path: "/api/g2/routines/:id" },
+    http: { method: "DELETE", path: "/routines/:id" },
   }),
 
   // -----------------------------------------------------------------------
@@ -362,7 +362,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["mark routine done", "complete today's task"],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/routines/:id/done" },
+    http: { method: "POST", path: "/routines/:id/done" },
   }),
 
   // -----------------------------------------------------------------------
@@ -381,7 +381,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["undo a completion", "reopen completed routine"],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/routines/:id/undo" },
+    http: { method: "POST", path: "/routines/:id/undo" },
   }),
 
   // -----------------------------------------------------------------------
@@ -400,7 +400,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["snooze for 30 minutes", "delay this reminder"],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/routines/:id/snooze" },
+    http: { method: "POST", path: "/routines/:id/snooze" },
   }),
 
   // -----------------------------------------------------------------------
@@ -419,7 +419,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["skip today's occurrence", "skip this reminder"],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/routines/:id/skip" },
+    http: { method: "POST", path: "/routines/:id/skip" },
   }),
 
   // -----------------------------------------------------------------------
@@ -438,7 +438,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["pause this routine", "stop reminders for now"],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/routines/:id/pause" },
+    http: { method: "POST", path: "/routines/:id/pause" },
   }),
 
   // -----------------------------------------------------------------------
@@ -457,7 +457,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["resume this routine", "restart reminders"],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/routines/:id/resume" },
+    http: { method: "POST", path: "/routines/:id/resume" },
   }),
 
   // -----------------------------------------------------------------------
@@ -476,7 +476,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["set an alarm for 07:30", "set an alarm for 2026-03-16T09:00:00-04:00"],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/alarms", successStatus: 201 },
+    http: { method: "POST", path: "/alarms", successStatus: 201 },
   }),
 
   // -----------------------------------------------------------------------
@@ -495,7 +495,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["set a 10m timer", "set a 2h timer"],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/timers", successStatus: 201 },
+    http: { method: "POST", path: "/timers", successStatus: 201 },
   }),
 
   // -----------------------------------------------------------------------
@@ -518,7 +518,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     examples: ["list pending alarms", "show delivered timers"],
     http: {
       method: "GET",
-      path: "/api/g2/alarms",
+      path: "/alarms",
       queryParams: z.object({
         state: z.string().optional(),
         limit: z.string().optional(),
@@ -542,7 +542,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     agentScopes: ROUTINE_SCOPES,
     examples: ["cancel alarm-123", "cancel a timer by id"],
     mutatesState: true,
-    http: { method: "DELETE", path: "/api/g2/alarms/:id" },
+    http: { method: "DELETE", path: "/alarms/:id" },
   }),
 
   // -----------------------------------------------------------------------
@@ -565,7 +565,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: [],
-    http: { method: "GET", path: "/api/g2/todos" },
+    http: { method: "GET", path: "/todos" },
   }),
 
   defineFunction({
@@ -599,7 +599,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     domains: ROUTINE_DOMAINS,
     agentScopes: [],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/todos", successStatus: 201 },
+    http: { method: "POST", path: "/todos", successStatus: 201 },
   }),
 
   defineFunction({
@@ -615,7 +615,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     domains: ROUTINE_DOMAINS,
     agentScopes: [],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/todos/:id/done" },
+    http: { method: "POST", path: "/todos/:id/done" },
   }),
 
   defineFunction({
@@ -649,7 +649,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     domains: ROUTINE_DOMAINS,
     agentScopes: [],
     mutatesState: true,
-    http: { method: "PATCH", path: "/api/g2/todos/:id" },
+    http: { method: "PATCH", path: "/todos/:id" },
   }),
 
   defineFunction({
@@ -665,6 +665,6 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     domains: ROUTINE_DOMAINS,
     agentScopes: [],
     mutatesState: true,
-    http: { method: "DELETE", path: "/api/g2/todos/:id" },
+    http: { method: "DELETE", path: "/todos/:id" },
   }),
 ];
