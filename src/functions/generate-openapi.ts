@@ -1,10 +1,13 @@
 /**
  * Generates an OpenAPI 3.1 specification from FunctionDefinitions.
  * Replaces the hand-written static spec in src/integrations/http/openapi.ts.
+ *
+ * All API-surface functions are included — both those with explicit `http`
+ * annotations and those whose route is auto-derived from their name.
  */
 import { z } from "zod";
-import type { FunctionDefinition } from "./define-function";
-import { API_PATH_PREFIX } from "./define-function";
+import type { FunctionDefinition, FunctionHttpAnnotation, HttpMethod } from "./define-function";
+import { API_PATH_PREFIX, deriveHttpAnnotation } from "./define-function";
 import type { FeatureId } from "../services/feature-config-service";
 
 // ---------------------------------------------------------------------------
@@ -30,7 +33,7 @@ function zodToJsonSchema(schema: z.ZodType): Record<string, unknown> {
   }
   if (schema instanceof z.ZodEnum) {
     const entries = zodDef(schema).entries as Record<string, string> | undefined;
-    const values = entries ? Object.values(entries) : (schema as any).options as string[];
+    const values = entries ? Object.values(entries) : (schema.options as string[]);
     return { type: "string", enum: values };
   }
   if (schema instanceof z.ZodArray) return { type: "array", items: zodToJsonSchema(zodDef(schema).type as z.ZodType) };
@@ -60,6 +63,22 @@ function zodToJsonSchema(schema: z.ZodType): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
+// Resolved HTTP config
+// ---------------------------------------------------------------------------
+
+interface ResolvedHttp {
+  method: HttpMethod;
+  path: string;
+  queryParams?: z.ZodObject<Record<string, z.ZodType>>;
+  successStatus?: number;
+}
+
+function resolveHttp(def: FunctionDefinition): ResolvedHttp {
+  if (def.http) return def.http;
+  return deriveHttpAnnotation(def);
+}
+
+// ---------------------------------------------------------------------------
 // OpenAPI generation
 // ---------------------------------------------------------------------------
 
@@ -69,14 +88,13 @@ interface OpenApiOptions {
   serverUrl?: string;
 }
 
-function buildPathParameters(def: FunctionDefinition): Record<string, unknown>[] {
+function buildPathParameters(http: ResolvedHttp, inputSchema: z.ZodType): Record<string, unknown>[] {
   const params: Record<string, unknown>[] = [];
 
   // Path params from :param segments
-  const pathPattern = def.http!.path;
   const paramRe = /:([^/]+)/g;
   let match: RegExpExecArray | null;
-  while ((match = paramRe.exec(pathPattern)) !== null) {
+  while ((match = paramRe.exec(http.path)) !== null) {
     params.push({
       name: match[1],
       in: "path",
@@ -85,16 +103,19 @@ function buildPathParameters(def: FunctionDefinition): Record<string, unknown>[]
     });
   }
 
-  // Query params from annotation
-  if (def.http!.method === "GET" && def.http!.queryParams instanceof z.ZodObject) {
-    const shape = def.http!.queryParams.shape as Record<string, z.ZodType>;
-    for (const [key, value] of Object.entries(shape)) {
-      params.push({
-        name: key,
-        in: "query",
-        required: !(value instanceof z.ZodOptional) && !(value instanceof z.ZodDefault),
-        schema: zodToJsonSchema(value),
-      });
+  // Query params: use explicit queryParams if present, otherwise derive from input schema for GET
+  if (http.method === "GET") {
+    const querySource = http.queryParams ?? (inputSchema instanceof z.ZodObject ? inputSchema : undefined);
+    if (querySource instanceof z.ZodObject) {
+      const shape = (querySource as z.ZodObject<Record<string, z.ZodType>>).shape as Record<string, z.ZodType>;
+      for (const [key, value] of Object.entries(shape)) {
+        params.push({
+          name: key,
+          in: "query",
+          required: !(value instanceof z.ZodOptional) && !(value instanceof z.ZodDefault),
+          schema: zodToJsonSchema(value),
+        });
+      }
     }
   }
 
@@ -111,14 +132,14 @@ export function generateOpenApiSpec(
   for (const def of definitions) {
     const surfaces = def.surfaces ?? ["api", "discord", "agent"];
     if (!surfaces.includes("api")) continue;
-    if (!def.http) continue;
     if (def.featureGate && featureChecker && !featureChecker(def.featureGate)) continue;
 
-    const method = def.http.method.toLowerCase();
+    const http = resolveHttp(def);
+    const method = http.method.toLowerCase();
     // Resolve full path: relative paths get the prefix prepended
-    const rawPath = def.http.path.startsWith("/api/")
-      ? def.http.path
-      : `${API_PATH_PREFIX}${def.http.path}`;
+    const rawPath = http.path.startsWith("/api/")
+      ? http.path
+      : `${API_PATH_PREFIX}${http.path}`;
     // Convert Express :param to OpenAPI {param}
     const path = rawPath.replace(/:([^/]+)/g, "{$1}");
 
@@ -129,11 +150,11 @@ export function generateOpenApiSpec(
     };
 
     // Parameters
-    const parameters = buildPathParameters(def);
+    const parameters = buildPathParameters(http, def.input);
     if (parameters.length > 0) operation.parameters = parameters;
 
     // Request body (for non-GET methods)
-    if (def.http.method !== "GET" && def.input instanceof z.ZodObject) {
+    if (http.method !== "GET" && def.input instanceof z.ZodObject) {
       operation.requestBody = {
         required: true,
         content: {
@@ -145,7 +166,7 @@ export function generateOpenApiSpec(
     }
 
     // Responses
-    const successStatus = String(def.http.successStatus ?? 200);
+    const successStatus = String(http.successStatus ?? 200);
     operation.responses = {
       [successStatus]: {
         description: "Success",

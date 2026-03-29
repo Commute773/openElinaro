@@ -78,7 +78,7 @@ export function generateAgentTool(
     tool: {
       name: def.name,
       description: def.description,
-      parameters: parameters as any,
+      parameters: parameters as Tool["parameters"],
     },
     handler: async (input: Record<string, unknown>) => {
       return traceSpan(`tool.${def.name}`, async () => {

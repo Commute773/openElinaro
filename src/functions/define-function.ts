@@ -32,11 +32,11 @@ export interface FunctionHttpAnnotation {
   /** Relative path (e.g. "/routines/:id/done"). The API_PATH_PREFIX is prepended at generation time. */
   path: string;
   /** Optional Zod schema for query params (GET requests). */
-  queryParams?: z.ZodObject<any>;
+  queryParams?: z.ZodObject<Record<string, z.ZodType>>;
   /** HTTP status code for success. Defaults to 200. */
   successStatus?: number;
   /** Optional transform applied to the handler result before sending as JSON. */
-  responseTransform?: (result: unknown) => unknown;
+  responseTransform?(result: unknown): unknown;
 }
 
 export interface FunctionDiscordAnnotation {
@@ -62,8 +62,10 @@ export interface FunctionDefinition<
   input: TInput;
   /** Optional Zod schema for output (drives OpenAPI response generation). */
   output?: z.ZodType<TOutput>;
-  /** The implementation. Receives validated input + context. */
-  handler: (input: z.output<TInput>, ctx: FunctionContext) => Promise<unknown>;
+  /** The implementation. Receives validated input + context.
+   *  Method syntax enables bivariant checking so specific definitions can be
+   *  stored in generic FunctionDefinition[] arrays. */
+  handler(input: z.output<TInput>, ctx: FunctionContext): Promise<TOutput>;
 
   // -- Surface control -------------------------------------------------------
 
@@ -102,7 +104,7 @@ export interface FunctionDefinition<
    * it to a human-readable string for the model. If not set, the handler
    * result is used directly (backwards-compatible with string-returning handlers).
    */
-  agentFormat?: (result: unknown) => string;
+  agentFormat?(result: TOutput): string;
 
   // -- Behavioral flags ------------------------------------------------------
 
@@ -173,6 +175,23 @@ export function defineFunction<
   TOutput = unknown,
 >(def: FunctionDefinition<TInput, TOutput>): FunctionDefinition<TInput, TOutput> {
   return def;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-derived HTTP annotation
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive an HTTP annotation from the function definition when none is explicit.
+ * - Method: POST if the function mutates state, GET otherwise.
+ * - Path: function name with underscores converted to slashes.
+ *   e.g. "finance_summary" → "/finance/summary"
+ */
+export function deriveHttpAnnotation(def: FunctionDefinition): { method: HttpMethod; path: string } {
+  return {
+    method: def.mutatesState ? "POST" : "GET",
+    path: "/" + def.name.replaceAll("_", "/"),
+  };
 }
 
 // ---------------------------------------------------------------------------

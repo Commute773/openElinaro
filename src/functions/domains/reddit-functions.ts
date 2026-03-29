@@ -59,39 +59,55 @@ interface RedditComment {
   created_utc: number;
 }
 
-function extractPosts(json: any): RedditPost[] {
-  const children = json?.data?.children ?? [];
+/** Shape of a Reddit listing child wrapper. */
+interface RedditListingChild {
+  kind: string;
+  data: Record<string, unknown>;
+}
+
+/** Shape of a Reddit listing response. */
+interface RedditListing {
+  data?: {
+    children?: RedditListingChild[];
+    after?: string | null;
+  };
+}
+
+function extractPosts(json: unknown): RedditPost[] {
+  const listing = json as RedditListing;
+  const children = listing?.data?.children ?? [];
   return children
-    .filter((c: any) => c.kind === "t3")
-    .map((c: any) => {
+    .filter((c) => c.kind === "t3")
+    .map((c) => {
       const d = c.data;
       return {
-        title: d.title,
-        author: d.author,
-        selftext: d.selftext?.slice(0, 500) || "",
-        url: d.url,
-        permalink: `https://www.reddit.com${d.permalink}`,
-        ups: d.ups,
-        num_comments: d.num_comments,
-        created_utc: d.created_utc,
-        subreddit: d.subreddit,
-        is_self: d.is_self,
-        link_flair_text: d.link_flair_text,
+        title: d.title as string,
+        author: d.author as string,
+        selftext: ((d.selftext as string) ?? "").slice(0, 500) || "",
+        url: d.url as string,
+        permalink: `https://www.reddit.com${d.permalink as string}`,
+        ups: d.ups as number,
+        num_comments: d.num_comments as number,
+        created_utc: d.created_utc as number,
+        subreddit: d.subreddit as string,
+        is_self: d.is_self as boolean,
+        link_flair_text: (d.link_flair_text as string | null) ?? null,
       };
     });
 }
 
-function extractComments(json: any): RedditComment[] {
-  const children = json?.data?.children ?? [];
+function extractComments(json: unknown): RedditComment[] {
+  const listing = json as RedditListing;
+  const children = listing?.data?.children ?? [];
   const comments: RedditComment[] = [];
   for (const c of children) {
     if (c.kind !== "t1") continue;
     const d = c.data;
     comments.push({
-      author: d.author,
-      body: d.body?.slice(0, 500) || "",
-      ups: d.ups,
-      created_utc: d.created_utc,
+      author: d.author as string,
+      body: ((d.body as string) ?? "").slice(0, 500) || "",
+      ups: d.ups as number,
+      created_utc: d.created_utc as number,
     });
   }
   return comments;
@@ -148,7 +164,7 @@ export const buildRedditFunctions: FunctionDomainBuilder = (ctx) => [
 
       const json = await redditFetch(`/r/${input.subreddit}/${sort}.json?${params}`);
       const posts = extractPosts(json);
-      const after = (json as any)?.data?.after ?? null;
+      const after = (json as RedditListing)?.data?.after ?? null;
       return { posts, after, subreddit: input.subreddit, sort };
     },
     auth: REDDIT_AUTH,
@@ -191,7 +207,7 @@ export const buildRedditFunctions: FunctionDomainBuilder = (ctx) => [
 
       const json = await redditFetch(path);
       const posts = extractPosts(json);
-      const after = (json as any)?.data?.after ?? null;
+      const after = (json as RedditListing)?.data?.after ?? null;
       return { posts, after, query: input.query };
     },
     auth: REDDIT_AUTH,
@@ -219,12 +235,16 @@ export const buildRedditFunctions: FunctionDomainBuilder = (ctx) => [
         `/r/${input.subreddit}/comments/${input.post_id}.json?${params}`,
       );
       // Reddit returns [post_listing, comments_listing]
-      const arr = json as any[];
-      const post = arr[0]?.data?.children?.[0]?.data;
+      const arr = json as RedditListing[];
+      const postData = arr[0]?.data?.children?.[0]?.data;
       const comments = extractComments(arr[1] ?? {});
       return {
-        post: post
-          ? { title: post.title, author: post.author, selftext: post.selftext?.slice(0, 500) || "" }
+        post: postData
+          ? {
+              title: postData.title as string,
+              author: postData.author as string,
+              selftext: ((postData.selftext as string) ?? "").slice(0, 500) || "",
+            }
           : null,
         comments,
       };
