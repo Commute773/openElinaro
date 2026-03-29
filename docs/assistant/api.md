@@ -243,9 +243,25 @@ Response: `{ "ok": true }`
 
 Service-level API routes are generated automatically from function definitions in [`src/functions/domains/`](../../src/functions/domains/). Each function that includes an `http` annotation and lists `api` in its `surfaces` array gets an auto-generated route at startup. Input validation, path/query parameter parsing, and error formatting are handled by the generation layer in [`src/functions/`](../../src/functions/).
 
-The `GET /api/g2/openapi.json` endpoint merges the static OpenAPI spec (covering the hand-written routes above) with a spec generated from these function definitions, so all routes appear in a single schema.
+### Path prefix
+
+Function definitions use relative paths (e.g. `/routines/:id/done`). The `API_PATH_PREFIX` constant in [`define-function.ts`](../../src/functions/define-function.ts) (currently `/api/g2`) is prepended automatically during route and OpenAPI generation.
+
+### Adding endpoints
 
 To add a new API endpoint, define a function with an `http` annotation in `src/functions/domains/` rather than hand-writing a route. The function layer takes care of route registration, input validation, and OpenAPI documentation.
+
+### Client codegen
+
+Run `bun run generate:client` (or `bun src/functions/generate-client.ts`) to produce a typed TypeScript client from the current function definitions. The generated client includes:
+
+- `OpenElinaroClient` class with one method per API endpoint
+- `ENDPOINTS` metadata array (method, path, params) for UI codegen
+- `OPENAPI_SPEC` embedded OpenAPI 3.1 spec
+
+Write to a specific file: `bun src/functions/generate-client.ts --out path/to/client.ts`
+
+The OpenAPI spec is also available at runtime: `GET /api/g2/openapi.json`.
 
 ## Error Responses
 
