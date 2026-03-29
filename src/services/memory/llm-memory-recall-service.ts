@@ -12,7 +12,6 @@ import { createTraceSpan } from "../../utils/telemetry-helpers";
 const llmRecallTelemetry = telemetry.child({ component: "llm_memory_recall" });
 const traceSpan = createTraceSpan(llmRecallTelemetry);
 
-const MAX_CORPUS_CHARS = 600_000;
 const MAX_RECALL_RESULTS = 5;
 
 export type LlmRecallMatch = {
@@ -184,24 +183,8 @@ export class LlmMemoryRecallService {
     }
 
     const segments: string[] = [];
-    const charCounter = { total: 0 };
-
-    // Prioritized paths: structured memory first, then core, then other docs
-    const prioritizedDirs = [
-      path.join(memoryDocRoot, "structured"),
-      path.join(memoryDocRoot, "core"),
-      memoryDocRoot,
-    ];
-
-    const seenPaths = new Set<string>();
-
-    for (const dir of prioritizedDirs) {
-      const dirStat = await stat(dir).catch(() => null);
-      if (!dirStat?.isDirectory()) continue;
-
-      await this.collectMarkdownFiles(dir, memoryDocRoot, segments, seenPaths, charCounter);
-      if (charCounter.total >= MAX_CORPUS_CHARS) break;
-    }
+    const seen = new Set<string>();
+    await this.collectMarkdownFiles(memoryDocRoot, memoryDocRoot, segments, seen);
 
     if (segments.length === 0) {
       return null;
@@ -224,18 +207,15 @@ export class LlmMemoryRecallService {
     rootDir: string,
     segments: string[],
     seen: Set<string>,
-    charCounter: { total: number },
   ) {
     const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
-      if (charCounter.total >= MAX_CORPUS_CHARS) break;
-
       const fullPath = path.join(dir, entry.name);
       if (seen.has(fullPath)) continue;
 
       if (entry.isDirectory()) {
-        if (entry.name === "identity" || entry.name === "compactions" || entry.name === "legacy") continue;
-        await this.collectMarkdownFiles(fullPath, rootDir, segments, seen, charCounter);
+        if (entry.name === "identity" || entry.name === "compactions") continue;
+        await this.collectMarkdownFiles(fullPath, rootDir, segments, seen);
         continue;
       }
 
@@ -248,11 +228,7 @@ export class LlmMemoryRecallService {
         const trimmed = content.trim();
         if (!trimmed) continue;
 
-        const segment = `### ${relativePath}\n${trimmed}`;
-        if (charCounter.total + segment.length > MAX_CORPUS_CHARS) break;
-
-        segments.push(segment);
-        charCounter.total += segment.length;
+        segments.push(`### ${relativePath}\n${trimmed}`);
       } catch {
         // Skip unreadable files
       }
