@@ -1,10 +1,9 @@
 import { mkdir } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { ConfigurationError, NotFoundError, ValidationError } from "../../domain/errors";
 import {
   getModels,
-  stream,
+  streamSimple,
   type Api,
   type Context,
   type KnownProvider,
@@ -22,7 +21,7 @@ import type {
   ToolCall,
 } from "../../messages/types";
 import { getOAuthApiKey, type OAuthCredentials } from "@mariozechner/pi-ai/oauth";
-import { approximateTextTokens, normalizeString } from "../../utils/text-utils";
+import { approximateTextTokens } from "../../utils/text-utils";
 import {
   approximateContentTokens,
   extractTextFromMessage,
@@ -173,25 +172,7 @@ interface ActiveModelStoreShape {
   activeModels?: Record<string, ActiveModelSelection>;
 }
 
-interface ProviderModelStub {
-  modelId: string;
-  name: string;
-}
-
-
 type RuntimeModelStub = Pick<Model<Api>, "id" | "name">;
-
-type ActiveModelInferenceOptions = ({
-  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
-  thinkingEnabled?: never;
-  thinkingBudgetTokens?: never;
-  effort?: never;
-} | {
-  reasoningEffort?: never;
-  thinkingEnabled?: boolean;
-  thinkingBudgetTokens?: number;
-  effort?: "low" | "medium" | "high" | "max";
-});
 
 function getStorePath() {
   return resolveRuntimePath("model-state.json");
@@ -345,38 +326,6 @@ function getListedContextWindow(
     : uncapped;
 }
 
-function extractAccountId(token: string) {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) {
-      throw new ValidationError("Invalid token");
-    }
-
-    const payload = JSON.parse(Buffer.from(parts[1] ?? "", "base64url").toString("utf8")) as {
-      https?: {
-        // ChatGPT account ids are embedded under a namespaced claim.
-        // The claim path is stable across the OAuth token flow used by pi-ai.
-        api?: {
-          openai?: {
-            com?: {
-              auth?: {
-                chatgpt_account_id?: string;
-              };
-            };
-          };
-        };
-      };
-    };
-    const accountId = payload.https?.api?.openai?.com?.auth?.chatgpt_account_id;
-    if (!accountId) {
-      throw new ValidationError("Missing account id");
-    }
-    return accountId;
-  } catch {
-    throw new ValidationError("Failed to extract the ChatGPT account id from the Codex token.");
-  }
-}
-
 function toolSchemaToJson(tool: PiTool) {
   return tool.parameters;
 }
@@ -398,104 +347,6 @@ function buildAnthropicAuthHeaders(apiKey: string) {
   }
 
   return headers;
-}
-
-function buildCodexHeaders(token: string) {
-  const headers = new Headers({
-    accept: "application/json",
-    authorization: `Bearer ${token}`,
-    "chatgpt-account-id": extractAccountId(token),
-    "OpenAI-Beta": "responses=experimental",
-    originator: "openelinaro",
-    "User-Agent": `openelinaro (${os.platform()} ${os.release()}; ${os.arch()})`,
-  });
-  return headers;
-}
-
-function buildZaiHeaders(apiKey: string) {
-  return new Headers({
-    accept: "application/json",
-    "content-type": "application/json",
-    authorization: `Bearer ${apiKey}`,
-  });
-}
-
-function extractCandidateString(
-  value: Record<string, unknown>,
-  keys: string[],
-): string | undefined {
-  for (const key of keys) {
-    const result = normalizeString(value[key]);
-    if (result) {
-      return result;
-    }
-  }
-  return undefined;
-}
-
-function normalizeCodexDiscoveredModels(payload: unknown): ProviderModelStub[] {
-  const results = new Map<string, ProviderModelStub>();
-  const queue: unknown[] = [payload];
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (Array.isArray(current)) {
-      queue.push(...current);
-      continue;
-    }
-    if (!current || typeof current !== "object") {
-      continue;
-    }
-
-    const record = current as Record<string, unknown>;
-    const modelId = extractCandidateString(record, ["slug", "id", "model_slug", "modelId"]);
-    const name = extractCandidateString(record, ["display_name", "displayName", "title", "name"]);
-    if (modelId && /^(gpt|o\d)/i.test(modelId)) {
-      results.set(modelId, {
-        modelId,
-        name: name ?? modelId,
-      });
-    }
-
-    for (const child of Object.values(record)) {
-      queue.push(child);
-    }
-  }
-
-  return [...results.values()].sort((left, right) => left.modelId.localeCompare(right.modelId));
-}
-
-function normalizeAnthropicDiscoveredModels(payload: unknown): ProviderModelStub[] {
-  const response = payload as {
-    data?: Array<{
-      id?: string;
-      display_name?: string;
-      name?: string;
-    }>;
-  };
-  return (response.data ?? [])
-    .map((model) => ({
-      modelId: model.id?.trim() ?? "",
-      name: model.display_name?.trim() || model.name?.trim() || model.id?.trim() || "",
-    }))
-    .filter((model) => model.modelId.length > 0)
-    .sort((left, right) => left.modelId.localeCompare(right.modelId));
-}
-
-function normalizeZaiDiscoveredModels(payload: unknown): ProviderModelStub[] {
-  const response = payload as {
-    data?: Array<{
-      id?: string;
-      name?: string;
-    }>;
-  };
-  return (response.data ?? [])
-    .map((model) => ({
-      modelId: model.id?.trim() ?? "",
-      name: model.name?.trim() || model.id?.trim() || "",
-    }))
-    .filter((model) => model.modelId.length > 0)
-    .sort((left, right) => left.modelId.localeCompare(right.modelId));
 }
 
 function normalizeModelLookupValue(value: string) {
@@ -898,38 +749,29 @@ export class ModelService {
   }
 
   async listProviderModels(providerId: ModelProviderId): Promise<ListedProviderModel[]> {
-    const runtimeCatalog = getRuntimeCatalog(providerId);
+    const runtimeModels = getModels(PROVIDER_RUNTIME_MAP[providerId]);
     const active = await this.getActiveModel();
-    const discovered = providerId === "claude"
-      ? await this.fetchAnthropicModels()
-      : providerId === "zai"
-        ? await this.fetchZaiModels()
-        : await this.fetchCodexModels();
 
-    return discovered.map((entry) => {
-      const runtimeModel = runtimeCatalog.get(entry.modelId) ??
-        resolveRuntimeModelIdentifier(entry.modelId, [...runtimeCatalog.values()]);
-      return {
+    return runtimeModels.map((model) => ({
+      providerId,
+      modelId: model.id,
+      name: model.name,
+      contextWindow: getListedContextWindow(
+        this.profile,
         providerId,
-        modelId: entry.modelId,
-        name: entry.name,
-        contextWindow: getListedContextWindow(
-          this.profile,
-          providerId,
-          entry.modelId,
-          active,
-          runtimeModel?.contextWindow,
-        ),
-        maxOutputTokens: runtimeModel?.maxTokens,
-        reasoning: runtimeModel?.reasoning,
-        supported: Boolean(runtimeModel),
-        active: active.providerId === providerId &&
-          Boolean(resolveRuntimeModelIdentifier(active.modelId, [{
-            id: entry.modelId,
-            name: entry.name,
-          }])),
-      };
-    });
+        model.id,
+        active,
+        model.contextWindow,
+      ),
+      maxOutputTokens: model.maxTokens,
+      reasoning: model.reasoning,
+      supported: true,
+      active: active.providerId === providerId &&
+        Boolean(resolveRuntimeModelIdentifier(active.modelId, [{
+          id: model.id,
+          name: model.name,
+        }])),
+    }));
   }
 
   async resolveProviderModel(providerId: ModelProviderId, requestedModelId: string) {
@@ -1003,10 +845,6 @@ export class ModelService {
     };
     await writeStoredActiveModel(this.selectionStoreKey, nextSelection);
     return nextSelection;
-  }
-
-  getInferenceOptions(selection: ActiveModelSelection): ActiveModelInferenceOptions {
-    return this.secondaryDispatch.getInferenceOptions(selection);
   }
 
   async summarizeToolResult(params: {
@@ -1155,10 +993,10 @@ export class ModelService {
 
         const startedAt = process.hrtime.bigint();
         let firstOutputAt: bigint | null = null;
-        const responseStream = stream(resolved.runtimeModel, context, {
+        const responseStream = streamSimple(resolved.runtimeModel, context, {
           apiKey: resolved.apiKey,
           maxTokens,
-          ...this.getInferenceOptions(resolved.selection),
+          reasoning: resolved.selection.thinkingLevel,
         });
 
         for await (const event of responseStream) {
@@ -1217,60 +1055,6 @@ export class ModelService {
         },
       },
     );
-  }
-
-  private async fetchCodexModels(): Promise<ProviderModelStub[]> {
-    const { apiKey } = await resolveCodexApiKey(this.profile.id);
-    const response = await fetch("https://chatgpt.com/backend-api/models", {
-      headers: buildCodexHeaders(apiKey),
-    });
-    if (!response.ok) {
-      throw new Error(`Codex model listing failed with HTTP ${response.status}.`);
-    }
-
-    const payload = await response.json();
-    const models = normalizeCodexDiscoveredModels(payload);
-    if (models.length === 0) {
-      throw new Error("Codex returned an empty or unrecognized model catalog.");
-    }
-    return models;
-  }
-
-  private async fetchAnthropicModels(): Promise<ProviderModelStub[]> {
-    const response = await fetch("https://api.anthropic.com/v1/models", {
-      headers: buildAnthropicAuthHeaders(resolveClaudeToken(this.profile.id)),
-    });
-    if (!response.ok) {
-      throw new Error(`Claude model listing failed with HTTP ${response.status}.`);
-    }
-
-    const payload = await response.json();
-    const models = normalizeAnthropicDiscoveredModels(payload);
-    if (models.length === 0) {
-      throw new Error("Claude returned an empty model catalog.");
-    }
-    return models;
-  }
-
-  private async fetchZaiModels(): Promise<ProviderModelStub[]> {
-    const apiKey = resolveZaiApiKey(this.profile.id);
-    const response = await fetch("https://api.z.ai/api/coding/paas/v4/models", {
-      headers: buildZaiHeaders(apiKey),
-    });
-    if (!response.ok) {
-      throw new Error(`Z.ai model listing failed with HTTP ${response.status}.`);
-    }
-
-    const payload = await response.json();
-    const models = normalizeZaiDiscoveredModels(payload);
-    if (models.length === 0) {
-      const runtimeCatalog = getRuntimeCatalog("zai");
-      return [...runtimeCatalog.values()].map((model) => ({
-        modelId: model.id,
-        name: model.name,
-      }));
-    }
-    return models;
   }
 
   private async countAnthropicTokens(params: {

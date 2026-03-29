@@ -1,15 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { stream, type Context, type Model } from "@mariozechner/pi-ai";
-import type { ProfileRecord } from "../domain/profiles";
+import { streamSimple, type Context, type Model } from "@mariozechner/pi-ai";
 import type { ActiveModelSelection } from "../services/models/model-service";
-import { ModelService } from "../services/models/model-service";
-
-const TEST_PROFILE: ProfileRecord = {
-  id: "test-profile",
-  name: "Test Profile",
-  roles: ["root"],
-  memoryNamespace: "test",
-};
 
 const CODEX_MODEL: Model<"openai-codex-responses"> = {
   id: "gpt-5.4",
@@ -64,7 +55,6 @@ function buildCodexToken() {
 async function captureRequestBody(
   selection: ActiveModelSelection = BASE_SELECTION,
 ): Promise<Record<string, unknown>> {
-  const service = new ModelService(TEST_PROFILE);
   let capturedBody: Record<string, unknown> | null = null;
 
   const context: Context = {
@@ -78,10 +68,10 @@ async function captureRequestBody(
     ],
   };
 
-  const responseStream = stream(CODEX_MODEL, context, {
+  const responseStream = streamSimple(CODEX_MODEL, context, {
     apiKey: buildCodexToken(),
     sessionId: "session:test",
-    ...service.getInferenceOptions(selection),
+    reasoning: selection.thinkingLevel,
     onPayload: (payload) => {
       if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
         throw new Error("Expected provider payload to be an object.");

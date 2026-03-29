@@ -1,12 +1,13 @@
 import {
   getModel,
   getModels,
-  stream,
+  streamSimple,
   type Context,
   type KnownProvider,
   type Message,
   type Model,
   type Api,
+  type ThinkingLevel,
   type Usage,
 } from "@mariozechner/pi-ai";
 import { assertSuccessfulProviderResponse } from "../../connectors/provider-response";
@@ -52,18 +53,6 @@ const DEFAULT_REFLECTION_MODEL_IDS: Record<ModelProviderId, string> = {
   claude: "claude-sonnet-4-5",
   zai: "glm-5",
 };
-
-type ActiveModelInferenceOptions = ({
-  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
-  thinkingEnabled?: never;
-  thinkingBudgetTokens?: never;
-  effort?: never;
-} | {
-  reasoningEffort?: never;
-  thinkingEnabled?: boolean;
-  thinkingBudgetTokens?: number;
-  effort?: "low" | "medium" | "high" | "max";
-});
 
 export interface ResolvedRuntimeModel {
   selection: ActiveModelSelection;
@@ -151,26 +140,6 @@ export class SecondaryModelDispatch {
       providerId,
       modelId: this.profile.reflectionModelId ?? DEFAULT_REFLECTION_MODEL_IDS[providerId],
       thinkingLevel: "minimal",
-    };
-  }
-
-  getInferenceOptions(selection: ActiveModelSelection): ActiveModelInferenceOptions {
-    if (selection.providerId === "claude") {
-      if (selection.thinkingLevel === "minimal") {
-        return {
-          thinkingEnabled: false,
-        };
-      }
-
-      return {
-        thinkingEnabled: true,
-        effort: selection.thinkingLevel === "xhigh" ? "max" : selection.thinkingLevel,
-      };
-    }
-
-    // Both openai-codex and zai use reasoningEffort (openai-completions API)
-    return {
-      reasoningEffort: selection.thinkingLevel,
     };
   }
 
@@ -286,10 +255,10 @@ export class SecondaryModelDispatch {
           ],
         };
         const sessionId = `tool-summarizer:${this.profile.id}:${Date.now()}`;
-        const responseStream = stream(resolved.runtimeModel, context, {
+        const responseStream = streamSimple(resolved.runtimeModel, context, {
           apiKey: resolved.apiKey,
           sessionId,
-          ...this.getInferenceOptions(resolved.selection),
+          reasoning: resolved.selection.thinkingLevel,
         });
         const response = assertSuccessfulProviderResponse(await responseStream.result(), {
           connector: "tool-summarizer",
@@ -350,10 +319,10 @@ export class SecondaryModelDispatch {
           } satisfies Message],
         };
         const sessionId = `${params.sessionIdPrefix?.trim() || "memory"}:${this.profile.id}:${Date.now()}`;
-        const responseStream = stream(resolved.runtimeModel, context, {
+        const responseStream = streamSimple(resolved.runtimeModel, context, {
           apiKey: resolved.apiKey,
           sessionId,
-          ...this.getInferenceOptions(resolved.selection),
+          reasoning: resolved.selection.thinkingLevel,
         });
         const response = assertSuccessfulProviderResponse(await responseStream.result(), {
           connector: "memory-model",

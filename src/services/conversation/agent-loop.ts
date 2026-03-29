@@ -6,14 +6,15 @@
  * until the model stops issuing tool calls or the step limit is reached.
  */
 import {
-  complete,
+  completeSimple,
   type AssistantMessage,
   type Context,
   type Message,
   type Model,
+  type SimpleStreamOptions,
+  type ThinkingLevel,
   type Tool,
   type ToolCall,
-  type ProviderStreamOptions,
 } from "@mariozechner/pi-ai";
 import type { ToolResultMessage } from "../../messages/types";
 
@@ -39,7 +40,9 @@ export interface AgentLoopOptions {
   onAssistantMessage?: (message: AssistantMessage) => void;
   /** Called after each tool result. */
   onToolResult?: (result: ToolResultMessage) => void;
-  /** Extra provider-specific options passed to pi-ai's complete(). */
+  /** Thinking/reasoning level passed to pi-ai's completeSimple(). */
+  reasoning?: ThinkingLevel;
+  /** Extra provider-specific options passed to pi-ai's completeSimple(). */
   providerOptions?: Record<string, unknown>;
 }
 
@@ -77,6 +80,7 @@ export async function runAgentLoop(
     apiKey,
     onAssistantMessage,
     onToolResult,
+    reasoning,
     providerOptions,
   } = options;
 
@@ -93,13 +97,14 @@ export async function runAgentLoop(
       tools: tools.length > 0 ? tools : undefined,
     };
 
-    const streamOptions: ProviderStreamOptions = {
+    const streamOptions: SimpleStreamOptions = {
       signal,
       apiKey,
+      reasoning,
       ...providerOptions,
     };
 
-    const response = await complete(model, context, streamOptions);
+    const response = await completeSimple(model, context, streamOptions);
     allMessages.push(response);
     newMessages.push(response);
     finalMessage = response;

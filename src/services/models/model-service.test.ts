@@ -28,43 +28,6 @@ function createSelection(
   };
 }
 
-describe("ModelService.getInferenceOptions", () => {
-  test("does not attach payload mutation for Codex extended context", () => {
-    const service = new ModelService(TEST_PROFILE);
-
-    expect(service.getInferenceOptions(createSelection({
-      extendedContextEnabled: true,
-    }))).toEqual({
-      reasoningEffort: "low",
-    });
-  });
-
-  test("maps Claude minimal thinking to disabled thinking", () => {
-    const service = new ModelService(TEST_PROFILE);
-
-    expect(service.getInferenceOptions(createSelection({
-      providerId: "claude",
-      modelId: "claude-sonnet-4-5",
-      thinkingLevel: "minimal",
-    }))).toEqual({
-      thinkingEnabled: false,
-    });
-  });
-
-  test("maps Claude xhigh thinking to max effort", () => {
-    const service = new ModelService(TEST_PROFILE);
-
-    expect(service.getInferenceOptions(createSelection({
-      providerId: "claude",
-      modelId: "claude-sonnet-4-5",
-      thinkingLevel: "xhigh",
-    }))).toEqual({
-      thinkingEnabled: true,
-      effort: "max",
-    });
-  });
-});
-
 describe("ModelService.getActiveModel", () => {
   test("uses the profile default thinking level when no stored selection exists", async () => {
     const previousCwd = process.cwd();
