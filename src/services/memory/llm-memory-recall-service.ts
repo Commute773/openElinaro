@@ -197,7 +197,7 @@ export class LlmMemoryRecallService {
     const memoryDocRoot = path.join(resolveRuntimePath("memory"), "documents", namespace);
 
     const segments: string[] = [];
-    let totalChars = 0;
+    const charCounter = { total: 0 };
 
     // Prioritized paths: structured memory first, then core, then other docs
     const prioritizedDirs = [
@@ -212,9 +212,8 @@ export class LlmMemoryRecallService {
       const dirStat = await stat(dir).catch(() => null);
       if (!dirStat?.isDirectory()) continue;
 
-      await this.collectMarkdownFiles(dir, memoryDocRoot, segments, seenPaths, () => totalChars);
-      totalChars = segments.reduce((sum, s) => sum + s.length, 0);
-      if (totalChars >= MAX_MEMORY_CORPUS_CHARS) break;
+      await this.collectMarkdownFiles(dir, memoryDocRoot, segments, seenPaths, charCounter);
+      if (charCounter.total >= MAX_MEMORY_CORPUS_CHARS) break;
     }
 
     if (segments.length === 0) {
@@ -238,11 +237,11 @@ export class LlmMemoryRecallService {
     rootDir: string,
     segments: string[],
     seen: Set<string>,
-    getCurrentChars: () => number,
+    charCounter: { total: number },
   ) {
     const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
-      if (getCurrentChars() >= MAX_MEMORY_CORPUS_CHARS) break;
+      if (charCounter.total >= MAX_MEMORY_CORPUS_CHARS) break;
 
       const fullPath = path.join(dir, entry.name);
       if (seen.has(fullPath)) continue;
@@ -250,7 +249,7 @@ export class LlmMemoryRecallService {
       if (entry.isDirectory()) {
         // Skip identity and compactions directories
         if (entry.name === "identity" || entry.name === "compactions" || entry.name === "legacy") continue;
-        await this.collectMarkdownFiles(fullPath, rootDir, segments, seen, getCurrentChars);
+        await this.collectMarkdownFiles(fullPath, rootDir, segments, seen, charCounter);
         continue;
       }
 
@@ -267,9 +266,10 @@ export class LlmMemoryRecallService {
         if (trimmed.length > 8_000) continue;
 
         const segment = `### ${relativePath}\n${trimmed}`;
-        if (getCurrentChars() + segment.length > MAX_MEMORY_CORPUS_CHARS) break;
+        if (charCounter.total + segment.length > MAX_MEMORY_CORPUS_CHARS) break;
 
         segments.push(segment);
+        charCounter.total += segment.length;
       } catch {
         // Skip unreadable files
       }
