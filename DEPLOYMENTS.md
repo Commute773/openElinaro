@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.12
+- Released at: 2026-03-29T22:18:39Z
+- Release id: 20260329T221839Z-c88d984
+- Previous version: 2026.03.29.11
+- Trigger: ci/release workflow
+
+- feat: add Z.ai (GLM) as third model provider alongside Claude and Codex (#203)
+
 ## 2026.03.29.11
 - Released at: 2026-03-29T22:10:01Z
 - Release id: 20260329T221001Z-2cb8421
