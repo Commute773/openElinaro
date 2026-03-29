@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.5
+- Released at: 2026-03-29T19:34:21Z
+- Release id: 20260329T193421Z-ce377a0
+- Previous version: 2026.03.29.4
+- Trigger: ci/release workflow
+
+- feat: structured API responses with agentFormat for string rendering (#196)
+
 ## 2026.03.29.4
 - Released at: 2026-03-29T19:13:47Z
 - Release id: 20260329T191347Z-1d293ac
