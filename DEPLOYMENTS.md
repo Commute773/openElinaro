@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.15
+- Released at: 2026-03-29T22:41:39Z
+- Release id: 20260329T224139Z-198eb41
+- Previous version: 2026.03.29.14
+- Trigger: ci/release workflow
+
+- refactor: use pi-ai's streamSimple/completeSimple and built-in model catalog (#206)
+
 ## 2026.03.29.14
 - Released at: 2026-03-29T22:36:57Z
 - Release id: 20260329T223657Z-6b00e49
