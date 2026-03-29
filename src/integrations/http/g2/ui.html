@@ -2,192 +2,116 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>G2 Simulator</title>
 <style>
-  :root {
-    --green: #00ff41;
-    --green-dim: #00aa2a;
-    --green-dimmer: #005515;
-    --green-faint: #002a0a;
-    --bg: #0a0a0a;
-    --panel-bg: #111;
-    --border: #222;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--green); font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
-  body { display: flex; flex-direction: column; }
+:root {
+  --green: #00ff41; --dim: #00aa2a; --dimmer: #005515; --faint: #002a0a;
+  --bg: #0a0a0a; --panel: #111; --border: #222;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--green);
+  font-family:'SF Mono','Fira Code','Cascadia Code',monospace; }
+body { display:flex; flex-direction:column; }
 
-  /* ── Top bar ── */
-  .topbar {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 4px 12px;
-    background: var(--panel-bg);
-    border-bottom: 1px solid var(--border);
-    font-size: 12px;
-  }
-  .topbar label { color: var(--green-dim); white-space: nowrap; }
-  .topbar select {
-    background: var(--bg); border: 1px solid var(--border); color: var(--green);
-    font-family: inherit; font-size: 12px; padding: 2px 6px; border-radius: 3px;
-  }
-  .topbar .spacer { flex: 1; }
-  .topbar .dim { color: var(--green-dimmer); font-size: 11px; }
-  .topbar .status { color: var(--green-dim); font-size: 11px; }
-  .topbar .status.ok { color: var(--green); }
-  .topbar .status.err { color: #ff4444; }
+.topbar { flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:4px 10px;
+  background:var(--panel); border-bottom:1px solid var(--border); font-size:11px; }
+.topbar select { background:var(--bg); border:1px solid var(--border); color:var(--green);
+  font-family:inherit; font-size:11px; padding:1px 4px; border-radius:3px; }
+.topbar .spacer { flex:1; }
+.topbar .dim { color:var(--dimmer); }
+.topbar .status { font-size:10px; color:var(--dim); }
 
-  /* ── Main layout ── */
-  .main { flex: 1; display: flex; min-height: 0; }
+.main { flex:1; display:flex; min-height:0; }
 
-  /* ── Simulator viewport — letterboxed ── */
-  .sim-viewport {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #000;
-    min-width: 0; min-height: 0;
-    overflow: hidden;
-  }
-  .sim-frame {
-    position: relative;
-    box-shadow: 0 0 40px rgba(0,255,65,0.06);
-  }
-  .sim-frame canvas {
-    display: block;
-    width: 100%; height: 100%;
-    image-rendering: pixelated;
-  }
+/* Simulator viewport */
+.sim-viewport { flex:1; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; background:#000; min-width:0; min-height:0; overflow:hidden; }
+.sim-frame { position:relative; }
+.sim-frame canvas { display:block; }
 
-  /* ── Sidebar ── */
-  .sidebar {
-    flex: 0 0 300px;
-    background: var(--panel-bg);
-    border-left: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    overflow: hidden;
-  }
-  .sidebar-header {
-    padding: 6px 10px;
-    font-size: 12px; font-weight: 600; color: var(--green-dim);
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 6px;
-  }
-  .sidebar-header input {
-    flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--green);
-    font-family: inherit; font-size: 11px; padding: 2px 6px; border-radius: 3px;
-  }
-  .fn-list {
-    flex: 1; overflow-y: auto; padding: 2px 0;
-  }
-  .fn-list::-webkit-scrollbar { width: 5px; }
-  .fn-list::-webkit-scrollbar-track { background: transparent; }
-  .fn-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+/* Controls */
+.sim-controls { flex:0 0 auto; display:flex; gap:6px; padding:8px; align-items:center; }
+.sim-controls button { background:rgba(0,255,65,0.08); border:1px solid var(--dimmer);
+  color:var(--green); font-family:inherit; font-size:13px; padding:6px 14px; border-radius:4px;
+  cursor:pointer; min-width:44px; }
+.sim-controls button:hover { background:rgba(0,255,65,0.15); }
+.sim-controls button:active { background:rgba(0,255,65,0.25); }
+.sim-controls button.voice { color:#4ec9b0; border-color:#4ec9b0; }
+.sim-controls button.voice.listening { background:rgba(78,201,176,0.2); animation:pulse 1s infinite; }
+@keyframes pulse { 50% { opacity:0.6; } }
 
-  .fn-domain {
-    padding: 6px 10px 2px; font-size: 9px;
-    text-transform: uppercase; letter-spacing: 1px; color: var(--green-dimmer);
-  }
-  .fn-item {
-    padding: 3px 10px; font-size: 11px; cursor: pointer;
-    display: flex; align-items: center; gap: 5px;
-    border-left: 2px solid transparent;
-  }
-  .fn-item:hover { background: rgba(0,255,65,0.05); border-left-color: var(--green-dimmer); }
-  .fn-item.selected { background: rgba(0,255,65,0.08); border-left-color: var(--green); }
-  .fn-item.is-view { border-left-color: var(--green-dimmer); border-left-style: dotted; }
-  .fn-item .method {
-    font-size: 9px; font-weight: 700; padding: 0 3px; border-radius: 2px;
-    min-width: 30px; text-align: center;
-  }
-  .fn-item .method.get { color: #4ec9b0; }
-  .fn-item .method.post { color: #dcdcaa; }
-  .fn-item .method.put { color: #ce9178; }
-  .fn-item .method.patch { color: #d7ba7d; }
-  .fn-item .method.delete { color: #f44747; }
-  .fn-item .name { color: var(--green); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Sidebar */
+.sidebar { flex:0 0 280px; background:var(--panel); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden; }
+.sidebar-header { padding:5px 8px; font-size:11px; color:var(--dim);
+  border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; }
+.sidebar-header input { flex:1; background:var(--bg); border:1px solid var(--border);
+  color:var(--green); font-family:inherit; font-size:10px; padding:2px 5px; border-radius:3px; }
+.fn-list { flex:1; overflow-y:auto; padding:2px 0; font-size:10px; }
+.fn-list::-webkit-scrollbar { width:4px; }
+.fn-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+.fn-domain { padding:5px 8px 1px; font-size:8px; text-transform:uppercase;
+  letter-spacing:1px; color:var(--dimmer); }
+.fn-item { padding:2px 8px; cursor:pointer; display:flex; align-items:center; gap:4px;
+  border-left:2px solid transparent; }
+.fn-item:hover { background:rgba(0,255,65,0.04); }
+.fn-item.selected { background:rgba(0,255,65,0.08); border-left-color:var(--green); }
+.fn-item .m { font-size:8px; font-weight:700; min-width:26px; text-align:center; }
+.fn-item .m.get { color:#4ec9b0; } .fn-item .m.post { color:#dcdcaa; }
+.fn-item .n { color:var(--green); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-  /* ── Detail panel ── */
-  .fn-detail {
-    flex: 0 0 auto; max-height: 45%;
-    border-top: 1px solid var(--border);
-    padding: 6px 10px; overflow-y: auto; font-size: 11px;
-  }
-  .fn-detail::-webkit-scrollbar { width: 5px; }
-  .fn-detail::-webkit-scrollbar-track { background: transparent; }
-  .fn-detail::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-  .fn-detail h3 { font-size: 12px; color: var(--green); margin-bottom: 3px; }
-  .fn-detail .desc { color: var(--green-dim); margin-bottom: 6px; line-height: 1.3; }
-  .fn-detail .tags { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 6px; }
-  .fn-detail .tag { font-size: 9px; padding: 1px 5px; border-radius: 8px; background: rgba(0,255,65,0.08); color: var(--green-dim); }
-  .fn-detail .params-title { font-size: 10px; color: var(--green-dimmer); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .fn-detail .param { display: flex; gap: 6px; padding: 1px 0; font-size: 11px; }
-  .fn-detail .param .pname { color: var(--green); }
-  .fn-detail .param .ptype { color: var(--green-dimmer); }
-  .fn-detail .param .preq { color: #f44747; font-size: 9px; }
-  .fn-detail textarea {
-    width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--green);
-    font-family: inherit; font-size: 10px; padding: 4px; border-radius: 3px;
-    resize: vertical; min-height: 32px; margin-top: 4px;
-  }
-  .fn-detail .btn-row { display: flex; gap: 4px; margin-top: 4px; }
-  .fn-detail button {
-    background: rgba(0,255,65,0.1); border: 1px solid var(--green-dimmer); color: var(--green);
-    font-family: inherit; font-size: 11px; padding: 3px 12px; border-radius: 3px; cursor: pointer;
-  }
-  .fn-detail button:hover { background: rgba(0,255,65,0.2); }
-  .fn-detail button.view-btn { border-color: #4ec9b0; color: #4ec9b0; }
-  .fn-detail .result {
-    margin-top: 4px; white-space: pre-wrap; color: var(--green-dim); font-size: 10px;
-    max-height: 100px; overflow-y: auto; background: var(--bg); padding: 3px; border-radius: 2px;
-  }
+.fn-detail { flex:0 0 auto; max-height:40%; border-top:1px solid var(--border);
+  padding:5px 8px; overflow-y:auto; font-size:10px; }
+.fn-detail h3 { font-size:11px; color:var(--green); margin-bottom:2px; }
+.fn-detail .desc { color:var(--dim); margin-bottom:4px; }
+.fn-detail textarea { width:100%; background:var(--bg); border:1px solid var(--border);
+  color:var(--green); font-family:inherit; font-size:9px; padding:3px; border-radius:2px;
+  resize:vertical; min-height:28px; margin-top:3px; }
+.fn-detail button { background:rgba(0,255,65,0.1); border:1px solid var(--dimmer);
+  color:var(--green); font-family:inherit; font-size:10px; padding:2px 10px;
+  border-radius:2px; cursor:pointer; margin-top:3px; }
+.fn-detail .result { margin-top:3px; white-space:pre-wrap; color:var(--dim); font-size:9px;
+  max-height:80px; overflow-y:auto; background:var(--bg); padding:2px; border-radius:2px; }
 
-  /* ── Bottom bar ── */
-  .bottombar {
-    flex: 0 0 auto; padding: 3px 12px;
-    background: var(--panel-bg); border-top: 1px solid var(--border);
-    font-size: 10px; color: var(--green-dimmer); display: flex; gap: 16px;
-  }
+.bottombar { flex:0 0 auto; padding:2px 10px; background:var(--panel);
+  border-top:1px solid var(--border); font-size:9px; color:var(--dimmer); display:flex; gap:12px; }
 </style>
 </head>
 <body>
 
 <div class="topbar">
   <span style="font-weight:700;color:var(--green)">G2</span>
-  <span class="dim" id="simDims">576x288</span>
-  <label>Line:
+  <span class="dim" id="dims">576x288</span>
+  <label style="color:var(--dim)">Line:
     <select id="lineHeight">
-      <option value="9">9</option>
-      <option value="12">12</option>
-      <option value="16" selected>16</option>
-      <option value="18">18</option>
-      <option value="24">24</option>
-      <option value="32">32</option>
-      <option value="36">36</option>
-      <option value="48">48</option>
+      <option value="9">9</option><option value="12">12</option>
+      <option value="16" selected>16</option><option value="18">18</option>
+      <option value="24">24</option><option value="32">32</option>
+      <option value="36">36</option><option value="48">48</option>
     </select>
   </label>
-  <label>Screen:
-    <select id="screenSelect"><option value="">—</option></select>
-  </label>
   <div class="spacer"></div>
-  <span class="status" id="connStatus">…</span>
+  <span class="status" id="status">…</span>
 </div>
 
 <div class="main">
-  <div class="sim-viewport" id="simViewport">
-    <div class="sim-frame" id="simFrame">
-      <canvas id="simCanvas"></canvas>
+  <div class="sim-viewport" id="viewport">
+    <div class="sim-frame" id="frame">
+      <canvas id="display"></canvas>
+    </div>
+    <div class="sim-controls">
+      <button onclick="input('up')" title="Swipe Up (↑)">▲</button>
+      <button onclick="input('down')" title="Swipe Down (↓)">▼</button>
+      <button onclick="input('press')" title="Tap (Enter)">Press</button>
+      <button onclick="input('longpress')" title="Hold (Esc)">Hold</button>
+      <button class="voice" id="voiceBtn" onclick="input('voice')" title="Voice (V)">🎤</button>
     </div>
   </div>
   <div class="sidebar">
     <div class="sidebar-header">
       <span>Functions</span>
-      <input type="text" id="fnSearch" placeholder="Filter…">
+      <input type="text" id="fnSearch" placeholder="Filter…" oninput="renderFnList(this.value)">
     </div>
     <div class="fn-list" id="fnList"></div>
     <div class="fn-detail" id="fnDetail" style="display:none"></div>
@@ -195,494 +119,618 @@
 </div>
 
 <div class="bottombar">
-  <span id="renderInfo">—</span>
-  <span id="frameTime"></span>
+  <span id="info">—</span>
 </div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════
-//  Constants
+//  CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════
-const SIM_W = 576;
-const SIM_H = 288;
-
-// 4-bit green micro-LED palette
-const PAL = Array.from({length: 16}, (_, i) => {
-  const t = i / 15;
-  return [Math.round(t * 20), Math.round(t * 255), Math.round(t * 40)];
+const W = 576, H = 288;
+const PAL = Array.from({length:16},(_,i)=>{
+  const t=i/15; return [Math.round(t*20),Math.round(t*255),Math.round(t*40)];
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-//  State
+//  STATE
 // ═══════════════════════════════════════════════════════════════════════
-let lineHeight = 16;
-let tools = [];           // from /api/g2/tools
-let openApiSpec = null;   // from /api/g2/openapi.json
-let screens = [];         // auto-derived GET endpoints suitable as "views"
-let currentScreen = null; // { path, method, operationId, ... }
-let screenData = null;    // last fetched data for current screen
-let selectedFn = null;    // selected function in sidebar
+let LH = 16;                 // line height
+let screenStack = [];         // navigation stack
+let tools = [];               // from openapi
+let selectedFn = null;
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Canvas + letterbox
+//  CRISP CANVAS — offscreen framebuffer + nearest-neighbor blit
 // ═══════════════════════════════════════════════════════════════════════
-const viewport = document.getElementById('simViewport');
-const frame = document.getElementById('simFrame');
-const canvas = document.getElementById('simCanvas');
-const ctx = canvas.getContext('2d');
-canvas.width = SIM_W;
-canvas.height = SIM_H;
+const fb = document.createElement('canvas');
+fb.width = W; fb.height = H;
+const fc = fb.getContext('2d');
 
-function resizeSimulator() {
+const display = document.getElementById('display');
+const dc = display.getContext('2d');
+const viewport = document.getElementById('viewport');
+const frame = document.getElementById('frame');
+
+function resize() {
+  // Available space (viewport minus controls)
   const vw = viewport.clientWidth;
-  const vh = viewport.clientHeight;
-  const aspect = SIM_W / SIM_H;
+  const vh = viewport.clientHeight - 60; // reserve for controls
+  const aspect = W / H;
   let w, h;
-  if (vw / vh > aspect) {
-    h = vh; w = h * aspect;
-  } else {
-    w = vw; h = w / aspect;
-  }
-  frame.style.width = Math.floor(w) + 'px';
-  frame.style.height = Math.floor(h) + 'px';
+  if (vw / vh > aspect) { h = vh; w = h * aspect; }
+  else { w = vw; h = w / aspect; }
+  w = Math.floor(w); h = Math.floor(h);
+  // Set display canvas pixel size to match CSS size * dpr for sharpness
+  const dpr = window.devicePixelRatio || 1;
+  display.width = w * dpr;
+  display.height = h * dpr;
+  display.style.width = w + 'px';
+  display.style.height = h + 'px';
+  frame.style.width = w + 'px';
+  frame.style.height = h + 'px';
+  blit();
 }
-new ResizeObserver(resizeSimulator).observe(viewport);
-resizeSimulator();
+
+function blit() {
+  dc.imageSmoothingEnabled = false;
+  dc.drawImage(fb, 0, 0, display.width, display.height);
+}
+
+new ResizeObserver(resize).observe(viewport);
+resize();
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Drawing primitives (G2 display model)
+//  DRAWING PRIMITIVES (on framebuffer)
 // ═══════════════════════════════════════════════════════════════════════
-function palColor(level) {
-  const [r, g, b] = PAL[Math.min(15, Math.max(0, level))];
+function clr() { fc.fillStyle='#000'; fc.fillRect(0,0,W,H); }
+
+function col(level) {
+  const [r,g,b] = PAL[Math.min(15,Math.max(0,level))];
   return `rgb(${r},${g},${b})`;
 }
 
-function clear() {
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, SIM_W, SIM_H);
+function txt(s, x, y, c=10, sz=LH) {
+  fc.fillStyle = col(c);
+  fc.font = `${sz}px 'SF Mono','Fira Code',monospace`;
+  fc.textBaseline = 'top';
+  fc.fillText(s, x, y);
 }
 
-function text(str, x, y, color = 10, size = lineHeight) {
-  ctx.fillStyle = palColor(color);
-  ctx.font = `${size}px 'SF Mono','Fira Code',monospace`;
-  ctx.textBaseline = 'top';
-  ctx.fillText(str, x, y);
+function hline(y, c=3) {
+  fc.strokeStyle = col(c); fc.lineWidth = 1;
+  fc.beginPath(); fc.moveTo(0,y+.5); fc.lineTo(W,y+.5); fc.stroke();
 }
 
-function border(x, y, w, h, color = 6, lw = 1) {
-  ctx.strokeStyle = palColor(color);
-  ctx.lineWidth = lw;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+function rect(x,y,w,h,c=5) {
+  fc.strokeStyle = col(c); fc.lineWidth = 1;
+  fc.strokeRect(x+.5,y+.5,w-1,h-1);
 }
 
-function hline(y, color = 3) {
-  ctx.strokeStyle = palColor(color);
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(SIM_W, y + 0.5); ctx.stroke();
-}
-
-function wrap(str, maxW, size = lineHeight) {
-  ctx.font = `${size}px 'SF Mono','Fira Code',monospace`;
-  const words = str.split(' ');
-  const lines = [];
-  let cur = '';
-  for (const w of words) {
-    const t = cur ? cur + ' ' + w : w;
-    if (ctx.measureText(t).width > maxW) {
-      if (cur) lines.push(cur);
-      cur = w;
-    } else cur = t;
-  }
-  if (cur) lines.push(cur);
-  return lines;
+function clip(s, maxW) {
+  fc.font = `${LH}px 'SF Mono','Fira Code',monospace`;
+  if (fc.measureText(s).width <= maxW) return s;
+  while (s.length > 1 && fc.measureText(s+'\u2026').width > maxW) s = s.slice(0,-1);
+  return s+'\u2026';
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Generic data renderer — renders any JSON onto the G2 display
+//  RENDER ENGINE
 // ═══════════════════════════════════════════════════════════════════════
-function renderDisplay() {
+function render() {
   const t0 = performance.now();
-  clear();
-  const maxLines = Math.floor(SIM_H / lineHeight);
+  clr();
+  const screen = screenStack[screenStack.length - 1];
+  if (!screen) { txt('Loading...', 4, LH*2, 6); blit(); return; }
+
+  const maxLines = Math.floor(H / LH);
   const pad = 4;
-  let y = 0;
-  let drawn = 0;
 
-  // Title bar — always first line
-  const title = currentScreen
-    ? currentScreen.label || currentScreen.operationId || currentScreen.path
-    : 'G2 Simulator';
-  border(0, 0, SIM_W, lineHeight, 4, 1);
-  text(title, pad, 0, 15, lineHeight);
-  const now = new Date();
-  const ts = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  ctx.font = `${lineHeight}px 'SF Mono','Fira Code',monospace`;
-  text(ts, SIM_W - ctx.measureText(ts).width - pad - 1, 0, 7, lineHeight);
-  y = lineHeight;
-  drawn++;
+  // Title bar
+  rect(0, 0, W, LH, 4);
+  txt(screen.title, pad, 0, 15);
+  const ts = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  fc.font = `${LH}px 'SF Mono','Fira Code',monospace`;
+  txt(ts, W - fc.measureText(ts).width - pad, 0, 7);
 
-  // Separator
-  hline(y, 3);
-  y += 1;
+  // Content area
+  const contentStart = LH + 1;
+  hline(LH, 3);
+  const contentLines = maxLines - 1;
+  const items = screen.lines || [];
+  const cursor = screen.cursor ?? -1;
+  const scrollOffset = screen.scroll ?? 0;
 
-  if (!screenData) {
-    text('No data', pad, y, 5);
-    drawn++;
-  } else if (Array.isArray(screenData)) {
-    // List view: each item gets one line
-    if (!screenData.length) {
-      text('(empty)', pad, y, 4);
-      drawn++;
-    }
-    for (const item of screenData) {
-      if (y + lineHeight > SIM_H) break;
-      const line = renderItemLine(item);
-      // Clip to display width
-      const clipped = clipText(line, SIM_W - pad * 2);
-      text(clipped, pad, y, 10);
-      y += lineHeight;
-      drawn++;
-    }
-  } else if (typeof screenData === 'object') {
-    // Key-value view with aligned columns
-    const entries = Object.entries(screenData).map(([k, v]) => [humanLabel(k), formatValue(v)]);
-    // Find max key width for alignment
-    ctx.font = `${lineHeight}px 'SF Mono','Fira Code',monospace`;
-    let maxKeyW = 0;
-    for (const [k] of entries) {
-      maxKeyW = Math.max(maxKeyW, ctx.measureText(k + ' ').width);
-    }
-    maxKeyW = Math.min(maxKeyW, SIM_W * 0.4); // cap at 40% of display
+  for (let i = 0; i < contentLines; i++) {
+    const idx = scrollOffset + i;
+    if (idx >= items.length) break;
+    const y = contentStart + i * LH;
+    const item = items[idx];
+    const isCursor = idx === cursor;
 
-    for (const [key, val] of entries) {
-      if (y + lineHeight > SIM_H) break;
-      const keyClipped = clipText(key, maxKeyW - 2);
-      text(keyClipped, pad, y, 6, lineHeight);
-      const valClipped = clipText(val, SIM_W - pad * 2 - maxKeyW - 2);
-      text(valClipped, pad + maxKeyW + 2, y, 12);
-      y += lineHeight;
-      drawn++;
+    if (isCursor) {
+      // Highlight bar
+      fc.fillStyle = col(2);
+      fc.fillRect(0, y, W, LH);
     }
-  } else {
-    const lines = wrap(String(screenData), SIM_W - pad * 2);
-    for (const line of lines) {
-      if (y + lineHeight > SIM_H) break;
-      text(line, pad, y, 10);
-      y += lineHeight;
-      drawn++;
-    }
+
+    const prefix = isCursor ? '\u25B8 ' : '  ';
+    const text = prefix + (typeof item === 'string' ? item : item.text || '');
+    const color = isCursor ? 15 : (item.color ?? 10);
+    txt(clip(text, W - pad * 2), pad, y, color);
   }
 
-  const ms = (performance.now() - t0).toFixed(1);
-  document.getElementById('renderInfo').textContent =
-    `${drawn}/${maxLines} lines | ${lineHeight}px | ${currentScreen?.path || '—'}`;
-  document.getElementById('frameTime').textContent = `${ms}ms`;
-}
+  // Scrollbar
+  if (items.length > contentLines) {
+    const barH = Math.max(8, (contentLines / items.length) * (H - contentStart));
+    const barY = contentStart + (scrollOffset / items.length) * (H - contentStart);
+    fc.fillStyle = col(3);
+    fc.fillRect(W - 3, barY, 2, barH);
+  }
 
-function clipText(str, maxW) {
-  ctx.font = `${lineHeight}px 'SF Mono','Fira Code',monospace`;
-  if (ctx.measureText(str).width <= maxW) return str;
-  while (str.length > 1 && ctx.measureText(str + '…').width > maxW) str = str.slice(0, -1);
-  return str + '…';
-}
-
-function renderItemLine(item) {
-  if (typeof item === 'string') return item;
-  if (typeof item !== 'object' || !item) return String(item);
-  // Pick the most useful fields to show in a single line
-  const id = item.id || item.name || item.title || '';
-  const status = item.status ? ` [${item.status}]` : '';
-  const desc = item.description || item.goal || item.body || item.text || '';
-  const extra = desc ? ' — ' + desc.slice(0, 50) : '';
-  return `${id}${status}${extra}`;
-}
-
-function formatValue(val) {
-  if (val === null || val === undefined) return '—';
-  if (typeof val === 'boolean') return val ? 'yes' : 'no';
-  if (typeof val === 'number') return String(val);
-  if (typeof val === 'string') return val;
-  if (Array.isArray(val)) return val.length ? `[${val.length} items]` : '[]';
-  if (typeof val === 'object') return JSON.stringify(val);
-  return String(val);
-}
-
-function humanLabel(key) {
-  return key.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').trim().toLowerCase();
+  blit();
+  document.getElementById('info').textContent =
+    `${Math.min(items.length, contentLines)}/${items.length} items | ${LH}px | ${screen.title} | ${(performance.now()-t0).toFixed(1)}ms`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  API + OpenAPI discovery
+//  SCREEN SYSTEM
 // ═══════════════════════════════════════════════════════════════════════
-async function fetchJson(path) {
+function pushScreen(screen) {
+  screenStack.push(screen);
+  if (screen.init) screen.init();
+  render();
+}
+
+function popScreen() {
+  if (screenStack.length > 1) {
+    screenStack.pop();
+    render();
+  }
+}
+
+function currentScreen() {
+  return screenStack[screenStack.length - 1];
+}
+
+// Scroll helpers
+function scrollToCursor(screen) {
+  const maxVisible = Math.floor(H / LH) - 1;
+  if (screen.cursor < screen.scroll) screen.scroll = screen.cursor;
+  if (screen.cursor >= screen.scroll + maxVisible) screen.scroll = screen.cursor - maxVisible + 1;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  INPUT HANDLING
+// ═══════════════════════════════════════════════════════════════════════
+function input(action) {
+  const s = currentScreen();
+  if (!s) return;
+
+  if (action === 'up') {
+    if (s.cursor > 0) { s.cursor--; scrollToCursor(s); render(); }
+  } else if (action === 'down') {
+    if (s.cursor < (s.lines?.length ?? 0) - 1) { s.cursor++; scrollToCursor(s); render(); }
+  } else if (action === 'press') {
+    if (s.onPress) s.onPress(s.cursor);
+  } else if (action === 'longpress') {
+    if (s.onLongPress) s.onLongPress();
+    else popScreen();
+  } else if (action === 'voice') {
+    startVoice();
+  }
+}
+
+// Keyboard
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  switch (e.key) {
+    case 'ArrowUp': case 'w': case 'W': e.preventDefault(); input('up'); break;
+    case 'ArrowDown': case 's': case 'S': e.preventDefault(); input('down'); break;
+    case 'Enter': case ' ': e.preventDefault(); input('press'); break;
+    case 'Escape': case 'Backspace': e.preventDefault(); input('longpress'); break;
+    case 'v': case 'V': e.preventDefault(); input('voice'); break;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VOICE (Web Speech API)
+// ═══════════════════════════════════════════════════════════════════════
+let recognition = null;
+let listening = false;
+
+function startVoice() {
+  if (listening) { stopVoice(); return; }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { showMessage('Speech not supported'); return; }
+
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = () => {
+    listening = true;
+    document.getElementById('voiceBtn').classList.add('listening');
+    showMessage('Listening...');
+  };
+
+  recognition.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    stopVoice();
+    handleVoiceInput(text);
+  };
+
+  recognition.onerror = () => stopVoice();
+  recognition.onend = () => stopVoice();
+  recognition.start();
+}
+
+function stopVoice() {
+  listening = false;
+  document.getElementById('voiceBtn').classList.remove('listening');
+  if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
+}
+
+async function handleVoiceInput(text) {
+  showMessage(`"${text}" — asking...`);
+  try {
+    const res = await fetch('/api/g2/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    const answer = data.agentFormat || data.text || data.reply || JSON.stringify(data);
+    pushScreen(makeTextScreen('Response', answer));
+  } catch (e) {
+    showMessage('Voice error: ' + e.message);
+  }
+}
+
+function showMessage(msg) {
+  const s = currentScreen();
+  if (s) { s._message = msg; }
+  // Flash in status bar
+  document.getElementById('status').textContent = msg;
+  setTimeout(() => { document.getElementById('status').textContent = ''; }, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  API
+// ═══════════════════════════════════════════════════════════════════════
+async function api(path) {
   const res = await fetch(path);
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json();
 }
 
-async function loadOpenApiSpec() {
-  try {
-    openApiSpec = await fetchJson('/api/g2/openapi.json');
-    deriveScreens();
-    deriveToolsFromSpec();
-    setStatus('ok', `${tools.length} fn`);
-  } catch (e) {
-    setStatus('err', e.message);
-  }
-}
-
-function deriveScreens() {
-  screens = [];
-  const sel = document.getElementById('screenSelect');
-  sel.innerHTML = '';
-  if (!openApiSpec?.paths) return;
-
-  for (const [path, methods] of Object.entries(openApiSpec.paths)) {
-    const getOp = methods.get;
-    if (!getOp) continue;
-    // Skip endpoints with required path params (need input)
-    if (path.includes('{')) continue;
-    const opId = getOp.operationId || path;
-    const label = getOp.summary || humanLabel(opId);
-    screens.push({ path: path, method: 'GET', operationId: opId, label, spec: getOp });
-    const opt = document.createElement('option');
-    opt.value = screens.length - 1;
-    opt.textContent = label;
-    sel.appendChild(opt);
-  }
-
-  // Auto-select first screen (usually /home)
-  if (screens.length > 0) {
-    // Prefer /home if it exists
-    const homeIdx = screens.findIndex(s => s.path.endsWith('/home'));
-    const idx = homeIdx >= 0 ? homeIdx : 0;
-    sel.value = idx;
-    selectScreen(idx);
-  }
-}
-
-function deriveToolsFromSpec() {
-  tools = [];
-  if (!openApiSpec?.paths) return;
-
-  for (const [path, methods] of Object.entries(openApiSpec.paths)) {
-    for (const [method, op] of Object.entries(methods)) {
-      if (method === 'parameters') continue;
-      const fullPath = path;
-      const hasPathParams = path.includes('{');
-      const isGet = method === 'get';
-      const isView = isGet && !hasPathParams;
-      tools.push({
-        name: op.operationId || `${method} ${path}`,
-        description: op.summary || op.description || '',
-        method: method.toUpperCase(),
-        path: fullPath,
-        pathTemplate: path,
-        hasPathParams,
-        isView,
-        mutatesState: !isGet,
-        domains: op.tags || [],
-        tags: op['x-tags'] || [],
-        parameters: op.parameters || [],
-        requestBody: op.requestBody,
-        spec: op,
-      });
-    }
-  }
-  renderFnList();
-}
-
-async function selectScreen(idx) {
-  currentScreen = screens[idx];
-  if (!currentScreen) return;
-  try {
-    screenData = await fetchJson(currentScreen.path);
-    // If response is wrapped in a known envelope, unwrap
-    if (screenData && typeof screenData === 'object' && !Array.isArray(screenData)) {
-      // Check for agentFormat (string render)
-      if ('agentFormat' in screenData && typeof screenData.agentFormat === 'string') {
-        // Keep the structured data, not the string
-      }
-    }
-  } catch (e) {
-    screenData = { error: e.message };
-  }
-  renderDisplay();
-}
-
-async function invokeFunction(fn, params = {}) {
-  let path = fn.path;
-  // Substitute path params
-  for (const [key, val] of Object.entries(params)) {
-    path = path.replace(`{${key}}`, encodeURIComponent(val));
-  }
-
-  const isGet = fn.method === 'GET';
-  const opts = isGet
-    ? {}
-    : { method: fn.method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params) };
-
-  const res = await fetch(path, opts);
+async function apiPost(path, body = {}) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   return res.json();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Sidebar: function list
+//  SCREEN FACTORIES
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Generic screen from agentFormat string — splits on newlines */
+function makeTextScreen(title, text) {
+  const lines = text.split('\n').map(t => ({ text: t, color: 10 }));
+  return { title, lines, cursor: 0, scroll: 0, onLongPress: popScreen };
+}
+
+/** Generic API screen — fetches endpoint, renders agentFormat */
+function makeApiScreen(title, path, opts = {}) {
+  return {
+    title,
+    lines: [{ text: 'Loading...', color: 5 }],
+    cursor: opts.cursor !== false ? 0 : -1,
+    scroll: 0,
+    _path: path,
+    _data: null,
+    _items: null,
+    async init() {
+      try {
+        const data = await api(path);
+        this._data = data;
+        // Use agentFormat if available
+        if (data.agentFormat) {
+          this.lines = data.agentFormat.split('\n').map((t, i) => ({
+            text: t,
+            color: 10,
+            _index: i,
+          }));
+        } else if (Array.isArray(data)) {
+          this._items = data;
+          this.lines = data.map((item, i) => ({
+            text: item.display || item.title || item.name || item.id || JSON.stringify(item),
+            color: 10,
+            _index: i,
+            _item: item,
+          }));
+        } else if (data.items && Array.isArray(data.items)) {
+          this._items = data.items;
+          if (data.agentFormat) {
+            this.lines = data.agentFormat.split('\n').map((t, i) => ({
+              text: t, color: 10, _index: i,
+              _item: data.items[i],
+            }));
+          } else {
+            this.lines = data.items.map((item, i) => ({
+              text: item.display || item.title || item.name || item.id || String(item),
+              color: 10, _index: i, _item: item,
+            }));
+          }
+        }
+        if (!this.lines.length) this.lines = [{ text: '(empty)', color: 4 }];
+        this.cursor = opts.cursor !== false ? 0 : -1;
+        render();
+      } catch (e) {
+        this.lines = [{ text: 'Error: ' + e.message, color: 4 }];
+        render();
+      }
+    },
+    onPress: opts.onPress || null,
+    onLongPress: opts.onLongPress || popScreen,
+  };
+}
+
+// ── Home Screen ──────────────────────────────────────────────────────
+function makeHomeScreen() {
+  const menuItems = [
+    { text: 'Routines',      screen: () => makeRoutinesScreen() },
+    { text: 'Notifications', screen: () => makeNotificationsScreen() },
+    { text: 'Agents',        screen: () => makeAgentsScreen() },
+    { text: 'Health',        screen: () => makeApiScreen('Health', '/api/g2/health') },
+    { text: 'Finance',       screen: () => makeApiScreen('Finance', '/api/g2/finance/summary') },
+    { text: 'Projects',      screen: () => makeApiScreen('Projects', '/api/g2/projects') },
+    { text: 'Todos',         screen: () => makeTodosScreen() },
+    { text: 'Ask (Voice)',   screen: () => { input('voice'); return null; } },
+  ];
+
+  return {
+    title: 'Home',
+    lines: [{ text: 'Loading...', color: 5 }],
+    cursor: 0,
+    scroll: 0,
+    async init() {
+      try {
+        const data = await api('/api/g2/home');
+        const header = [];
+        const tc = data.timeContext || data;
+        if (tc.dayOfWeek) header.push({ text: `${tc.dayOfWeek} ${tc.localTime || ''} ${tc.dayPeriod || ''}`, color: 8 });
+        if (data.pendingNotificationCount > 0) header.push({ text: `${data.pendingNotificationCount} notifications pending`, color: 12 });
+        if (data.activeAgentCount > 0) header.push({ text: `${data.activeAgentCount} agents running`, color: 10 });
+        if (data.nextRoutine) {
+          const nr = data.nextRoutine;
+          const time = nr.time ? new Date(nr.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '';
+          header.push({ text: `Next: [${nr.type}] ${nr.name} ${time}`, color: 10 });
+        }
+        header.push({ text: '\u2500'.repeat(30), color: 3 });
+        this.lines = [
+          ...header,
+          ...menuItems.map(m => ({ text: m.text, color: 10, _menuItem: m })),
+        ];
+        this.cursor = header.length; // start on first menu item
+        render();
+      } catch (e) {
+        this.lines = [
+          { text: 'API unreachable', color: 4 },
+          { text: '\u2500'.repeat(30), color: 3 },
+          ...menuItems.map(m => ({ text: m.text, color: 10, _menuItem: m })),
+        ];
+        this.cursor = 2;
+        render();
+      }
+    },
+    onPress(idx) {
+      const item = this.lines[idx];
+      if (item?._menuItem) {
+        const s = item._menuItem.screen();
+        if (s) pushScreen(s);
+      }
+    },
+    onLongPress() { /* home is root, no back */ },
+  };
+}
+
+// ── Routines Screen ──────────────────────────────────────────────────
+function makeRoutinesScreen() {
+  const screen = makeApiScreen('Routines', '/api/g2/routines/check', {
+    onPress(idx) {
+      const item = screen.lines[idx];
+      const dataItem = item?._item || (screen._data?.items?.[idx]);
+      if (!dataItem?.id) return;
+      // Mark done
+      showMessage('Marking done...');
+      apiPost(`/api/g2/routines/${dataItem.id}/done`).then(() => {
+        showMessage('Done!');
+        screen.init(); // refresh
+      }).catch(e => showMessage('Error: ' + e.message));
+    },
+  });
+  return screen;
+}
+
+// ── Notifications Screen ─────────────────────────────────────────────
+function makeNotificationsScreen() {
+  const screen = makeApiScreen('Notifications', '/api/g2/notifications', {
+    onPress(idx) {
+      const items = screen._items || screen._data?.items || [];
+      const item = items[idx];
+      if (!item?.id) return;
+      showMessage('Dismissing...');
+      apiPost(`/api/g2/notifications/${item.id}/action`, { action: 'done' }).then(() => {
+        showMessage('Done!');
+        screen.init();
+      }).catch(e => showMessage('Error: ' + e.message));
+    },
+  });
+  return screen;
+}
+
+// ── Agents Screen ────────────────────────────────────────────────────
+function makeAgentsScreen() {
+  const screen = makeApiScreen('Agents', '/api/g2/agents', {
+    onPress(idx) {
+      const items = screen._items || screen._data?.items || [];
+      const agent = items[idx];
+      if (!agent?.id) return;
+      pushScreen(makeApiScreen('Agent Output', `/api/g2/agents/${agent.id}/output`, { cursor: false }));
+    },
+  });
+  return screen;
+}
+
+// ── Todos Screen ─────────────────────────────────────────────────────
+function makeTodosScreen() {
+  const screen = makeApiScreen('Todos', '/api/g2/routines?kind=todo', {
+    onPress(idx) {
+      const items = screen._items || screen._data?.items || [];
+      const item = items[idx];
+      if (!item?.id) return;
+      showMessage('Marking done...');
+      apiPost(`/api/g2/routines/${item.id}/done`).then(() => {
+        showMessage('Done!');
+        screen.init();
+      }).catch(e => showMessage('Error: ' + e.message));
+    },
+  });
+  return screen;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  FUNCTION LIST (sidebar)
 // ═══════════════════════════════════════════════════════════════════════
 function renderFnList(filter = '') {
   const list = document.getElementById('fnList');
   list.innerHTML = '';
   const lc = filter.toLowerCase();
   const grouped = {};
-
   for (const fn of tools) {
     if (lc && !fn.name.toLowerCase().includes(lc) && !fn.description.toLowerCase().includes(lc)) continue;
-    const domain = fn.domains[0] || 'general';
-    if (!grouped[domain]) grouped[domain] = [];
-    grouped[domain].push(fn);
+    const d = fn.domains[0] || 'general';
+    (grouped[d] = grouped[d] || []).push(fn);
   }
-
-  for (const [domain, fns] of Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0]))) {
-    const hdr = document.createElement('div');
-    hdr.className = 'fn-domain';
-    hdr.textContent = domain;
-    list.appendChild(hdr);
-
+  for (const [domain, fns] of Object.entries(grouped).sort((a,b) => a[0].localeCompare(b[0]))) {
+    const h = document.createElement('div');
+    h.className = 'fn-domain'; h.textContent = domain;
+    list.appendChild(h);
     for (const fn of fns) {
       const el = document.createElement('div');
-      const isSel = selectedFn?.name === fn.name;
-      el.className = 'fn-item' + (isSel ? ' selected' : '') + (fn.isView ? ' is-view' : '');
-      el.innerHTML = `<span class="method ${fn.method.toLowerCase()}">${fn.method}</span><span class="name">${fn.name}</span>`;
-      el.onclick = () => { selectedFn = fn; renderFnList(filter); showDetail(fn); };
+      el.className = 'fn-item' + (selectedFn?.name === fn.name ? ' selected' : '');
+      el.innerHTML = `<span class="m ${fn.method.toLowerCase()}">${fn.method}</span><span class="n">${fn.name}</span>`;
+      el.onclick = () => { selectedFn = fn; renderFnList(filter); showFnDetail(fn); };
       list.appendChild(el);
     }
   }
 }
 
-function showDetail(fn) {
+function showFnDetail(fn) {
   const d = document.getElementById('fnDetail');
   d.style.display = 'block';
-
-  let h = `<h3>${fn.name}</h3>`;
-  h += `<div class="desc">${fn.description}</div>`;
-  if (fn.domains.length) {
-    h += '<div class="tags">';
-    for (const t of fn.domains) h += `<span class="tag">${t}</span>`;
-    h += '</div>';
-  }
-
-  // Parameters
-  const params = fn.parameters || [];
+  let h = `<h3>${fn.name}</h3><div class="desc">${fn.description}</div>`;
   const bodySchema = fn.requestBody?.content?.['application/json']?.schema;
-  const allParams = [...params];
-
-  if (params.length || bodySchema) {
-    h += '<div class="params-title">Parameters</div>';
-    for (const p of params) {
-      const req = p.required ? '<span class="preq"> *</span>' : '';
-      h += `<div class="param"><span class="pname">${p.name}${req}</span><span class="ptype">${p.schema?.type || '?'}</span></div>`;
-    }
-    if (bodySchema?.properties) {
-      const reqSet = new Set(bodySchema.required || []);
-      for (const [name, prop] of Object.entries(bodySchema.properties)) {
-        const req = reqSet.has(name) ? '<span class="preq"> *</span>' : '';
-        h += `<div class="param"><span class="pname">${name}${req}</span><span class="ptype">${prop.type || '?'}</span></div>`;
-      }
-    }
-  }
-
-  // Build default invocation body
   const defaultObj = {};
-  for (const p of params) {
-    if (p.in === 'path') defaultObj[p.name] = p.schema?.default ?? '';
-  }
+  for (const p of fn.parameters || []) { if (p.in==='path') defaultObj[p.name] = ''; }
   if (bodySchema?.properties) {
-    for (const [k, v] of Object.entries(bodySchema.properties)) {
-      defaultObj[k] = v.default ?? (v.type === 'string' ? '' : v.type === 'number' ? 0 : null);
-    }
+    for (const [k,v] of Object.entries(bodySchema.properties))
+      defaultObj[k] = v.default ?? (v.type==='string'?'':v.type==='number'?0:null);
   }
-
-  h += `<textarea id="invokeBody">${JSON.stringify(defaultObj, null, 2)}</textarea>`;
-  h += '<div class="btn-row">';
-  h += `<button onclick="doInvoke()">Invoke</button>`;
-  if (fn.isView) h += `<button class="view-btn" onclick="doViewOnSim()">View on display</button>`;
-  h += '</div>';
+  h += `<textarea id="invokeBody">${JSON.stringify(defaultObj,null,2)}</textarea>`;
+  h += `<button onclick="doInvokeFn()">Invoke</button>`;
+  if (fn.isView) h += ` <button onclick="doViewFn()">View</button>`;
   h += '<div class="result" id="invokeResult"></div>';
-
   d.innerHTML = h;
 }
 
-async function doInvoke() {
+async function doInvokeFn() {
   if (!selectedFn) return;
-  const result = document.getElementById('invokeResult');
-  result.textContent = '…';
+  const r = document.getElementById('invokeResult');
+  r.textContent = '…';
   try {
     const params = JSON.parse(document.getElementById('invokeBody').value);
-    const data = await invokeFunction(selectedFn, params);
-    result.textContent = JSON.stringify(data, null, 2);
-    // Refresh display if mutating
-    if (selectedFn.mutatesState && currentScreen) selectScreen(
-      screens.indexOf(currentScreen)
-    );
-  } catch (e) {
-    result.textContent = 'Error: ' + e.message;
-  }
+    let path = selectedFn.path;
+    for (const [k,v] of Object.entries(params)) path = path.replace(`{${k}}`, encodeURIComponent(v));
+    const data = selectedFn.method === 'GET' ? await api(path) : await apiPost(path, params);
+    r.textContent = data.agentFormat || JSON.stringify(data, null, 2);
+    // Also show on display
+    const text = data.agentFormat || JSON.stringify(data, null, 2);
+    pushScreen(makeTextScreen(selectedFn.name, text));
+  } catch (e) { r.textContent = 'Error: ' + e.message; }
 }
 
-function doViewOnSim() {
+function doViewFn() {
   if (!selectedFn?.isView) return;
-  // Find the matching screen and switch to it
-  const idx = screens.findIndex(s => s.path === selectedFn.path);
-  if (idx >= 0) {
-    document.getElementById('screenSelect').value = idx;
-    selectScreen(idx);
+  pushScreen(makeApiScreen(selectedFn.name, selectedFn.path));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  OPENAPI DISCOVERY
+// ═══════════════════════════════════════════════════════════════════════
+async function loadSpec() {
+  try {
+    const spec = await api('/api/g2/openapi.json');
+    tools = [];
+    for (const [path, methods] of Object.entries(spec.paths || {})) {
+      for (const [method, op] of Object.entries(methods)) {
+        if (method === 'parameters') continue;
+        const isGet = method === 'get';
+        tools.push({
+          name: op.operationId || `${method} ${path}`,
+          description: op.summary || op.description || '',
+          method: method.toUpperCase(),
+          path: path,
+          hasPathParams: path.includes('{'),
+          isView: isGet && !path.includes('{'),
+          mutatesState: !isGet,
+          domains: op.tags || [],
+          parameters: op.parameters || [],
+          requestBody: op.requestBody,
+        });
+      }
+    }
+    renderFnList();
+    document.getElementById('status').textContent = `${tools.length} functions`;
+  } catch (e) {
+    document.getElementById('status').textContent = 'spec: ' + e.message;
   }
 }
 
-function setStatus(type, msg) {
-  const el = document.getElementById('connStatus');
-  el.className = 'status ' + type;
-  el.textContent = msg;
-}
-
 // ═══════════════════════════════════════════════════════════════════════
-//  Events
+//  SSE
 // ═══════════════════════════════════════════════════════════════════════
-document.getElementById('lineHeight').onchange = function() {
-  lineHeight = parseInt(this.value);
-  document.getElementById('simDims').textContent = `${SIM_W}x${SIM_H} @${lineHeight}`;
-  renderDisplay();
-};
-
-document.getElementById('screenSelect').onchange = function() {
-  selectScreen(parseInt(this.value));
-};
-
-document.getElementById('fnSearch').oninput = function() {
-  renderFnList(this.value);
-};
-
-// SSE for live updates
 function connectSSE() {
   try {
     const es = new EventSource('/api/g2/events');
-    es.onopen = () => { /* keep status from tool count */ };
-    es.onerror = () => {};
     for (const evt of ['agent_started','agent_completed','routine_reminder','alarm_triggered']) {
       es.addEventListener(evt, () => {
-        if (currentScreen) selectScreen(screens.indexOf(currentScreen));
+        const s = currentScreen();
+        if (s?.init) s.init();
       });
     }
-  } catch (e) {}
+  } catch(e) {}
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Init
+//  LINE HEIGHT
+// ═══════════════════════════════════════════════════════════════════════
+document.getElementById('lineHeight').onchange = function() {
+  LH = parseInt(this.value);
+  document.getElementById('dims').textContent = `${W}x${H} @${LH}`;
+  render();
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+//  INIT
 // ═══════════════════════════════════════════════════════════════════════
 (async () => {
-  setStatus('ok', 'loading…');
-  renderDisplay(); // show empty state
-  await loadOpenApiSpec();
+  await loadSpec();
+  pushScreen(makeHomeScreen());
   connectSSE();
 })();
 </script>

@@ -18,6 +18,7 @@ import type { FeatureId } from "../services/feature-config-service";
 import { json, error } from "../integrations/http/g2/helpers";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { telemetry } from "../services/infrastructure/telemetry";
+import { formatResult } from "./formatters";
 
 const apiTelemetry = telemetry.child({ component: "function_api" });
 const traceSpan = createTraceSpan(apiTelemetry);
@@ -172,6 +173,21 @@ export function generateApiRoute(
             responseData = { text: result };
           } else {
             responseData = result;
+          }
+
+          // 6. Attach agentFormat string (used by glasses UI and agent output)
+          //    Custom agentFormat takes priority; generic formatResult is fallback.
+          try {
+            const formatted = def.agentFormat
+              ? def.agentFormat(result)
+              : formatResult(result);
+            if (Array.isArray(responseData)) {
+              responseData = { items: responseData, agentFormat: formatted };
+            } else if (responseData && typeof responseData === "object") {
+              (responseData as Record<string, unknown>).agentFormat = formatted;
+            }
+          } catch {
+            // formatter failure is non-fatal
           }
 
           return json(responseData, http.successStatus ?? 200);
