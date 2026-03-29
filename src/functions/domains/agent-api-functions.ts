@@ -51,7 +51,7 @@ export const buildAgentApiFunctions: FunctionDomainBuilder = (_ctx) => [
     auth: AGENT_API_AUTH,
     domains: ["agents"],
     agentScopes: [],
-    http: { method: "GET", path: "/api/g2/agents" },
+    http: { method: "GET", path: "/agents" },
   }),
 
   // -------------------------------------------------------------------------
@@ -75,7 +75,7 @@ export const buildAgentApiFunctions: FunctionDomainBuilder = (_ctx) => [
     agentScopes: [],
     http: {
       method: "GET",
-      path: "/api/g2/agents/:id/output",
+      path: "/agents/:id/output",
       queryParams: z.object({
         lines: z.string().optional(),
       }),
@@ -102,7 +102,7 @@ export const buildAgentApiFunctions: FunctionDomainBuilder = (_ctx) => [
     agentScopes: [],
     http: {
       method: "GET",
-      path: "/api/g2/agents/:id/summary",
+      path: "/agents/:id/summary",
     },
   }),
 
@@ -128,6 +128,6 @@ export const buildAgentApiFunctions: FunctionDomainBuilder = (_ctx) => [
     domains: ["agents"],
     agentScopes: [],
     mutatesState: true,
-    http: { method: "POST", path: "/api/g2/agents/:id/send" },
+    http: { method: "POST", path: "/agents/:id/send" },
   }),
 ];
