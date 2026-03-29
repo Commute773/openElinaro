@@ -444,7 +444,7 @@ function deriveScreens() {
     if (path.includes('{')) continue;
     const opId = getOp.operationId || path;
     const label = getOp.summary || humanLabel(opId);
-    screens.push({ path: '/api/g2' + path, method: 'GET', operationId: opId, label, spec: getOp });
+    screens.push({ path: path, method: 'GET', operationId: opId, label, spec: getOp });
     const opt = document.createElement('option');
     opt.value = screens.length - 1;
     opt.textContent = label;
@@ -468,7 +468,7 @@ function deriveToolsFromSpec() {
   for (const [path, methods] of Object.entries(openApiSpec.paths)) {
     for (const [method, op] of Object.entries(methods)) {
       if (method === 'parameters') continue;
-      const fullPath = '/api/g2' + path;
+      const fullPath = path;
       const hasPathParams = path.includes('{');
       const isGet = method === 'get';
       const isView = isGet && !hasPathParams;
