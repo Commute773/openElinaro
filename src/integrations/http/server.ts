@@ -37,6 +37,15 @@ export function createHttpRequestHandler(
       return Response.json({ ok: true }, { status: 200, headers: CORS_HEADERS });
     }
 
+    // G2 simulator UI
+    if (pathname === "/g2" || pathname === "/g2/") {
+      const uiPath = new URL("./g2/ui.html", import.meta.url).pathname;
+      const file = Bun.file(uiPath);
+      return new Response(file, {
+        headers: { "Content-Type": "text/html; charset=utf-8", ...CORS_HEADERS },
+      });
+    }
+
     // G2 API routes
     if (app && pathname.startsWith("/api/g2")) {
       const g2Response = await handleG2ApiRequest(request, pathname, app);
