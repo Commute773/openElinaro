@@ -1,4 +1,4 @@
-import { complete } from "@mariozechner/pi-ai";
+import { completeSimple } from "@mariozechner/pi-ai";
 import type { Message, UserMessage, AssistantMessage, TextContent } from "../../messages/types";
 import {
   userMessage,
@@ -312,7 +312,7 @@ export class ConversationCompactionService {
           formatTranscript(params.messages),
         ].join("\n");
 
-        const response = await complete(resolved.runtimeModel, {
+        const response = await completeSimple(resolved.runtimeModel, {
           systemPrompt,
           messages: [{ role: "user", content: transcriptContent, timestamp: Date.now() }],
         }, {
@@ -396,7 +396,7 @@ export class ConversationCompactionService {
       "If nothing is durable enough to save, return an empty string.",
     ].join(" ");
 
-    const response = await complete(resolved.runtimeModel, {
+    const response = await completeSimple(resolved.runtimeModel, {
       systemPrompt,
       messages: [{
         role: "user",

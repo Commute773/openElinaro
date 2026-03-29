@@ -1,4 +1,4 @@
-import { complete } from "@mariozechner/pi-ai";
+import { completeSimple } from "@mariozechner/pi-ai";
 import type { AssistantMessage } from "../../messages/types";
 import {
   assistantTextMessage,
@@ -160,7 +160,7 @@ export class ConversationStateTransitionService {
   ): Promise<AssistantMessage> {
     try {
       const resolved = await this.models.resolveModelForPurpose("conversation_opening");
-      const response = await complete(resolved.runtimeModel, {
+      const response = await completeSimple(resolved.runtimeModel, {
         systemPrompt: composeSystemPrompt(snapshot.text).text,
         messages: [
           userMessage(
