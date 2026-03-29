@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.4
+- Released at: 2026-03-29T19:13:47Z
+- Release id: 20260329T191347Z-1d293ac
+- Previous version: 2026.03.29.3
+- Trigger: ci/release workflow
+
+- fix: coerce query string params to match Zod schema types (#195)
+
 ## 2026.03.29.3
 - Released at: 2026-03-29T19:09:39Z
 - Release id: 20260329T190939Z-c05178b
