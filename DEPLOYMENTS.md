@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.10
+- Released at: 2026-03-29T21:40:29Z
+- Release id: 20260329T214029Z-8329b8b
+- Previous version: 2026.03.29.9
+- Trigger: ci/release workflow
+
+- feat: interactive G2 simulator with shared formatters and 5-input navigation (#201)
+
 ## 2026.03.29.9
 - Released at: 2026-03-29T21:15:54Z
 - Release id: 20260329T211554Z-eaf0ac9
