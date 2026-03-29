@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.7
+- Released at: 2026-03-29T20:36:29Z
+- Release id: 20260329T203629Z-e5fd100
+- Previous version: 2026.03.29.6
+- Trigger: ci/release workflow
+
+- feat: auto-derive API routes for all functions and enforce typed handler returns
+
 ## 2026.03.29.6
 - Released at: 2026-03-29T20:15:02Z
 - Release id: 20260329T201502Z-5c3c87c
