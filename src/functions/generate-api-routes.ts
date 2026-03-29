@@ -1,14 +1,21 @@
 /**
  * Generates HTTP route definitions from FunctionDefinitions.
  * The output is compatible with the existing G2 router's RouteDefinition interface.
+ *
+ * Functions with explicit `http` annotations use those settings.
+ * Functions without `http` get an auto-derived route:
+ *   - Method: POST if mutatesState, GET otherwise
+ *   - Path: function name with underscores converted to slashes
+ *
+ * String handler results are auto-wrapped in { text: string } for JSON responses.
  */
 import { z } from "zod";
-import type { FunctionDefinition, FunctionContext } from "./define-function";
-import { API_PATH_PREFIX } from "./define-function";
+import type { FunctionDefinition, FunctionContext, HttpMethod } from "./define-function";
+import { API_PATH_PREFIX, deriveHttpAnnotation } from "./define-function";
 import type { RouteDefinition } from "../integrations/http/g2/router";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { FeatureId } from "../services/feature-config-service";
-import { CORS_HEADERS, json, error } from "../integrations/http/g2/helpers";
+import { json, error } from "../integrations/http/g2/helpers";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { telemetry } from "../services/infrastructure/telemetry";
 
@@ -16,17 +23,15 @@ const apiTelemetry = telemetry.child({ component: "function_api" });
 const traceSpan = createTraceSpan(apiTelemetry);
 
 /**
- * Extract path parameter names from an Express-style route pattern.
- * e.g. "/api/g2/routines/:id/done" -> ["id"]
+ * Resolved HTTP configuration for a route, combining explicit annotation
+ * with auto-derived defaults.
  */
-function extractPathParamNames(pattern: string): string[] {
-  const names: string[] = [];
-  const re = /:([^/]+)/g;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(pattern)) !== null) {
-    names.push(match[1]!);
-  }
-  return names;
+interface ResolvedHttp {
+  method: HttpMethod;
+  path: string;
+  queryParams?: z.ZodObject<Record<string, z.ZodType>>;
+  successStatus?: number;
+  responseTransform?: (result: unknown) => unknown;
 }
 
 /**
@@ -42,6 +47,16 @@ function parseQueryParams(request: Request): Record<string, string> {
 }
 
 /**
+ * Unwrap one layer of ZodOptional or ZodDefault to find the inner type.
+ */
+function unwrapOptional(schema: z.ZodType): z.ZodType {
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodDefault) {
+    return (schema as z.ZodOptional<z.ZodType> | z.ZodDefault<z.ZodType>).unwrap();
+  }
+  return schema;
+}
+
+/**
  * Coerce string query param values to match expected Zod schema types.
  * Query params are always strings, but schemas may expect boolean/number.
  */
@@ -54,9 +69,7 @@ function coerceQueryParams(
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(params)) {
     const fieldSchema = shape[key];
-    const inner = fieldSchema instanceof z.ZodOptional || fieldSchema instanceof z.ZodDefault
-      ? (fieldSchema as any)._def.innerType as z.ZodType | undefined
-      : fieldSchema;
+    const inner = fieldSchema ? unwrapOptional(fieldSchema) : undefined;
     if (inner instanceof z.ZodBoolean) {
       result[key] = value === "true" || value === "1";
     } else if (inner instanceof z.ZodNumber) {
@@ -75,13 +88,12 @@ async function buildInput(
   def: FunctionDefinition,
   request: Request,
   pathParams: Record<string, string>,
+  http: ResolvedHttp,
 ): Promise<unknown> {
-  const method = def.http!.method;
-
-  if (method === "GET") {
-    // Merge path params + query params, coercing types
+  if (http.method === "GET") {
+    // Merge path params + query params, coercing types against the input schema
     const queryParams = parseQueryParams(request);
-    const coerced = coerceQueryParams(queryParams, def.input);
+    const coerced = coerceQueryParams(queryParams, http.queryParams ?? def.input);
     return { ...coerced, ...pathParams };
   }
 
@@ -100,8 +112,19 @@ async function buildInput(
 }
 
 /**
+ * Resolve a function's HTTP configuration, falling back to auto-derivation.
+ */
+function resolveHttp(def: FunctionDefinition): ResolvedHttp {
+  if (def.http) return def.http;
+  return deriveHttpAnnotation(def);
+}
+
+/**
  * Convert a single FunctionDefinition into a RouteDefinition.
- * Returns null if the function has no HTTP annotation or excludes the API surface.
+ * Returns null only if the function excludes the API surface.
+ *
+ * Functions without an explicit `http` annotation get an auto-derived route
+ * based on their name and mutatesState flag.
  */
 export function generateApiRoute(
   def: FunctionDefinition,
@@ -109,19 +132,20 @@ export function generateApiRoute(
 ): RouteDefinition | null {
   const surfaces = def.surfaces ?? ["api", "discord", "agent"];
   if (!surfaces.includes("api")) return null;
-  if (!def.http) return null;
 
-  const fullPath = def.http.path.startsWith("/api/")
-    ? def.http.path                            // already absolute (legacy)
-    : `${API_PATH_PREFIX}${def.http.path}`;    // relative → prepend prefix
+  const http = resolveHttp(def);
+
+  const fullPath = http.path.startsWith("/api/")
+    ? http.path                            // already absolute (legacy)
+    : `${API_PATH_PREFIX}${http.path}`;    // relative → prepend prefix
 
   return {
-    method: def.http.method,
+    method: http.method,
     pattern: fullPath,
     handler: async (request, params, _app) => {
       return traceSpan(`api.${def.name}`, async () => {
         // 1. Build input from request
-        const rawInput = await buildInput(def, request, params);
+        const rawInput = await buildInput(def, request, params, http);
 
         // 2. Validate with Zod
         const parsed = def.input.safeParse(rawInput);
@@ -140,14 +164,20 @@ export function generateApiRoute(
         try {
           const result = await def.handler(parsed.data, ctx);
 
-          // 5. Apply response transform if present
-          const responseData = def.http!.responseTransform
-            ? def.http!.responseTransform(result)
-            : result;
+          // 5. Apply response transform if present, then auto-wrap strings
+          let responseData: unknown;
+          if (http.responseTransform) {
+            responseData = http.responseTransform(result);
+          } else if (typeof result === "string") {
+            responseData = { text: result };
+          } else {
+            responseData = result;
+          }
 
-          return json(responseData, def.http!.successStatus ?? 200);
-        } catch (err: any) {
-          return error(err.message ?? "Internal error", 500);
+          return json(responseData, http.successStatus ?? 200);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "Internal error";
+          return error(message, 500);
         }
       });
     },

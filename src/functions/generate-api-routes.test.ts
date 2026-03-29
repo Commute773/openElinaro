@@ -15,7 +15,7 @@ function makeDef(overrides: Partial<FunctionDefinition> = {}): FunctionDefinitio
     name: "test_fn",
     description: "A test function",
     input: z.object({ greeting: z.string() }),
-    handler: async (input: any) => ({ echo: input.greeting }),
+    handler: async (input) => ({ echo: (input as Record<string, string>).greeting }),
     auth: { access: "public", behavior: "allow" },
     domains: ["test"],
     agentScopes: ["foreground"],
@@ -52,11 +52,22 @@ describe("generateApiRoute", () => {
     expect(typeof route!.handler).toBe("function");
   });
 
-  test("returns null for functions without http annotation", () => {
-    const def = makeDef({ http: undefined });
+  test("auto-derives route for functions without http annotation", () => {
+    const def = makeDef({ name: "finance_summary", http: undefined });
     const route = generateApiRoute(def, stubServices);
 
-    expect(route).toBeNull();
+    expect(route).not.toBeNull();
+    expect(route!.method).toBe("GET"); // not mutatesState, so GET
+    expect(route!.pattern).toBe("/api/g2/finance/summary");
+  });
+
+  test("auto-derives POST method when mutatesState is true", () => {
+    const def = makeDef({ name: "health_log_checkin", http: undefined, mutatesState: true });
+    const route = generateApiRoute(def, stubServices);
+
+    expect(route).not.toBeNull();
+    expect(route!.method).toBe("POST");
+    expect(route!.pattern).toBe("/api/g2/health/log/checkin");
   });
 
   test("returns null for functions whose surfaces exclude api", () => {
@@ -90,7 +101,7 @@ describe("route handler: input parsing", () => {
       method: "POST",
       body: { greeting: "hello" },
     });
-    const response = await route.handler(request, {}, null as any);
+    const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -100,13 +111,13 @@ describe("route handler: input parsing", () => {
   test("parses query params for GET requests", async () => {
     const def = makeDef({
       input: z.object({ q: z.string().optional() }),
-      handler: async (input: any) => ({ query: input.q ?? "none" }),
+      handler: async (input) => ({ query: (input as Record<string, string>).q ?? "none" }),
       http: { method: "GET", path: "/api/g2/search" },
     });
     const route = generateApiRoute(def, stubServices)!;
 
     const request = makeRequest("http://localhost/api/g2/search?q=bun", { method: "GET" });
-    const response = await route.handler(request, {}, null as any);
+    const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -116,7 +127,7 @@ describe("route handler: input parsing", () => {
   test("merges path params into POST body", async () => {
     const def = makeDef({
       input: z.object({ id: z.string(), action: z.string() }),
-      handler: async (input: any) => ({ id: input.id, action: input.action }),
+      handler: async (input) => ({ id: (input as Record<string, string>).id, action: (input as Record<string, string>).action }),
       http: { method: "POST", path: "/api/g2/items/:id" },
     });
 
@@ -127,7 +138,7 @@ describe("route handler: input parsing", () => {
       body: { action: "archive" },
     });
     // Path params are provided by the router, not extracted from the URL here
-    const response = await route.handler(request, { id: "42" }, null as any);
+    const response = await route.handler(request, { id: "42" }, null!);
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -137,14 +148,14 @@ describe("route handler: input parsing", () => {
   test("merges path params into GET query params", async () => {
     const def = makeDef({
       input: z.object({ id: z.string(), format: z.string().optional() }),
-      handler: async (input: any) => ({ id: input.id, format: input.format }),
+      handler: async (input) => ({ id: (input as Record<string, string>).id, format: (input as Record<string, string>).format }),
       http: { method: "GET", path: "/api/g2/items/:id" },
     });
 
     const route = generateApiRoute(def, stubServices)!;
 
     const request = makeRequest("http://localhost/api/g2/items/99?format=json", { method: "GET" });
-    const response = await route.handler(request, { id: "99" }, null as any);
+    const response = await route.handler(request, { id: "99" }, null!);
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -154,7 +165,7 @@ describe("route handler: input parsing", () => {
   test("path params override query params for GET", async () => {
     const def = makeDef({
       input: z.object({ id: z.string() }),
-      handler: async (input: any) => ({ id: input.id }),
+      handler: async (input) => ({ id: (input as Record<string, string>).id }),
       http: { method: "GET", path: "/api/g2/items/:id" },
     });
 
@@ -162,7 +173,7 @@ describe("route handler: input parsing", () => {
 
     // Query has id=query-val, path params have id=path-val; path should win
     const request = makeRequest("http://localhost/api/g2/items/path-val?id=query-val", { method: "GET" });
-    const response = await route.handler(request, { id: "path-val" }, null as any);
+    const response = await route.handler(request, { id: "path-val" }, null!);
 
     const data = await response.json();
     expect(data).toEqual({ id: "path-val" });
@@ -171,14 +182,14 @@ describe("route handler: input parsing", () => {
   test("handles POST with empty body gracefully", async () => {
     const def = makeDef({
       input: z.object({ id: z.string() }),
-      handler: async (input: any) => ({ id: input.id }),
+      handler: async (input) => ({ id: (input as Record<string, string>).id }),
       http: { method: "POST", path: "/api/g2/items/:id" },
     });
 
     const route = generateApiRoute(def, stubServices)!;
 
     const request = makeRequest("http://localhost/api/g2/items/7", { method: "POST" });
-    const response = await route.handler(request, { id: "7" }, null as any);
+    const response = await route.handler(request, { id: "7" }, null!);
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -197,11 +208,11 @@ describe("route handler: Zod validation", () => {
       method: "POST",
       body: { greeting: "hi" },
     });
-    const response = await route.handler(request, {}, null as any);
+    const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(400);
-    const data: any = await response.json();
-    expect(data.error).toBeDefined();
+    const data = await response.json();
+    expect((data as Record<string, string>).error).toBeDefined();
   });
 
   test("returns 400 when required fields are missing", async () => {
@@ -214,7 +225,7 @@ describe("route handler: Zod validation", () => {
       method: "POST",
       body: {},
     });
-    const response = await route.handler(request, {}, null as any);
+    const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(400);
   });
@@ -229,7 +240,7 @@ describe("route handler: Zod validation", () => {
       method: "POST",
       body: { greeting: "hello" },
     });
-    const response = await route.handler(request, {}, null as any);
+    const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -250,11 +261,11 @@ describe("route handler: error handling", () => {
       method: "POST",
       body: { greeting: "boom" },
     });
-    const response = await route.handler(request, {}, null as any);
+    const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(500);
-    const data: any = await response.json();
-    expect(data.error).toBe("database exploded");
+    const data = await response.json();
+    expect((data as Record<string, string>).error).toBe("database exploded");
   });
 
   test("returns 500 with fallback message when error has no message", async () => {
@@ -269,15 +280,15 @@ describe("route handler: error handling", () => {
       method: "POST",
       body: { greeting: "boom" },
     });
-    const response = await route.handler(request, {}, null as any);
+    const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(500);
-    const data: any = await response.json();
-    expect(data.error).toBe("Internal error");
+    const data = await response.json();
+    expect((data as Record<string, string>).error).toBe("Internal error");
   });
 });
 
-describe("route handler: response transform and custom status", () => {
+describe("route handler: response transform, custom status, and string wrapping", () => {
   test("applies responseTransform when present", async () => {
     const def = makeDef({
       http: {
@@ -292,7 +303,7 @@ describe("route handler: response transform and custom status", () => {
       method: "POST",
       body: { greeting: "hi" },
     });
-    const response = await route.handler(request, {}, null as any);
+    const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -313,9 +324,43 @@ describe("route handler: response transform and custom status", () => {
       method: "POST",
       body: { greeting: "hi" },
     });
-    const response = await route.handler(request, {}, null as any);
+    const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(201);
+  });
+
+  test("auto-wraps string handler results in { text: string }", async () => {
+    const def = makeDef({
+      name: "string_fn",
+      input: z.object({}),
+      handler: async () => "hello world",
+      http: undefined,
+    });
+    const route = generateApiRoute(def, stubServices)!;
+
+    const request = makeRequest("http://localhost/api/g2/string/fn", { method: "GET" });
+    const response = await route.handler(request, {}, null!);
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data).toEqual({ text: "hello world" });
+  });
+
+  test("passes through object handler results as-is", async () => {
+    const def = makeDef({
+      name: "object_fn",
+      input: z.object({}),
+      handler: async () => ({ count: 42 }),
+      http: undefined,
+    });
+    const route = generateApiRoute(def, stubServices)!;
+
+    const request = makeRequest("http://localhost/api/g2/object/fn", { method: "GET" });
+    const response = await route.handler(request, {}, null!);
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data).toEqual({ count: 42 });
   });
 });
 
@@ -332,14 +377,14 @@ describe("generateApiRoutes", () => {
     expect(routes[1]!.method).toBe("GET");
   });
 
-  test("excludes functions without http annotation", () => {
+  test("includes functions without http annotation via auto-derivation", () => {
     const defs = [
       makeDef({ name: "with_http" }),
       makeDef({ name: "without_http", http: undefined }),
     ];
     const routes = generateApiRoutes(defs, stubServices);
 
-    expect(routes).toHaveLength(1);
+    expect(routes).toHaveLength(2);
   });
 
   test("excludes functions whose surfaces exclude api", () => {

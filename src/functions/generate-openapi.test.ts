@@ -398,11 +398,14 @@ describe("generateOpenApiSpec", () => {
       expect(spec.paths).toEqual({});
     });
 
-    test("skips functions without http annotation", () => {
+    test("auto-derives route for functions without http annotation", () => {
       const def = makeDef({ name: "noHttp" });
       delete (def as any).http;
       const spec = generateOpenApiSpec([def]);
-      expect(spec.paths).toEqual({});
+      const paths = spec.paths as Record<string, Record<string, unknown>>;
+      expect(paths["/api/g2/noHttp"]).toBeDefined();
+      const op = paths["/api/g2/noHttp"]!["get"] as Record<string, unknown>;
+      expect(op.operationId).toBe("noHttp");
     });
   });
 
