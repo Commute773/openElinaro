@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 import type { MediaKind } from "../../services/media-service";
 
 // ---------------------------------------------------------------------------
@@ -77,6 +78,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
         ),
       ].join("\n");
     },
+    format: formatResult,
     auth: { ...MEDIA_AUTH, note: "Reads the local tagged media library under the runtime media/ directory." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
@@ -109,6 +111,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
         `- ${speaker.id}: ${speaker.name} | device=${speaker.deviceName} | transport=${speaker.transport} | available=${speaker.available ? "yes" : "no"}${speaker.isCurrentOutput ? " | current output" : ""}`
       ).join("\n");
     },
+    format: formatResult,
     auth: { ...MEDIA_AUTH, note: "Inspects local output devices and configured speaker aliases." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
@@ -144,6 +147,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
         `Tags: ${result.item.tags.join(", ")}`,
       ].join("\n");
     },
+    format: formatResult,
     auth: { ...MEDIA_AUTH, note: "Controls local audio playback and speaker routing on this machine." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
@@ -165,6 +169,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
       const status = await media.pause(input.speaker);
       return `Paused ${status.media?.title ?? "current audio"} on ${status.speaker.name}.`;
     },
+    format: formatResult,
     auth: { ...MEDIA_AUTH, note: "Controls local audio playback and speaker routing on this machine." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
@@ -186,6 +191,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
       const status = await media.stop(input.speaker);
       return `Stopped playback on ${status.speaker.name}.`;
     },
+    format: formatResult,
     auth: { ...MEDIA_AUTH, note: "Controls local audio playback and speaker routing on this machine." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
@@ -207,6 +213,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
       const status = await media.setVolume(input.volume, input.speaker);
       return `Volume set to ${status.volume ?? input.volume} on ${status.speaker.name}.`;
     },
+    format: formatResult,
     auth: { ...MEDIA_AUTH, note: "Controls local audio playback volume on this machine." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,
@@ -237,6 +244,7 @@ export const buildMediaFunctions: FunctionDomainBuilder = (ctx) => [
         status.media ? `Tags: ${status.media.tags.join(", ")}` : undefined,
       ].filter(Boolean).join("\n");
     },
+    format: formatResult,
     auth: { ...MEDIA_AUTH, note: "Reads local audio playback state from the managed mpv player." },
     domains: MEDIA_DOMAINS,
     agentScopes: MEDIA_SCOPES,

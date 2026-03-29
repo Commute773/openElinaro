@@ -9,6 +9,7 @@ import {
   DEFAULT_WEB_SEARCH_LANGUAGE,
   DEFAULT_WEB_SEARCH_UI_LANG,
 } from "../../services/tool-defaults";
+import { formatWebSearchHit, formatWebFetchResult, formatResult } from "../formatters";
 
 // ---------------------------------------------------------------------------
 // Shared schemas (same as web-tools.ts)
@@ -70,6 +71,12 @@ export const buildWebFunctions: FunctionDomainBuilder = (ctx) => [
       }
       return webSearch.searchBrave(input);
     },
+    format: (result) => {
+      if (typeof result === "string") return result;
+      const r = result as { query: string; count: number; results: Array<{ title: string; url: string; description: string; published?: string; siteName?: string }> };
+      if (r.results.length === 0) return `No results for "${r.query}".`;
+      return `${r.count} results for "${r.query}":\n${r.results.map(formatWebSearchHit).join("\n")}`;
+    },
     auth: WEB_AUTH,
     domains: WEB_DOMAINS,
     agentScopes: WEB_SCOPES,
@@ -92,6 +99,10 @@ export const buildWebFunctions: FunctionDomainBuilder = (ctx) => [
       "Fetch a URL through Crawl4AI and return AI-friendly page content as markdown, text, or html. Use this for reading a specific page after discovery with web_search; prefer openbrowser only when interactive browser control is required.",
     input: webFetchSchema,
     handler: async (input, fnCtx) => fnCtx.services.webFetch.fetch(input),
+    format: (result) => {
+      if (typeof result === "string") return result;
+      return formatWebFetchResult(result as { url: string; finalUrl: string; title?: string; content: string; truncated: boolean });
+    },
     auth: WEB_AUTH,
     domains: WEB_DOMAINS,
     agentScopes: WEB_SCOPES,

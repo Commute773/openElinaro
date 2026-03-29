@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 
 // ---------------------------------------------------------------------------
 // Shared schemas (same as memory-tools.ts)
@@ -80,6 +81,7 @@ export const buildMemoryFunctions: FunctionDomainBuilder = (ctx) => [
         `Embedding model: ${result.modelId}.`,
       ].join("\n");
     },
+    format: formatResult,
     auth: { ...MEMORY_AUTH_ROLE_SENSITIVE, note: "Memory is written under the active profile namespace." },
     domains: MEMORY_DOMAINS,
     agentScopes: MEMORY_SCOPES,
@@ -96,6 +98,7 @@ export const buildMemoryFunctions: FunctionDomainBuilder = (ctx) => [
       "Search imported markdown memory using hybrid vector similarity plus BM25 ranking.",
     input: memorySearchSchema,
     handler: async (input, fnCtx) => fnCtx.services.memory.search(input),
+    format: formatResult,
     auth: { ...MEMORY_AUTH_ROLE_SENSITIVE, note: "Memory results are limited to the active profile namespace." },
     domains: MEMORY_DOMAINS,
     agentScopes: MEMORY_SCOPES,
@@ -116,6 +119,7 @@ export const buildMemoryFunctions: FunctionDomainBuilder = (ctx) => [
       "Search past conversation history saved to the append-only JSONL archive using BM25 retrieval with opportunistic vector reranking when local embeddings are already warm, then return recent matching excerpts.",
     input: conversationSearchSchema,
     handler: async (input, fnCtx) => fnCtx.services.conversations.searchHistory(input),
+    format: formatResult,
     auth: { ...MEMORY_AUTH_ROLE_SENSITIVE, note: "Results are limited to the append-only conversation archive for the active profile." },
     domains: MEMORY_DOMAINS,
     agentScopes: MEMORY_SCOPES,
@@ -131,6 +135,7 @@ export const buildMemoryFunctions: FunctionDomainBuilder = (ctx) => [
       "Search spans and events in the local telemetry store by trace, operation, entity, or free text. Supports format=json for structured output.",
     input: telemetryQuerySchema,
     handler: async (input, fnCtx) => fnCtx.services.telemetryQuery.query(input),
+    format: formatResult,
     auth: MEMORY_AUTH_ROOT,
     domains: MEMORY_DOMAINS,
     agentScopes: MEMORY_SCOPES,
@@ -159,6 +164,7 @@ export const buildMemoryFunctions: FunctionDomainBuilder = (ctx) => [
         `Embedding model: ${result.modelId}.`,
       ].join("\n");
     },
+    format: formatResult,
     auth: { ...MEMORY_AUTH_ROLE_SENSITIVE, note: "Reindexing only sees memory visible to the active profile." },
     domains: MEMORY_DOMAINS,
     agentScopes: MEMORY_SCOPES,

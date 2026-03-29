@@ -6,6 +6,7 @@
 import path from "node:path";
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 import { isRunningInsideManagedService } from "../../services/infrastructure/runtime-platform";
 import type { RuntimePlatform } from "../../services/infrastructure/runtime-platform";
 import type { ToolBuildContext } from "../../tools/groups/tool-group-types";
@@ -260,6 +261,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
           `Benchmark duration: ${formatDurationMs(embeddingBenchmark.durationMs)}`,
         ].join("\n");
       },
+      format: formatResult,
       auth: { access: "anyone" as const, behavior: "role-sensitive" as const, note: "Benchmark uses the active profile model and memory index." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
@@ -276,6 +278,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       input: z.object({}),
       handler: async (_input, fnCtx) =>
         await fnCtx.services.deploymentVersion.formatSummary(),
+      format: formatResult,
       auth: { access: "anyone" as const, behavior: "uniform" as const, note: "Reads the stamped deploy version metadata for the current runtime." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
@@ -300,6 +303,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
           input.sinceVersion ?? input.version ?? "",
           { limit: input.limit },
         ),
+      format: formatResult,
       auth: { access: "anyone" as const, behavior: "uniform" as const, note: "Reads deploy changelog entries whose version is numerically newer than a requested version for the current runtime." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
@@ -328,6 +332,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
         });
         return renderShellExecResult(result);
       },
+      format: formatResult,
       auth: { access: "root" as const, behavior: "uniform" as const, note: "Sends a simulated healthcheck message through the live local agent process and waits for HEALTHCHECK_OK." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
@@ -350,6 +355,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       input: serviceActionSchema,
       handler: async (input, fnCtx) =>
         runUpdatePreview(input, fnCtx.services),
+      format: formatResult,
       auth: { access: "root" as const, behavior: "uniform" as const, note: "Reads the prepared source-root update metadata and changelog entries newer than the running service version." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
@@ -372,6 +378,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       input: serviceActionSchema,
       handler: async (input, fnCtx) =>
         runUpdate(input, fnCtx.services),
+      format: formatResult,
       auth: { access: "root" as const, behavior: "uniform" as const, note: "Applies the latest prepared local update to the managed service, runs the healthcheck, and rolls back on failure." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
@@ -404,6 +411,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
         });
         return `${renderShellExecResult(result)}${describeServiceTransition("rollback")}`;
       },
+      format: formatResult,
       auth: { access: "root" as const, behavior: "uniform" as const, note: "Restarts the managed service on the previous release and verifies it with the healthcheck." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
@@ -427,6 +435,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       input: z.object({}),
       handler: async (_input, fnCtx) =>
         fnCtx.services.requestManagedServiceRestart("manual"),
+      format: formatResult,
       auth: { access: "root" as const, behavior: "uniform" as const, note: "Restarts the managed service process via the platform service manager." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,

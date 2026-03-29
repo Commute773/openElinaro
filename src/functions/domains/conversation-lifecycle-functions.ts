@@ -8,6 +8,7 @@ import type { ActiveExtendedContextStatus, ContextWindowUsage, ModelProviderId, 
 import type { AgentToolScope } from "../../domain/tool-catalog";
 import { composeSystemPrompt } from "../../services/system-prompt-service";
 import { renderExtendedContextStatus, formatTokenCount } from "./config-functions";
+import { formatResult } from "../formatters";
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -291,6 +292,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
       });
       return rendered[mode];
     },
+    format: formatResult,
     auth: { ...SESSION_AUTH, note: "Project and profile context are filtered by role." },
     domains: SESSION_DOMAINS,
     agentScopes: SESSION_SCOPES,
@@ -334,6 +336,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
         daily,
       });
     },
+    format: formatResult,
     auth: { ...SESSION_AUTH, note: "Usage and cost summaries are limited to the active profile's model-usage ledger records." },
     domains: ["observability", "usage", "session"],
     agentScopes: SESSION_SCOPES,
@@ -373,6 +376,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
         `Summary: ${compacted.summary}`,
       ].join("\n");
     },
+    format: formatResult,
     auth: { ...SESSION_AUTH, note: "Durable memory writes land in the active profile namespace." },
     domains: SESSION_DOMAINS,
     agentScopes: SESSION_SCOPES,
@@ -409,6 +413,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
         `Loaded at: ${conversation.systemPrompt?.loadedAt ?? snapshot.loadedAt}`,
       ].join("\n");
     },
+    format: formatResult,
     auth: { access: "anyone", behavior: "uniform" },
     domains: SESSION_DOMAINS,
     agentScopes: SESSION_SCOPES,
@@ -445,6 +450,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
         result.entry.body,
       ].filter(Boolean).join("\n");
     },
+    format: formatResult,
     auth: { ...SESSION_AUTH, note: "Reflection entries are written under the active profile memory namespace." },
     domains: SESSION_DOMAINS,
     agentScopes: SESSION_SCOPES,
@@ -514,6 +520,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
 
       return resultMessage;
     },
+    format: formatResult,
     auth: { ...SESSION_AUTH, note: "Starts a fresh chat in the active conversation namespace and optionally skips durable memory writes when force=true." },
     domains: SESSION_DOMAINS,
     agentScopes: SESSION_SCOPES,
@@ -622,6 +629,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
         `Visible tool count after load: ${visibleAfter.length}`,
       ].join("\n");
     },
+    format: formatResult,
     auth: { ...TOOLING_AUTH, note: "Visible libraries and activated tools depend on the active profile and scope." },
     domains: ["meta", "tooling"],
     agentScopes: TOOLING_ALL_SCOPES,
@@ -699,6 +707,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
         .filter(Boolean)
         .join("\n");
     },
+    format: formatResult,
     auth: { ...TOOLING_AUTH, note: "Stored tool-result refs are scoped to the active conversation or worker session unless the operator reads them directly." },
     domains: ["meta", "tooling", "session"],
     agentScopes: TOOLING_ALL_SCOPES,
@@ -742,6 +751,7 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
         `Manifest: ${result.manifestPath}`,
       ].join("\n");
     },
+    format: formatResult,
     auth: { ...TOOLING_AUTH, note: "The callable tool bundle is filtered by profile." },
     domains: ["meta", "orchestration", "tooling"],
     agentScopes: TOOLING_ALL_SCOPES,

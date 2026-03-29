@@ -6,6 +6,7 @@
 import fs from "node:fs";
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 import type { ModelProviderId, ActiveExtendedContextStatus } from "../../services/models/model-service";
 import { SECRET_STORE_KINDS } from "../../services/infrastructure/secret-store-service";
 import type { FeatureId } from "../../services/feature-config-service";
@@ -262,6 +263,7 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
         ...renderExtendedContextStatus(await fnCtx.services.models.getActiveExtendedContextStatus()),
       ].join("\n");
     },
+    format: formatResult,
     auth: CONFIG_AUTH_ANYONE,
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
@@ -298,6 +300,7 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
         ),
       ].join("\n");
     },
+    format: formatResult,
     auth: { access: "root" as const, behavior: "uniform" as const, note: "Lists local secret-store metadata for the active root profile without revealing secret values." },
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
@@ -321,6 +324,7 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
       const saved = fnCtx.services.secrets.importSecretFromFile(input);
       return `Stored ${saved.name} for profile ${saved.profileId} with fields: ${saved.fields.join(", ")}.`;
     },
+    format: formatResult,
     auth: { access: "root" as const, behavior: "uniform" as const, note: "Imports a flat JSON secret payload from a local file into the local secret store." },
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
@@ -353,6 +357,7 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
         `Preserved fields: ${saved.preservedFieldCount}`,
       ].join("\n");
     },
+    format: formatResult,
     auth: { access: "root" as const, behavior: "uniform" as const, note: "Generates a strong password server-side and stores it in the local secret store without returning the raw password." },
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
@@ -376,6 +381,7 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
       const existed = fnCtx.services.secrets.deleteSecret(input.name);
       return existed ? `Deleted secret ${input.name}.` : `Secret ${input.name} was already missing.`;
     },
+    format: formatResult,
     auth: { access: "root" as const, behavior: "uniform" as const, note: "Deletes one stored secret from the local secret store." },
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
@@ -460,6 +466,7 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
 
       return lines.join("\n");
     },
+    format: formatResult,
     auth: { access: "root" as const, behavior: "uniform" as const, note: "Reads and edits ~/.openelinaro/config.yaml, validates the result against the runtime schema, and may restart the managed service." },
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,
@@ -525,6 +532,7 @@ export const buildConfigFunctions: FunctionDomainBuilder = (ctx) => [
 
       return lines.join("\n");
     },
+    format: formatResult,
     auth: { access: "root" as const, behavior: "uniform" as const, note: "Reads and writes optional feature config blocks and may restart the managed service." },
     domains: CONFIG_DOMAINS,
     agentScopes: CONFIG_SCOPES,

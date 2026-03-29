@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { generateAgentTool, generateAgentTools } from "./generate-tools";
 import type { FunctionDefinition } from "./define-function";
+import { formatResult } from "./formatters";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
 
@@ -24,6 +25,7 @@ function makeDef(
     description: "A test function",
     input: z.object({ value: z.string() }),
     handler: async (input: any) => `echo:${input.value}`,
+    format: formatResult,
     auth: { access: "anyone", behavior: "uniform" },
     domains: ["test"],
     agentScopes: ["chat"],

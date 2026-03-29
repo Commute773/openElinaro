@@ -15,7 +15,7 @@ import type {
   Weekday,
 } from "../../domain/routines";
 import type { ScheduledAlarm } from "../../services/alarm-service";
-import { formatRoutineItem, formatCheckItem, formatAlarm } from "../formatters";
+import { formatRoutineItem, formatCheckItem, formatAlarm, formatResult } from "../formatters";
 
 // ---------------------------------------------------------------------------
 // Shared schemas (same as routine-tools.ts)
@@ -275,7 +275,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         }),
       };
     },
-    agentFormat: (result) => {
+    format: (result) => {
       if (result.actionableCount === 0) return `Nothing needs active attention right now. Context: ${result.context.mode}.`;
       return result.items.map((i) => i.display).join("\n");
     },
@@ -309,7 +309,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         return { ...s, display: formatRoutineItem(s) };
       });
     },
-    agentFormat: (result) => {
+    format: (result) => {
       if (result.length === 0) return "No routine items matched.";
       return result.map((item) => item.display).join("\n");
     },
@@ -342,7 +342,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       const s = serializeItem(item);
       return { ...s, display: formatRoutineItem(s) };
     },
-    agentFormat: (result) => result.display,
+    format: (result) => result.display,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -374,7 +374,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       });
       return serializeItem(item);
     },
-    agentFormat: (result) => `Saved routine item ${result.id}: ${fmtItem(result)}`,
+    format: (result) => `Saved routine item ${result.id}: ${fmtItem(result)}`,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -415,7 +415,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       });
       return serializeItem(item);
     },
-    agentFormat: (result) => `Updated routine item ${result.id}: ${fmtItem(result)}`,
+    format: (result) => `Updated routine item ${result.id}: ${fmtItem(result)}`,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -435,7 +435,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       const item = fnCtx.services.routines.deleteItem(input.id);
       return { id: item.id, title: item.title, deleted: true };
     },
-    agentFormat: (result) => `Deleted routine item ${result.id}: ${result.title}`,
+    format: (result) => `Deleted routine item ${result.id}: ${result.title}`,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -452,7 +452,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Mark a routine item completed.",
     input: idSchema,
     handler: async (input, fnCtx) => serializeItem(fnCtx.services.routines.markDone(input.id)),
-    agentFormat: (result) => `Marked done: ${fmtItem(result)}`,
+    format: (result) => `Marked done: ${fmtItem(result)}`,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -469,7 +469,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Undo the most recent completion for a routine item.",
     input: idSchema,
     handler: async (input, fnCtx) => serializeItem(fnCtx.services.routines.undoDone(input.id)),
-    agentFormat: (result) => `Undid completion: ${fmtItem(result)}`,
+    format: (result) => `Undid completion: ${fmtItem(result)}`,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -489,7 +489,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       const item = fnCtx.services.routines.snooze(input.id, input.minutes);
       return { ...serializeItem(item), snoozedUntil: item.state.snoozedUntil };
     },
-    agentFormat: (result) => `Snoozed ${result.id} until ${result.snoozedUntil ?? "later"}.`,
+    format: (result) => `Snoozed ${result.id} until ${result.snoozedUntil ?? "later"}.`,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -506,7 +506,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Skip the current occurrence of a routine item.",
     input: idSchema,
     handler: async (input, fnCtx) => serializeItem(fnCtx.services.routines.skip(input.id)),
-    agentFormat: (result) => `Skipped the current occurrence for ${result.id}.`,
+    format: (result) => `Skipped the current occurrence for ${result.id}.`,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -523,7 +523,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Pause a routine item.",
     input: idSchema,
     handler: async (input, fnCtx) => serializeItem(fnCtx.services.routines.pause(input.id)),
-    agentFormat: (result) => `Paused ${result.id}.`,
+    format: (result) => `Paused ${result.id}.`,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -540,7 +540,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Resume a paused routine item.",
     input: idSchema,
     handler: async (input, fnCtx) => serializeItem(fnCtx.services.routines.resume(input.id)),
-    agentFormat: (result) => `Resumed ${result.id}.`,
+    format: (result) => `Resumed ${result.id}.`,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: ROUTINE_SCOPES,
@@ -560,7 +560,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       const alarm = fnCtx.services.alarms.setAlarm(input.name, input.time);
       return serializeAlarm(alarm);
     },
-    agentFormat: (result) => `Alarm set: ${result.name}\nId: ${result.id}\nTriggers at: ${result.triggerAt}`,
+    format: (result) => `Alarm set: ${result.name}\nId: ${result.id}\nTriggers at: ${result.triggerAt}`,
     auth: ROUTINE_AUTH,
     domains: ["routines", "alarms"],
     agentScopes: ROUTINE_SCOPES,
@@ -580,7 +580,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       const timer = fnCtx.services.alarms.setTimer(input.name, input.duration);
       return serializeAlarm(timer);
     },
-    agentFormat: (result) => `Timer set: ${result.name}\nId: ${result.id}\nTriggers at: ${result.triggerAt}`,
+    format: (result) => `Timer set: ${result.name}\nId: ${result.id}\nTriggers at: ${result.triggerAt}`,
     auth: ROUTINE_AUTH,
     domains: ["routines", "alarms"],
     agentScopes: ROUTINE_SCOPES,
@@ -603,7 +603,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         return { ...s, display: formatAlarm(s) };
       });
     },
-    agentFormat: (result) => {
+    format: (result) => {
       if (result.length === 0) return "No alarms or timers matched.";
       return result.map((a) => a.display).join("\n");
     },
@@ -632,7 +632,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       const alarm = fnCtx.services.alarms.cancelAlarm(input.id);
       return serializeAlarm(alarm);
     },
-    agentFormat: (result) => `Cancelled ${result.kind} ${result.id}: ${result.name}`,
+    format: (result) => `Cancelled ${result.kind} ${result.id}: ${result.name}`,
     auth: ROUTINE_AUTH,
     domains: ["routines", "alarms"],
     agentScopes: ROUTINE_SCOPES,
@@ -658,6 +658,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         priority: item.priority,
       }));
     },
+    format: formatResult,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: [],
@@ -691,6 +692,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         schedule: (input.schedule as RoutineSchedule | undefined) ?? { kind: "once", dueAt: new Date().toISOString() },
       });
     },
+    format: formatResult,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: [],
@@ -707,6 +709,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       fnCtx.services.routines.markDone(input.id);
       return { ok: true };
     },
+    format: formatResult,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: [],
@@ -741,6 +744,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
         blockedBy: input.blockedBy,
       });
     },
+    format: formatResult,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: [],
@@ -757,6 +761,7 @@ export const buildRoutineFunctions: FunctionDomainBuilder = (ctx) => [
       fnCtx.services.routines.deleteItem(input.id);
       return { ok: true };
     },
+    format: formatResult,
     auth: ROUTINE_AUTH,
     domains: ROUTINE_DOMAINS,
     agentScopes: [],

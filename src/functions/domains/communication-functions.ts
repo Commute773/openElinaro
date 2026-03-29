@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 import { PHONE_CALL_BACKENDS } from "../../services/phone-call-backends";
 
 // ---------------------------------------------------------------------------
@@ -174,6 +175,7 @@ export const buildCommunicationFunctions: FunctionDomainBuilder = (ctx) => [
       body: input.body,
       format: input.format,
     }),
+    format: formatResult,
     auth: { ...COMMS_AUTH, note: "Reads and sends mail through the configured mailbox account and may mark messages as read." },
     domains: COMMS_DOMAINS,
     agentScopes: COMMS_SCOPES,
@@ -202,6 +204,7 @@ export const buildCommunicationFunctions: FunctionDomainBuilder = (ctx) => [
       }
       return fnCtx.services.vonage.formatStatus(status);
     },
+    format: formatResult,
     auth: { ...COMMS_AUTH, note: "Reads Vonage communications setup status and the webhook URLs exposed by the local HTTP listener." },
     domains: COMMS_DOMAINS,
     agentScopes: COMMS_SCOPES,
@@ -225,6 +228,7 @@ export const buildCommunicationFunctions: FunctionDomainBuilder = (ctx) => [
         instructions: input.instructions,
       }));
     },
+    format: formatResult,
     auth: { ...COMMS_AUTH, note: "Places an outbound Gemini Live phone call and writes the live transcript to disk." },
     domains: COMMS_DOMAINS,
     agentScopes: COMMS_SCOPES,
@@ -252,6 +256,7 @@ export const buildCommunicationFunctions: FunctionDomainBuilder = (ctx) => [
       }
       return fnCtx.services.vonage.formatCallList(calls);
     },
+    format: formatResult,
     auth: { ...COMMS_AUTH, note: "Reads persisted and fetched Vonage call records, including inbound webhook events." },
     domains: COMMS_DOMAINS,
     agentScopes: COMMS_SCOPES,
@@ -274,6 +279,7 @@ export const buildCommunicationFunctions: FunctionDomainBuilder = (ctx) => [
     input: idSchema,
     handler: async (input, fnCtx) =>
       fnCtx.services.vonage.formatCall(await fnCtx.services.vonage.getCall(input.id)),
+    format: formatResult,
     auth: { ...COMMS_AUTH, note: "Reads one Vonage call record and may refresh it from the remote API." },
     domains: COMMS_DOMAINS,
     agentScopes: COMMS_SCOPES,
@@ -304,6 +310,7 @@ export const buildCommunicationFunctions: FunctionDomainBuilder = (ctx) => [
         language: input.language,
         destinationNumber: input.destinationNumber,
       })),
+    format: formatResult,
     auth: { ...COMMS_AUTH, note: "Controls a live Vonage call by altering media or transferring the destination." },
     domains: COMMS_DOMAINS,
     agentScopes: COMMS_SCOPES,
@@ -328,6 +335,7 @@ export const buildCommunicationFunctions: FunctionDomainBuilder = (ctx) => [
         text: input.text,
         clientRef: input.clientRef,
       })),
+    format: formatResult,
     auth: { ...COMMS_AUTH, note: "Sends outbound Vonage messages over SMS, MMS, WhatsApp, Messenger, or Viber." },
     domains: COMMS_DOMAINS,
     agentScopes: COMMS_SCOPES,
@@ -356,6 +364,7 @@ export const buildCommunicationFunctions: FunctionDomainBuilder = (ctx) => [
       }
       return fnCtx.services.vonage.formatMessageList(messages);
     },
+    format: formatResult,
     auth: { ...COMMS_AUTH, note: "Reads persisted Vonage inbound, outbound, and status message records." },
     domains: COMMS_DOMAINS,
     agentScopes: COMMS_SCOPES,
@@ -383,6 +392,7 @@ export const buildCommunicationFunctions: FunctionDomainBuilder = (ctx) => [
       }
       return fnCtx.services.vonage.formatMessage(message);
     },
+    format: formatResult,
     auth: { ...COMMS_AUTH, note: "Reads one persisted Vonage message record." },
     domains: COMMS_DOMAINS,
     agentScopes: COMMS_SCOPES,

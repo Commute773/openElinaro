@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult, formatHealthCheckin } from "../formatters";
 
 // ---------------------------------------------------------------------------
 // Shared schemas (same as health-tools.ts)
@@ -57,6 +58,7 @@ export const buildHealthFunctions: FunctionDomainBuilder = (ctx) => [
       "Show the latest health tracking summary with recent check-ins and short trend context.",
     input: z.object({}),
     handler: async (_input, fnCtx) => fnCtx.services.health.summary(),
+    format: formatResult,
     auth: HEALTH_AUTH,
     domains: HEALTH_DOMAINS,
     agentScopes: HEALTH_SCOPES,
@@ -74,6 +76,7 @@ export const buildHealthFunctions: FunctionDomainBuilder = (ctx) => [
     input: healthHistorySchema,
     handler: async (input, fnCtx) =>
       fnCtx.services.health.history(input.limit ?? 20),
+    format: formatResult,
     auth: HEALTH_AUTH,
     domains: HEALTH_DOMAINS,
     agentScopes: HEALTH_SCOPES,
@@ -109,6 +112,7 @@ export const buildHealthFunctions: FunctionDomainBuilder = (ctx) => [
         meals: input.meals,
         notes: input.notes,
       }),
+    format: (result) => formatHealthCheckin(result as any),
     auth: HEALTH_AUTH,
     domains: HEALTH_DOMAINS,
     agentScopes: HEALTH_SCOPES,

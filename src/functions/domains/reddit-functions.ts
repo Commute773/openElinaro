@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatRedditPost, formatRedditComment, formatResult } from "../formatters";
 
 // ---------------------------------------------------------------------------
 // Shared constants
@@ -167,6 +168,11 @@ export const buildRedditFunctions: FunctionDomainBuilder = (ctx) => [
       const after = (json as RedditListing)?.data?.after ?? null;
       return { posts, after, subreddit: input.subreddit, sort };
     },
+    format: (result) => {
+      if (result.posts.length === 0) return "No posts found.";
+      const header = `r/${result.subreddit} (${result.sort})`;
+      return `${header}\n${result.posts.map(formatRedditPost).join("\n")}${result.after ? `\nMore: after=${result.after}` : ""}`;
+    },
     auth: REDDIT_AUTH,
     domains: REDDIT_DOMAINS,
     agentScopes: REDDIT_SCOPES,
@@ -210,6 +216,10 @@ export const buildRedditFunctions: FunctionDomainBuilder = (ctx) => [
       const after = (json as RedditListing)?.data?.after ?? null;
       return { posts, after, query: input.query };
     },
+    format: (result) => {
+      if (result.posts.length === 0) return `No results for "${result.query}".`;
+      return `Search: ${result.query}\n${result.posts.map(formatRedditPost).join("\n")}${result.after ? `\nMore: after=${result.after}` : ""}`;
+    },
     auth: REDDIT_AUTH,
     domains: REDDIT_DOMAINS,
     agentScopes: REDDIT_SCOPES,
@@ -248,6 +258,13 @@ export const buildRedditFunctions: FunctionDomainBuilder = (ctx) => [
           : null,
         comments,
       };
+    },
+    format: (result) => {
+      const lines: string[] = [];
+      if (result.post) lines.push(`${result.post.title} — u/${result.post.author}`);
+      if (result.comments.length === 0) { lines.push("No comments."); return lines.join("\n"); }
+      lines.push(...result.comments.map(formatRedditComment));
+      return lines.join("\n");
     },
     auth: REDDIT_AUTH,
     domains: REDDIT_DOMAINS,

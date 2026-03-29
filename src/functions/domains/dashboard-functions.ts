@@ -3,6 +3,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 
 const DASHBOARD_AUTH = { access: "anyone" as const, behavior: "uniform" as const };
 
@@ -52,6 +53,16 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
         pendingNotificationCount,
       };
     },
+    format: (result) => {
+      const tc = result.timeContext;
+      const lines = [
+        `${tc.dayOfWeek} ${tc.localDate} ${tc.localTime} (${tc.dayPeriod})`,
+        `Active agents: ${result.activeAgentCount}`,
+        result.nextRoutine ? `Next: ${result.nextRoutine.name} at ${result.nextRoutine.time}` : "Next: none",
+        `Pending notifications: ${result.pendingNotificationCount}`,
+      ];
+      return lines.join("\n");
+    },
     auth: DASHBOARD_AUTH,
     domains: ["dashboard"],
     agentScopes: [],
@@ -83,6 +94,7 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
       }));
       return { summary, checkins };
     },
+    format: formatResult,
     auth: DASHBOARD_AUTH,
     domains: ["dashboard", "health"],
     agentScopes: [],
@@ -114,6 +126,10 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
         tags: p.tags,
       }));
     },
+    format: (result) => {
+      if (result.length === 0) return "No projects.";
+      return result.map((p: any) => `${p.id} [${p.status}/${p.priority}] ${p.name} — ${p.summary ?? ""}`).join("\n");
+    },
     auth: DASHBOARD_AUTH,
     domains: ["dashboard", "projects"],
     agentScopes: [],
@@ -135,6 +151,10 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
         messageCount: c.messages.length,
         updatedAt: c.updatedAt,
       }));
+    },
+    format: (result) => {
+      if (result.length === 0) return "No conversations.";
+      return result.map((c: any) => `${c.key} — ${c.messageCount} messages, updated ${c.updatedAt}`).join("\n");
     },
     auth: DASHBOARD_AUTH,
     domains: ["dashboard", "conversations"],

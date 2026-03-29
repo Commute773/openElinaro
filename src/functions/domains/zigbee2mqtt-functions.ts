@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -68,6 +69,7 @@ export const buildZigbee2MqttFunctions: FunctionDomainBuilder = (ctx) => [
       "Show all smart lights: names, models, power state, brightness, color, and connection quality.",
     input: z.object({}),
     handler: async (_input, fnCtx) => fnCtx.services.zigbee2mqtt.renderStatus(),
+    format: formatResult,
     auth: { ...ZIGBEE_AUTH, note: "Reads status of all paired Zigbee smart lights." },
     domains: ZIGBEE_DOMAINS,
     agentScopes: ZIGBEE_SCOPES,
@@ -83,6 +85,7 @@ export const buildZigbee2MqttFunctions: FunctionDomainBuilder = (ctx) => [
       "Inspect a specific light: model, capabilities, supported features, and current state.",
     input: deviceNameSchema,
     handler: async (input, fnCtx) => fnCtx.services.zigbee2mqtt.renderDeviceDetail(input.device),
+    format: formatResult,
     auth: { ...ZIGBEE_AUTH, note: "Reads detailed capabilities and state of a specific light." },
     domains: ZIGBEE_DOMAINS,
     agentScopes: ZIGBEE_SCOPES,
@@ -118,6 +121,7 @@ export const buildZigbee2MqttFunctions: FunctionDomainBuilder = (ctx) => [
       const result = await fnCtx.services.zigbee2mqtt.setDeviceState(input.device, state);
       return `Set ${input.mode} → ${desc}\n\n${result}`;
     },
+    format: formatResult,
     auth: { ...ZIGBEE_AUTH, note: "Sets a light's color, temperature, or brightness." },
     domains: ZIGBEE_DOMAINS,
     agentScopes: ZIGBEE_SCOPES,
@@ -134,6 +138,7 @@ export const buildZigbee2MqttFunctions: FunctionDomainBuilder = (ctx) => [
       "Read the current state of a light directly from the device (fresh values, not cached).",
     input: deviceNameSchema,
     handler: async (input, fnCtx) => fnCtx.services.zigbee2mqtt.getDeviceStateFresh(input.device),
+    format: formatResult,
     auth: { ...ZIGBEE_AUTH, note: "Reads fresh state from a light device." },
     domains: ZIGBEE_DOMAINS,
     agentScopes: ZIGBEE_SCOPES,
@@ -148,6 +153,7 @@ export const buildZigbee2MqttFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Turn a light on.",
     input: deviceNameSchema,
     handler: async (input, fnCtx) => fnCtx.services.zigbee2mqtt.setDeviceState(input.device, { state: "ON" }),
+    format: formatResult,
     auth: { ...ZIGBEE_AUTH, note: "Turns a light on." },
     domains: ZIGBEE_DOMAINS,
     agentScopes: ZIGBEE_SCOPES,
@@ -163,6 +169,7 @@ export const buildZigbee2MqttFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Turn a light off.",
     input: deviceNameSchema,
     handler: async (input, fnCtx) => fnCtx.services.zigbee2mqtt.setDeviceState(input.device, { state: "OFF" }),
+    format: formatResult,
     auth: { ...ZIGBEE_AUTH, note: "Turns a light off." },
     domains: ZIGBEE_DOMAINS,
     agentScopes: ZIGBEE_SCOPES,
@@ -179,6 +186,7 @@ export const buildZigbee2MqttFunctions: FunctionDomainBuilder = (ctx) => [
       "Open the Zigbee network for pairing so a new light can join. The user should put their device in pairing mode after this.",
     input: permitJoinSchema,
     handler: async (input, fnCtx) => fnCtx.services.zigbee2mqtt.permitJoin(input.seconds),
+    format: formatResult,
     auth: { ...ZIGBEE_AUTH, note: "Opens the Zigbee network for new device pairing." },
     domains: ZIGBEE_DOMAINS,
     agentScopes: ZIGBEE_SCOPES,
@@ -194,6 +202,7 @@ export const buildZigbee2MqttFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Rename a light's friendly name.",
     input: renameSchema,
     handler: async (input, fnCtx) => fnCtx.services.zigbee2mqtt.renameDevice(input.old_name, input.new_name),
+    format: formatResult,
     auth: { ...ZIGBEE_AUTH, note: "Renames a paired light's friendly name." },
     domains: ZIGBEE_DOMAINS,
     agentScopes: ZIGBEE_SCOPES,

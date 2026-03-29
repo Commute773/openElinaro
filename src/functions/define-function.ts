@@ -96,15 +96,16 @@ export interface FunctionDefinition<
   agentScopes: AgentToolScope[];
   defaultVisibleScopes?: AgentToolScope[];
 
-  // -- Surface formatting ----------------------------------------------------
+  // -- Display formatting -----------------------------------------------------
 
   /**
-   * Format the handler result as a string for the agent tool surface.
-   * When set, the handler returns structured data and this function converts
-   * it to a human-readable string for the model. If not set, the handler
-   * result is used directly (backwards-compatible with string-returning handlers).
+   * Convert the handler result to a human-readable display string.
+   * Required for every function — ensures structured output is always
+   * presentable as text for agent tool surfaces, the G2 glasses UI,
+   * and API consumers. For handlers that already return strings,
+   * use `formatResult` as the identity-safe default.
    */
-  agentFormat?(result: TOutput): string;
+  format(result: TOutput): string;
 
   // -- Behavioral flags ------------------------------------------------------
 

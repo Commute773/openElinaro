@@ -1,7 +1,7 @@
 /**
  * Shared display formatters for domain objects.
  *
- * Used by both agent text output (agentFormat) and G2 glasses UI.
+ * Used by both agent text output (display) and G2 glasses UI.
  * Each formatter produces a single-line string suitable for:
  * - G2 display rendering (one item per line)
  * - Agent tool output: items.map(formatXxx).join('\n')
@@ -164,12 +164,170 @@ export function formatAlarm(alarm: AlarmForFormat): string {
 }
 
 // ---------------------------------------------------------------------------
+// Reddit posts & comments
+// ---------------------------------------------------------------------------
+
+export interface RedditPostForFormat {
+  title: string;
+  author: string;
+  ups: number;
+  num_comments: number;
+  permalink: string;
+  selftext?: string;
+  subreddit?: string;
+}
+
+/** Example: [42↑ 12💬] How to set up Zigbee2MQTT — u/alice (r/homeassistant) */
+export function formatRedditPost(post: RedditPostForFormat): string {
+  const sub = post.subreddit ? ` (r/${post.subreddit})` : "";
+  return `[${post.ups}\u2191 ${post.num_comments}\uD83D\uDCAC] ${post.title} \u2014 u/${post.author}${sub}`;
+}
+
+export interface RedditCommentForFormat {
+  author: string;
+  body: string;
+  ups: number;
+}
+
+/** Example: [12↑] u/bob: I had the same issue with... */
+export function formatRedditComment(comment: RedditCommentForFormat): string {
+  const body = comment.body.length > 120 ? comment.body.slice(0, 119) + "\u2026" : comment.body;
+  return `[${comment.ups}\u2191] u/${comment.author}: ${body.replaceAll("\n", " ")}`;
+}
+
+// ---------------------------------------------------------------------------
+// Web search results
+// ---------------------------------------------------------------------------
+
+export interface WebSearchHitForFormat {
+  title: string;
+  url: string;
+  description: string;
+  published?: string;
+  siteName?: string;
+}
+
+/** Example: Example Domain (example.com) — A description of the page */
+export function formatWebSearchHit(hit: WebSearchHitForFormat): string {
+  const site = hit.siteName ? ` (${hit.siteName})` : "";
+  const desc = hit.description.length > 100 ? hit.description.slice(0, 99) + "\u2026" : hit.description;
+  return `${hit.title}${site} \u2014 ${desc}`;
+}
+
+// ---------------------------------------------------------------------------
+// Web fetch results
+// ---------------------------------------------------------------------------
+
+export interface WebFetchResultForFormat {
+  url: string;
+  finalUrl: string;
+  title?: string;
+  content: string;
+  truncated: boolean;
+}
+
+export function formatWebFetchResult(result: WebFetchResultForFormat): string {
+  const title = result.title ? `${result.title}\n` : "";
+  const truncNote = result.truncated ? "\n(truncated)" : "";
+  return `${title}${result.content}${truncNote}`;
+}
+
+// ---------------------------------------------------------------------------
+// OpenBrowser results
+// ---------------------------------------------------------------------------
+
+export interface OpenBrowserResultForFormat {
+  ok: boolean;
+  title: string;
+  finalUrl: string;
+  screenshots: Array<{ path: string }>;
+  stepResults: Array<{ type: string; ok: boolean; error?: string; result?: unknown }>;
+}
+
+export function formatOpenBrowserResult(result: OpenBrowserResultForFormat): string {
+  const lines = [
+    `Page: ${result.title}`,
+    `URL: ${result.finalUrl}`,
+  ];
+  for (const step of result.stepResults) {
+    if (!step.ok) {
+      lines.push(`${step.type}: FAILED \u2014 ${step.error ?? "unknown"}`);
+    } else if (step.type === "screenshot") {
+      lines.push(`screenshot: ${(step.result as { path?: string })?.path ?? "saved"}`);
+    } else if (step.type === "evaluate" && step.result !== undefined) {
+      const val = typeof step.result === "string" ? step.result : JSON.stringify(step.result);
+      lines.push(`evaluate: ${val.length > 200 ? val.slice(0, 199) + "\u2026" : val}`);
+    }
+  }
+  if (result.screenshots.length > 0) {
+    lines.push(`Screenshots: ${result.screenshots.map((s) => s.path).join(", ")}`);
+  }
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Health check-ins
+// ---------------------------------------------------------------------------
+
+export interface HealthCheckinForFormat {
+  id: string;
+  observedAt: string;
+  kind?: string;
+  energy?: number;
+  mood?: number;
+  sleepHours?: number;
+  anxiety?: number;
+  symptoms?: string;
+  notes?: string;
+}
+
+/** Example: checkin @ 2026-03-29T10:00:00Z energy 7/10 mood 8/10 */
+export function formatHealthCheckin(c: HealthCheckinForFormat): string {
+  const parts = [
+    `${c.kind ?? "checkin"} @ ${c.observedAt}`,
+    c.energy != null ? `energy ${c.energy}/10` : "",
+    c.mood != null ? `mood ${c.mood}/10` : "",
+    c.sleepHours != null ? `sleep ${c.sleepHours}h` : "",
+    c.anxiety != null ? `anxiety ${c.anxiety}/10` : "",
+    c.symptoms ? `symptoms: ${c.symptoms.slice(0, 60)}` : "",
+  ].filter(Boolean);
+  return parts.join(", ");
+}
+
+// ---------------------------------------------------------------------------
+// Mutation results — shared shape for { status, id, ... } patterns
+// ---------------------------------------------------------------------------
+
+export interface MutationResultForFormat {
+  status: string;
+  id?: string | number;
+  [key: string]: unknown;
+}
+
+/** Example: added id:42 */
+export function formatMutationResult(result: MutationResultForFormat): string {
+  const id = result.id != null ? ` id:${result.id}` : "";
+  const extras = Object.entries(result)
+    .filter(([k]) => k !== "status" && k !== "id")
+    .map(([k, v]) => `${k}=${formatMutationValue(v)}`)
+    .join(" ");
+  return `${result.status}${id}${extras ? ` ${extras}` : ""}`;
+}
+
+function formatMutationValue(val: unknown): string {
+  if (val === null || val === undefined) return "\u2014";
+  if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") return String(val);
+  return JSON.stringify(val);
+}
+
+// ---------------------------------------------------------------------------
 // Generic formatter — universal fallback for any function result
 // ---------------------------------------------------------------------------
 
 /**
  * Format any function result as a display string.
- * Used as fallback when a function has no custom agentFormat.
+ * Universal fallback suitable as a function's `format` implementation.
+ * Handles strings, arrays, objects, and primitives.
  *
  * Strategy:
  * - Strings pass through
@@ -194,7 +352,7 @@ export function formatResult(result: unknown): string {
     // Unwrap common envelopes
     if (Array.isArray(obj.items)) {
       const header = Object.entries(obj)
-        .filter(([k]) => k !== "items" && k !== "agentFormat")
+        .filter(([k]) => k !== "items" && k !== "display")
         .map(([k, v]) => `${humanLabel(k)}: ${formatValue(v)}`)
         .join("  ");
       const items = (obj.items as unknown[]).map(formatResultItem).join("\n");
@@ -208,7 +366,7 @@ export function formatResult(result: unknown): string {
 
     // Key-value rendering
     return Object.entries(obj)
-      .filter(([k]) => k !== "agentFormat")
+      .filter(([k]) => k !== "display")
       .map(([k, v]) => `${humanLabel(k)}: ${formatValue(v)}`)
       .join("\n");
   }
