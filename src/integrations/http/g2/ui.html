@@ -41,39 +41,6 @@ body { display:flex; flex-direction:column; }
 .sim-controls button.voice.listening { background:rgba(78,201,176,0.2); animation:pulse 1s infinite; }
 @keyframes pulse { 50% { opacity:0.6; } }
 
-/* Sidebar */
-.sidebar { flex:0 0 280px; background:var(--panel); border-left:1px solid var(--border);
-  display:flex; flex-direction:column; overflow:hidden; }
-.sidebar-header { padding:5px 8px; font-size:11px; color:var(--dim);
-  border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; }
-.sidebar-header input { flex:1; background:var(--bg); border:1px solid var(--border);
-  color:var(--green); font-family:inherit; font-size:10px; padding:2px 5px; border-radius:3px; }
-.fn-list { flex:1; overflow-y:auto; padding:2px 0; font-size:10px; }
-.fn-list::-webkit-scrollbar { width:4px; }
-.fn-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
-.fn-domain { padding:5px 8px 1px; font-size:8px; text-transform:uppercase;
-  letter-spacing:1px; color:var(--dimmer); }
-.fn-item { padding:2px 8px; cursor:pointer; display:flex; align-items:center; gap:4px;
-  border-left:2px solid transparent; }
-.fn-item:hover { background:rgba(0,255,65,0.04); }
-.fn-item.selected { background:rgba(0,255,65,0.08); border-left-color:var(--green); }
-.fn-item .m { font-size:8px; font-weight:700; min-width:26px; text-align:center; }
-.fn-item .m.get { color:#4ec9b0; } .fn-item .m.post { color:#dcdcaa; }
-.fn-item .n { color:var(--green); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-
-.fn-detail { flex:0 0 auto; max-height:40%; border-top:1px solid var(--border);
-  padding:5px 8px; overflow-y:auto; font-size:10px; }
-.fn-detail h3 { font-size:11px; color:var(--green); margin-bottom:2px; }
-.fn-detail .desc { color:var(--dim); margin-bottom:4px; }
-.fn-detail textarea { width:100%; background:var(--bg); border:1px solid var(--border);
-  color:var(--green); font-family:inherit; font-size:9px; padding:3px; border-radius:2px;
-  resize:vertical; min-height:28px; margin-top:3px; }
-.fn-detail button { background:rgba(0,255,65,0.1); border:1px solid var(--dimmer);
-  color:var(--green); font-family:inherit; font-size:10px; padding:2px 10px;
-  border-radius:2px; cursor:pointer; margin-top:3px; }
-.fn-detail .result { margin-top:3px; white-space:pre-wrap; color:var(--dim); font-size:9px;
-  max-height:80px; overflow-y:auto; background:var(--bg); padding:2px; border-radius:2px; }
-
 .bottombar { flex:0 0 auto; padding:2px 10px; background:var(--panel);
   border-top:1px solid var(--border); font-size:9px; color:var(--dimmer); display:flex; gap:12px; }
 </style>
@@ -108,14 +75,6 @@ body { display:flex; flex-direction:column; }
       <button class="voice" id="voiceBtn" onclick="input('voice')" title="Voice (V)">🎤</button>
     </div>
   </div>
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <span>Functions</span>
-      <input type="text" id="fnSearch" placeholder="Filter…" oninput="renderFnList(this.value)">
-    </div>
-    <div class="fn-list" id="fnList"></div>
-    <div class="fn-detail" id="fnDetail" style="display:none"></div>
-  </div>
 </div>
 
 <div class="bottombar">
@@ -136,8 +95,6 @@ const PAL = Array.from({length:16},(_,i)=>{
 // ═══════════════════════════════════════════════════════════════════════
 let LH = 16;                 // line height
 let screenStack = [];         // navigation stack
-let tools = [];               // from openapi
-let selectedFn = null;
 
 // ═══════════════════════════════════════════════════════════════════════
 //  CRISP CANVAS — offscreen framebuffer + nearest-neighbor blit
@@ -604,98 +561,14 @@ function makeTodosScreen() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  FUNCTION LIST (sidebar)
-// ═══════════════════════════════════════════════════════════════════════
-function renderFnList(filter = '') {
-  const list = document.getElementById('fnList');
-  list.innerHTML = '';
-  const lc = filter.toLowerCase();
-  const grouped = {};
-  for (const fn of tools) {
-    if (lc && !fn.name.toLowerCase().includes(lc) && !fn.description.toLowerCase().includes(lc)) continue;
-    const d = fn.domains[0] || 'general';
-    (grouped[d] = grouped[d] || []).push(fn);
-  }
-  for (const [domain, fns] of Object.entries(grouped).sort((a,b) => a[0].localeCompare(b[0]))) {
-    const h = document.createElement('div');
-    h.className = 'fn-domain'; h.textContent = domain;
-    list.appendChild(h);
-    for (const fn of fns) {
-      const el = document.createElement('div');
-      el.className = 'fn-item' + (selectedFn?.name === fn.name ? ' selected' : '');
-      el.innerHTML = `<span class="m ${fn.method.toLowerCase()}">${fn.method}</span><span class="n">${fn.name}</span>`;
-      el.onclick = () => { selectedFn = fn; renderFnList(filter); showFnDetail(fn); };
-      list.appendChild(el);
-    }
-  }
-}
-
-function showFnDetail(fn) {
-  const d = document.getElementById('fnDetail');
-  d.style.display = 'block';
-  let h = `<h3>${fn.name}</h3><div class="desc">${fn.description}</div>`;
-  const bodySchema = fn.requestBody?.content?.['application/json']?.schema;
-  const defaultObj = {};
-  for (const p of fn.parameters || []) { if (p.in==='path') defaultObj[p.name] = ''; }
-  if (bodySchema?.properties) {
-    for (const [k,v] of Object.entries(bodySchema.properties))
-      defaultObj[k] = v.default ?? (v.type==='string'?'':v.type==='number'?0:null);
-  }
-  h += `<textarea id="invokeBody">${JSON.stringify(defaultObj,null,2)}</textarea>`;
-  h += `<button onclick="doInvokeFn()">Invoke</button>`;
-  if (fn.isView) h += ` <button onclick="doViewFn()">View</button>`;
-  h += '<div class="result" id="invokeResult"></div>';
-  d.innerHTML = h;
-}
-
-async function doInvokeFn() {
-  if (!selectedFn) return;
-  const r = document.getElementById('invokeResult');
-  r.textContent = '…';
-  try {
-    const params = JSON.parse(document.getElementById('invokeBody').value);
-    let path = selectedFn.path;
-    for (const [k,v] of Object.entries(params)) path = path.replace(`{${k}}`, encodeURIComponent(v));
-    const data = selectedFn.method === 'GET' ? await api(path) : await apiPost(path, params);
-    r.textContent = data.display || JSON.stringify(data, null, 2);
-    // Also show on display
-    const text = data.display || JSON.stringify(data, null, 2);
-    pushScreen(makeTextScreen(selectedFn.name, text));
-  } catch (e) { r.textContent = 'Error: ' + e.message; }
-}
-
-function doViewFn() {
-  if (!selectedFn?.isView) return;
-  pushScreen(makeApiScreen(selectedFn.name, selectedFn.path));
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  OPENAPI DISCOVERY
+//  OPENAPI DISCOVERY (status only)
 // ═══════════════════════════════════════════════════════════════════════
 async function loadSpec() {
   try {
     const spec = await api('/api/g2/openapi.json');
-    tools = [];
-    for (const [path, methods] of Object.entries(spec.paths || {})) {
-      for (const [method, op] of Object.entries(methods)) {
-        if (method === 'parameters') continue;
-        const isGet = method === 'get';
-        tools.push({
-          name: op.operationId || `${method} ${path}`,
-          description: op.summary || op.description || '',
-          method: method.toUpperCase(),
-          path: path,
-          hasPathParams: path.includes('{'),
-          isView: isGet && !path.includes('{'),
-          mutatesState: !isGet,
-          domains: op.tags || [],
-          parameters: op.parameters || [],
-          requestBody: op.requestBody,
-        });
-      }
-    }
-    renderFnList();
-    document.getElementById('status').textContent = `${tools.length} functions`;
+    const count = Object.values(spec.paths || {}).reduce((n, m) =>
+      n + Object.keys(m).filter(k => k !== 'parameters').length, 0);
+    document.getElementById('status').textContent = `${count} functions`;
   } catch (e) {
     document.getElementById('status').textContent = 'spec: ' + e.message;
   }
