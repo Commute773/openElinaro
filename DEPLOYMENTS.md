@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.9
+- Released at: 2026-03-29T21:15:54Z
+- Release id: 20260329T211554Z-eaf0ac9
+- Previous version: 2026.03.29.8
+- Trigger: ci/release workflow
+
+- fix: remove double /api/g2 prefix in G2 simulator UI paths (#200)
+
 ## 2026.03.29.8
 - Released at: 2026-03-29T21:11:37Z
 - Release id: 20260329T211137Z-4258ef0
