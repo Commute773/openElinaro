@@ -31,6 +31,8 @@ export const ProfileRecordSchema = z.object({
   reflectionModelId: z.string().min(1).optional(),
   heartbeatProvider: ModelProviderSchema.optional(),
   heartbeatModelId: z.string().min(1).optional(),
+  memoryRecallProvider: ModelProviderSchema.optional(),
+  memoryRecallModelId: z.string().min(1).optional(),
   defaultThinkingLevel: ThinkingLevelSchema.optional(),
   maxContextTokens: z.number().int().positive().optional(),
   subagentPreferredProvider: ModelProviderSchema.optional(),

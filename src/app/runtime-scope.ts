@@ -12,6 +12,7 @@ import { SshFilesystemBackend } from "../services/filesystem-backend-ssh";
 import type { FinanceService } from "../services/finance-service";
 import type { HealthTrackingService } from "../services/health-tracking-service";
 import { MemoryService } from "../services/memory-service";
+import { LlmMemoryRecallService } from "../services/memory/llm-memory-recall-service";
 import { MemoryManagementAgent } from "../services/memory/memory-management-agent";
 import { StructuredMemoryManager } from "../services/memory/structured-memory-manager";
 import { ModelService } from "../services/models/model-service";
@@ -79,6 +80,7 @@ const K = {
   transitions: "transitions",
   structuredMemoryManager: "structuredMemoryManager",
   memoryManagementAgent: "memoryManagementAgent",
+  llmMemoryRecall: "llmMemoryRecall",
   routineTools: "routineTools",
   toolResolver: "toolResolver",
   chat: "chat",
@@ -182,6 +184,7 @@ export function createRuntimeScope(ctx: {
       c.resolve<MemoryService>(K.memory),
       c.resolve<ModelService>(K.models),
       profiles,
+      c.resolve<LlmMemoryRecallService>(K.llmMemoryRecall),
     ),
   );
 
@@ -257,6 +260,14 @@ export function createRuntimeScope(ctx: {
     new MemoryManagementAgent(
       c.resolve<StructuredMemoryManager>(K.structuredMemoryManager),
       c.resolve<ModelService>(K.models),
+    ),
+  );
+
+  c.register<LlmMemoryRecallService>(K.llmMemoryRecall, () =>
+    new LlmMemoryRecallService(
+      c.resolve<ProfileRecord>(K.profile),
+      c.resolve<ModelService>(K.models),
+      profiles,
     ),
   );
 

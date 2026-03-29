@@ -117,6 +117,22 @@ export class SecondaryModelDispatch {
     };
   }
 
+  getMemoryRecallSelection(): MemoryModelSelection {
+    const providerId = this.profile.memoryRecallProvider ??
+      this.profile.memoryProvider ??
+      this.profile.toolSummarizerProvider ??
+      this.profile.preferredProvider ??
+      DEFAULT_ACTIVE_MODEL_PROVIDER_ID;
+    return {
+      providerId,
+      modelId: this.profile.memoryRecallModelId ??
+        this.profile.memoryModelId ??
+        this.profile.toolSummarizerModelId ??
+        DEFAULT_TOOL_SUMMARIZER_MODEL_IDS[providerId],
+      thinkingLevel: "minimal",
+    };
+  }
+
   getHeartbeatSelection(): HeartbeatModelSelection {
     const heartbeatConfig = getRuntimeConfig().core.app.heartbeat;
     const configProvider = heartbeatConfig.provider || undefined;
