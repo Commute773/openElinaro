@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.3
+- Released at: 2026-03-29T19:09:39Z
+- Release id: 20260329T190939Z-c05178b
+- Previous version: 2026.03.29.2
+- Trigger: ci/release workflow
+
+- fix: add global CORS preflight + headers to all HTTP routes (#194)
+
 ## 2026.03.29.2
 - Released at: 2026-03-29T15:16:37Z
 - Release id: 20260329T151637Z-56de117
