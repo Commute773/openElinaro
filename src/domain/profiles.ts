@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const ModelProviderSchema = z.enum(["openai-codex", "claude"]);
+const ModelProviderSchema = z.enum(["openai-codex", "claude", "zai"]);
 export const ThinkingLevelSchema = z.enum(["minimal", "low", "medium", "high", "xhigh"]);
 const ProfileExecutionSchema = z.discriminatedUnion("kind", [
   z.object({

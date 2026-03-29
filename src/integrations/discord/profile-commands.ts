@@ -26,6 +26,7 @@ export const ROUTINE_PRIORITY_CHOICES: { name: string; value: RoutinePriority }[
 export const MODEL_PROVIDER_CHOICES: { name: string; value: ModelProviderId }[] = [
   { name: "openai-codex", value: "openai-codex" },
   { name: "claude", value: "claude" },
+  { name: "zai", value: "zai" },
 ];
 
 export const PROFILE_ACTION_CHOICES = [
@@ -39,6 +40,7 @@ export const PROFILE_AUTH_PROVIDER_CHOICES = [
   { name: "status", value: "status" },
   { name: "codex", value: "codex" },
   { name: "claude", value: "claude" },
+  { name: "zai", value: "zai" },
 ] as const;
 
 export const THINKING_LEVEL_CHOICES = [
@@ -141,6 +143,7 @@ export function formatLaunchableProfileDetails(activeProfileId: string, targetPr
     `Default thinking: ${targetProfile.defaultThinkingLevel ?? DEFAULT_PROFILE_THINKING_LEVEL}`,
     `Codex auth: ${auth.codex ? "configured" : "missing"}`,
     `Claude auth: ${auth.claude ? "configured" : "missing"}`,
+    `Z.ai auth: ${auth.zai ? "configured" : "missing"}`,
   ]
     .filter(Boolean)
     .join("\n");

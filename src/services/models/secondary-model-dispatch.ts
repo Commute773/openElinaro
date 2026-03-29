@@ -1,7 +1,9 @@
 import {
+  getModel,
   getModels,
   stream,
   type Context,
+  type KnownProvider,
   type Message,
   type Model,
   type Api,
@@ -18,6 +20,7 @@ import {
   getSelectedContextWindow,
   resolveCodexApiKey,
   resolveClaudeToken,
+  resolveZaiApiKey,
   resolveRuntimeModelIdentifier,
   type ActiveModelSelection,
   type HeartbeatModelSelection,
@@ -35,16 +38,19 @@ const DEFAULT_ACTIVE_MODEL_PROVIDER_ID: ModelProviderId = "openai-codex";
 const DEFAULT_TOOL_SUMMARIZER_MODEL_IDS: Record<ModelProviderId, string> = {
   "openai-codex": "gpt-5.1-codex-mini",
   claude: "claude-haiku-4-5",
+  zai: "glm-4.7-flash",
 };
 
 const DEFAULT_HEARTBEAT_MODEL_IDS: Record<ModelProviderId, string> = {
   "openai-codex": "gpt-5.1-codex-mini",
   claude: "claude-haiku-4-5",
+  zai: "glm-4.7-flash",
 };
 
 const DEFAULT_REFLECTION_MODEL_IDS: Record<ModelProviderId, string> = {
   "openai-codex": "gpt-5.1-codex-mini",
   claude: "claude-sonnet-4-5",
+  zai: "glm-5",
 };
 
 type ActiveModelInferenceOptions = ({
@@ -79,6 +85,7 @@ interface UsageRecorder {
 export interface AuthResolver {
   resolveClaudeToken(profileId: string): string;
   resolveCodexApiKey(profileId: string): Promise<{ apiKey: string }>;
+  resolveZaiApiKey(profileId: string): string;
 }
 
 export class SecondaryModelDispatch {
@@ -92,6 +99,7 @@ export class SecondaryModelDispatch {
     this.authResolver = authResolver ?? {
       resolveClaudeToken,
       resolveCodexApiKey,
+      resolveZaiApiKey,
     };
   }
 
@@ -160,6 +168,7 @@ export class SecondaryModelDispatch {
       };
     }
 
+    // Both openai-codex and zai use reasoningEffort (openai-completions API)
     return {
       reasoningEffort: selection.thinkingLevel,
     };
@@ -169,8 +178,22 @@ export class SecondaryModelDispatch {
     selection: ActiveModelSelection,
   ): Promise<ResolvedRuntimeModel> {
     const runtimeProvider = PROVIDER_RUNTIME_MAP[selection.providerId];
-    const runtimeModels = getModels(runtimeProvider);
-    const runtimeModel = resolveRuntimeModelIdentifier(selection.modelId, runtimeModels);
+    const runtimeModels = getModels(runtimeProvider as KnownProvider) as Model<Api>[];
+    let runtimeModel: Model<Api> | undefined = resolveRuntimeModelIdentifier(selection.modelId, runtimeModels);
+
+    // For z.ai models not yet in the pi-ai catalog, create a synthetic entry
+    // based on the closest known model (glm-5).
+    if (!runtimeModel && selection.providerId === "zai") {
+      const baseModel = getModel("zai", "glm-5" as any) as Model<Api> | undefined;
+      if (baseModel) {
+        runtimeModel = {
+          ...baseModel,
+          id: selection.modelId,
+          name: selection.modelId.toUpperCase().replace("glm-", "GLM-"),
+        } as Model<Api>;
+      }
+    }
+
     if (!runtimeModel) {
       throw new Error(
         `The active model ${selection.providerId}/${selection.modelId} is not supported by the runtime.`,
@@ -191,6 +214,9 @@ export class SecondaryModelDispatch {
   async resolveApiKeyForProvider(providerId: ModelProviderId) {
     if (providerId === "claude") {
       return this.authResolver.resolveClaudeToken(this.profile.id);
+    }
+    if (providerId === "zai") {
+      return this.authResolver.resolveZaiApiKey(this.profile.id);
     }
 
     const { apiKey } = await this.authResolver.resolveCodexApiKey(this.profile.id);

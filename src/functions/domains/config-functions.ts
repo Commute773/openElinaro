@@ -29,7 +29,7 @@ import path from "node:path";
 // Shared schemas (same as config-tools.ts)
 // ---------------------------------------------------------------------------
 
-const modelProviderSchema = z.enum(["openai-codex", "claude"]);
+const modelProviderSchema = z.enum(["openai-codex", "claude", "zai"]);
 const thinkingLevelSchema = z.enum(["minimal", "low", "medium", "high", "xhigh"]);
 
 const modelToolSchema = z.object({

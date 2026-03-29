@@ -27,8 +27,8 @@ import type { ThinkingLevel } from "@mariozechner/pi-ai";
 // ---------------------------------------------------------------------------
 
 const responseFormatSchema = z.enum(["text", "json"]);
-const modelProviderSchema = z.enum(["openai-codex", "claude"]);
-const modelProviderIds: ModelProviderId[] = ["openai-codex", "claude"];
+const modelProviderSchema = z.enum(["openai-codex", "claude", "zai"]);
+const modelProviderIds: ModelProviderId[] = ["openai-codex", "claude", "zai"];
 const thinkingLevelSchema = z.enum(["minimal", "low", "medium", "high", "xhigh"]);
 const jobStatusSchema = z.enum(["active", "paused", "archived"]);
 const projectStatusSchema = z.enum(["active", "paused", "idea", "archived"]);
@@ -444,7 +444,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
               profile.defaultModelId ? `model=${profile.defaultModelId}` : "",
               `thinking=${profile.defaultThinkingLevel}`,
               `auth=${profile.auth.any
-                ? [profile.auth.codex ? "codex" : "", profile.auth.claude ? "claude" : ""]
+                ? [profile.auth.codex ? "codex" : "", profile.auth.claude ? "claude" : "", profile.auth.zai ? "zai" : ""]
                   .filter(Boolean)
                   .join(",")
                 : "missing"}`,

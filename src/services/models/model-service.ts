@@ -7,6 +7,7 @@ import {
   stream,
   type Api,
   type Context,
+  type KnownProvider,
   type Message,
   type Model,
   type ThinkingLevel,
@@ -38,7 +39,7 @@ import {
   type RecordedUsageInspection,
   type RecordedUsageDailyInspection,
 } from "./model-usage-service";
-import { getClaudeSetupToken, getCodexCredentials, saveCodexCredentials } from "../../auth/store";
+import { getClaudeSetupToken, getCodexCredentials, getZaiApiKey, saveCodexCredentials } from "../../auth/store";
 import type { ProfileRecord } from "../../domain/profiles";
 import { getRuntimeConfig } from "../../config/runtime-config";
 import { resolveRuntimePath } from "../runtime-root";
@@ -50,7 +51,7 @@ import { SecondaryModelDispatch, type ResolvedRuntimeModel } from "./secondary-m
 export type { RecordedUsageInspection, RecordedUsageDailyInspection } from "./model-usage-service";
 export { ModelUsageService } from "./model-usage-service";
 
-export type ModelProviderId = "openai-codex" | "claude";
+export type ModelProviderId = "openai-codex" | "claude" | "zai";
 const modelTelemetry = telemetry.child({ component: "model" });
 const MAX_ANTHROPIC_BASE64_BYTES = 5 * 1024 * 1024;
 
@@ -203,14 +204,16 @@ const DEFAULT_ACTIVE_MODEL: ActiveModelSelection = {
   updatedAt: new Date(0).toISOString(),
 };
 
-export const PROVIDER_RUNTIME_MAP: Record<ModelProviderId, "openai-codex" | "anthropic"> = {
+export const PROVIDER_RUNTIME_MAP: Record<ModelProviderId, KnownProvider> = {
   "openai-codex": "openai-codex",
   claude: "anthropic",
+  zai: "zai",
 };
 
 const PROVIDER_LABELS: Record<ModelProviderId, string> = {
   "openai-codex": "OpenAI Codex",
   claude: "Claude",
+  zai: "Z.ai",
 };
 
 async function ensureStoreDir() {
@@ -409,6 +412,14 @@ function buildCodexHeaders(token: string) {
   return headers;
 }
 
+function buildZaiHeaders(apiKey: string) {
+  return new Headers({
+    accept: "application/json",
+    "content-type": "application/json",
+    authorization: `Bearer ${apiKey}`,
+  });
+}
+
 function extractCandidateString(
   value: Record<string, unknown>,
   keys: string[],
@@ -466,6 +477,22 @@ function normalizeAnthropicDiscoveredModels(payload: unknown): ProviderModelStub
     .map((model) => ({
       modelId: model.id?.trim() ?? "",
       name: model.display_name?.trim() || model.name?.trim() || model.id?.trim() || "",
+    }))
+    .filter((model) => model.modelId.length > 0)
+    .sort((left, right) => left.modelId.localeCompare(right.modelId));
+}
+
+function normalizeZaiDiscoveredModels(payload: unknown): ProviderModelStub[] {
+  const response = payload as {
+    data?: Array<{
+      id?: string;
+      name?: string;
+    }>;
+  };
+  return (response.data ?? [])
+    .map((model) => ({
+      modelId: model.id?.trim() ?? "",
+      name: model.name?.trim() || model.id?.trim() || "",
     }))
     .filter((model) => model.modelId.length > 0)
     .sort((left, right) => left.modelId.localeCompare(right.modelId));
@@ -782,6 +809,14 @@ export function resolveClaudeToken(profileId: string) {
   return token;
 }
 
+export function resolveZaiApiKey(profileId: string) {
+  const key = getZaiApiKey(profileId);
+  if (!key) {
+    throw new ConfigurationError("Z.ai auth is not configured yet. Use `/auth provider:zai` first.");
+  }
+  return key;
+}
+
 export class ModelService {
   private readonly usageService: ModelUsageService;
   private readonly selectionStoreKey: string;
@@ -803,7 +838,7 @@ export class ModelService {
   }
 
   getSupportedProviders(): ModelProviderId[] {
-    return ["openai-codex", "claude"];
+    return ["openai-codex", "claude", "zai"];
   }
 
   getProviderLabel(providerId: ModelProviderId) {
@@ -867,7 +902,9 @@ export class ModelService {
     const active = await this.getActiveModel();
     const discovered = providerId === "claude"
       ? await this.fetchAnthropicModels()
-      : await this.fetchCodexModels();
+      : providerId === "zai"
+        ? await this.fetchZaiModels()
+        : await this.fetchCodexModels();
 
     return discovered.map((entry) => {
       const runtimeModel = runtimeCatalog.get(entry.modelId) ??
@@ -1211,6 +1248,27 @@ export class ModelService {
     const models = normalizeAnthropicDiscoveredModels(payload);
     if (models.length === 0) {
       throw new Error("Claude returned an empty model catalog.");
+    }
+    return models;
+  }
+
+  private async fetchZaiModels(): Promise<ProviderModelStub[]> {
+    const apiKey = resolveZaiApiKey(this.profile.id);
+    const response = await fetch("https://api.z.ai/api/coding/paas/v4/models", {
+      headers: buildZaiHeaders(apiKey),
+    });
+    if (!response.ok) {
+      throw new Error(`Z.ai model listing failed with HTTP ${response.status}.`);
+    }
+
+    const payload = await response.json();
+    const models = normalizeZaiDiscoveredModels(payload);
+    if (models.length === 0) {
+      const runtimeCatalog = getRuntimeCatalog("zai");
+      return [...runtimeCatalog.values()].map((model) => ({
+        modelId: model.id,
+        name: model.name,
+      }));
     }
     return models;
   }
