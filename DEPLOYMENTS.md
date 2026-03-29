@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.14
+- Released at: 2026-03-29T22:36:57Z
+- Release id: 20260329T223657Z-6b00e49
+- Previous version: 2026.03.29.13
+- Trigger: ci/release workflow
+
+- feat: add structured memory system with categorized entity files
+
 ## 2026.03.29.13
 - Released at: 2026-03-29T22:21:36Z
 - Release id: 20260329T222136Z-31805a9
