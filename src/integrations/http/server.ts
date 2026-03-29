@@ -9,6 +9,7 @@ import { VonageService, getVonageWebhookPath } from "../../services/vonage-servi
 import type { OpenElinaroApp } from "../../app/runtime";
 import { handleG2ApiRequest } from "./g2-api";
 import { authenticateApiRequest } from "./api-auth";
+import { CORS_HEADERS } from "./g2/helpers";
 
 export function normalizePath(pathname: string) {
   return pathname.replace(/\/+$/, "") || "/";
@@ -24,11 +25,16 @@ export function createHttpRequestHandler(
     const url = new URL(request.url, "http://localhost");
     const pathname = normalizePath(url.pathname);
 
+    // Global CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
     const authResponse = authenticateApiRequest(request, pathname, config);
     if (authResponse) return authResponse;
 
     if (pathname === "/healthz") {
-      return Response.json({ ok: true }, { status: 200 });
+      return Response.json({ ok: true }, { status: 200, headers: CORS_HEADERS });
     }
 
     // G2 API routes
