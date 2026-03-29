@@ -12,7 +12,7 @@ import { createTraceSpan } from "../../utils/telemetry-helpers";
 const llmRecallTelemetry = telemetry.child({ component: "llm_memory_recall" });
 const traceSpan = createTraceSpan(llmRecallTelemetry);
 
-const MAX_MEMORY_CORPUS_CHARS = 120_000;
+const MAX_CORPUS_CHARS = 600_000;
 const MAX_RECALL_RESULTS = 5;
 
 export type LlmRecallMatch = {
@@ -22,18 +22,14 @@ export type LlmRecallMatch = {
   reason: string;
 };
 
-const RECALL_SYSTEM_PROMPT = [
-  "You are a memory recall agent. You have been given a corpus of memory documents.",
-  "When the user sends a message, identify which memories are relevant to that message.",
-  "Return a JSON array of up to 5 relevant memories. Each entry has:",
-  '  { "path": "category/slug.md", "heading": "title", "content": "relevant excerpt", "reason": "why this is relevant" }',
+const CORPUS_SYSTEM_PREFIX = "You are a memory recall agent. Below is a corpus of memory documents. When the user asks, return relevant memories as JSON.\n\n## Memory Corpus\n\n";
+
+const RECALL_USER_PREFIX = [
+  "Which memories from the corpus are relevant to the following message? Return a JSON array (max 5 entries).",
+  'Each entry: { "path": "relative/path.md", "heading": "title", "content": "1-3 line excerpt", "reason": "why relevant" }',
+  "Return [] if nothing is relevant. JSON only, no markdown fences, no explanation text.",
   "",
-  "Rules:",
-  "- Only return memories that are genuinely relevant to the user's message",
-  "- If nothing is relevant, return an empty array: []",
-  "- Prefer specific, actionable memories over vague matches",
-  "- Keep content excerpts concise (1-3 bullets or sentences)",
-  "- Return valid JSON only, no markdown fences, no explanation",
+  "User message: ",
 ].join("\n");
 
 function stripCodeFence(text: string) {
@@ -94,7 +90,7 @@ function parseRecallResponse(raw: string): LlmRecallMatch[] {
  * across calls.
  */
 export class LlmMemoryRecallService {
-  private corpusCache: { text: string; builtAt: number } | null = null;
+  private corpusCache: { text: string; mtimeMs: number } | null = null;
   private readonly profiles: ProfileService;
   private readonly sessionId: string;
 
@@ -123,20 +119,14 @@ export class LlmMemoryRecallService {
           return [];
         }
 
-        const systemPrompt = [
-          RECALL_SYSTEM_PROMPT,
-          "",
-          "## Memory Corpus",
-          "",
-          corpus,
-        ].join("\n");
+        const systemPrompt = CORPUS_SYSTEM_PREFIX + corpus;
 
         const resolved = await this.models.resolveMemoryRecallModel();
         const response = await complete(resolved.runtimeModel, {
           systemPrompt,
           messages: [{
             role: "user",
-            content: params.userMessage,
+            content: RECALL_USER_PREFIX + params.userMessage,
             timestamp: Date.now(),
           }],
         }, {
@@ -177,24 +167,21 @@ export class LlmMemoryRecallService {
   }
 
   /**
-   * Invalidate the in-memory corpus cache so the next recall re-reads from disk.
-   */
-  invalidateCorpus() {
-    this.corpusCache = null;
-  }
-
-  /**
    * Load all memory markdown files into a single text corpus.
-   * Cached in memory for 5 minutes to avoid re-reading on every turn.
+   * Uses the memory document root's mtime as a cheap staleness check —
+   * if the directory hasn't changed, returns the cached corpus instantly.
+   * Full re-read is ~5-7ms so even a miss is cheap.
    */
   private async loadCorpus(): Promise<string | null> {
-    const CACHE_TTL_MS = 5 * 60 * 1_000;
-    if (this.corpusCache && Date.now() - this.corpusCache.builtAt < CACHE_TTL_MS) {
-      return this.corpusCache.text;
-    }
-
     const namespace = this.profiles.getWriteMemoryNamespace(this.profile);
     const memoryDocRoot = path.join(resolveRuntimePath("memory"), "documents", namespace);
+
+    // Check root mtime as a cheap staleness signal
+    const rootStat = await stat(memoryDocRoot).catch(() => null);
+    const currentMtime = rootStat?.mtimeMs ?? 0;
+    if (this.corpusCache && this.corpusCache.mtimeMs === currentMtime) {
+      return this.corpusCache.text;
+    }
 
     const segments: string[] = [];
     const charCounter = { total: 0 };
@@ -213,7 +200,7 @@ export class LlmMemoryRecallService {
       if (!dirStat?.isDirectory()) continue;
 
       await this.collectMarkdownFiles(dir, memoryDocRoot, segments, seenPaths, charCounter);
-      if (charCounter.total >= MAX_MEMORY_CORPUS_CHARS) break;
+      if (charCounter.total >= MAX_CORPUS_CHARS) break;
     }
 
     if (segments.length === 0) {
@@ -221,7 +208,7 @@ export class LlmMemoryRecallService {
     }
 
     const corpus = segments.join("\n\n");
-    this.corpusCache = { text: corpus, builtAt: Date.now() };
+    this.corpusCache = { text: corpus, mtimeMs: currentMtime };
 
     llmRecallTelemetry.event("llm_memory_recall.corpus_loaded", {
       profileId: this.profile.id,
@@ -241,13 +228,12 @@ export class LlmMemoryRecallService {
   ) {
     const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
-      if (charCounter.total >= MAX_MEMORY_CORPUS_CHARS) break;
+      if (charCounter.total >= MAX_CORPUS_CHARS) break;
 
       const fullPath = path.join(dir, entry.name);
       if (seen.has(fullPath)) continue;
 
       if (entry.isDirectory()) {
-        // Skip identity and compactions directories
         if (entry.name === "identity" || entry.name === "compactions" || entry.name === "legacy") continue;
         await this.collectMarkdownFiles(fullPath, rootDir, segments, seen, charCounter);
         continue;
@@ -262,11 +248,8 @@ export class LlmMemoryRecallService {
         const trimmed = content.trim();
         if (!trimmed) continue;
 
-        // Skip very large files
-        if (trimmed.length > 8_000) continue;
-
         const segment = `### ${relativePath}\n${trimmed}`;
-        if (charCounter.total + segment.length > MAX_MEMORY_CORPUS_CHARS) break;
+        if (charCounter.total + segment.length > MAX_CORPUS_CHARS) break;
 
         segments.push(segment);
         charCounter.total += segment.length;
