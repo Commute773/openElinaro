@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.11
+- Released at: 2026-03-29T22:10:01Z
+- Release id: 20260329T221001Z-2cb8421
+- Previous version: 2026.03.29.10
+- Trigger: ci/release workflow
+
+- feat: require format on every function definition, add shared domain formatters (#202)
+
 ## 2026.03.29.10
 - Released at: 2026-03-29T21:40:29Z
 - Release id: 20260329T214029Z-8329b8b
