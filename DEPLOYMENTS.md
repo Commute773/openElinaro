@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.8
+- Released at: 2026-03-29T21:11:37Z
+- Release id: 20260329T211137Z-4258ef0
+- Previous version: 2026.03.29.7
+- Trigger: ci/release workflow
+
+- feat: add G2 glasses simulator UI with data-driven function catalogue (#199)
+
 ## 2026.03.29.7
 - Released at: 2026-03-29T20:36:29Z
 - Release id: 20260329T203629Z-e5fd100
