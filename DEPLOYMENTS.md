@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.17
+- Released at: 2026-03-29T23:07:11Z
+- Release id: 20260329T230711Z-8603500
+- Previous version: 2026.03.29.16
+- Trigger: ci/release workflow
+
+- fix: corpus char counter in LLM recall was not updating during collection
+
 ## 2026.03.29.16
 - Released at: 2026-03-29T23:03:46Z
 - Release id: 20260329T230346Z-3734460
