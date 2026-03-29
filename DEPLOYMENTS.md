@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.6
+- Released at: 2026-03-29T20:15:02Z
+- Release id: 20260329T201502Z-5c3c87c
+- Previous version: 2026.03.29.5
+- Trigger: ci/release workflow
+
+- fix: handle non-JSON reflection output and prevent empty compaction summaries
+
 ## 2026.03.29.5
 - Released at: 2026-03-29T19:34:21Z
 - Release id: 20260329T193421Z-ce377a0
