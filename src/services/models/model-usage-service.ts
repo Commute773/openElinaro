@@ -9,7 +9,7 @@ import {
   type UsagePromptDiagnostics,
 } from "../usage-tracking-service";
 
-export type ModelProviderId = "openai-codex" | "claude";
+export type ModelProviderId = "openai-codex" | "claude" | "zai";
 
 export interface RecordedUsageInspection {
   conversation: UsageLedgerSummary;

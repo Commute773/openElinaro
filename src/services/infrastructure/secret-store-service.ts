@@ -42,6 +42,12 @@ export type ProviderAuthSecret =
       type: "token";
       token: string;
       updatedAt: string;
+    }
+  | {
+      provider: "zai";
+      type: "token";
+      token: string;
+      updatedAt: string;
     };
 
 type LegacySecretEnvelope = {

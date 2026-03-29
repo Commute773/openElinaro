@@ -1,6 +1,6 @@
 import { loginOpenAICodex } from "@mariozechner/pi-ai/oauth";
 import { validateClaudeSetupToken } from "../../auth/claude";
-import { saveClaudeSetupToken, saveCodexCredentials } from "../../auth/store";
+import { saveClaudeSetupToken, saveCodexCredentials, saveZaiApiKey } from "../../auth/store";
 
 type SendMessage = (content: string) => Promise<void>;
 
@@ -123,6 +123,43 @@ export class DiscordAuthSessionManager {
       await send(`Codex auth saved locally for profile ${profileId}.`);
     } catch (error) {
       await send(`Codex auth failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      this.activeSessions.delete(userId);
+      this.pendingPrompts.delete(userId);
+    }
+  }
+
+  async startZaiApiKeyFlowForProfile(
+    profileId: string,
+    userId: string,
+    send: SendMessage,
+  ): Promise<void> {
+    if (this.activeSessions.has(userId)) {
+      await send("An auth flow is already active. Reply `cancel` to stop it first.");
+      return;
+    }
+
+    this.activeSessions.add(userId);
+    try {
+      await send(
+        [
+          "Z.ai auth uses an API key.",
+          "Paste your Z.ai API key here in DM.",
+          "Reply `cancel` to abort.",
+        ].join("\n"),
+      );
+
+      const key = await this.waitForPromptResponse(userId);
+      const trimmed = key.trim();
+      if (trimmed.length < 10) {
+        await send("Z.ai API key rejected: too short.");
+        return;
+      }
+
+      saveZaiApiKey(trimmed, profileId);
+      await send(`Z.ai auth saved locally for profile ${profileId}.`);
+    } catch (error) {
+      await send(error instanceof Error ? error.message : String(error));
     } finally {
       this.activeSessions.delete(userId);
       this.pendingPrompts.delete(userId);

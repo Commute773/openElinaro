@@ -467,6 +467,19 @@ async function handleSlashCommand(params: {
       return;
     }
 
+    if (provider === "zai") {
+      await replyWithChunks(interaction, `Check your DMs to continue Z.ai auth for profile ${targetProfile.id}.`, {
+        ephemeral: true,
+      });
+      await beginDirectMessageAuth(interaction, () =>
+        authManager.startZaiApiKeyFlowForProfile(targetProfile.id, interaction.user.id, async (text) => {
+          const dm = await interaction.user.createDM();
+          await dm.send(text);
+        }),
+      );
+      return;
+    }
+
     await replyWithChunks(interaction, `Check your DMs to continue Claude auth for profile ${targetProfile.id}.`, {
       ephemeral: true,
     });
@@ -541,6 +554,19 @@ async function handleSlashCommand(params: {
       });
       await beginDirectMessageAuth(interaction, () =>
         authManager.startCodexOAuthFlowForProfile(targetProfile.id, interaction.user.id, async (text) => {
+          const dm = await interaction.user.createDM();
+          await dm.send(text);
+        }),
+      );
+      return;
+    }
+
+    if (provider === "zai") {
+      await replyWithChunks(interaction, `Check your DMs to continue Z.ai auth for profile ${targetProfile.id}.`, {
+        ephemeral: true,
+      });
+      await beginDirectMessageAuth(interaction, () =>
+        authManager.startZaiApiKeyFlowForProfile(targetProfile.id, interaction.user.id, async (text) => {
           const dm = await interaction.user.createDM();
           await dm.send(text);
         }),

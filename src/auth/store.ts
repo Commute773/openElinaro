@@ -7,17 +7,19 @@ import { type ProviderAuthSecret, SecretStoreService } from "../services/infrast
 import { telemetry } from "../services/infrastructure/telemetry";
 import { timestamp } from "../utils/timestamp";
 
-export type ProviderId = "openai-codex" | "claude";
+export type ProviderId = "openai-codex" | "claude" | "zai";
 
 export type ProviderAuthStatus = {
   profileId: string;
   codex: boolean;
   claude: boolean;
+  zai: boolean;
   any: boolean;
 };
 
 type CodexCredential = Extract<ProviderAuthSecret, { provider: "openai-codex" }>;
 type ClaudeCredential = Extract<ProviderAuthSecret, { provider: "claude" }>;
+type ZaiCredential = Extract<ProviderAuthSecret, { provider: "zai" }>;
 
 type LegacyAuthStoreShape = {
   version?: number;
@@ -130,6 +132,10 @@ function hasUsableClaudeToken(value: ClaudeCredential | null | undefined) {
   return Boolean(typeof value?.token === "string" && value.token.trim().length > 0);
 }
 
+function hasUsableZaiToken(value: ZaiCredential | null | undefined) {
+  return Boolean(typeof value?.token === "string" && value.token.trim().length > 0);
+}
+
 function getStoredCodexCredential(profileId: string) {
   migrateLegacyProfileIfNeeded(profileId);
   const value = secrets.getProviderAuth("openai-codex", profileId);
@@ -140,6 +146,11 @@ function getStoredClaudeCredential(profileId: string) {
   migrateLegacyProfileIfNeeded(profileId);
   const value = secrets.getProviderAuth("claude", profileId);
   return value?.provider === "claude" ? value : null;
+}
+
+function getStoredZaiCredential(profileId: string) {
+  const value = secrets.getProviderAuth("zai", profileId);
+  return value?.provider === "zai" ? value : null;
 }
 
 export function getCodexCredentials(profileId = getDefaultProfileId()): OAuthCredentials | null {
@@ -183,25 +194,51 @@ export function getClaudeSetupToken(profileId = getDefaultProfileId()): string |
   return getStoredClaudeCredential(profileId)?.token ?? null;
 }
 
+export function saveZaiApiKey(token: string, profileId = getDefaultProfileId()) {
+  secrets.saveProviderAuth({
+    provider: "zai",
+    type: "token",
+    token,
+    updatedAt: timestamp(),
+  }, profileId);
+  telemetry.event("auth.zai_token_saved", {
+    profileId,
+    provider: "zai",
+    entityType: "auth_credentials",
+    entityId: profileId,
+  });
+}
+
+export function getZaiApiKey(profileId = getDefaultProfileId()): string | null {
+  return getStoredZaiCredential(profileId)?.token ?? null;
+}
+
 export function hasProviderAuth(provider: ProviderId, profileId = getDefaultProfileId()): boolean {
-  return provider === "openai-codex"
-    ? hasUsableCodexCredentials(getStoredCodexCredential(profileId))
-    : hasUsableClaudeToken(getStoredClaudeCredential(profileId));
+  if (provider === "openai-codex") {
+    return hasUsableCodexCredentials(getStoredCodexCredential(profileId));
+  }
+  if (provider === "zai") {
+    return hasUsableZaiToken(getStoredZaiCredential(profileId));
+  }
+  return hasUsableClaudeToken(getStoredClaudeCredential(profileId));
 }
 
 export function hasAnyProviderAuth(profileId = getDefaultProfileId()): boolean {
   return hasUsableCodexCredentials(getStoredCodexCredential(profileId))
-    || hasUsableClaudeToken(getStoredClaudeCredential(profileId));
+    || hasUsableClaudeToken(getStoredClaudeCredential(profileId))
+    || hasUsableZaiToken(getStoredZaiCredential(profileId));
 }
 
 export function getAuthStatus(profileId = getDefaultProfileId()): ProviderAuthStatus {
   const codex = hasUsableCodexCredentials(getStoredCodexCredential(profileId));
   const claude = hasUsableClaudeToken(getStoredClaudeCredential(profileId));
+  const zai = hasUsableZaiToken(getStoredZaiCredential(profileId));
   return {
     profileId,
     codex,
     claude,
-    any: codex || claude,
+    zai,
+    any: codex || claude || zai,
   };
 }
 
@@ -211,5 +248,6 @@ export function getAuthStatusLines(profileId = getDefaultProfileId()): string[] 
     `profile: ${status.profileId}`,
     `codex: ${status.codex ? "configured" : "missing"}`,
     `claude: ${status.claude ? "configured" : "missing"}`,
+    `zai: ${status.zai ? "configured" : "missing"}`,
   ];
 }
