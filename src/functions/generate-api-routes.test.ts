@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import type { FunctionDefinition } from "./define-function";
+import { formatResult } from "./formatters";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import { generateApiRoute, generateApiRoutes } from "./generate-api-routes";
 
@@ -16,6 +17,7 @@ function makeDef(overrides: Partial<FunctionDefinition> = {}): FunctionDefinitio
     description: "A test function",
     input: z.object({ greeting: z.string() }),
     handler: async (input) => ({ echo: (input as Record<string, string>).greeting }),
+    format: formatResult,
     auth: { access: "public", behavior: "allow" },
     domains: ["test"],
     agentScopes: ["foreground"],
@@ -105,7 +107,7 @@ describe("route handler: input parsing", () => {
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual({ echo: "hello" });
+    expect(data).toMatchObject({ echo: "hello" });
   });
 
   test("parses query params for GET requests", async () => {
@@ -121,7 +123,7 @@ describe("route handler: input parsing", () => {
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual({ query: "bun" });
+    expect(data).toMatchObject({ query: "bun" });
   });
 
   test("merges path params into POST body", async () => {
@@ -142,7 +144,7 @@ describe("route handler: input parsing", () => {
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual({ id: "42", action: "archive" });
+    expect(data).toMatchObject({ id: "42", action: "archive" });
   });
 
   test("merges path params into GET query params", async () => {
@@ -159,7 +161,7 @@ describe("route handler: input parsing", () => {
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual({ id: "99", format: "json" });
+    expect(data).toMatchObject({ id: "99", format: "json" });
   });
 
   test("path params override query params for GET", async () => {
@@ -176,7 +178,7 @@ describe("route handler: input parsing", () => {
     const response = await route.handler(request, { id: "path-val" }, null!);
 
     const data = await response.json();
-    expect(data).toEqual({ id: "path-val" });
+    expect(data).toMatchObject({ id: "path-val" });
   });
 
   test("handles POST with empty body gracefully", async () => {
@@ -193,7 +195,7 @@ describe("route handler: input parsing", () => {
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual({ id: "7" });
+    expect(data).toMatchObject({ id: "7" });
   });
 });
 
@@ -244,7 +246,7 @@ describe("route handler: Zod validation", () => {
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual({ echo: "hello" });
+    expect(data).toMatchObject({ echo: "hello" });
   });
 });
 
@@ -307,7 +309,7 @@ describe("route handler: response transform, custom status, and string wrapping"
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual({ wrapped: { echo: "hi" } });
+    expect(data).toMatchObject({ wrapped: { echo: "hi" } });
   });
 
   test("uses custom successStatus", async () => {
@@ -343,7 +345,7 @@ describe("route handler: response transform, custom status, and string wrapping"
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual({ text: "hello world" });
+    expect(data).toMatchObject({ text: "hello world" });
   });
 
   test("passes through object handler results as-is", async () => {
@@ -360,7 +362,7 @@ describe("route handler: response transform, custom status, and string wrapping"
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual({ count: 42 });
+    expect(data).toMatchObject({ count: 42 });
   });
 });
 

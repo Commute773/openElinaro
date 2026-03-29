@@ -175,16 +175,13 @@ export function generateApiRoute(
             responseData = result;
           }
 
-          // 6. Attach agentFormat string (used by glasses UI and agent output)
-          //    Custom agentFormat takes priority; generic formatResult is fallback.
+          // 6. Attach display string (used by glasses UI and agent output)
           try {
-            const formatted = def.agentFormat
-              ? def.agentFormat(result)
-              : formatResult(result);
+            const display = def.format(result);
             if (Array.isArray(responseData)) {
-              responseData = { items: responseData, agentFormat: formatted };
+              responseData = { items: responseData, display };
             } else if (responseData && typeof responseData === "object") {
-              (responseData as Record<string, unknown>).agentFormat = formatted;
+              (responseData as Record<string, unknown>).display = display;
             }
           } catch {
             // formatter failure is non-fatal

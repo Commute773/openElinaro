@@ -91,7 +91,7 @@ export function generateAgentTool(
           ...extras,
         };
         const result = await def.handler(input, ctx);
-        return def.agentFormat ? def.agentFormat(result) : result;
+        return def.format(result);
       }, { attributes: input });
     },
   };

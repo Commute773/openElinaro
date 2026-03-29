@@ -2,6 +2,7 @@ import { test, expect, describe } from "bun:test";
 import { z } from "zod";
 import { FunctionRegistry } from "./function-registry";
 import type { FunctionDefinition, FunctionDomainBuilder } from "./define-function";
+import { formatResult } from "./formatters";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 
 // ---------------------------------------------------------------------------
@@ -17,6 +18,7 @@ function makeDef(overrides: Partial<FunctionDefinition> & { name: string }): Fun
     description: `${overrides.name} description`,
     input: z.object({}),
     handler: async () => "ok",
+    format: formatResult,
     auth: { access: "anyone", behavior: "uniform" },
     domains: ["test"],
     agentScopes: ["chat"],

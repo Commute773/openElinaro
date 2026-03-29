@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 
 // ---------------------------------------------------------------------------
 // Shared schemas (same as finance-tools.ts)
@@ -149,6 +150,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
       "Show the current finance overview: budget status, review queue, receivables, and the imported Google Sheet source link.",
     input: z.object({}),
     handler: async (_input, fnCtx) => fnCtx.services.finance.summary(),
+    format: formatResult,
     auth: FINANCE_AUTH,
     domains: FINANCE_DOMAINS,
     agentScopes: FINANCE_SCOPES,
@@ -170,6 +172,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
         date: input.date,
         weeklyLimit: input.weeklyLimit,
       }),
+    format: formatResult,
     auth: FINANCE_AUTH,
     domains: FINANCE_DOMAINS,
     agentScopes: FINANCE_SCOPES,
@@ -197,6 +200,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
         onlyReview: input.onlyReview,
         limit: input.limit,
       }),
+    format: formatResult,
     auth: FINANCE_AUTH,
     domains: FINANCE_DOMAINS,
     agentScopes: FINANCE_SCOPES,
@@ -219,6 +223,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
       }
       return fnCtx.services.finance.reviewQueue(input.limit ?? 10);
     },
+    format: formatResult,
     auth: FINANCE_AUTH,
     domains: FINANCE_DOMAINS,
     agentScopes: FINANCE_SCOPES,
@@ -249,6 +254,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
         transactionsGid: input.transactionsGid,
         csvText: input.csvText,
       }),
+    format: formatResult,
     auth: FINANCE_AUTH,
     domains: FINANCE_DOMAINS,
     agentScopes: FINANCE_SCOPES,
@@ -402,6 +408,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
           throw new Error(`Unsupported finance action: ${input.action}`);
       }
     },
+    format: formatResult,
     auth: FINANCE_AUTH,
     domains: FINANCE_DOMAINS,
     agentScopes: FINANCE_SCOPES,
@@ -421,6 +428,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
     input: financeForecastSchema,
     handler: async (input, fnCtx) =>
       fnCtx.services.finance.forecast(input.view ?? "summary"),
+    format: formatResult,
     auth: FINANCE_AUTH,
     domains: FINANCE_DOMAINS,
     agentScopes: FINANCE_SCOPES,

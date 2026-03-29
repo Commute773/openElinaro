@@ -5,6 +5,7 @@
 import os from "node:os";
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 import type { SubagentRun } from "../../domain/subagent-run";
 import type { ProjectsService } from "../../services/projects-service";
 import { summarizeAgentRun } from "../../services/subagent-summary-service";
@@ -175,6 +176,7 @@ export const buildSubagentFunctions: FunctionDomainBuilder = (ctx) => {
           "Use agent_status only for occasional manual spot checks.",
         ].join("\n");
       },
+      format: formatResult,
       auth: { ...SUBAGENT_AUTH, note: "Subagent profile selection is restricted by the caller's roles." },
       domains: SUBAGENT_DOMAINS,
       agentScopes: SUBAGENT_SCOPES,
@@ -208,6 +210,7 @@ export const buildSubagentFunctions: FunctionDomainBuilder = (ctx) => {
           "Completion updates are pushed back automatically.",
         ].join("\n");
       },
+      format: formatResult,
       auth: { ...SUBAGENT_AUTH, note: "Only runs visible to the active profile can be resumed." },
       domains: SUBAGENT_DOMAINS,
       agentScopes: SUBAGENT_SCOPES,
@@ -237,6 +240,7 @@ export const buildSubagentFunctions: FunctionDomainBuilder = (ctx) => {
           "The message was sent to the agent's tmux window via stdin.",
         ].join("\n");
       },
+      format: formatResult,
       auth: { ...SUBAGENT_AUTH, note: "Only runs visible to the active profile can receive steering instructions." },
       domains: SUBAGENT_DOMAINS,
       agentScopes: SUBAGENT_SCOPES,
@@ -262,6 +266,7 @@ export const buildSubagentFunctions: FunctionDomainBuilder = (ctx) => {
           `Status: ${run.status}`,
         ].join("\n");
       },
+      format: formatResult,
       auth: { ...SUBAGENT_AUTH, note: "Only runs visible to the active profile can be cancelled." },
       domains: SUBAGENT_DOMAINS,
       agentScopes: SUBAGENT_SCOPES,
@@ -353,6 +358,7 @@ export const buildSubagentFunctions: FunctionDomainBuilder = (ctx) => {
             .join("\n"))
           .join("\n\n");
       },
+      format: formatResult,
       auth: { ...SUBAGENT_AUTH, note: "Only runs visible to the active profile are returned." },
       domains: SUBAGENT_DOMAINS,
       agentScopes: SUBAGENT_SCOPES,
@@ -373,6 +379,7 @@ export const buildSubagentFunctions: FunctionDomainBuilder = (ctx) => {
         const output = await fnCtx.services.subagents.readAgentTerminal(input.runId);
         return output || "(empty terminal buffer)";
       },
+      format: formatResult,
       auth: { ...SUBAGENT_AUTH, note: "Only terminal output for runs visible to the active profile is returned." },
       domains: SUBAGENT_DOMAINS,
       agentScopes: SUBAGENT_SCOPES,
@@ -390,6 +397,7 @@ export const buildSubagentFunctions: FunctionDomainBuilder = (ctx) => {
           subagents: fnCtx.services.subagents,
           models: fnCtx.services.models,
         }),
+      format: formatResult,
       auth: { ...SUBAGENT_AUTH, note: "Only summaries for runs visible to the active profile are returned." },
       domains: SUBAGENT_DOMAINS,
       agentScopes: SUBAGENT_SCOPES,

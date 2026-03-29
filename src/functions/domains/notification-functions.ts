@@ -3,7 +3,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
-import { formatNotification } from "../formatters";
+import { formatNotification, formatResult } from "../formatters";
 
 const NOTIFICATION_AUTH = { access: "anyone" as const, behavior: "uniform" as const };
 
@@ -61,6 +61,10 @@ export const buildNotificationFunctions: FunctionDomainBuilder = (_ctx) => [
 
       return notifications;
     },
+    format: (result) => {
+      if (result.length === 0) return "No pending notifications.";
+      return result.map((n: any) => n.display).join("\n");
+    },
     auth: NOTIFICATION_AUTH,
     domains: ["routines", "notifications"],
     agentScopes: [],
@@ -98,6 +102,7 @@ export const buildNotificationFunctions: FunctionDomainBuilder = (_ctx) => [
 
       return { ok: true };
     },
+    format: formatResult,
     auth: NOTIFICATION_AUTH,
     domains: ["routines", "notifications"],
     agentScopes: [],

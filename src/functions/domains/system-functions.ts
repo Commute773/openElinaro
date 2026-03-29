@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatOpenBrowserResult, formatResult } from "../formatters";
 
 function parseOpenBrowserActionsInput(value: unknown) {
   if (typeof value !== "string") return value;
@@ -48,6 +49,7 @@ export const buildSystemFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Run local browser automation with OpenBrowser. In an active agent thread, this reuses the same live browser session by default so later calls continue on the current page/tab unless resetSession is true. Occasionally inspect the page visually with screenshots so you confirm what the browser is actually showing, especially before or after important interactions. For user input, aggressively prefer real interaction: use coordinate-based mouse_click plus the dedicated type action instead of evaluate helpers that call element.click(), form.submit(), element.value=, or other DOM-mutation shortcuts. Treat DOM mutation as a fallback only when normal interaction fails, and verify field state with screenshots or explicit input.value checks rather than body.innerText alone. For stored credentials or cards, call secret_list first, then pass secret refs like { secretRef: \"prepaid_card.number\" } inside action args so the runtime resolves them server-side.",
     input: openBrowserSchema,
     handler: async (input, fnCtx) => fnCtx.services.openbrowser.run(input),
+    format: (result) => formatOpenBrowserResult(result as any),
     auth: { access: "root", behavior: "uniform", note: "Launches a local browser session and may write screenshot artifacts to disk." },
     domains: ["browser", "automation"],
     agentScopes: ["chat", "direct"],

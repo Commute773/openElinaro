@@ -5,6 +5,7 @@ import {
   generateDiscordCommands,
 } from "./generate-discord-commands";
 import type { FunctionDefinition } from "./define-function";
+import { formatResult } from "./formatters";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -17,6 +18,7 @@ function makeDef(
   return {
     description: "test function",
     handler: async () => ({}),
+    format: formatResult,
     auth: { access: "self", behavior: "allow" },
     domains: ["test"],
     agentScopes: ["foreground"],

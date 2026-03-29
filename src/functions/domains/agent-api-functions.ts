@@ -4,7 +4,7 @@
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
 import { summarizeAgentRun } from "../../services/subagent-summary-service";
-import { formatAgent } from "../formatters";
+import { formatAgent, formatResult } from "../formatters";
 
 const AGENT_API_AUTH = { access: "anyone" as const, behavior: "uniform" as const };
 
@@ -52,6 +52,10 @@ export const buildAgentApiFunctions: FunctionDomainBuilder = (_ctx) => [
         return { ...entry, display: formatAgent(entry) };
       });
     },
+    format: (result) => {
+      if (result.length === 0) return "No active agents.";
+      return result.map((a: any) => a.display).join("\n");
+    },
     auth: AGENT_API_AUTH,
     domains: ["agents"],
     agentScopes: [],
@@ -74,6 +78,7 @@ export const buildAgentApiFunctions: FunctionDomainBuilder = (_ctx) => [
       const output = await fnCtx.services.subagents.captureAgentPane(input.id, lines);
       return { runId: input.id, output: output.split("\n") };
     },
+    format: (result) => `Run ${result.runId}:\n${result.output.join("\n")}`,
     auth: AGENT_API_AUTH,
     domains: ["agents"],
     agentScopes: [],
@@ -101,6 +106,7 @@ export const buildAgentApiFunctions: FunctionDomainBuilder = (_ctx) => [
         models: fnCtx.services.models,
       }),
     }),
+    format: (result) => `Run ${result.runId}: ${result.summary}`,
     auth: AGENT_API_AUTH,
     domains: ["agents"],
     agentScopes: [],
@@ -128,6 +134,7 @@ export const buildAgentApiFunctions: FunctionDomainBuilder = (_ctx) => [
       });
       return { ok: true };
     },
+    format: formatResult,
     auth: AGENT_API_AUTH,
     domains: ["agents"],
     agentScopes: [],

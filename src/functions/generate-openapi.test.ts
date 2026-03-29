@@ -2,6 +2,7 @@ import { test, expect, describe } from "bun:test";
 import { z } from "zod";
 import { generateOpenApiSpec } from "./generate-openapi";
 import type { FunctionDefinition } from "./define-function";
+import { formatResult } from "./formatters";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -15,6 +16,7 @@ function makeDef(
     description: `${overrides.name} description`,
     input: z.object({}),
     handler: async () => ({}),
+    format: formatResult,
     surfaces: ["api"],
     http: { method: "GET", path: `/api/${overrides.name}` },
     auth: { access: "anyone", behavior: "uniform" },

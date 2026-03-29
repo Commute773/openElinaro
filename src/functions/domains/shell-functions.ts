@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 import { renderShellExecResult } from "../../tools/groups";
 
 // ---------------------------------------------------------------------------
@@ -80,6 +81,7 @@ export const buildShellFunctions: FunctionDomainBuilder = (ctx) => [
       const result = await fnCtx.services.shell.exec(input);
       return renderShellExecResult(result);
     },
+    format: formatResult,
     auth: SHELL_AUTH,
     domains: SHELL_DOMAINS,
     agentScopes: SHELL_SCOPES,
@@ -149,6 +151,7 @@ export const buildShellFunctions: FunctionDomainBuilder = (ctx) => [
         .filter(Boolean)
         .join("\n");
     },
+    format: formatResult,
     auth: { access: "anyone" as const, behavior: "role-sensitive" as const, note: "Background shell job visibility follows the active profile's shell access." },
     domains: SHELL_DOMAINS,
     agentScopes: SHELL_SCOPES,
@@ -181,6 +184,7 @@ export const buildShellFunctions: FunctionDomainBuilder = (ctx) => [
           : `Output lines: (no output; total ${output.totalLines})`,
       ].join("\n");
     },
+    format: formatResult,
     auth: { access: "anyone" as const, behavior: "role-sensitive" as const, note: "Background shell output visibility follows the active profile's shell access." },
     domains: SHELL_DOMAINS,
     agentScopes: SHELL_SCOPES,

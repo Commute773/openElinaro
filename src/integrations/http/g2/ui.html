@@ -380,7 +380,7 @@ async function handleVoiceInput(text) {
       body: JSON.stringify({ text }),
     });
     const data = await res.json();
-    const answer = data.agentFormat || data.text || data.reply || JSON.stringify(data);
+    const answer = data.display || data.text || data.reply || JSON.stringify(data);
     pushScreen(makeTextScreen('Response', answer));
   } catch (e) {
     showMessage('Voice error: ' + e.message);
@@ -417,13 +417,13 @@ async function apiPost(path, body = {}) {
 //  SCREEN FACTORIES
 // ═══════════════════════════════════════════════════════════════════════
 
-/** Generic screen from agentFormat string — splits on newlines */
+/** Generic screen from display string — splits on newlines */
 function makeTextScreen(title, text) {
   const lines = text.split('\n').map(t => ({ text: t, color: 10 }));
   return { title, lines, cursor: 0, scroll: 0, onLongPress: popScreen };
 }
 
-/** Generic API screen — fetches endpoint, renders agentFormat */
+/** Generic API screen — fetches endpoint, renders display */
 function makeApiScreen(title, path, opts = {}) {
   return {
     title,
@@ -437,9 +437,9 @@ function makeApiScreen(title, path, opts = {}) {
       try {
         const data = await api(path);
         this._data = data;
-        // Use agentFormat if available
-        if (data.agentFormat) {
-          this.lines = data.agentFormat.split('\n').map((t, i) => ({
+        // Use display if available
+        if (data.display) {
+          this.lines = data.display.split('\n').map((t, i) => ({
             text: t,
             color: 10,
             _index: i,
@@ -454,8 +454,8 @@ function makeApiScreen(title, path, opts = {}) {
           }));
         } else if (data.items && Array.isArray(data.items)) {
           this._items = data.items;
-          if (data.agentFormat) {
-            this.lines = data.agentFormat.split('\n').map((t, i) => ({
+          if (data.display) {
+            this.lines = data.display.split('\n').map((t, i) => ({
               text: t, color: 10, _index: i,
               _item: data.items[i],
             }));
@@ -657,9 +657,9 @@ async function doInvokeFn() {
     let path = selectedFn.path;
     for (const [k,v] of Object.entries(params)) path = path.replace(`{${k}}`, encodeURIComponent(v));
     const data = selectedFn.method === 'GET' ? await api(path) : await apiPost(path, params);
-    r.textContent = data.agentFormat || JSON.stringify(data, null, 2);
+    r.textContent = data.display || JSON.stringify(data, null, 2);
     // Also show on display
-    const text = data.agentFormat || JSON.stringify(data, null, 2);
+    const text = data.display || JSON.stringify(data, null, 2);
     pushScreen(makeTextScreen(selectedFn.name, text));
   } catch (e) { r.textContent = 'Error: ' + e.message; }
 }

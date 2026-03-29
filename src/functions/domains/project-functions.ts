@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 import type { JobStatus, ProjectStatus } from "../../domain/projects";
 import { NotFoundError } from "../../domain/errors";
 import {
@@ -261,6 +262,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
             job.summary,
           ].join(" ")).join("\n");
       },
+      format: formatResult,
       auth: { ...PROJECT_AUTH, note: "Only jobs attached to accessible projects are listed." },
       domains: PROJECT_DOMAINS,
       agentScopes: PROJECT_SCOPES,
@@ -287,6 +289,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
         }
         return fnCtx.services.projects.formatJob(job);
       },
+      format: formatResult,
       auth: { ...PROJECT_AUTH, note: "Only jobs attached to accessible projects are readable." },
       domains: PROJECT_DOMAINS,
       agentScopes: PROJECT_SCOPES,
@@ -313,6 +316,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
         }
         return fnCtx.services.workPlanning.buildSummary();
       },
+      format: formatResult,
       auth: { ...PROJECT_AUTH, note: "Work summaries only include projects and jobs visible to the active profile." },
       domains: PROJECT_DOMAINS,
       agentScopes: PROJECT_SCOPES,
@@ -351,6 +355,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
             `workspace=${fnCtx.services.projects.resolveWorkspacePath(project)}`,
           ].join(" ")).join("\n");
       },
+      format: formatResult,
       auth: { ...PROJECT_AUTH, note: "Only projects allowed by role are listed." },
       domains: PROJECT_DOMAINS,
       agentScopes: PROJECT_SCOPES,
@@ -378,6 +383,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
         }
         return fnCtx.services.projects.formatProject(project);
       },
+      format: formatResult,
       auth: { ...PROJECT_AUTH, note: "Only projects allowed by role are readable." },
       domains: PROJECT_DOMAINS,
       agentScopes: PROJECT_SCOPES,
@@ -455,6 +461,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
           ),
         ].join("\n");
       },
+      format: formatResult,
       auth: { ...PROJECT_AUTH, note: "Returned profiles are limited to subagent targets the active profile can launch." },
       domains: PROJECT_DOMAINS,
       agentScopes: PROJECT_SCOPES,
@@ -541,6 +548,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
           .filter(Boolean)
           .join("\n");
       },
+      format: formatResult,
       auth: { ...PROJECT_AUTH, note: "Only launchable target profiles can be updated, and model ids are validated against the target profile's live provider catalog before both profile defaults and stored runtime selection are synced." },
       domains: PROJECT_DOMAINS,
       agentScopes: PROJECT_SCOPES,
@@ -574,6 +582,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
           ...result.tickets.map((ticket) => `- ${formatTicketLine(ticket)}`),
         ].join("\n");
       },
+      format: formatResult,
       auth: { ...TICKET_AUTH, note: "Reads the external Elinaro Tickets tracker through the configured API URL or SSH tunnel." },
       domains: PROJECT_DOMAINS,
       agentScopes: ["chat", "direct"],
@@ -598,6 +607,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
         const ticket = await fnCtx.services.tickets.getTicket(input.id);
         return formatTicketDetail(ticket);
       },
+      format: formatResult,
       auth: { ...TICKET_AUTH, note: "Reads one ticket from the external Elinaro Tickets tracker." },
       domains: PROJECT_DOMAINS,
       agentScopes: ["chat", "direct"],
@@ -628,6 +638,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
         });
         return `Created ticket:\n${formatTicketDetail(ticket)}`;
       },
+      format: formatResult,
       auth: { ...TICKET_AUTH, note: "Creates a ticket in the external Elinaro Tickets tracker." },
       domains: PROJECT_DOMAINS,
       agentScopes: ["chat", "direct"],
@@ -659,6 +670,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
         });
         return `Updated ticket:\n${formatTicketDetail(ticket)}`;
       },
+      format: formatResult,
       auth: { ...TICKET_AUTH, note: "Updates a ticket in the external Elinaro Tickets tracker." },
       domains: PROJECT_DOMAINS,
       agentScopes: ["chat", "direct"],

@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
+import { formatResult } from "../formatters";
 
 // ---------------------------------------------------------------------------
 // Schemas (same as filesystem-tools.ts)
@@ -103,6 +104,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
       "Read a file or directory. File reads return numbered lines. Directory reads return entries. Supports offset and limit for paging.",
     input: readFileSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.read(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -125,6 +127,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
       "Write or append text to a file. Creates parent directories when needed.",
     input: writeFileSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.write(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -142,6 +145,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
       "Replace text in a file using an exact oldString -> newString edit. Errors if the match is missing or ambiguous.",
     input: editFileSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.edit(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -159,6 +163,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
       "Apply a structured multi-file patch with add, update, move, and delete operations. Prefer this for diff-shaped edits instead of full rewrites.",
     input: applyPatchSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.applyPatch(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -176,6 +181,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
       "List directory contents. Supports recursive listing, result limits, and format=json for structured output.",
     input: listDirSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.listDir(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -197,6 +203,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Find paths matching a glob pattern under a directory.",
     input: globSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.glob(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -219,6 +226,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
       "Search file contents with ripgrep. Returns matching file paths, line numbers, and lines.",
     input: grepSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.grep(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -240,6 +248,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Show metadata for a file or directory path. Supports format=json for structured output.",
     input: statPathSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.statPath(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -261,6 +270,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Create a directory.",
     input: mkdirSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.mkdir(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -277,6 +287,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Move or rename a file or directory.",
     input: copyMoveSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.movePath(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -293,6 +304,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Copy a file or directory.",
     input: copyMoveSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.copyPath(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
@@ -309,6 +321,7 @@ export const buildFilesystemFunctions: FunctionDomainBuilder = (ctx) => [
     description: "Delete a file or directory.",
     input: deletePathSchema,
     handler: async (input, fnCtx) => fnCtx.services.filesystem.deletePath(input),
+    format: formatResult,
     auth: FS_AUTH,
     domains: FS_DOMAINS,
     agentScopes: FS_SCOPES,
