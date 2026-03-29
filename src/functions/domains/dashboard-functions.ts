@@ -35,8 +35,18 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
       const dueAlarms = alarms.listDueAlarms();
       const pendingNotificationCount = overdueItems.length + dueAlarms.length;
 
+      // Enrich time context with human-readable fields
+      const ctx = assessment.context;
+      const nowDate = new Date(ctx.now);
+      const fmtOpts = { timeZone: ctx.timezone };
+      const dayOfWeek = nowDate.toLocaleDateString("en-US", { ...fmtOpts, weekday: "long" });
+      const localDate = nowDate.toLocaleDateString("en-CA", fmtOpts); // YYYY-MM-DD
+      const localTime = nowDate.toLocaleTimeString("en-US", { ...fmtOpts, hour: "2-digit", minute: "2-digit", hour12: false });
+      const hour = parseInt(localTime.split(":")[0]!, 10);
+      const dayPeriod = hour < 6 ? "night" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "night";
+
       return {
-        timeContext: assessment.context,
+        timeContext: { ...ctx, dayOfWeek, localDate, localTime, dayPeriod },
         activeAgentCount: activeAgents.length,
         nextRoutine,
         pendingNotificationCount,

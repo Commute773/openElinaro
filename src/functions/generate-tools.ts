@@ -90,7 +90,8 @@ export function generateAgentTool(
           conversationKey: toolContext?.conversationKey,
           ...extras,
         };
-        return def.handler(input, ctx);
+        const result = await def.handler(input, ctx);
+        return def.agentFormat ? def.agentFormat(result) : result;
       }, { attributes: input });
     },
   };
