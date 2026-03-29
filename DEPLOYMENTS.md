@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.29.2
+- Released at: 2026-03-29T15:16:37Z
+- Release id: 20260329T151637Z-56de117
+- Previous version: 2026.03.29
+- Trigger: ci/release workflow
+
+- docs: document API path prefix and client codegen in api.md (#193)
+
 ## 2026.03.29
 - Released at: 2026-03-29T15:08:49Z
 - Release id: 20260329T150849Z-ac82da9
