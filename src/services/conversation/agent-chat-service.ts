@@ -25,8 +25,8 @@ import type { ReflectionService } from "../reflection-service";
 import type { MemoryManagementAgent } from "../memory/memory-management-agent";
 import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS } from "../../config/service-constants";
 import { wrapInjectedMessage } from "../injected-message-service";
-import type { CoreFactory, CoreToolExecutor, CoreToolDefinition } from "../../core/types";
-import { splitToolsForCore } from "../../core/tool-split";
+import type { AgentCore, CoreFactory, CoreToolExecutor, CoreToolDefinition } from "../../core/types";
+import { splitToolsForCore, coreOwnsFeature, featureIsShared } from "../../core/tool-split";
 
 const QUEUED_WHILE_COMPACTING_MESSAGE = "message queued as we are currently compacting";
 const STEERING_ACCEPTED_MESSAGE = "message accepted and will steer the current agent at the next turn";
@@ -459,8 +459,28 @@ export class AgentChatService {
           continue;
         }
 
-        await this.compactIfNeeded(job, session);
-        const result = await this.runTurn(job);
+        // Resolve the core early so we can check feature ownership
+        const resolved = await this.deps.models.resolveModelForPurpose(job.execution.usagePurpose);
+        const core = this.deps.coreFactory({
+          modelConfig: {
+            providerId: resolved.selection.providerId,
+            modelId: resolved.selection.modelId,
+            apiKey: resolved.apiKey,
+            reasoning: resolved.selection.thinkingLevel,
+            providerOptions: {
+              sessionId: job.execution.providerSessionId ?? job.conversationKey,
+            },
+            runtimeModel: resolved.runtimeModel,
+          },
+        });
+
+        // Skip harness compaction when the core handles it
+        const coreHandlesCompaction = coreOwnsFeature(core.manifest, "compaction")
+          || featureIsShared(core.manifest, "compaction");
+        if (!coreHandlesCompaction) {
+          await this.compactIfNeeded(job, session);
+        }
+        const result = await this.runTurn(job, core, resolved);
         this.requeueUnconsumedSteeringMessages(session);
         if (job.background) {
           await job.onBackgroundResponse?.(result);
@@ -623,7 +643,7 @@ export class AgentChatService {
     job.resolve();
   }
 
-  private async runTurn(job: QueuedChatJob) {
+  private async runTurn(job: QueuedChatJob, core: AgentCore, resolved: { selection: any; apiKey: string; runtimeModel: any }) {
     return traceSpan(
       "agent_chat.reply",
       async () => {
@@ -669,22 +689,10 @@ export class AgentChatService {
 
         const toolSet = this.buildChatToolSet(job.conversationKey, session, job.onToolUse);
 
-        // Resolve the model for this turn
-        const resolved = await this.deps.models.resolveModelForPurpose(job.execution.usagePurpose);
-
-        // Create the core for this turn via the factory
-        const core = this.deps.coreFactory({
-          modelConfig: {
-            providerId: resolved.selection.providerId,
-            modelId: resolved.selection.modelId,
-            apiKey: resolved.apiKey,
-            reasoning: resolved.selection.thinkingLevel,
-            providerOptions: {
-              sessionId: job.execution.providerSessionId ?? job.conversationKey,
-            },
-            runtimeModel: resolved.runtimeModel,
-          },
-        });
+        // Check what the core needs from the harness
+        const coreNeedsHistory = core.manifest.requires.messageHistory;
+        const coreHandlesPersistence = coreOwnsFeature(core.manifest, "session_persistence")
+          || featureIsShared(core.manifest, "session_persistence");
 
         // Build the core tool executor that delegates to ToolRegistry
         const coreToolExecutor: CoreToolExecutor = async (toolCall, signal) => {
@@ -726,11 +734,17 @@ export class AgentChatService {
         );
         this.throwIfStopRequested(session);
 
-        const inputMessages: Message[] = [
-          ...conversation.messages,
-          ...backgroundExecMessages,
-          userMessage(userMessageText),
-        ];
+        // Build input messages: include full history only when the core needs it
+        const inputMessages: Message[] = coreNeedsHistory
+          ? [
+            ...conversation.messages,
+            ...backgroundExecMessages,
+            userMessage(userMessageText),
+          ]
+          : [
+            ...backgroundExecMessages,
+            userMessage(userMessageText),
+          ];
 
         try {
           const result = await this.runAbortableModelCall(session, (signal) =>
@@ -741,6 +755,37 @@ export class AgentChatService {
               executeTool: coreToolExecutor,
               maxSteps: CHAT_MAX_STEPS,
               signal,
+              hooks: {
+                onPreCompact: async (summary) => {
+                  // When the core handles compaction, persist memory via hook
+                  this.deps.reflection?.queueCompactionReflection({
+                    summary,
+                    conversationKey: job.conversationKey,
+                  });
+                  if (this.deps.structuredMemory) {
+                    this.deps.structuredMemory.processTranscript({
+                      transcript: summary,
+                      conversationKey: job.conversationKey,
+                      source: "compaction",
+                    }).catch((error) => {
+                      agentChatTelemetry.event("agent_chat.structured_memory.failed", {
+                        conversationKey: job.conversationKey,
+                        error: error instanceof Error ? error.message : String(error),
+                      }, { level: "warn", outcome: "error" });
+                    });
+                  }
+                },
+                onUsage: (usage) => {
+                  agentChatTelemetry.event("agent_chat.core_usage", {
+                    conversationKey: job.conversationKey,
+                    coreId: core.manifest.id,
+                    inputTokens: usage.input,
+                    outputTokens: usage.output,
+                    cacheReadTokens: usage.cacheRead,
+                    totalCost: usage.cost.total,
+                  }, { level: "debug" });
+                },
+              },
             })
           );
 
@@ -756,11 +801,16 @@ export class AgentChatService {
             };
           }
 
-          // Persist response messages BEFORE checking stop
+          // Persist the user message and response for harness-side visibility.
+          // When the core handles persistence internally, we still save the
+          // user prompt and final response for conversation search/history.
           if (job.execution.persistConversation) {
+            const messagesToPersist = coreHandlesPersistence
+              ? [...pendingTurnMessages, ...(result.finalMessage ? [result.finalMessage] : [])]
+              : [...pendingTurnMessages, ...result.newMessages];
             await this.deps.conversations.appendMessages(
               job.conversationKey,
-              [...pendingTurnMessages, ...result.newMessages],
+              messagesToPersist,
             );
           }
 
