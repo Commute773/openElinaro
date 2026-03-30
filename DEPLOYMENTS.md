@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.5
+- Released at: 2026-03-30T16:40:38Z
+- Release id: 20260330T164038Z-3f6221a
+- Previous version: 2026.03.30.4
+- Trigger: ci/release workflow
+
+- feat: add inter-instance messaging protocol (Phase 3)
+
 ## 2026.03.30.4
 - Released at: 2026-03-30T16:08:05Z
 - Release id: 20260330T160805Z-850d3ed
