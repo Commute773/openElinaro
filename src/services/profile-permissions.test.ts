@@ -4,7 +4,6 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { assistantTextMessage } from "../messages/types";
 import { NotFoundError } from "../domain/errors";
 
 const repoRoot = process.cwd();
@@ -37,21 +36,17 @@ function writeTestProfileRegistry() {
         {
           id: "root",
           name: "Root",
-          roles: ["root"],
           memoryNamespace: "root",
           preferredProvider: "openai-codex",
           defaultModelId: "gpt-5.4",
-          maxSubagentDepth: 1,
         },
         {
           id: "restricted",
           name: "Restricted",
-          roles: ["restricted"],
           memoryNamespace: "restricted",
           shellUser: "restricted",
           preferredProvider: "claude",
           defaultModelId: "claude-sonnet-4-5",
-          maxSubagentDepth: 1,
         },
       ],
     }, null, 2)}\n`,
@@ -238,21 +233,19 @@ describe("profile-scoped auth and permissions", () => {
     expect(rootEnv.GIT_SSH_COMMAND).toContain(rootKeys.privateKeyPath);
     expect(restrictedEnv.GIT_SSH_COMMAND).toContain(restrictedKeys.privateKeyPath);
     expect(restrictedEnv.OPENELINARO_PROFILE_SHELL_USER).toBe("restricted");
-    expect(restrictedEnv.OPENELINARO_PROFILE_MAX_SUBAGENT_DEPTH).toBe("1");
     expect(rootEnv.TMPDIR).toBe("/tmp/openelinaro-profile-tmp/root");
     expect(restrictedEnv.TMPDIR).toBe("/tmp/openelinaro-profile-tmp/restricted");
     expect(restrictedEnv.TMP).toBe(restrictedEnv.TMPDIR);
     expect(restrictedEnv.TEMP).toBe(restrictedEnv.TMPDIR);
   });
 
-  test("allows SSH-backed profiles to use shell tools within configured remote roots", () => {
+  test("allows SSH-backed profiles to access paths within configured remote roots", () => {
     writeTestProfileRegistry();
     const profileService = new profilesModule.ProfileService("root");
     const registry = profileService.loadRegistry();
     registry.profiles.push({
       id: "remote",
       name: "Remote",
-      roles: ["remote"],
       memoryNamespace: "remote",
       pathRoots: ["/Users/remote"],
       execution: {
@@ -263,7 +256,6 @@ describe("profile-scoped auth and permissions", () => {
       },
       preferredProvider: "claude",
       defaultModelId: "claude-sonnet-4-5",
-      maxSubagentDepth: 1,
     });
     profileService.saveRegistry(registry);
 
@@ -272,7 +264,6 @@ describe("profile-scoped auth and permissions", () => {
     const projects = new projectsModule.ProjectsService(remote, remoteProfileService);
     const access = new accessModule.AccessControlService(remote, remoteProfileService, projects);
 
-    expect(remoteProfileService.canUseShellTools(remote)).toBe(true);
     expect(access.assertPathAccess("/Users/remote/project")).toBe("/Users/remote/project");
     expect(() => access.assertPathAccess(path.join(tempRoot, "README.md"))).toThrow(
       "outside the allowed workspace roots",
@@ -286,7 +277,6 @@ describe("profile-scoped auth and permissions", () => {
     registry.profiles.push({
       id: "remote",
       name: "Remote",
-      roles: ["remote"],
       memoryNamespace: "remote",
       pathRoots: ["/Users/remote"],
       execution: {
@@ -297,7 +287,6 @@ describe("profile-scoped auth and permissions", () => {
       },
       preferredProvider: "claude",
       defaultModelId: "claude-sonnet-4-5",
-      maxSubagentDepth: 1,
     });
     profileService.saveRegistry(registry);
 
@@ -382,88 +371,6 @@ describe("profile-scoped auth and permissions", () => {
       process.chdir(previous);
       fs.rmSync(otherCwd, { recursive: true, force: true });
     }
-  });
-
-  test("filters projects by role", () => {
-    writeTestProjectRegistry();
-    const profileService = new profilesModule.ProfileService("restricted");
-    const restricted = profileService.getActiveProfile();
-    const root = profileService.getProfile("root");
-
-    const restrictedProjects = new projectsModule.ProjectsService(restricted, profileService);
-    const rootProjects = new projectsModule.ProjectsService(root, profileService);
-
-    expect(restrictedProjects.listProjects().map((project) => project.id)).toEqual(["telecorder"]);
-    expect(rootProjects.listProjects().map((project) => project.id)).toContain("telecorder");
-  });
-
-  test("lists the profiles each active profile can launch subagents under", async () => {
-    writeTestProfileRegistry();
-    const rootProfileService = new profilesModule.ProfileService("root");
-    const root = rootProfileService.getActiveProfile();
-    expect(rootProfileService.listLaunchableProfiles(root).map((profile) => profile.id)).toEqual([
-      "root",
-      "restricted",
-    ]);
-
-    const restrictedProfileService = new profilesModule.ProfileService("restricted");
-    const restricted = restrictedProfileService.getActiveProfile();
-    expect(
-      restrictedProfileService.listLaunchableProfiles(restricted).map((profile) => profile.id),
-    ).toEqual(["restricted"]);
-
-    const projects = new projectsModule.ProjectsService(restricted, restrictedProfileService);
-    const access = new accessModule.AccessControlService(restricted, restrictedProfileService, projects);
-    const routines = new routinesModule.RoutinesService();
-    const conversations = new conversationsModule.ConversationStore();
-    const systemPrompts = new systemPromptsModule.SystemPromptService();
-    const memory = new memoryModule.MemoryService(restricted, restrictedProfileService);
-    const models = new modelsModule.ModelService(restricted);
-    const transitions = new transitionsModule.ConversationStateTransitionService(
-      models,
-      conversations,
-      memory,
-      systemPrompts,
-    );
-    const registry = new toolRegistryModule.ToolRegistry(
-      routines,
-      projects,
-      models,
-      conversations,
-      memory,
-      systemPrompts,
-      transitions,
-      access,
-    );
-
-    const result = await registry.invokeRaw("profile_list_launchable", { format: "json" });
-    const currentRestricted = new profilesModule.ProfileService("restricted").getProfile("restricted");
-    expect(result).toEqual({
-      activeProfileId: "restricted",
-      profiles: [
-        {
-          id: "restricted",
-          name: "Restricted",
-          roles: ["restricted"],
-          memoryNamespace: "restricted",
-          shellUser: "restricted",
-          executionKind: "local",
-          executionTarget: null,
-          pathRoots: [],
-          preferredProvider: "claude",
-          defaultModelId: currentRestricted.defaultModelId,
-          defaultThinkingLevel: "low",
-          auth: {
-            profileId: "restricted",
-            codex: false,
-            claude: false,
-            any: false,
-          },
-          maxSubagentDepth: 1,
-        },
-      ],
-      count: 1,
-    });
   });
 
   test("updates a launchable profile default model through the dedicated tool", async () => {
@@ -592,7 +499,7 @@ describe("profile-scoped auth and permissions", () => {
     }
   });
 
-  test("updates launchable profile thinking defaults and syncs stored selections", async () => {
+  test("updates profile thinking defaults and syncs stored selections", async () => {
     writeTestProfileRegistry();
     authStore.saveClaudeSetupToken("restricted-token", "restricted");
 
@@ -642,17 +549,6 @@ describe("profile-scoped auth and permissions", () => {
         modelId: "gpt-5.4",
         thinkingLevel: "minimal",
       });
-      new modelsModule.ModelService(staleProfile, {
-        selectionStoreKey: "restricted:subagent",
-        defaultSelectionOverride: {
-          providerId: staleProfile.subagentPreferredProvider ?? staleProfile.preferredProvider,
-          modelId: staleProfile.subagentDefaultModelId ?? staleProfile.defaultModelId,
-        },
-      }).setStoredSelectionDefaults({
-        providerId: "openai-codex",
-        modelId: "gpt-5.4",
-        thinkingLevel: "minimal",
-      });
 
       const result = await registry.invokeRaw("profile_set_defaults", {
         profileId: "restricted",
@@ -675,24 +571,12 @@ describe("profile-scoped auth and permissions", () => {
         modelId: "claude-opus-4-6-20260301",
         thinkingLevel: "high",
       });
-
-      expect(await new modelsModule.ModelService(updated, {
-        selectionStoreKey: "restricted:subagent",
-        defaultSelectionOverride: {
-          providerId: updated.subagentPreferredProvider ?? updated.preferredProvider,
-          modelId: updated.subagentDefaultModelId ?? updated.defaultModelId,
-        },
-      }).getActiveModel()).toMatchObject({
-        providerId: "claude",
-        modelId: "claude-opus-4-6-20260301",
-        thinkingLevel: "high",
-      });
     } finally {
       modelsModule.ModelService.prototype.resolveProviderModel = originalResolveProviderModel;
     }
   });
 
-  test("enforces tool and path restrictions for non-root profiles", () => {
+  test("canUseTool always returns true in single-profile mode", () => {
     writeTestProjectRegistry();
     const profileService = new profilesModule.ProfileService("restricted");
     const restricted = profileService.getActiveProfile();
@@ -701,26 +585,6 @@ describe("profile-scoped auth and permissions", () => {
 
     expect(access.canUseTool("project_list")).toBe(true);
     expect(access.canUseTool("exec_command")).toBe(true);
-    expect(() =>
-      access.assertPathAccess(path.join(tempRoot, ".openelinarotest/projects/telecorder/README.md"))
-    ).not.toThrow();
-    expect(() =>
-      access.assertPathAccess(path.join(tempRoot, ".openelinarotest/projects/root-only/README.md"))
-    ).toThrow(/not accessible|outside the allowed workspace roots/);
-    expect(profileService.canReadMemoryPath(restricted, "restricted/note.md")).toBe(true);
-    expect(profileService.canReadMemoryPath(restricted, "root/note.md")).toBe(false);
-  });
-
-  test("disables subagent launches when the current depth already meets the profile limit", () => {
-    writeTestProfileRegistry();
-    const profileService = new profilesModule.ProfileService("restricted");
-    const restricted = profileService.getActiveProfile();
-    const projects = new projectsModule.ProjectsService(restricted, profileService);
-    const access = new accessModule.AccessControlService(restricted, profileService, projects);
-
-    expect(profileService.getMaxSubagentDepth(restricted)).toBe(1);
-    expect(access.listLaunchableProfiles(0).map((profile) => profile.id)).toEqual(["restricted"]);
-    expect(access.listLaunchableProfiles(1)).toEqual([]);
   });
 
   test("requires auth declarations for all tools and exposes them in the catalog", () => {
@@ -758,8 +622,6 @@ describe("profile-scoped auth and permissions", () => {
     ).not.toThrow();
 
     const catalog = registry.getToolCatalog();
-    expect(catalog.every((card) => card.authorization.access === "anyone" || card.authorization.access === "root")).toBe(true);
     expect(catalog.some((card) => card.name === "exec_command")).toBe(true);
-    expect(catalog.find((card) => card.name === "project_list")?.authorization.behavior).toBe("role-sensitive");
   });
 });

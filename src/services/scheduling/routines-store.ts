@@ -75,7 +75,7 @@ function normalizeItem(item: LegacyRoutineItem): RoutineItem {
 
 function listKnownProfileIds() {
   try {
-    return new Set(new ProfileService().listProfiles().map((profile) => profile.id));
+    return new Set(new ProfileService().loadRegistry().profiles.map((profile) => profile.id));
   } catch {
     return new Set([DEFAULT_ROUTINE_PROFILE_ID]);
   }

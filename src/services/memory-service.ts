@@ -770,9 +770,6 @@ export class MemoryService {
     const documents: MemoryDocumentRecord[] = [];
     const glob = new Bun.Glob("**/*.md");
     for await (const relativePath of glob.scan({ cwd: memoryDocumentRoot, onlyFiles: true })) {
-      if (!this.profiles.canReadMemoryPath(this.profile, relativePath)) {
-        continue;
-      }
       const copiedPath = path.join(memoryDocumentRoot, relativePath);
       const content = await Bun.file(copiedPath).text();
       const fileStat = await stat(copiedPath);

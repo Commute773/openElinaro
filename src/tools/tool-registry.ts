@@ -731,12 +731,8 @@ export class ToolRegistry {
     const deployment = await this.deploymentVersion.load();
     const profileSection = [
       `Profile: ${profile.id}`,
-      `Roles: ${profile.roles.join(", ")}`,
       `Runtime version: ${deployment.version}`,
       `Runtime release: ${deployment.releaseId ?? "unknown"}`,
-      this.access.isRoot()
-        ? "Permissions: unrestricted root profile."
-        : `Permissions: projects restricted to allowedRoles matching [${profile.roles.join(", ")}]; root-only tools are unavailable.`,
     ].join("\n");
     const sections = [
       profileSection,

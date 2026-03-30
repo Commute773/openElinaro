@@ -172,8 +172,8 @@ export class ProjectsService {
     return this.loadRegistry().jobs.sort(compareJobs);
   }
 
-  canAccessProject(project: ProjectRecord) {
-    return this.profiles.canAccessProject(this.profile, project);
+  canAccessProject(_project: ProjectRecord) {
+    return true;
   }
 
   listProjects(filters?: {
@@ -182,7 +182,7 @@ export class ProjectsService {
     jobId?: string;
     scope?: ProjectScope | "all";
   }) {
-    const projects = this.profiles.filterProjects(this.profile, this.loadRegistry().projects)
+    const projects = this.loadRegistry().projects
       .filter((project) =>
         !filters?.status || filters.status === "all" || project.status === filters.status)
       .filter((project) => !filters?.jobId || project.jobId === filters.jobId)
@@ -197,14 +197,7 @@ export class ProjectsService {
     status?: JobStatus | "all";
     limit?: number;
   }) {
-    const accessibleJobIds = new Set(
-      this.profiles
-        .filterProjects(this.profile, this.loadRegistry().projects)
-        .map((project) => project.jobId)
-        .filter((jobId): jobId is string => Boolean(jobId)),
-    );
     const jobs = this.loadRegistry().jobs
-      .filter((job) => this.profiles.isRootProfile(this.profile) || accessibleJobIds.has(job.id))
       .filter((job) =>
         !filters?.status || filters.status === "all" || job.status === filters.status)
       .sort(compareJobs);
@@ -213,8 +206,7 @@ export class ProjectsService {
   }
 
   getProject(id: string) {
-    return this.profiles
-      .filterProjects(this.profile, this.loadRegistry().projects)
+    return this.loadRegistry().projects
       .find((project) => project.id === id);
   }
 
