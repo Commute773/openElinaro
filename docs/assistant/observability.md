@@ -77,7 +77,7 @@ Per-request model usage is also written to `~/.openelinaro/model-usage.jsonl` th
 
 The ledger now persists provider-reported USD cost alongside token counts, scoped by active profile id. Agents can inspect that data through the `usage_summary` tool for both per-thread totals and local-day totals in the routines timezone.
 
-Each record still keeps the exact provider-reported token totals, and chat-style requests routed through [`src/connectors/active-model-connector.ts`](../../src/connectors/active-model-connector.ts) now also persist prompt diagnostics for later debugging:
+Each record still keeps the exact provider-reported token totals, and chat-style requests now also persist prompt diagnostics for later debugging:
 
 - approximate prompt breakdown by category
 - prompt message counts by role
