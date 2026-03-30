@@ -40,8 +40,8 @@ describe("ModelService.getActiveModel", () => {
       });
 
       expect(await service.getActiveModel()).toMatchObject({
-        providerId: "openai-codex",
-        modelId: "gpt-5.4",
+        providerId: "claude",
+        modelId: "claude-sonnet-4-6",
         thinkingLevel: "high",
       });
     } finally {

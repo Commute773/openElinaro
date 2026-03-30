@@ -34,7 +34,7 @@ import {
 const secondaryTelemetry = telemetry.child({ component: "secondary_model" });
 const traceSpan = createTraceSpan(secondaryTelemetry);
 
-const DEFAULT_ACTIVE_MODEL_PROVIDER_ID: ModelProviderId = "openai-codex";
+const DEFAULT_ACTIVE_MODEL_PROVIDER_ID: ModelProviderId = "claude";
 
 const DEFAULT_TOOL_SUMMARIZER_MODEL_IDS: Record<ModelProviderId, string> = {
   "openai-codex": "gpt-5.1-codex-mini",

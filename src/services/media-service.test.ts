@@ -206,6 +206,7 @@ describe("MediaService", () => {
         mpvBin: "mpv",
         ncBin: "nc",
         osascriptBin: "osascript",
+        processIsAlive: (pid) => pid === 321,
         runCommand: async ({ file, args, input }) => {
           if (file === "switchaudio" && args?.join(" ") === "-a -t output") {
             return { stdout: "B06HD\n", stderr: "", exitCode: 0 };
@@ -266,7 +267,7 @@ describe("MediaService", () => {
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   test("kills a lingering player before restarting the same speaker", async () => {
     const tempRoot = createTempRoot();

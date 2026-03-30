@@ -381,14 +381,14 @@ describe("FinanceService", () => {
       ].join("\n"),
     ];
     let fetchCount = 0;
-    (service as unknown as { fetchText: (url: string) => Promise<string> }).fetchText = async () => {
+    const fetcher = async () => {
       const currentImport = Math.floor(fetchCount / 2);
       const isAccounts = fetchCount % 2 === 0;
       fetchCount += 1;
       return isAccounts ? (accountImports[currentImport] ?? accountImports[accountImports.length - 1] ?? "") : emptyTransactionsCsv;
     };
 
-    await service.importTransactions({ source: "fintable_gsheet" });
+    await service.importTransactions({ source: "fintable_gsheet", fetcher });
     service.addReceivable({
       counterparty: "Remote Client",
       amountCad: 23000,
@@ -396,7 +396,7 @@ describe("FinanceService", () => {
       expectedDate: "2026-04-01",
       status: "pending",
     });
-    await service.importTransactions({ source: "fintable_gsheet" });
+    await service.importTransactions({ source: "fintable_gsheet", fetcher });
 
     const transactions = service.listTransactionsStructured({ limit: 10 });
     const inferred = transactions.rows.find((row) => row.source === "account_balance_inference");

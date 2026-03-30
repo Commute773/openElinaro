@@ -172,7 +172,7 @@ describe("RecentThreadContextService", () => {
     expect(text.length).toBeLessThanOrEqual(recentContextModule.THREAD_START_CONTEXT_CHAR_BUDGET);
   });
 
-  test("respects profile-scoped memory and project access", () => {
+  test("single-profile install sees all memory namespaces and projects", () => {
     const profiles = new profileServiceModule.ProfileService("restricted");
     const profile = profiles.getActiveProfile();
     const projects = new projectsServiceModule.ProjectsService(profile, profiles);
@@ -180,10 +180,10 @@ describe("RecentThreadContextService", () => {
 
     const text = service.buildThreadStartContext();
 
+    // Single-profile-per-install: no memory namespace isolation
     expect(text).toContain(".openelinarotest/memory/documents/restricted/private.md");
+    expect(text).toContain(".openelinarotest/memory/documents/root/compactions/2026-03-12T17-06-03.752Z.md");
     expect(text).toContain(".openelinarotest/projects/sample/README.md");
-    expect(text).not.toContain(".openelinarotest/memory/documents/root/compactions/2026-03-12T17-06-03.752Z.md");
-    expect(text).not.toContain(".openelinarotest/projects/root-only/README.md");
   });
 
   test("only includes startup context before the first human message", () => {

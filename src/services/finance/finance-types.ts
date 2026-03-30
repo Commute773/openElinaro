@@ -30,6 +30,8 @@ export interface FinanceImportOptions {
   accountsGid?: string;
   transactionsGid?: string;
   csvText?: string;
+  /** Override the default HTTP fetcher (for testing). */
+  fetcher?: (url: string) => Promise<string>;
 }
 
 export interface FinanceSettingsUpdateInput {

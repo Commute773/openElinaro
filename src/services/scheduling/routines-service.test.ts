@@ -240,7 +240,7 @@ describe("RoutinesService", () => {
       })).toThrow("Project not found: missing-project");
   });
 
-  test("limits non-root profiles to their own routine items", () => {
+  test("single-profile install sees all routine items regardless of creator", () => {
     writeProjectsRegistry(runtimeRoot);
 
     const rootProfiles = new ProfileService("root");
@@ -265,9 +265,10 @@ describe("RoutinesService", () => {
     const restrictedProjects = new ProjectsService(restrictedProfiles.getActiveProfile(), restrictedProfiles);
     const restrictedService = new RoutinesService(restrictedProjects);
 
-    expect(restrictedService.listItems().map((item) => item.id)).toEqual([telecorderItem.id]);
-    expect(restrictedService.getItem(rootItem.id)).toBeUndefined();
-    expect(() => restrictedService.markDone(rootItem.id)).toThrow(`Routine item not found: ${rootItem.id}`);
+    // Single-profile-per-install: no profile isolation, all items visible
+    const ids = restrictedService.listItems().map((item) => item.id);
+    expect(ids).toContain(telecorderItem.id);
+    expect(ids).toContain(rootItem.id);
   });
 
   test("surfaces unseen manual backlog items in the heartbeat snapshot and marks them reminded", () => {

@@ -24,7 +24,13 @@ function normalize(targetPath: string, remote = false) {
   try {
     return realpathSync.native(resolved);
   } catch {
-    return resolved;
+    // File may not exist yet (e.g. write target). Resolve the parent directory
+    // to canonicalize symlinks (macOS /tmp → /private/tmp), then re-append the basename.
+    try {
+      return path.join(realpathSync.native(path.dirname(resolved)), path.basename(resolved));
+    } catch {
+      return resolved;
+    }
   }
 }
 
@@ -65,8 +71,8 @@ export class AccessControlService {
 
     // Local profiles: allow access to repo root, data root, project workspaces, path roots, managed workspaces
     if (!remote) {
-      if (isWithin(resolved, getRepoRoot())) return resolved;
-      if (isWithin(resolved, getDataRoot())) return resolved;
+      if (isWithin(resolved, normalize(getRepoRoot()))) return resolved;
+      if (isWithin(resolved, normalize(getDataRoot()))) return resolved;
     }
 
     // Check project workspaces

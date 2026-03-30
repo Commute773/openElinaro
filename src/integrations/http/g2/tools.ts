@@ -30,7 +30,7 @@ export const toolRoutes: RouteDefinition[] = [
     handler: async (request, params, app) => {
       const toolName = params.name!;
       try {
-        const body = await request.json().catch(() => ({}));
+        const body = await request.json().catch(() => ({})) as Record<string, unknown>;
         const result = await app.invokeRoutineTool(toolName, body, {
           conversationKey: `g2-tool-${Date.now()}`,
         });

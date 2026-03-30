@@ -178,9 +178,9 @@ function getStorePath() {
   return resolveRuntimePath("model-state.json");
 }
 const DEFAULT_ACTIVE_MODEL: ActiveModelSelection = {
-  providerId: "openai-codex",
-  modelId: "gpt-5.4",
-  thinkingLevel: "low",
+  providerId: "claude",
+  modelId: "claude-sonnet-4-6",
+  thinkingLevel: "medium",
   extendedContextEnabled: false,
   updatedAt: new Date(0).toISOString(),
 };

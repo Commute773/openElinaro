@@ -42,6 +42,8 @@ function createMockRegistry(opts: {
     getAgentDefaultVisibleToolNames: (_scope: any) => defaultNames,
     getToolsByNames: (names: string[], _context?: any, _opts?: any) =>
       names.map((n) => makeFakeTool(n)),
+    getToolDefinitionsByNames: (names: string[], _context?: any) =>
+      names.map((n) => makeFakeTool(n)),
     getToolCatalog: (_context?: any) => catalog,
   } as unknown as ToolRegistry;
 }
