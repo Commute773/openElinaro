@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.7
+- Released at: 2026-03-30T17:23:42Z
+- Release id: 20260330T172342Z-cc68fab
+- Previous version: 2026.03.30.6
+- Trigger: ci/release workflow
+
+- feat: add Claude Agent SDK core (Phase 4)
+
 ## 2026.03.30.6
 - Released at: 2026-03-30T17:19:46Z
 - Release id: 20260330T171946Z-58ededb
