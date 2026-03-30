@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.16
+- Released at: 2026-03-30T21:00:06Z
+- Release id: 20260330T210006Z-e2f57fe
+- Previous version: 2026.03.30.15
+- Trigger: ci/release workflow
+
+- refactor: rename PiToolEntry to ToolEntry, unify tool/function naming
+
 ## 2026.03.30.15
 - Released at: 2026-03-30T20:56:25Z
 - Release id: 20260330T205625Z-127dda5
