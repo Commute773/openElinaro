@@ -52,7 +52,7 @@ export async function compressImageForApi(
   return { data: new Uint8Array(result), mimeType: "image/jpeg", compressed: true };
 }
 
-function detectMimeFromBytes(bytes: Uint8Array): string | undefined {
+export function detectMimeFromBytes(bytes: Uint8Array): string | undefined {
   if (
     bytes.length >= 8 &&
     bytes[0] === 0x89 &&

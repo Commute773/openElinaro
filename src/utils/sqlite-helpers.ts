@@ -38,7 +38,7 @@ export type SqliteRetryOptions = {
   label?: string;
 };
 
-function isSqliteBusyError(error: unknown): boolean {
+export function isSqliteBusyError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const msg = error.message;
   return msg.includes("database is locked") || msg.includes("SQLITE_BUSY");
