@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.22
+- Released at: 2026-03-30T22:01:49Z
+- Release id: 20260330T220149Z-5ea8b48
+- Previous version: 2026.03.30.21
+- Trigger: ci/release workflow
+
+- refactor: rename REST API prefix from /api/g2 to /api (#229)
+
 ## 2026.03.30.21
 - Released at: 2026-03-30T21:41:49Z
 - Release id: 20260330T214149Z-290165c
