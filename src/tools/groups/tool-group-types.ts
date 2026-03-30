@@ -31,7 +31,6 @@ import type { SystemPromptService } from "../../services/system-prompt-service";
 import type { ConversationStateTransitionService } from "../../services/conversation/conversation-state-transition-service";
 import type { ReflectionService } from "../../services/reflection-service";
 import type { ToolResultStore } from "../../services/tool-result-store";
-import type { ToolProgramService } from "../../services/tool-program-service";
 import type { PeerClient } from "../../instance/peer-client";
 import type { PeerRegistry } from "../../instance/peer-registry";
 
@@ -87,7 +86,6 @@ export interface ToolBuildContext {
   transitions: ConversationStateTransitionService;
   reflection: Pick<ReflectionService, "runExplicitReflection"> | undefined;
   toolResults: ToolResultStore;
-  toolPrograms: ToolProgramService;
   peerClient: PeerClient | undefined;
   peerRegistry: PeerRegistry | undefined;
 }

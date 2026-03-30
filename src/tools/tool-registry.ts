@@ -38,7 +38,6 @@ import { RoutinesService } from "../services/scheduling/routines-service";
 import { ShellService } from "../services/infrastructure/shell-service";
 import { AccessControlService } from "../services/profiles";
 import { AlarmService } from "../services/alarm-service";
-import { ToolProgramService } from "../services/tool-program-service";
 import {
   assertToolAuthorizationCoverage,
   getToolAuthorizationDeclaration,
@@ -79,7 +78,6 @@ import type { ShellRuntime, FilesystemRuntime, TicketsRuntime } from "./groups/t
 export const ROUTINE_TOOL_NAMES = [
   "load_tool_library",
   "tool_result_read",
-  "run_tool_program",
   "job_list",
   "job_get",
   "work_summary",
@@ -261,7 +259,6 @@ const DYNAMIC_TOOL_DEFAULT_VISIBLE_SCOPES: Record<AgentToolScope, readonly strin
   chat: [
     "load_tool_library",
     "tool_result_read",
-    "run_tool_program",
     "context",
     "usage_summary",
     "model",
@@ -273,17 +270,14 @@ const DYNAMIC_TOOL_DEFAULT_VISIBLE_SCOPES: Record<AgentToolScope, readonly strin
   "coding-planner": [
     "load_tool_library",
     "tool_result_read",
-    "run_tool_program",
   ],
   "coding-worker": [
     "load_tool_library",
     "tool_result_read",
-    "run_tool_program",
   ],
   direct: [
     "load_tool_library",
     "tool_result_read",
-    "run_tool_program",
     "context",
     "usage_summary",
     "model",
@@ -298,7 +292,6 @@ const DYNAMIC_TOOL_DEFAULT_VISIBLE_SCOPES: Record<AgentToolScope, readonly strin
 const DYNAMIC_TOOL_CATALOG: Record<string, Partial<ToolCatalogCard>> = {
   load_tool_library: { domains: ["meta", "tooling"], agentScopes: ["chat", "coding-planner", "coding-worker", "direct"], examples: ["load the web_research library", "load filesystem_read tools"] },
   tool_result_read: { domains: ["meta", "tooling", "session"], agentScopes: ["chat", "coding-planner", "coding-worker", "direct"], examples: ["reopen a stored tool result", "summarize a saved tool output by ref"] },
-  run_tool_program: { domains: ["meta", "orchestration", "tooling"], agentScopes: ["chat", "coding-planner", "coding-worker", "direct"], examples: ["loop over many tool calls", "aggregate repeated search results"] },
   context: { domains: ["system", "session"], agentScopes: ["chat", "direct"], examples: ["show context usage", "show context full"] },
   usage_summary: { domains: ["observability", "usage", "session"], agentScopes: ["chat", "direct"], examples: ["show today's model spend", "show this thread cost"] },
   model: { domains: ["system", "session"], agentScopes: ["chat", "direct"], examples: ["list models for the current provider", "set thinking high on the active model"], mutatesState: true },
@@ -415,7 +408,6 @@ export class ToolRegistry {
   private readonly webFetch = new WebFetchService();
   private readonly featureConfig = new FeatureConfigService(this.secrets);
   private readonly alarms = new AlarmService();
-  private readonly toolPrograms: ToolProgramService;
   private readonly filesystem: FilesystemRuntime;
   private readonly telemetryQuery = new TelemetryQueryService();
   private readonly deploymentVersion = new DeploymentVersionService();
@@ -464,7 +456,6 @@ export class ToolRegistry {
       : null;
     this.tickets = tickets ?? new ElinaroTicketsService();
     this.toolResults = toolResults ?? new ToolResultStore();
-    this.toolPrograms = new ToolProgramService(this);
     this.workPlanning = new WorkPlanningService(this.routines, this.projects);
     assertToolAuthorizationCoverage([
       ...ROUTINE_TOOL_NAMES,
@@ -507,7 +498,6 @@ export class ToolRegistry {
       get transitions() { return self.transitions; },
       get reflection() { return self.reflection; },
       get toolResults() { return self.toolResults; },
-      get toolPrograms() { return self.toolPrograms; },
       get peerClient() { return self._peerClient; },
       get peerRegistry() { return self._peerRegistry; },
     };

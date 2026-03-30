@@ -32,7 +32,7 @@ Organize `src/services/` into domain-based subdirectories:
 | `models/` | `model-service.ts`, `ai-sdk-message-service.ts`, `cache-miss-monitor.ts`, `inference-prompt-drift-monitor.ts`, `text-embedding-service.ts`, `usage-tracking-service.ts` |
 | `communications/` | `vonage-service.ts`, `communications-store.ts`, `gemini-live-phone-service.ts`, `phone-call-backends.ts`, `phone-call-prompts.ts`, `email-service.ts`, `discord-response-service.ts` |
 | `routines/` | `routines-service.ts`, `routines-store.ts`, `alarm-service.ts`, `alarm-notification-service.ts`, `calendar-sync-service.ts`, `calendar-sync-state-service.ts`, `autonomous-time-service.ts`, `autonomous-time-prompt-service.ts`, `autonomous-time-state-service.ts` |
-| `tools/` | `tool-authorization-service.ts`, `tool-error-service.ts`, `tool-library-service.ts`, `tool-program-service.ts`, `tool-program-artifact-service.ts`, `tool-resolution-service.ts`, `tool-result-store.ts`, `tool-defaults.ts` |
+| `tools/` | `tool-authorization-service.ts`, `tool-error-service.ts`, `tool-library-service.ts`, `tool-resolution-service.ts`, `tool-result-store.ts`, `tool-defaults.ts` |
 | `integrations/` | `web-search-service.ts`, `web-fetch-service.ts`, `openbrowser-service.ts`, `zigbee2mqtt-service.ts`, `elinaro-tickets-service.ts`, `media-service.ts`, `python-runtime.ts` |
 | `monitoring/` | `telemetry.ts`, `telemetry-store.ts`, `telemetry-query-service.ts`, `health-tracking-service.ts`, `heartbeat-service.ts`, `heartbeat-state-service.ts` |
 

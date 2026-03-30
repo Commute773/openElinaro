@@ -46,7 +46,6 @@ const USER_DATA_TOP_LEVEL = new Set([
   "shell-tasks",
   "telemetry.sqlite",
   "tmp",
-  "tool-program-artifacts",
   "tool-results",
   "web-fetch",
   "workflow-session-history.json",
