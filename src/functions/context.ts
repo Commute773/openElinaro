@@ -28,7 +28,7 @@ import type { PhoneCallBackend } from "../services/phone-call-backends";
 import type { Zigbee2MqttService } from "../services/zigbee2mqtt-service";
 import type { SystemPromptService } from "../services/system-prompt-service";
 import type { ConversationStateTransitionService } from "../services/conversation/conversation-state-transition-service";
-import type { ReflectionService } from "../services/reflection-service";
+import type { AutonomousTimeService } from "../services/autonomous-time-service";
 import type { ToolResultStore } from "../services/tool-result-store";
 import type { PeerClient } from "../instance/peer-client";
 import type { PeerRegistry } from "../instance/peer-registry";
@@ -82,7 +82,7 @@ export interface ToolBuildContext {
   requestManagedServiceRestart: (source: "config_edit" | "feature_manage" | "manual") => Promise<string>;
   systemPrompts: SystemPromptService;
   transitions: ConversationStateTransitionService;
-  reflection: Pick<ReflectionService, "runExplicitReflection"> | undefined;
+  reflection: Pick<AutonomousTimeService, "runExplicitReflection"> | undefined;
   toolResults: ToolResultStore;
   peerClient: PeerClient | undefined;
   peerRegistry: PeerRegistry | undefined;

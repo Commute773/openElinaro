@@ -4,6 +4,8 @@ import { resolveRuntimePath } from "./runtime-root";
 
 type AutonomousTimeProfileState = {
   lastTriggeredLocalDate?: string;
+  lastReflectionLocalDate?: string;
+  lastSoulRewriteLocalDate?: string;
 };
 
 function getStatePath() {
@@ -17,6 +19,8 @@ function normalizeProfileState(raw: unknown): AutonomousTimeProfileState {
   const candidate = raw as Record<string, unknown>;
   return {
     lastTriggeredLocalDate: normalizeString(candidate.lastTriggeredLocalDate) ?? undefined,
+    lastReflectionLocalDate: normalizeString(candidate.lastReflectionLocalDate) ?? undefined,
+    lastSoulRewriteLocalDate: normalizeString(candidate.lastSoulRewriteLocalDate) ?? undefined,
   };
 }
 

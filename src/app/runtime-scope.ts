@@ -16,13 +16,11 @@ import { StructuredMemoryManager } from "../services/memory/structured-memory-ma
 import { ModelService } from "../services/models/model-service";
 import type { ProfileService } from "../services/profiles";
 import { ProjectsService } from "../services/projects-service";
-import { ReflectionService } from "../services/reflection-service";
 import type { RoutinesService } from "../services/scheduling/routines-service";
 import { ServiceContainer } from "../services/container";
 import { ShellService } from "../services/infrastructure/shell-service";
 import { SshShellBackend } from "../services/shell-backend-ssh";
 import { LocalShellBackend } from "../services/shell-backend-local";
-import { SoulService } from "../services/soul-service";
 import type { SystemPromptService } from "../services/system-prompt-service";
 import { ToolResolutionService } from "../services/tool-resolution-service";
 import { ToolRegistry } from "../functions/tool-registry";
@@ -54,7 +52,6 @@ export type RuntimeScope = {
   projects: ProjectsService;
   models: ModelService;
   memory: MemoryService;
-  reflection: ReflectionService;
   autonomousTime: AutonomousTimeService;
   shell: ShellRuntime;
   transitions: ConversationStateTransitionService;
@@ -71,8 +68,6 @@ const K = {
   access: "access",
   models: "models",
   memory: "memory",
-  soul: "soul",
-  reflection: "reflection",
   autonomousTime: "autonomousTime",
   shellBackend: "shellBackend",
   shell: "shell",
@@ -166,28 +161,14 @@ export function createRuntimeScope(ctx: {
     new MemoryService(c.resolve<ProfileRecord>(K.profile), profiles),
   );
 
-  c.register<SoulService>(K.soul, () =>
-    new SoulService(
-      c.resolve<ProfileRecord>(K.profile),
-      routines,
-      c.resolve<MemoryService>(K.memory),
-      c.resolve<ModelService>(K.models),
-    ),
-  );
-
-  c.register<ReflectionService>(K.reflection, () =>
-    new ReflectionService(
+  c.register<AutonomousTimeService>(K.autonomousTime, () =>
+    new AutonomousTimeService(
       c.resolve<ProfileRecord>(K.profile),
       routines,
       conversations,
       c.resolve<MemoryService>(K.memory),
       c.resolve<ModelService>(K.models),
-      c.resolve<SoulService>(K.soul),
     ),
-  );
-
-  c.register<AutonomousTimeService>(K.autonomousTime, () =>
-    new AutonomousTimeService(c.resolve<ProfileRecord>(K.profile), routines),
   );
 
   c.register(K.shellBackend, () => {
@@ -253,7 +234,7 @@ export function createRuntimeScope(ctx: {
       c.resolve<FilesystemRuntime>(K.filesystem),
       finance,
       health,
-      c.resolve<ReflectionService>(K.reflection),
+      c.resolve<AutonomousTimeService>(K.autonomousTime),
     );
     const peerRegistry = new PeerRegistry();
     registry.setInstanceMessaging(new PeerClient(peerRegistry), peerRegistry);
@@ -296,7 +277,7 @@ export function createRuntimeScope(ctx: {
         conversations,
         systemPrompts,
         models: c.resolve<ModelService>(K.models),
-        reflection: c.resolve<ReflectionService>(K.reflection),
+        autonomousTime: c.resolve<AutonomousTimeService>(K.autonomousTime),
         structuredMemory: automaticConversationMemoryDisabled
           ? undefined
           : c.resolve<MemoryManagementAgent>(K.memoryManagementAgent),
@@ -326,7 +307,6 @@ export function createRuntimeScope(ctx: {
     projects: c.resolve<ProjectsService>(K.projects),
     models: c.resolve<ModelService>(K.models),
     memory: c.resolve<MemoryService>(K.memory),
-    reflection: c.resolve<ReflectionService>(K.reflection),
     autonomousTime: c.resolve<AutonomousTimeService>(K.autonomousTime),
     shell: c.resolve<ShellRuntime>(K.shell),
     transitions: c.resolve<ConversationStateTransitionService>(K.transitions),

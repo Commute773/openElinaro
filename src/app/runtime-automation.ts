@@ -50,7 +50,7 @@ export async function buildThreadStartSystemContext(
     ),
     { component: "recent_thread_context" },
   ).buildThreadStartContext();
-  const reflectionContext = await scope.reflection.buildThreadBootstrapContext();
+  const reflectionContext = await scope.autonomousTime.buildThreadBootstrapContext();
   const sections = [reflectionContext, recentThreadContext].filter(Boolean);
   return sections.length > 0
     ? wrapInjectedMessage("recent_context", sections.join("\n\n"))
@@ -143,7 +143,7 @@ export async function runHourlyHeartbeat(
   const workFocus = ctx.buildHeartbeatWorkFocus(options?.reference);
   const reminderSnapshot = ctx.routines.getHeartbeatReminderSnapshot(options?.reference);
   const localTime = reminderSnapshot.currentLocalTime;
-  const reflectionEligible = scope.reflection.isDailyReflectionEligible(options?.reference);
+  const reflectionEligible = scope.autonomousTime.isDailyReflectionEligible(options?.reference);
   const heartbeatConversationKey = buildAutomationSessionKey("heartbeat", conversationKey);
   let reminderMarked = false;
   let userFacingMessageSent = false;
@@ -279,7 +279,7 @@ export async function runHourlyHeartbeat(
   }
   const completed = userFacingMessageSent || reminderSnapshot.requiredCandidates.length === 0;
   if (completed && response.mode !== "accepted" && !userFacingMessageSent && reflectionEligible) {
-    scope.reflection.queueDailyReflectionIfEligible(options?.reference);
+    scope.autonomousTime.queueDailyReflectionIfEligible(options?.reference);
   }
 
   return {
