@@ -95,7 +95,6 @@ function isAutomaticConversationMemoryDisabled() {
 
 export function createRuntimeScope(ctx: {
   profileId: string;
-  mode: "interactive" | "subagent";
   appTelemetry: typeof telemetry;
   profiles: ProfileService;
   activeProfile: ProfileRecord;
@@ -112,7 +111,6 @@ export function createRuntimeScope(ctx: {
 }): RuntimeScope {
   const {
     profileId,
-    mode,
     appTelemetry,
     profiles,
     routines,
@@ -150,13 +148,6 @@ export function createRuntimeScope(ctx: {
 
   c.register<ModelService>(K.models, () => {
     const profile = c.resolve<ProfileRecord>(K.profile);
-    const subagentDefaults = mode === "subagent"
-      ? {
-          providerId: profile.subagentPreferredProvider ?? profile.preferredProvider,
-          modelId: profile.subagentDefaultModelId ?? profile.defaultModelId,
-          thinkingLevel: "high" as const,
-        }
-      : undefined;
     return new ModelService(profile, {
       onCacheMissWarning: (warning) => {
         if (!ctx.onCacheMissWarning) {
@@ -170,8 +161,7 @@ export function createRuntimeScope(ctx: {
           });
         });
       },
-      selectionStoreKey: mode === "subagent" ? `${profile.id}:subagent` : profile.id,
-      defaultSelectionOverride: subagentDefaults,
+      selectionStoreKey: profile.id,
     });
   });
 
@@ -316,12 +306,12 @@ export function createRuntimeScope(ctx: {
         systemPrompts,
         models: c.resolve<ModelService>(K.models),
         reflection: c.resolve<ReflectionService>(K.reflection),
-        structuredMemory: mode === "subagent" || automaticConversationMemoryDisabled
+        structuredMemory: automaticConversationMemoryDisabled
           ? undefined
           : c.resolve<MemoryManagementAgent>(K.memoryManagementAgent),
         coreFactory,
       },
-      mode === "interactive" && profile.id === "root",
+      true,
       ctx.onConversationActivityChange
         ? (params) => {
             void Promise.resolve(ctx.onConversationActivityChange?.(params)).catch((error) => {

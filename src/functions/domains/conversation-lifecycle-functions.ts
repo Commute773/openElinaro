@@ -656,7 +656,6 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
       if (
         context?.conversationKey
         && record.namespace !== context.conversationKey
-        && !fnCtx.services.access.isRoot()
       ) {
         throw new Error(
           `Tool result ref ${input.ref} belongs to ${record.namespace}, not the active session ${context.conversationKey}.`,

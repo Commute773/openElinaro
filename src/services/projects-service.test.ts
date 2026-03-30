@@ -14,7 +14,6 @@ function makeProfile(overrides: Partial<ProfileRecord> = {}): ProfileRecord {
   return {
     id: "root",
     name: "Root",
-    roles: ["root"],
     memoryNamespace: "root",
     ...overrides,
   };
@@ -28,7 +27,7 @@ function writeProfileRegistry(rootDir: string, profiles?: ProfileRecord[]) {
       version: 1,
       profiles: profiles ?? [
         makeProfile(),
-        makeProfile({ id: "restricted", name: "Restricted", roles: ["restricted"], memoryNamespace: "restricted" }),
+        makeProfile({ id: "restricted", name: "Restricted", memoryNamespace: "restricted" }),
       ],
     }, null, 2)}\n`,
   );
@@ -196,14 +195,12 @@ describe("ProjectsService", () => {
     expect(projects).toHaveLength(1);
   });
 
-  test("listProjects respects profile role restrictions", () => {
+  test("listProjects returns all projects in single-profile mode", () => {
     const profiles = new ProfileService("restricted");
     const restricted = profiles.getActiveProfile();
     const service = new ProjectsService(restricted, profiles);
     const projects = service.listProjects({ status: "all" });
-    expect(projects.every((p) => p.allowedRoles.includes("restricted"))).toBe(true);
-    expect(projects).toHaveLength(1);
-    expect(projects[0]!.id).toBe("alpha");
+    expect(projects).toHaveLength(3);
   });
 
   test("getProject returns a specific project", () => {
@@ -219,11 +216,11 @@ describe("ProjectsService", () => {
     expect(service.getProject("missing")).toBeUndefined();
   });
 
-  test("getProject respects role restrictions", () => {
+  test("getProject returns any project in single-profile mode", () => {
     const profiles = new ProfileService("restricted");
     const restricted = profiles.getActiveProfile();
     const service = new ProjectsService(restricted, profiles);
-    expect(service.getProject("beta")).toBeUndefined();
+    expect(service.getProject("beta")?.id).toBe("beta");
     expect(service.getProject("alpha")?.id).toBe("alpha");
   });
 

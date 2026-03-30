@@ -11,12 +11,10 @@ const ProfileExecutionSchema = z.discriminatedUnion("kind", [
     defaultCwd: z.string().min(1).optional(),
   }),
 ]);
-export const DEFAULT_MAX_SUBAGENT_DEPTH = 1;
 
 export const ProfileRecordSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  roles: z.array(z.string().min(1)).min(1),
   memoryNamespace: z.string().min(1),
   shellUser: z.string().min(1).optional(),
   pathRoots: z.array(z.string().min(1)).min(1).optional(),
@@ -35,25 +33,6 @@ export const ProfileRecordSchema = z.object({
   memoryRecallModelId: z.string().min(1).optional(),
   defaultThinkingLevel: ThinkingLevelSchema.optional(),
   maxContextTokens: z.number().int().positive().optional(),
-  subagentPreferredProvider: ModelProviderSchema.optional(),
-  subagentDefaultModelId: z.string().min(1).optional(),
-  maxSubagentDepth: z.number().int().min(0).optional(),
-  subagentPaths: z.object({
-    claude: z.union([
-      z.string().min(1),
-      z.object({
-        path: z.string().min(1),
-        description: z.string().min(1).optional(),
-      }),
-    ]).optional(),
-    codex: z.union([
-      z.string().min(1),
-      z.object({
-        path: z.string().min(1),
-        description: z.string().min(1).optional(),
-      }),
-    ]).optional(),
-  }).optional(),
 });
 export type ProfileRecord = z.infer<typeof ProfileRecordSchema>;
 

@@ -423,12 +423,8 @@ export class RoutinesService {
     return this.profiles.getProfile(profileId).id;
   }
 
-  private isRootProfile() {
-    return this.profiles.isRootProfile(this.activeProfile);
-  }
-
-  private canAccessProfile(profileId: string) {
-    return this.isRootProfile() || profileId === this.activeProfile.id;
+  private canAccessProfile(_profileId: string) {
+    return true;
   }
 
   private assertProfileAccess(profileId: string) {
@@ -438,19 +434,11 @@ export class RoutinesService {
   }
 
   private filterVisibleItems(items: RoutineItem[], requestedProfileId?: string | "all") {
-    if (this.isRootProfile()) {
-      if (!requestedProfileId || requestedProfileId === "all") {
-        return items;
-      }
-      const normalizedProfileId = this.requireKnownProfileId(requestedProfileId);
-      return items.filter((item) => item.profileId === normalizedProfileId);
+    if (!requestedProfileId || requestedProfileId === "all") {
+      return items;
     }
-
-    if (requestedProfileId && requestedProfileId !== this.activeProfile.id) {
-      throw new AuthorizationError(`Profile not accessible for routine items: ${requestedProfileId}`);
-    }
-
-    return items.filter((item) => item.profileId === this.activeProfile.id);
+    const normalizedProfileId = this.requireKnownProfileId(requestedProfileId);
+    return items.filter((item) => item.profileId === normalizedProfileId);
   }
 
   private requireAccessibleItem(data: RoutineStoreData, id: string) {

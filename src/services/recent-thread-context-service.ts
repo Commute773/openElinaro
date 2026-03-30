@@ -189,9 +189,6 @@ export class RecentThreadContextService {
 
     for (const absolutePath of listMarkdownFiles(memoryDocumentRoot)) {
       const relativePath = path.relative(memoryDocumentRoot, absolutePath);
-      if (!this.profiles.canReadMemoryPath(this.profile, relativePath)) {
-        continue;
-      }
       if (isReflectionIdentityPath(relativePath.replaceAll("\\", "/"))) {
         continue;
       }

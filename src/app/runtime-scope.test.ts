@@ -21,7 +21,6 @@ function writeRuntimeFixture() {
         {
           id: "root",
           name: "Root",
-          roles: ["root"],
           memoryNamespace: "root",
           preferredProvider: "claude",
           defaultModelId: "claude-sonnet-4-20250514",
@@ -117,14 +116,13 @@ afterEach(() => {
   }
 });
 
-function buildScope(overrides: { mode?: "interactive" | "subagent" } = {}): RuntimeScope {
-  const { ProfileService } = require("../services/profile-service");
+function buildScope(): RuntimeScope {
+  const { ProfileService } = require("../services/profiles");
   const profiles = new ProfileService("root");
   const activeProfile = profiles.getProfile("root");
 
   return createRuntimeScope({
     profileId: "root",
-    mode: overrides.mode ?? "interactive",
     appTelemetry: telemetry,
     profiles,
     activeProfile,
@@ -178,10 +176,4 @@ describe("createRuntimeScope", () => {
     expect(keys).toEqual(expected);
   });
 
-  test("works in subagent mode", () => {
-    const scope = buildScope({ mode: "subagent" });
-    expect(scope.profile.id).toBe("root");
-    expect(scope.models).toBeDefined();
-    expect(scope.chat).toBeDefined();
-  });
 });

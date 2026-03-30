@@ -74,9 +74,7 @@ export class SshShellBackend implements ShellBackend {
   }
 
   private buildRemoteCommand(command: string, cwd: string, sudo: boolean) {
-    if (sudo && !this.access?.isRoot()) {
-      throw new Error("sudo=true is only available when running as the root profile.");
-    }
+    // Single-profile install: sudo is always available.
     const remoteShellCommand = sudo ? `sudo -n ${command}` : command;
     return [
       `cd ${shellQuote(cwd)}`,

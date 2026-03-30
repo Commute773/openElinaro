@@ -15,6 +15,7 @@ import {
   type ElinaroTicket,
 } from "../../services/elinaro-tickets-service";
 import { hasProviderAuth, getAuthStatus } from "../../auth/store";
+import type { ProfileRecord } from "../../domain/profiles";
 import { ProfileService } from "../../services/profiles";
 import {
   AmbiguousModelIdentifierError,
@@ -406,11 +407,10 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
       input: listLaunchableProfilesSchema,
       handler: async (input, fnCtx) => {
         const activeProfile = fnCtx.services.access.getProfile();
-        const profiles = fnCtx.services.access.listLaunchableProfiles();
-        const items = profiles.map((profile) => ({
+        const profiles = [activeProfile];
+        const items = profiles.map((profile: ProfileRecord) => ({
           id: profile.id,
           name: profile.name,
-          roles: profile.roles,
           memoryNamespace: profile.memoryNamespace,
           shellUser: profile.shellUser ?? null,
           executionKind: profile.execution?.kind ?? "local",
@@ -422,7 +422,6 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
           defaultModelId: profile.defaultModelId ?? null,
           defaultThinkingLevel: profile.defaultThinkingLevel ?? "low",
           auth: getAuthStatus(profile.id),
-          maxSubagentDepth: profile.maxSubagentDepth ?? null,
         }));
 
         if (input.format === "json") {
@@ -435,12 +434,11 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
 
         return [
           `Active profile: ${activeProfile.id}`,
-          "Launchable subagent profiles:",
+          "Profiles:",
           ...items.map((profile) =>
             [
               `- ${profile.id}`,
               `(${profile.name})`,
-              `roles=${profile.roles.join(",")}`,
               `memory=${profile.memoryNamespace}`,
               profile.shellUser ? `shellUser=${profile.shellUser}` : "",
               `execution=${profile.executionKind}`,
@@ -454,7 +452,6 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
                   .filter(Boolean)
                   .join(",")
                 : "missing"}`,
-              `maxDepth=${profile.maxSubagentDepth ?? 1}`,
             ]
               .filter(Boolean)
               .join(" "),
@@ -477,12 +474,8 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
         "Update one launchable profile's persisted default model and/or thinking level, and sync its stored active selection.",
       input: setProfileDefaultsSchema,
       handler: async (input, fnCtx) => {
-        fnCtx.services.access.assertSpawnProfile(input.profileId);
-        const targetProfile = fnCtx.services.access.listLaunchableProfiles()
-          .find((profile) => profile.id === input.profileId);
-        if (!targetProfile) {
-          throw new Error(`Profile not found or not launchable: ${input.profileId}`);
-        }
+        const profileService = new ProfileService(fnCtx.services.access.getProfile().id);
+        const targetProfile = profileService.getProfile(input.profileId);
 
         let providerId: ModelProviderId | undefined;
         let resolvedModelId: string | undefined;
@@ -509,7 +502,6 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
             : `Default model set to ${resolved.modelId}.`;
         }
 
-        const profileService = new ProfileService(fnCtx.services.access.getProfile().id);
         const updated = profileService.setProfileDefaults(targetProfile.id, {
           preferredProvider: providerId,
           defaultModelId: resolvedModelId,
@@ -520,22 +512,6 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
           selectionStoreKey: updated.id,
         }).setStoredSelectionDefaults({
           ...(providerId && resolvedModelId ? { providerId, modelId: resolvedModelId } : {}),
-          ...(input.thinkingLevel ? { thinkingLevel: input.thinkingLevel as ThinkingLevel } : {}),
-        });
-
-        new ModelService(updated, {
-          selectionStoreKey: `${updated.id}:subagent`,
-          defaultSelectionOverride: {
-            providerId: updated.subagentPreferredProvider ?? updated.preferredProvider,
-            modelId: updated.subagentDefaultModelId ?? updated.defaultModelId,
-          },
-        }).setStoredSelectionDefaults({
-          ...((resolvedModelId || providerId)
-            ? {
-                providerId: updated.subagentPreferredProvider ?? providerId ?? updated.preferredProvider,
-                modelId: updated.subagentDefaultModelId ?? resolvedModelId ?? updated.defaultModelId,
-              }
-            : {}),
           ...(input.thinkingLevel ? { thinkingLevel: input.thinkingLevel as ThinkingLevel } : {}),
         });
 

@@ -11,7 +11,6 @@ import { UsageTrackingService } from "../usage-tracking-service";
 const TEST_PROFILE: ProfileRecord = {
   id: "test-profile",
   name: "Test Profile",
-  roles: ["root"],
   memoryNamespace: "test",
 };
 
@@ -43,72 +42,6 @@ describe("ModelService.getActiveModel", () => {
       expect(await service.getActiveModel()).toMatchObject({
         providerId: "openai-codex",
         modelId: "gpt-5.4",
-        thinkingLevel: "high",
-      });
-    } finally {
-      process.chdir(previousCwd);
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    }
-  });
-
-  test("supports a separate subagent default model selection scope", async () => {
-    const previousCwd = process.cwd();
-    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-service-"));
-    process.chdir(tempRoot);
-
-    try {
-      const interactive = new ModelService({
-        ...TEST_PROFILE,
-        preferredProvider: "claude",
-        defaultModelId: "claude-opus-4-6-20260301",
-        subagentPreferredProvider: "openai-codex",
-        subagentDefaultModelId: "gpt-5.4",
-      });
-      const subagent = new ModelService({
-        ...TEST_PROFILE,
-        preferredProvider: "claude",
-        defaultModelId: "claude-opus-4-6-20260301",
-        subagentPreferredProvider: "openai-codex",
-        subagentDefaultModelId: "gpt-5.4",
-      }, {
-        selectionStoreKey: "test-profile:subagent",
-        defaultSelectionOverride: {
-          providerId: "openai-codex",
-          modelId: "gpt-5.4",
-        },
-      });
-
-      expect(await interactive.getActiveModel()).toMatchObject({
-        providerId: "claude",
-        modelId: "claude-opus-4-6-20260301",
-      });
-      expect(await subagent.getActiveModel()).toMatchObject({
-        providerId: "openai-codex",
-        modelId: "gpt-5.4",
-      });
-    } finally {
-      process.chdir(previousCwd);
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    }
-  });
-
-  test("supports a separate subagent default thinking level override", async () => {
-    const previousCwd = process.cwd();
-    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-model-service-"));
-    process.chdir(tempRoot);
-
-    try {
-      const subagent = new ModelService({
-        ...TEST_PROFILE,
-        defaultThinkingLevel: "low",
-      }, {
-        selectionStoreKey: "test-profile:subagent",
-        defaultSelectionOverride: {
-          thinkingLevel: "high",
-        },
-      });
-
-      expect(await subagent.getActiveModel()).toMatchObject({
         thinkingLevel: "high",
       });
     } finally {

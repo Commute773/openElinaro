@@ -811,22 +811,15 @@ export class OpenElinaroApp {
     }));
   }
 
-  private getScope(
-    profileId = this.activeProfile.id,
-    options?: {
-      mode?: "interactive" | "subagent";
-    },
-  ): RuntimeScope {
-    const mode = options?.mode ?? "interactive";
-    const scopeKey = mode === "subagent" ? `${profileId}:subagent` : profileId;
-    const cached = this.scopes.get(scopeKey);
+  private getScope(): RuntimeScope {
+    const profileId = this.activeProfile.id;
+    const cached = this.scopes.get(profileId);
     if (cached) {
       return cached;
     }
 
     const scope = createRuntimeScope({
       profileId,
-      mode,
       appTelemetry: this.appTelemetry,
       profiles: this.profiles,
       activeProfile: this.activeProfile,
@@ -859,7 +852,7 @@ export class OpenElinaroApp {
           }
         : undefined,
     });
-    this.scopes.set(scopeKey, scope);
+    this.scopes.set(profileId, scope);
     this.wirePlaybackEndNotification(scope);
     return scope;
   }

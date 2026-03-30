@@ -87,8 +87,7 @@ export function getProfileCommandAction(interaction: ChatInputCommandInteraction
 
 export function getLaunchableDiscordProfiles(activeProfileId: string) {
   const profiles = new ProfileService(activeProfileId);
-  const activeProfile = profiles.getProfile(activeProfileId);
-  return profiles.listLaunchableProfiles(activeProfile);
+  return [profiles.getProfile(activeProfileId)];
 }
 
 export function getDiscordTargetProfile(activeProfileId: string, requestedProfileId?: string) {
@@ -109,7 +108,6 @@ function formatLaunchableProfileLine(activeProfileId: string, targetProfileId: s
     : "missing";
   return [
     `- ${targetProfile.id} (${targetProfile.name})`,
-    `roles=${targetProfile.roles.join(",")}`,
     targetProfile.preferredProvider ? `provider=${targetProfile.preferredProvider}` : "",
     targetProfile.defaultModelId ? `model=${targetProfile.defaultModelId}` : "",
     `thinking=${targetProfile.defaultThinkingLevel ?? DEFAULT_PROFILE_THINKING_LEVEL}`,
@@ -134,7 +132,6 @@ export function formatLaunchableProfileDetails(activeProfileId: string, targetPr
   return [
     `Profile: ${targetProfile.id}`,
     `Name: ${targetProfile.name}`,
-    `Roles: ${targetProfile.roles.join(", ")}`,
     `Memory namespace: ${targetProfile.memoryNamespace}`,
     `Execution: ${targetProfile.execution?.kind ?? "local"}`,
     targetProfile.shellUser ? `Shell user: ${targetProfile.shellUser}` : "",
