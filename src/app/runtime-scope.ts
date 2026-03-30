@@ -107,7 +107,6 @@ export function createRuntimeScope(ctx: {
     conversationKey: string;
     active: boolean;
   }) => Promise<void> | void;
-  createSubagentController: (profileId: string) => ReturnType<any>;
 }): RuntimeScope {
   const {
     profileId,
@@ -272,7 +271,6 @@ export function createRuntimeScope(ctx: {
       c.resolve<MemoryService>(K.memory),
       systemPrompts,
       c.resolve<ConversationStateTransitionService>(K.transitions),
-      ctx.createSubagentController(profileId),
       c.resolve<AccessControlService>(K.access),
       c.resolve<ShellRuntime>(K.shell),
       c.resolve<FilesystemRuntime>(K.filesystem),

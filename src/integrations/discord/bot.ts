@@ -114,8 +114,6 @@ export interface DiscordAppRuntime {
   ): Promise<string>;
   getActiveModel(): Promise<{ providerId: ModelProviderId }> | { providerId: ModelProviderId };
   getActiveProfile(): { id: string };
-  getAgentRun(runId: string): ReturnType<OpenElinaroApp["getAgentRun"]>;
-  listAgentRuns(): ReturnType<OpenElinaroApp["listAgentRuns"]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -588,31 +586,7 @@ async function handleSlashCommand(params: {
 
   if (interaction.commandName === "workflow") {
     await deferInteractionReply(interaction);
-    const action = interaction.options.getString("action", true);
-
-    if (action === "demo") {
-      await replyWithChunks(interaction, "Demo workflow is no longer available. Use launch_agent tool from chat instead.");
-      return;
-    }
-
-    const runId = interaction.options.getString("run_id") ?? undefined;
-    const run = runId ? app.getAgentRun(runId) : app.listAgentRuns().at(-1);
-    if (!run) {
-      await replyWithChunks(interaction, "No agent run found.");
-      return;
-    }
-
-    await replyWithChunks(
-      interaction,
-      [
-        `Run: ${run.id}`,
-        `Provider: ${run.provider}`,
-        `Status: ${run.status}`,
-        `Goal: ${run.goal}`,
-        run.workspaceCwd ? `Workspace: ${run.workspaceCwd}` : "",
-        `Summary: ${run.resultSummary ?? "pending"}`,
-      ].join("\n"),
-    );
+    await replyWithChunks(interaction, "Workflow commands are no longer available. Subagent infrastructure has been removed.");
     return;
   }
 

@@ -133,10 +133,6 @@ function buildScope(overrides: { mode?: "interactive" | "subagent" } = {}): Runt
     systemPrompts: makeMinimalSystemPrompts(),
     finance: makeMinimalFinance(),
     health: makeMinimalHealth(),
-    createSubagentController: () => ({
-      launch: () => {},
-      list: () => [],
-    }),
   });
 }
 

@@ -27,7 +27,6 @@ import type {
 import type { RuntimePlatform } from "../../services/infrastructure/runtime-platform";
 import type { PhoneCallBackend } from "../../services/phone-call-backends";
 import type { Zigbee2MqttService } from "../../services/zigbee2mqtt-service";
-import type { SubagentController } from "../../app/runtime-subagent";
 import type { SystemPromptService } from "../../services/system-prompt-service";
 import type { ConversationStateTransitionService } from "../../services/conversation/conversation-state-transition-service";
 import type { ReflectionService } from "../../services/reflection-service";
@@ -82,7 +81,6 @@ export interface ToolBuildContext {
   resolvePhoneCallBackend: (requestedBackend?: string) => PhoneCallBackend;
   createWebSearchService: () => WebSearchService | null;
   requestManagedServiceRestart: (source: "config_edit" | "feature_manage" | "manual") => Promise<string>;
-  subagents: SubagentController;
   systemPrompts: SystemPromptService;
   transitions: ConversationStateTransitionService;
   reflection: Pick<ReflectionService, "runExplicitReflection"> | undefined;

@@ -433,37 +433,6 @@ describe("profile-scoped auth and permissions", () => {
       memory,
       systemPrompts,
       transitions,
-      {
-        launchAgent: async () =>
-          ({
-            id: "run-1",
-            profileId: "restricted",
-            provider: "codex" as const,
-            goal: "goal",
-            status: "starting" as const,
-            tmuxSession: "openelinaro",
-            tmuxWindow: "run-1",
-            workspaceCwd: "/tmp/test",
-            createdAt: new Date().toISOString(),
-            launchDepth: 1,
-            timeoutMs: 300_000,
-            eventLog: [],
-          }),
-        resumeAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        steerAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        cancelAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        getAgentRun: () => undefined,
-        listAgentRuns: () => [],
-        captureAgentPane: async () => "",
-        readAgentTerminal: async () => "",
-        listAvailableProviders: () => [],
-      },
       access,
     );
 
@@ -524,37 +493,6 @@ describe("profile-scoped auth and permissions", () => {
       memory,
       systemPrompts,
       transitions,
-      {
-        launchAgent: async () =>
-          ({
-            id: "run-1",
-            profileId: "root",
-            provider: "codex" as const,
-            goal: "goal",
-            status: "starting" as const,
-            tmuxSession: "openelinaro",
-            tmuxWindow: "run-1",
-            workspaceCwd: "/tmp/test",
-            createdAt: new Date().toISOString(),
-            launchDepth: 1,
-            timeoutMs: 300_000,
-            eventLog: [],
-          }),
-        resumeAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        steerAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        cancelAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        getAgentRun: () => undefined,
-        listAgentRuns: () => [],
-        captureAgentPane: async () => "",
-        readAgentTerminal: async () => "",
-        listAvailableProviders: () => [],
-      },
       access,
     );
 
@@ -619,37 +557,6 @@ describe("profile-scoped auth and permissions", () => {
       memory,
       systemPrompts,
       transitions,
-      {
-        launchAgent: async () =>
-          ({
-            id: "run-1",
-            profileId: "root",
-            provider: "codex" as const,
-            goal: "goal",
-            status: "starting" as const,
-            tmuxSession: "openelinaro",
-            tmuxWindow: "run-1",
-            workspaceCwd: "/tmp/test",
-            createdAt: new Date().toISOString(),
-            launchDepth: 1,
-            timeoutMs: 300_000,
-            eventLog: [],
-          }),
-        resumeAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        steerAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        cancelAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        getAgentRun: () => undefined,
-        listAgentRuns: () => [],
-        captureAgentPane: async () => "",
-        readAgentTerminal: async () => "",
-        listAvailableProviders: () => [],
-      },
       access,
     );
 
@@ -712,37 +619,6 @@ describe("profile-scoped auth and permissions", () => {
       memory,
       systemPrompts,
       transitions,
-      {
-        launchAgent: async () =>
-          ({
-            id: "run-1",
-            profileId: "root",
-            provider: "codex" as const,
-            goal: "goal",
-            status: "starting" as const,
-            tmuxSession: "openelinaro",
-            tmuxWindow: "run-1",
-            workspaceCwd: "/tmp/test",
-            createdAt: new Date().toISOString(),
-            launchDepth: 1,
-            timeoutMs: 300_000,
-            eventLog: [],
-          }),
-        resumeAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        steerAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        cancelAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        getAgentRun: () => undefined,
-        listAgentRuns: () => [],
-        captureAgentPane: async () => "",
-        readAgentTerminal: async () => "",
-        listAvailableProviders: () => [],
-      },
       access,
     );
 
@@ -871,37 +747,6 @@ describe("profile-scoped auth and permissions", () => {
       memory,
       systemPrompts,
       transitions,
-      {
-        launchAgent: async () =>
-          ({
-            id: "run-1",
-            profileId: "restricted",
-            provider: "codex" as const,
-            goal: "goal",
-            status: "starting" as const,
-            tmuxSession: "openelinaro",
-            tmuxWindow: "run-1",
-            workspaceCwd: "/tmp/test",
-            createdAt: new Date().toISOString(),
-            launchDepth: 1,
-            timeoutMs: 300_000,
-            eventLog: [],
-          }),
-        resumeAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        steerAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        cancelAgent: async () => {
-          throw new Error("not used in this test");
-        },
-        getAgentRun: () => undefined,
-        listAgentRuns: () => [],
-        captureAgentPane: async () => "",
-        readAgentTerminal: async () => "",
-        listAvailableProviders: () => [],
-      },
       access,
     );
 
