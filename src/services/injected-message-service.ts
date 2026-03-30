@@ -4,8 +4,7 @@ export type InjectedMessageSource =
   | "background_exec"
   | "heartbeat"
   | "memory_recall"
-  | "recent_context"
-  | "subagent_completion";
+  | "recent_context";
 
 export function wrapInjectedMessage(generatedBy: InjectedMessageSource, content: string) {
   const body = content.trim();

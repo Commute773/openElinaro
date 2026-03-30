@@ -85,19 +85,13 @@ export function getProfileCommandAction(interaction: ChatInputCommandInteraction
   return "show";
 }
 
-export function getLaunchableDiscordProfiles(activeProfileId: string) {
-  const profiles = new ProfileService(activeProfileId);
-  return [profiles.getProfile(activeProfileId)];
-}
-
 export function getDiscordTargetProfile(activeProfileId: string, requestedProfileId?: string) {
   const targetProfileId = requestedProfileId?.trim() || activeProfileId;
-  const launchableProfiles = getLaunchableDiscordProfiles(activeProfileId);
-  const targetProfile = launchableProfiles.find((profile) => profile.id === targetProfileId);
-  if (!targetProfile) {
+  if (targetProfileId !== activeProfileId) {
     throw new Error(`Profile not found or not launchable: ${targetProfileId}`);
   }
-  return targetProfile;
+  const profiles = new ProfileService(activeProfileId);
+  return profiles.getProfile(activeProfileId);
 }
 
 function formatLaunchableProfileLine(activeProfileId: string, targetProfileId: string) {
@@ -118,11 +112,10 @@ function formatLaunchableProfileLine(activeProfileId: string, targetProfileId: s
 }
 
 export function formatLaunchableProfileList(activeProfileId: string) {
-  const launchableProfiles = getLaunchableDiscordProfiles(activeProfileId);
   return [
     `Active profile: ${activeProfileId}`,
-    "Launchable profiles:",
-    ...launchableProfiles.map((profile) => formatLaunchableProfileLine(activeProfileId, profile.id)),
+    "Profiles:",
+    formatLaunchableProfileLine(activeProfileId, activeProfileId),
   ].join("\n");
 }
 

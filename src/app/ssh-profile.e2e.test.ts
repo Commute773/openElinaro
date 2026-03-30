@@ -55,7 +55,6 @@ function writeTestProfileRegistry() {
           memoryNamespace: "root",
           preferredProvider: "openai-codex",
           defaultModelId: "gpt-5.4",
-          maxSubagentDepth: 1,
         },
         {
           id: "remote",
@@ -70,7 +69,6 @@ function writeTestProfileRegistry() {
           },
           preferredProvider: "claude",
           defaultModelId: "claude-opus-4-6-20260301",
-          maxSubagentDepth: 1,
         },
       ],
     }, null, 2)}\n`,

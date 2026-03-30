@@ -13,11 +13,10 @@ function getConfigVersion(config: RawConfig): number {
 }
 
 /**
- * Migration 1 (v0 → v1): Replace core.app.workflow with core.app.subagent.
+ * Migration 1 (v0 → v1): Drop legacy core.app.workflow config.
  *
- * Old fields dropped: stuckAfterMs, maxConsecutiveTaskErrors, resumeRetryDelayMs.
- * Old field renamed: hardTimeoutGraceMs → timeoutGraceMs.
- * New fields added with defaults: tmuxSession, defaultTimeoutMs, sidecarSocketPath.
+ * Originally created a subagent config block, but that was removed in
+ * migration 3. Now just drops the dead workflow section and bumps the version.
  */
 function migrationV1(config: RawConfig): RawConfig {
   const core = config.core as RawConfig | undefined;
@@ -26,30 +25,13 @@ function migrationV1(config: RawConfig): RawConfig {
   const app = core.app as RawConfig | undefined;
   if (!app) return { ...config, configVersion: 1 };
 
-  const workflow = app.workflow as RawConfig | undefined;
-  const subagent: RawConfig = {
-    tmuxSession: "openelinaro",
-    defaultTimeoutMs: 3_600_000,
-    timeoutGraceMs: 30_000,
-    sidecarSocketPath: "",
-  };
-
-  if (workflow) {
-    if (typeof workflow.hardTimeoutGraceMs === "number") {
-      subagent.timeoutGraceMs = workflow.hardTimeoutGraceMs;
-    }
-  }
-
   const { workflow: _dropped, ...restApp } = app;
   return {
     ...config,
     configVersion: 1,
     core: {
       ...core,
-      app: {
-        ...restApp,
-        subagent,
-      },
+      app: restApp,
     },
   };
 }

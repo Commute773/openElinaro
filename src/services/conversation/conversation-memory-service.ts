@@ -76,7 +76,6 @@ const INTERNAL_AUTOMATION_PATTERNS = [
   /^<injected_message\b/i,
   /^this is a healthcheck\b/i,
   /^automated heartbeat trigger\./i,
-  /^background subagent completion update\./i,
   /^context summary \(generated automatically during compaction;/i,
 ];
 

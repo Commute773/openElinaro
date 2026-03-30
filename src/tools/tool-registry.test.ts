@@ -109,7 +109,6 @@ function writeTestProfileRegistry(rootDir: string) {
           memoryNamespace: "root",
           preferredProvider: "openai-codex",
           defaultModelId: "gpt-5.4",
-          maxSubagentDepth: 1,
         },
         {
           id: "restricted",
@@ -118,7 +117,6 @@ function writeTestProfileRegistry(rootDir: string) {
           memoryNamespace: "restricted",
           preferredProvider: "openai-codex",
           defaultModelId: "gpt-5.4",
-          maxSubagentDepth: 1,
         },
         {
           id: "remote",
@@ -127,7 +125,6 @@ function writeTestProfileRegistry(rootDir: string) {
           memoryNamespace: "remote",
           preferredProvider: "openai-codex",
           defaultModelId: "gpt-5.4",
-          maxSubagentDepth: 1,
         },
       ],
     }, null, 2)}\n`,
@@ -1753,68 +1750,6 @@ describe("ToolRegistry tool catalog", () => {
 
     expect(String(result)).toContain(`Updated routine item ${id}`);
     expect(harness.routines.getItem(id)?.description).toBe("Updated from a legacy notes field.");
-  });
-
-  test("agent_summary is available and summarizes terminal output", async () => {
-    const harness = createHarness();
-    const registry = harness.registry;
-    (registry as any).subagents.getAgentRun = () => ({
-      id: "workflow-test-run",
-      profileId: "root",
-      provider: "codex",
-      goal: "test goal",
-      status: "running",
-      tmuxSession: "openelinaro",
-      tmuxWindow: "workflow-test-run",
-      workspaceCwd: "/tmp/test",
-      createdAt: new Date(0).toISOString(),
-      launchDepth: 1,
-      timeoutMs: 300_000,
-      eventLog: [],
-    });
-    (registry as any).subagents.readAgentTerminal = async () => "running tests\nFINAL_STATUS=green";
-    (registry as any).models.summarizeToolResult = async () => "Agent is still running tests and looks healthy.";
-
-    expect(registry.getToolNames()).toContain("agent_summary");
-
-    const result = await registry.invoke("agent_summary", {
-      runId: "workflow-test-run",
-    });
-
-    expect(String(result)).toContain("Agent is still running tests and looks healthy.");
-  });
-
-  test("agent_summary falls back to stored run state when no terminal buffer is available", async () => {
-    const harness = createHarness();
-    const registry = harness.registry;
-    (registry as any).subagents.getAgentRun = () => ({
-      id: "workflow-test-run",
-      profileId: "root",
-      provider: "codex",
-      goal: "test goal",
-      status: "failed",
-      tmuxSession: "openelinaro",
-      tmuxWindow: "workflow-test-run",
-      workspaceCwd: "/tmp/test",
-      createdAt: new Date(0).toISOString(),
-      launchDepth: 1,
-      timeoutMs: 300_000,
-      error: "node not found",
-      eventLog: [
-        { kind: "worker.failed", timestamp: new Date(0).toISOString(), summary: "node not found" },
-      ],
-    });
-    (registry as any).subagents.readAgentTerminal = async () => "(tmux window no longer exists)";
-    (registry as any).models.summarizeToolResult = async (params: { output: string }) => {
-      expect(params.output).toContain("node not found");
-      return "The agent failed before it could start.";
-    };
-
-    const result = await registry.invoke("agent_summary", {
-      runId: "workflow-test-run",
-    });
-
-    expect(String(result)).toContain("The agent failed before it could start.");
   });
 
   test("supports brief, verbose, and full context usage modes", async () => {
