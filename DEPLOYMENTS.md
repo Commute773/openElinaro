@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30
+- Released at: 2026-03-30T00:03:31Z
+- Release id: 20260330T000331Z-3796b0f
+- Previous version: 2026.03.29.19
+- Trigger: ci/release workflow
+
+- refactor: flatten memory path — remove unnecessary documents/ nesting
+
 ## 2026.03.29.19
 - Released at: 2026-03-29T23:52:26Z
 - Release id: 20260329T235226Z-24d505d
