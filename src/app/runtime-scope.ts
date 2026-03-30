@@ -30,6 +30,7 @@ import { ToolRegistry } from "../tools/tool-registry";
 import { telemetry } from "../services/infrastructure/telemetry";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { PiCore } from "../core/pi-core";
+import { ClaudeSdkCore } from "../core/claude-sdk-core";
 import type { CoreFactory } from "../core/types";
 import { PeerClient } from "../instance/peer-client";
 import { PeerRegistry } from "../instance/peer-registry";
@@ -287,8 +288,14 @@ export function createRuntimeScope(ctx: {
     const profile = c.resolve<ProfileRecord>(K.profile);
 
     // Core factory: creates an AgentCore instance per turn based on the resolved model.
-    // Currently always returns PiCore. Future: select ClaudeSdkCore based on provider.
+    // Routes to ClaudeSdkCore for the claude provider, PiCore for all others.
     const coreFactory: CoreFactory = ({ modelConfig }) => {
+      if (modelConfig.providerId === "claude") {
+        return new ClaudeSdkCore({
+          model: modelConfig.modelId,
+          apiKey: modelConfig.apiKey,
+        });
+      }
       return new PiCore({
         model: modelConfig.runtimeModel as Model<Api>,
         apiKey: modelConfig.apiKey,
