@@ -249,15 +249,26 @@ function buildMcpTool(
   toolDef: CoreToolDefinition,
   executeTool: CoreRunOptions["executeTool"],
 ) {
-  // Convert JSON Schema parameters to a Zod schema for the SDK's tool() function.
-  // The SDK accepts ZodRawShape, so we use z.object({}).passthrough() to accept any input
-  // and let the harness tool handler validate.
+  // Extract the Zod schema shape for the SDK's tool() function.
+  // The SDK expects ZodRawShape — the .shape of a z.object().
+  // If the original Zod schema is available and is a ZodObject, use its shape directly.
+  // Otherwise fall back to a passthrough schema.
+  const zodSchema = toolDef.zodSchema;
+  const shape = zodSchema instanceof z.ZodObject
+    ? (zodSchema as z.ZodObject<z.ZodRawShape>).shape
+    : { input: z.string().optional().describe("JSON-encoded tool arguments") };
+  const useFallback = !(zodSchema instanceof z.ZodObject);
+
   return tool(
     toolDef.name,
     toolDef.description,
-    { input: z.string().optional().describe("JSON-encoded tool arguments") },
+    shape,
     async (args) => {
-      const parsedArgs = args.input ? JSON.parse(args.input) : {};
+      // When using the fallback schema, parse the JSON string input.
+      // When using the real schema, args are already parsed by Zod.
+      const parsedArgs = useFallback && typeof args.input === "string"
+        ? JSON.parse(args.input)
+        : args;
       const result = await executeTool(
         {
           type: "toolCall",

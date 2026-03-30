@@ -152,6 +152,8 @@ export interface CoreToolDefinition {
   description: string;
   /** JSON Schema object for the tool parameters. */
   parameters: Record<string, unknown>;
+  /** Original Zod schema, when available. Cores that accept Zod input (e.g., Claude Agent SDK) use this for proper schema passthrough. */
+  zodSchema?: unknown;
 }
 
 // ---------------------------------------------------------------------------

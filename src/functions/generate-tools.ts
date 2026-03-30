@@ -86,6 +86,7 @@ export function generateAgentTool(
       name: def.name,
       description: def.description,
       parameters: parameters as Tool["parameters"],
+      zodSchema: schema,
     },
     handler: async (input: Record<string, unknown>): Promise<ToolRawResult> => {
       return traceSpan(`tool.${def.name}`, async () => {
