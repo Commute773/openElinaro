@@ -389,7 +389,7 @@ export class ToolRegistry {
   private _activeToolContext: ToolContext | undefined;
   private readonly runtimePlatform: RuntimePlatform;
   private readonly shell: ShellRuntime;
-  private readonly finance: FinanceService;
+  private readonly finance: FinanceService | undefined;
   private readonly email: EmailService;
   private readonly vonage: VonageService;
   private readonly geminiLivePhone: GeminiLivePhoneService;
@@ -438,7 +438,7 @@ export class ToolRegistry {
     this.runtimePlatform = runtimePlatform ?? resolveRuntimePlatform();
     this.shell = shell ?? new ShellService(undefined, this.access);
     this.filesystem = filesystem ?? new FilesystemService(this.access);
-    this.finance = finance ?? new FinanceService();
+    this.finance = finance;
     this.email = new EmailService();
     this.vonage = new VonageService();
     this.geminiLivePhone = new GeminiLivePhoneService({ vonage: this.vonage });
@@ -723,7 +723,7 @@ export class ToolRegistry {
         },
       ),
       guardRuntimeContextSection(
-        this.featureConfig.isActive("finance") ? this.finance.buildAssistantContext() : "",
+        this.featureConfig.isActive("finance") && this.finance ? this.finance.buildAssistantContext() : "",
         {
           sourceType: "other",
           sourceName: "finance runtime context",

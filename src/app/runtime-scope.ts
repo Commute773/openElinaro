@@ -93,7 +93,7 @@ export function createRuntimeScope(ctx: {
   routines: RoutinesService;
   conversations: ConversationStore;
   systemPrompts: SystemPromptService;
-  finance: FinanceService;
+  finance?: FinanceService;
   health: HealthTrackingService;
   onCacheMissWarning?: (warning: CacheMissWarning) => Promise<void> | void;
   onConversationActivityChange?: (params: {

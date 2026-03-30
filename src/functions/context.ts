@@ -58,7 +58,7 @@ export interface ToolBuildContext {
   models: ModelService;
   conversations: ConversationStore;
   access: AccessControlService;
-  finance: FinanceService;
+  finance?: FinanceService;
   health: HealthTrackingService;
   shell: ShellRuntime;
   filesystem: FilesystemRuntime;

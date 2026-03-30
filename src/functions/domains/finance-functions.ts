@@ -140,7 +140,14 @@ const FINANCE_UNTRUSTED = {
 // Domain builder
 // ---------------------------------------------------------------------------
 
-export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
+export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => {
+  // If the finance service isn't available, register no finance functions.
+  if (!ctx.finance) return [];
+
+  // Capture a definite reference so handlers don't need optional chaining.
+  const finance = ctx.finance;
+
+  return [
   // -----------------------------------------------------------------------
   // finance_summary
   // -----------------------------------------------------------------------
@@ -149,7 +156,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
     description:
       "Show the current finance overview: budget status, review queue, receivables, and the imported Google Sheet source link.",
     input: z.object({}),
-    handler: async (_input, fnCtx) => fnCtx.services.finance.summary(),
+    handler: async (_input) => finance.summary(),
     format: formatResult,
     auth: FINANCE_AUTH,
     domains: FINANCE_DOMAINS,
@@ -167,8 +174,8 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
     description:
       "Show the weekly or fallback monthly budget snapshot, with rollover, pace, and optional limit override.",
     input: financeBudgetSchema,
-    handler: async (input, fnCtx) =>
-      fnCtx.services.finance.budget({
+    handler: async (input) =>
+      finance.budget({
         date: input.date,
         weeklyLimit: input.weeklyLimit,
       }),
@@ -189,8 +196,8 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
     description:
       "List transaction history with optional month/date/category/account filters, including budget-only or review-only views.",
     input: financeHistorySchema,
-    handler: async (input, fnCtx) =>
-      fnCtx.services.finance.history({
+    handler: async (input) =>
+      finance.history({
         month: input.month,
         fromDate: input.fromDate,
         toDate: input.toDate,
@@ -217,11 +224,11 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
     description:
       "Inspect the finance review queue or apply review decisions that set categories, budget counts, descriptions, and notes.",
     input: financeReviewSchema,
-    handler: async (input, fnCtx) => {
+    handler: async (input) => {
       if (input.decisions && input.decisions.length > 0) {
-        return fnCtx.services.finance.categorize(input.decisions);
+        return finance.categorize(input.decisions);
       }
-      return fnCtx.services.finance.reviewQueue(input.limit ?? 10);
+      return finance.reviewQueue(input.limit ?? 10);
     },
     format: formatResult,
     auth: FINANCE_AUTH,
@@ -245,8 +252,8 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
     description:
       "Import finance transactions from the configured Fintable Google Sheet or caller-provided CSV text.",
     input: financeImportSchema,
-    handler: async (input, fnCtx) =>
-      fnCtx.services.finance.importTransactions({
+    handler: async (input) =>
+      finance.importTransactions({
         source: input.source,
         dryRun: input.dryRun,
         spreadsheetId: input.spreadsheetId,
@@ -276,10 +283,10 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
     description:
       "Manage finance state: add expenses, receivables, recurring items, payables, income sources, FX events, or list, edit, and refresh those records.",
     input: financeManageSchema,
-    handler: async (input, fnCtx) => {
+    handler: async (input) => {
       switch (input.action) {
         case "add_expense":
-          return fnCtx.services.finance.addExpense({
+          return finance.addExpense({
             postedDate: input.postedDate!,
             amount: input.amount!,
             currency: input.currency,
@@ -291,7 +298,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
             note: input.note,
           });
         case "add_receivable":
-          return fnCtx.services.finance.addReceivable({
+          return finance.addReceivable({
             counterparty: input.counterparty!,
             amount: input.amount,
             amountCad: input.amountCad,
@@ -302,14 +309,14 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
             notes: input.notes,
           });
         case "list_receivables":
-          return fnCtx.services.finance.listReceivables(input.status);
+          return finance.listReceivables(input.status);
         case "check_receivables":
-          return fnCtx.services.finance.checkReceivables({
+          return finance.checkReceivables({
             today: input.today,
             horizonDays: input.horizonDays,
           });
         case "add_recurring":
-          return fnCtx.services.finance.addRecurring({
+          return finance.addRecurring({
             name: input.name!,
             matchKind: input.matchKind,
             matchValue: input.matchValue!,
@@ -325,7 +332,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
             notes: input.notes,
           });
         case "set_recurring":
-          return fnCtx.services.finance.setRecurring({
+          return finance.setRecurring({
             id: input.id,
             name: input.name,
             matchKind: input.matchKind,
@@ -342,23 +349,23 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
             notes: input.notes,
           });
         case "list_recurring":
-          return fnCtx.services.finance.listRecurring();
+          return finance.listRecurring();
         case "list_recurring_candidates":
-          return fnCtx.services.finance.listRecurringCandidates({
+          return finance.listRecurringCandidates({
             today: input.today,
             includeKnown: input.includeKnown,
             maxAgeDays: input.maxAgeDays,
           });
         case "refresh_recurring":
-          return fnCtx.services.finance.refreshRecurring({
+          return finance.refreshRecurring({
             today: input.today,
             noAutoSeed: input.noAutoSeed,
             seedLimit: input.seedLimit,
           });
         case "delete_recurring":
-          return fnCtx.services.finance.deleteRecurring(input.id!);
+          return finance.deleteRecurring(input.id!);
         case "add_payable":
-          return fnCtx.services.finance.addPayable({
+          return finance.addPayable({
             counterparty: input.counterparty!,
             description: input.description,
             amount: input.amount!,
@@ -370,14 +377,14 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
             notes: input.notes,
           });
         case "list_payables":
-          return fnCtx.services.finance.listPayables({
+          return finance.listPayables({
             status: input.status,
             certainty: input.certainty,
           });
         case "pay_payable":
-          return fnCtx.services.finance.markPayablePaid(input.id!);
+          return finance.markPayablePaid(input.id!);
         case "add_income_source":
-          return fnCtx.services.finance.addIncomeSource({
+          return finance.addIncomeSource({
             name: input.name!,
             type: input.type,
             currency: input.currency,
@@ -391,9 +398,9 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
             notes: input.notes,
           });
         case "list_income_sources":
-          return fnCtx.services.finance.listIncomeSources();
+          return finance.listIncomeSources();
         case "add_fx_event":
-          return fnCtx.services.finance.addFxEvent({
+          return finance.addFxEvent({
             date: input.date!,
             amountFrom: input.amountFrom!,
             currencyFrom: input.currencyFrom,
@@ -403,7 +410,7 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
             notes: input.notes,
           });
         case "list_fx_events":
-          return fnCtx.services.finance.listFxEvents();
+          return finance.listFxEvents();
         default:
           throw new Error(`Unsupported finance action: ${input.action}`);
       }
@@ -426,8 +433,8 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
     description:
       "Render the finance forecast summary, monthly cashflow, receivables view, or payables view.",
     input: financeForecastSchema,
-    handler: async (input, fnCtx) =>
-      fnCtx.services.finance.forecast(input.view ?? "summary"),
+    handler: async (input) =>
+      finance.forecast(input.view ?? "summary"),
     format: formatResult,
     auth: FINANCE_AUTH,
     domains: FINANCE_DOMAINS,
@@ -440,4 +447,5 @@ export const buildFinanceFunctions: FunctionDomainBuilder = (ctx) => [
       notes: "Finance forecast output is derived from user-managed personal data.",
     },
   }),
-];
+  ];
+};
