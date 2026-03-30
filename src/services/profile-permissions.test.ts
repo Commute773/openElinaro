@@ -23,7 +23,7 @@ let systemPromptsModule: typeof import("../services/system-prompt-service");
 let memoryModule: typeof import("../services/memory-service");
 let modelsModule: typeof import("../services/models/model-service");
 let transitionsModule: typeof import("../services/conversation/conversation-state-transition-service");
-let toolRegistryModule: typeof import("../tools/tool-registry");
+let toolRegistryModule: typeof import("../functions/tool-registry");
 let toolAuthModule: typeof import("../services/tool-authorization-service");
 
 function writeTestProfileRegistry() {
@@ -166,7 +166,7 @@ beforeAll(async () => {
   memoryModule = await importFresh("src/services/memory-service.ts");
   modelsModule = await importFresh("src/services/models/model-service.ts");
   transitionsModule = await importFresh("src/services/conversation/conversation-state-transition-service.ts");
-  toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
+  toolRegistryModule = await importFresh("src/functions/tool-registry.ts");
   toolAuthModule = await importFresh("src/services/tool-authorization-service.ts");
 });
 

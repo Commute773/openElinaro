@@ -17,7 +17,7 @@ import {
   formatSystemPromptWarning,
   SystemPromptService,
 } from "../system-prompt-service";
-import { ToolRegistry } from "../../tools/tool-registry";
+import { ToolRegistry } from "../../functions/tool-registry";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { ToolResolutionService } from "../tool-resolution-service";

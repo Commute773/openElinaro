@@ -1,7 +1,7 @@
 import type { Tool } from "../messages/types";
 import type { AgentToolScope, ResolvedToolBundle, ToolCatalogCard } from "../domain/tool-catalog";
-import type { ToolContext } from "../tools/tool-registry";
-import { ToolRegistry } from "../tools/tool-registry";
+import type { ToolContext } from "../functions/tool-registry";
+import { ToolRegistry } from "../functions/tool-registry";
 
 type ResolveParams = {
   agentScope: AgentToolScope;

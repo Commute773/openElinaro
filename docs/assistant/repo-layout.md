@@ -33,12 +33,11 @@ That means `projects/` is part of the assistant's world model, but not part of t
 - `src/core/`: swappable core system — AgentCore interface, ClaudeSdkCore (Claude Agent SDK), PiCore (pi-ai adapter), canonical message types, core-aware tool filtering, message bridge
 - `src/instance/`: inter-instance peer messaging — Unix socket server, peer client, peer registry
 - `src/services/`: stateful application services, persistence, auth, model routing, tools, memory, logging, shell, and access control. Includes subdirectories `finance/` (extracted finance modules) and `gemini-live/` (extracted live phone modules)
-- `src/tools/`: tool definitions via `tool-registry.ts` and domain-specific tool groups under `groups/`
 - `src/config/`: runtime configuration and extracted constants (`runtime-config.ts`, `service-constants.ts`)
 - `src/utils/`: shared utility modules (`timestamp.ts`, `text-utils.ts`, `file-utils.ts`, `time-helpers.ts`, `telemetry-helpers.ts`, `sqlite-helpers.ts`)
 - `src/domain/`: schemas, runtime domain objects, and structured error types (`errors.ts`)
 - `src/messages/`: canonical message type re-exports from core types, helper constructors and predicates
-- `src/functions/`: unified function layer — `FunctionDefinition` types (`define-function.ts`), domain builders (`domains/`), a central registry (`function-registry.ts`), and generators that produce agent tools (`generate-tools.ts`), HTTP API routes (`generate-api-routes.ts`), Discord commands (`generate-discord-commands.ts`), and OpenAPI specs (`generate-openapi.ts`) from the same function definitions
+- `src/functions/`: unified function and tool layer — `FunctionDefinition` types (`define-function.ts`), domain builders (`domains/`), a central registry (`function-registry.ts`), the `ToolRegistry` class (`tool-registry.ts`), tool output pipeline (`tool-output-pipeline.ts`), shared build context (`context.ts`), and generators that produce agent tools (`generate-tools.ts`), HTTP API routes (`generate-api-routes.ts`), Discord commands (`generate-discord-commands.ts`), and OpenAPI specs (`generate-openapi.ts`) from the same function definitions
 - `src/auth/`: provider-specific auth helpers
 - `src/integrations/`: external surfaces such as Discord and the local HTTP webhook listener
 - `src/workers/`: background worker entrypoints

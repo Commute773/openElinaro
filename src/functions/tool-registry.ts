@@ -2,8 +2,8 @@ import type { Tool, ToolCall, ToolResultMessage } from "../messages/types";
 import { toolResultMessage } from "../messages/types";
 import {
   renderShellExecResult,
-} from "./groups";
-import type { ToolEntry } from "../functions/generate-tools";
+} from "./context";
+import type { ToolEntry } from "./generate-tools";
 import {
   stripToolControlInput,
   normalizeToolFailure,
@@ -43,8 +43,8 @@ import {
   getToolAuthorizationDeclaration,
   registerAuthDeclarations,
 } from "../services/tool-authorization-service";
-import { FunctionRegistry } from "../functions/function-registry";
-import { ALL_FUNCTION_BUILDERS } from "../functions/domains";
+import { FunctionRegistry } from "./function-registry";
+import { ALL_FUNCTION_BUILDERS } from "./domains";
 import { OpenBrowserService } from "../services/openbrowser-service";
 import {
   SecretStoreService,
@@ -73,7 +73,7 @@ import {
   getRuntimeConfig,
 } from "../config/runtime-config";
 import type { AgentToolScope, ToolCatalogCard } from "../domain/tool-catalog";
-import type { ShellRuntime, FilesystemRuntime, TicketsRuntime } from "./groups/tool-group-types";
+import type { ShellRuntime, FilesystemRuntime, TicketsRuntime } from "./context";
 
 export const ROUTINE_TOOL_NAMES = [
   "load_tool_library",
@@ -418,7 +418,7 @@ export class ToolRegistry {
   private readonly reflection?: Pick<ReflectionService, "runExplicitReflection">;
   private _peerClient: import("../instance/peer-client").PeerClient | undefined;
   private _peerRegistry: import("../instance/peer-registry").PeerRegistry | undefined;
-  private readonly _toolBuildContext: import("./groups/tool-group-types").ToolBuildContext;
+  private readonly _toolBuildContext: import("./context").ToolBuildContext;
 
   /** The unified function registry, built alongside legacy tool groups. */
   readonly functionRegistry: FunctionRegistry;
@@ -636,7 +636,7 @@ export class ToolRegistry {
   }
 
   /** Expose the ToolBuildContext for the function-layer API route generator. */
-  getToolBuildContext(): import("./groups/tool-group-types").ToolBuildContext {
+  getToolBuildContext(): import("./context").ToolBuildContext {
     return this._toolBuildContext;
   }
 

@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
 import { formatResult } from "../formatters";
-import { renderShellExecResult } from "../../tools/groups";
+import { renderShellExecResult } from "../context";
 
 // ---------------------------------------------------------------------------
 // Schemas (same as shell-tools.ts)

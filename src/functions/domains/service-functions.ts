@@ -9,7 +9,7 @@ import { defineFunction, type FunctionDomainBuilder } from "../define-function";
 import { formatResult } from "../formatters";
 import { isRunningInsideManagedService } from "../../services/infrastructure/runtime-platform";
 import type { RuntimePlatform } from "../../services/infrastructure/runtime-platform";
-import type { ToolBuildContext } from "../../tools/groups/tool-group-types";
+import type { ToolBuildContext } from "../context";
 
 // ---------------------------------------------------------------------------
 // Shared schemas (same as service-tools.ts)

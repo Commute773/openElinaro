@@ -13,7 +13,7 @@ import { z } from "zod";
 import type { FunctionDefinition, FunctionContext, HttpMethod } from "./define-function";
 import { API_PATH_PREFIX, deriveHttpAnnotation } from "./define-function";
 import type { RouteDefinition } from "../integrations/http/g2/router";
-import type { ToolBuildContext } from "../tools/groups/tool-group-types";
+import type { ToolBuildContext } from "./context";
 import type { FeatureId } from "../services/feature-config-service";
 import { json, error } from "../integrations/http/g2/helpers";
 import { createTraceSpan } from "../utils/telemetry-helpers";
