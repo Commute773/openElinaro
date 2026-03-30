@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.15
+- Released at: 2026-03-30T20:56:25Z
+- Release id: 20260330T205625Z-127dda5
+- Previous version: 2026.03.30.14
+- Trigger: ci/release workflow
+
+- feat: maximize logging of SDK-native operations
+
 ## 2026.03.30.14
 - Released at: 2026-03-30T20:53:09Z
 - Release id: 20260330T205309Z-81a5827
