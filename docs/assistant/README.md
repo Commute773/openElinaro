@@ -1,13 +1,32 @@
 # Assistant Docs
 
-These docs describe the current agent system, not arbitrary project content stored elsewhere in the repo.
+These docs describe the current agent system architecture and runtime behavior.
 
-## Generated Inventory
-<!-- docs-index:start:inventory -->
-- Core maps: [Repo Layout And Boundaries](repo-layout.md), [Architecture Decisions](architecture-decisions.md), [Configuration And Features](configuration.md), [Runtime Domain Model](runtime-domain-model.md), [Projects](projects.md), [Memory Runtime](memory.md), [Observability](observability.md), [Reflection Runtime](reflection.md), [Tickets Tooling](tickets.md), [Media Runtime](media.md), [Extensions](extensions.md), [HTTP API](api.md)
-- Agent behavior: [Decision Support](decision-support.md), [OpenClaw Migration Notes](openclaw-migration.md)
-- Operator and validation docs: [Tool Use Playbook](tool-use-playbook.md), [Harness Smoke Tests](harness-smoke-tests.md)
-- Additional assistant docs: [Communications Runtime](communications.md)
-<!-- docs-index:end:inventory -->
+## Core Architecture
+
+- [Repo Layout](repo-layout.md) -- directory structure and system boundaries
+- [Architecture Decisions](architecture-decisions.md) -- key design decisions shaping the codebase
+- [Runtime Domain Model](runtime-domain-model.md) -- core types, profiles, auth, projects, routines
+- [Configuration](configuration.md) -- config files, feature flags, onboarding
+
+## Runtime Systems
+
+- [Autonomous Time & Reflection](reflection.md) -- unified autonomous time, journal, soul rewrites
+- [Memory](memory.md) -- durable memory, structured entities, identity continuity
+- [Communications](communications.md) -- phone calls, messaging, Vonage/Gemini Live
+- [Media](media.md) -- local audio playback, speakers, media library
+- [Tickets](tickets.md) -- external Elinaro Tickets tracker integration
+
+## Agent Behavior
+
+- [Tool Use Playbook](tool-use-playbook.md) -- tool discovery, web ladder, browser secrets, patterns
+- [Decision Support](decision-support.md) -- guidance style, spending and impulse management
+- [Observability](observability.md) -- telemetry, logging, model usage ledger
+
+## Platform Surface
+
+- [HTTP API](api.md) -- JSON API endpoints, generated routes, client codegen
+- [Projects](projects.md) -- project registry, per-project docs, workspace conventions
+- [Extensions](extensions.md) -- user-installed extension modules (discovery/validation implemented, activation stubbed)
 
 User-specific persona and operator docs are loaded from `~/.openelinaro/docs/assistant/`, not from this repo.

@@ -58,11 +58,9 @@ const ASSISTANT_CORE_DOCS = [
 ] as const;
 const ASSISTANT_BEHAVIOR_DOCS = [
   "docs/assistant/decision-support.md",
-  "docs/assistant/openclaw-migration.md",
 ] as const;
 const ASSISTANT_OPERATOR_DOCS = [
   "docs/assistant/tool-use-playbook.md",
-  "docs/assistant/harness-smoke-tests.md",
 ] as const;
 const TOP_LEVEL_REPO_PATHS = [
   "src",

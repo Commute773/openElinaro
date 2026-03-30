@@ -111,9 +111,15 @@ Further reading:
 The short version:
 
 - Discord is the primary surface; `src/index.ts` starts that runtime.
+- Everything is chat: `AppRequest` has `id`, `text`, `conversationKey`, optional `chatContent`. No request kinds.
 - The app uses a swappable `AgentCore` interface: ClaudeSdkCore (primary, Claude Agent SDK) and PiCore (adapter for non-Claude providers).
 - Each core declares a manifest with feature ownership. The harness skips its own compaction/context management when the core handles them.
-- Tools are defined as `FunctionDefinition` objects and adapted per core. Native tools (file ops, shell, web for ClaudeSdkCore) are filtered out automatically.
+- Tools are defined as `FunctionDefinition` objects with three surfaces (API, Discord, Agent) and adapted per core. Native tools filtered out automatically.
+- AgentChatService is decomposed: thin facade, session manager, turn runner, shared types and helpers.
+- Finance is optionally decoupled (`finance?: FinanceService` in `ToolBuildContext`).
+- System prompts: strict universal + custom concatenation. No merge logic, no override, no in-code defaults.
+- Autonomous time unifies reflection, soul rewrites, and self-directed work in a single daily session.
+- Single identity per install. Each process is one profile.
 - Profiles, projects, auth, and tool access are explicit runtime objects with local single sources of truth.
 - Prompt guidance is intentionally compact and uses docs for progressive disclosure instead of a huge base prompt.
 
@@ -152,13 +158,9 @@ Docs are part of the product surface and must stay current.
 
 The docs graph starts here:
 
-<!-- docs-index:start:doc-entrypoints -->
 - [docs/README.md](docs/README.md)
 - [docs/assistant/README.md](docs/assistant/README.md)
 - [docs/research/README.md](docs/research/README.md)
-<!-- docs-index:end:doc-entrypoints -->
-
-- [docs/README.md](docs/README.md)
 
 ## Research And Historical Notes
 
