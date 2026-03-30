@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.8
+- Released at: 2026-03-30T17:41:49Z
+- Release id: 20260330T174149Z-867cc6e
+- Previous version: 2026.03.30.7
+- Trigger: ci/release workflow
+
+- test: Phase 5 dual-core verification tests
+
 ## 2026.03.30.7
 - Released at: 2026-03-30T17:23:42Z
 - Release id: 20260330T172342Z-cc68fab
