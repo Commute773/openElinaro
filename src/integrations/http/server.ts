@@ -7,9 +7,9 @@ import {
 } from "../../services/gemini-live-phone-service";
 import { VonageService, getVonageWebhookPath } from "../../services/vonage-service";
 import type { OpenElinaroApp } from "../../app/runtime";
-import { handleG2ApiRequest } from "./g2-api";
+import { handleApiRequest } from "./api";
 import { authenticateApiRequest } from "./api-auth";
-import { CORS_HEADERS } from "./g2/helpers";
+import { CORS_HEADERS } from "./api/helpers";
 
 export function normalizePath(pathname: string) {
   return pathname.replace(/\/+$/, "") || "/";
@@ -37,19 +37,19 @@ export function createHttpRequestHandler(
       return Response.json({ ok: true }, { status: 200, headers: CORS_HEADERS });
     }
 
-    // G2 simulator UI
+    // Simulator UI
     if (pathname === "/g2" || pathname === "/g2/") {
-      const uiPath = new URL("./g2/ui.html", import.meta.url).pathname;
+      const uiPath = new URL("./api/ui.html", import.meta.url).pathname;
       const file = Bun.file(uiPath);
       return new Response(file, {
         headers: { "Content-Type": "text/html; charset=utf-8", ...CORS_HEADERS },
       });
     }
 
-    // G2 API routes
-    if (app && pathname.startsWith("/api/g2")) {
-      const g2Response = await handleG2ApiRequest(request, pathname, app);
-      if (g2Response) return g2Response;
+    // API routes
+    if (app && pathname.startsWith("/api")) {
+      const apiResponse = await handleApiRequest(request, pathname, app);
+      if (apiResponse) return apiResponse;
     }
 
     if (pathname === normalizePath(`${getVonageWebhookPath("voice.answer").replace(/\/answer$/, "")}/test-answer`)) {

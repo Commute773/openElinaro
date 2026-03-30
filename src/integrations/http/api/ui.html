@@ -331,7 +331,7 @@ function stopVoice() {
 async function handleVoiceInput(text) {
   showMessage(`"${text}" — asking...`);
   try {
-    const res = await fetch('/api/g2/ask', {
+    const res = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
@@ -442,9 +442,9 @@ function makeHomeScreen() {
     { text: 'Routines',      screen: () => makeRoutinesScreen() },
     { text: 'Notifications', screen: () => makeNotificationsScreen() },
     { text: 'Agents',        screen: () => makeAgentsScreen() },
-    { text: 'Health',        screen: () => makeApiScreen('Health', '/api/g2/health') },
-    { text: 'Finance',       screen: () => makeApiScreen('Finance', '/api/g2/finance/summary') },
-    { text: 'Projects',      screen: () => makeApiScreen('Projects', '/api/g2/projects') },
+    { text: 'Health',        screen: () => makeApiScreen('Health', '/api/health') },
+    { text: 'Finance',       screen: () => makeApiScreen('Finance', '/api/finance/summary') },
+    { text: 'Projects',      screen: () => makeApiScreen('Projects', '/api/projects') },
     { text: 'Todos',         screen: () => makeTodosScreen() },
     { text: 'Ask (Voice)',   screen: () => { input('voice'); return null; } },
   ];
@@ -456,7 +456,7 @@ function makeHomeScreen() {
     scroll: 0,
     async init() {
       try {
-        const data = await api('/api/g2/home');
+        const data = await api('/api/home');
         const header = [];
         const tc = data.timeContext || data;
         if (tc.dayOfWeek) header.push({ text: `${tc.dayOfWeek} ${tc.localTime || ''} ${tc.dayPeriod || ''}`, color: 8 });
@@ -497,14 +497,14 @@ function makeHomeScreen() {
 
 // ── Routines Screen ──────────────────────────────────────────────────
 function makeRoutinesScreen() {
-  const screen = makeApiScreen('Routines', '/api/g2/routines/check', {
+  const screen = makeApiScreen('Routines', '/api/routines/check', {
     onPress(idx) {
       const item = screen.lines[idx];
       const dataItem = item?._item || (screen._data?.items?.[idx]);
       if (!dataItem?.id) return;
       // Mark done
       showMessage('Marking done...');
-      apiPost(`/api/g2/routines/${dataItem.id}/done`).then(() => {
+      apiPost(`/api/routines/${dataItem.id}/done`).then(() => {
         showMessage('Done!');
         screen.init(); // refresh
       }).catch(e => showMessage('Error: ' + e.message));
@@ -515,13 +515,13 @@ function makeRoutinesScreen() {
 
 // ── Notifications Screen ─────────────────────────────────────────────
 function makeNotificationsScreen() {
-  const screen = makeApiScreen('Notifications', '/api/g2/notifications', {
+  const screen = makeApiScreen('Notifications', '/api/notifications', {
     onPress(idx) {
       const items = screen._items || screen._data?.items || [];
       const item = items[idx];
       if (!item?.id) return;
       showMessage('Dismissing...');
-      apiPost(`/api/g2/notifications/${item.id}/action`, { action: 'done' }).then(() => {
+      apiPost(`/api/notifications/${item.id}/action`, { action: 'done' }).then(() => {
         showMessage('Done!');
         screen.init();
       }).catch(e => showMessage('Error: ' + e.message));
@@ -532,12 +532,12 @@ function makeNotificationsScreen() {
 
 // ── Agents Screen ────────────────────────────────────────────────────
 function makeAgentsScreen() {
-  const screen = makeApiScreen('Agents', '/api/g2/agents', {
+  const screen = makeApiScreen('Agents', '/api/agents', {
     onPress(idx) {
       const items = screen._items || screen._data?.items || [];
       const agent = items[idx];
       if (!agent?.id) return;
-      pushScreen(makeApiScreen('Agent Output', `/api/g2/agents/${agent.id}/output`, { cursor: false }));
+      pushScreen(makeApiScreen('Agent Output', `/api/agents/${agent.id}/output`, { cursor: false }));
     },
   });
   return screen;
@@ -545,13 +545,13 @@ function makeAgentsScreen() {
 
 // ── Todos Screen ─────────────────────────────────────────────────────
 function makeTodosScreen() {
-  const screen = makeApiScreen('Todos', '/api/g2/routines?kind=todo', {
+  const screen = makeApiScreen('Todos', '/api/routines?kind=todo', {
     onPress(idx) {
       const items = screen._items || screen._data?.items || [];
       const item = items[idx];
       if (!item?.id) return;
       showMessage('Marking done...');
-      apiPost(`/api/g2/routines/${item.id}/done`).then(() => {
+      apiPost(`/api/routines/${item.id}/done`).then(() => {
         showMessage('Done!');
         screen.init();
       }).catch(e => showMessage('Error: ' + e.message));
@@ -565,7 +565,7 @@ function makeTodosScreen() {
 // ═══════════════════════════════════════════════════════════════════════
 async function loadSpec() {
   try {
-    const spec = await api('/api/g2/openapi.json');
+    const spec = await api('/api/openapi.json');
     const count = Object.values(spec.paths || {}).reduce((n, m) =>
       n + Object.keys(m).filter(k => k !== 'parameters').length, 0);
     document.getElementById('status').textContent = `${count} functions`;
@@ -579,7 +579,7 @@ async function loadSpec() {
 // ═══════════════════════════════════════════════════════════════════════
 function connectSSE() {
   try {
-    const es = new EventSource('/api/g2/events');
+    const es = new EventSource('/api/events');
     for (const evt of ['agent_started','agent_completed','routine_reminder','alarm_triggered']) {
       es.addEventListener(evt, () => {
         const s = currentScreen();

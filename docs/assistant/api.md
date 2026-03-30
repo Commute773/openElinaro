@@ -1,8 +1,8 @@
-# G2 API
+# HTTP API
 
-The G2 API is an HTTP JSON API served by the main runtime on the same port as the health and webhook endpoints. It provides programmatic access to the agent's home dashboard, routines, todos, notifications, running agents, and a chat interface.
+The HTTP API is a JSON API served by the main runtime on the same port as the health and webhook endpoints. It provides programmatic access to the agent's home dashboard, routines, todos, notifications, running agents, and a chat interface.
 
-All endpoints live under `/api/g2/` and are handled by [`src/integrations/http/g2-api.ts`](../../src/integrations/http/g2-api.ts). The HTTP server is started by [`src/integrations/http/server.ts`](../../src/integrations/http/server.ts) using `Bun.serve()`.
+All endpoints live under `/api/` and are handled by [`src/integrations/http/api.ts`](../../src/integrations/http/api.ts). The HTTP server is started by [`src/integrations/http/server.ts`](../../src/integrations/http/server.ts) using `Bun.serve()`.
 
 ## Configuration
 
@@ -15,20 +15,20 @@ core:
     port: 3000         # default
 ```
 
-There is currently no authentication layer on the G2 API. Access control is expected to be handled at the network level (e.g. firewall, reverse proxy).
+There is currently no authentication layer on the API. Access control is expected to be handled at the network level (e.g. firewall, reverse proxy).
 
 ## CORS
 
-All G2 responses include permissive CORS headers (`Access-Control-Allow-Origin: *`). `OPTIONS` preflight requests to any `/api/g2` path return `204 No Content` with the same CORS headers.
+All API responses include permissive CORS headers (`Access-Control-Allow-Origin: *`). `OPTIONS` preflight requests to any `/api` path return `204 No Content` with the same CORS headers.
 
 ## Endpoints
 
-### GET /api/g2/home
+### GET /api/home
 
 Dashboard summary: time context, active agent count, next upcoming routine, and pending notification count.
 
 ```sh
-curl http://localhost:3000/api/g2/home
+curl http://localhost:3000/api/home
 ```
 
 Response:
@@ -44,12 +44,12 @@ Response:
 
 `nextRoutine` is `null` when no upcoming routine exists.
 
-### GET /api/g2/agents
+### GET /api/agents
 
 List currently running or starting background agents.
 
 ```sh
-curl http://localhost:3000/api/g2/agents
+curl http://localhost:3000/api/agents
 ```
 
 Response:
@@ -66,7 +66,7 @@ Response:
 ]
 ```
 
-### GET /api/g2/agents/:id/output
+### GET /api/agents/:id/output
 
 Capture recent terminal output from a running agent.
 
@@ -76,7 +76,7 @@ Capture recent terminal output from a running agent.
 | `lines` | query | `20` | Number of lines to capture |
 
 ```sh
-curl "http://localhost:3000/api/g2/agents/abc123/output?lines=50"
+curl "http://localhost:3000/api/agents/abc123/output?lines=50"
 ```
 
 Response:
@@ -88,12 +88,12 @@ Response:
 }
 ```
 
-### GET /api/g2/agents/:id/summary
+### GET /api/agents/:id/summary
 
 Summarize a running or recently completed agent. The runtime prefers the full tmux terminal buffer and falls back to stored run metadata when the window is already gone.
 
 ```sh
-curl http://localhost:3000/api/g2/agents/abc123/summary
+curl http://localhost:3000/api/agents/abc123/summary
 ```
 
 Response:
@@ -105,12 +105,12 @@ Response:
 }
 ```
 
-### POST /api/g2/agents/:id/send
+### POST /api/agents/:id/send
 
 Send input text to a running agent (steer it).
 
 ```sh
-curl -X POST http://localhost:3000/api/g2/agents/abc123/send \
+curl -X POST http://localhost:3000/api/agents/abc123/send \
   -H "Content-Type: application/json" \
   -d '{"input": "Focus on the failing test first"}'
 ```
@@ -119,12 +119,12 @@ Request body: `{ "input": "<text>" }` (required).
 
 Response: `{ "ok": true }`
 
-### GET /api/g2/routines
+### GET /api/routines
 
 List active scheduled routines with their current status.
 
 ```sh
-curl http://localhost:3000/api/g2/routines
+curl http://localhost:3000/api/routines
 ```
 
 Response:
@@ -138,22 +138,22 @@ Response:
 
 Status is one of `done`, `pending`, or `missed`. Items are sorted by time.
 
-### POST /api/g2/routines/:id/done
+### POST /api/routines/:id/done
 
 Mark a routine as done.
 
 ```sh
-curl -X POST http://localhost:3000/api/g2/routines/r1/done
+curl -X POST http://localhost:3000/api/routines/r1/done
 ```
 
 Response: `{ "ok": true }`
 
-### GET /api/g2/todos
+### GET /api/todos
 
 List active todo items.
 
 ```sh
-curl http://localhost:3000/api/g2/todos
+curl http://localhost:3000/api/todos
 ```
 
 Response:
@@ -164,22 +164,22 @@ Response:
 ]
 ```
 
-### POST /api/g2/todos/:id/done
+### POST /api/todos/:id/done
 
 Mark a todo as done.
 
 ```sh
-curl -X POST http://localhost:3000/api/g2/todos/t1/done
+curl -X POST http://localhost:3000/api/todos/t1/done
 ```
 
 Response: `{ "ok": true }`
 
-### POST /api/g2/ask
+### POST /api/ask
 
 Send a chat message to the agent and receive a response.
 
 ```sh
-curl -X POST http://localhost:3000/api/g2/ask \
+curl -X POST http://localhost:3000/api/ask \
   -H "Content-Type: application/json" \
   -d '{"text": "What is on my schedule today?"}'
 ```
@@ -188,14 +188,14 @@ Request body: `{ "text": "<message>" }` (required).
 
 Response: `{ "response": "You have two routines remaining today..." }`
 
-The request is processed on the `g2-simulator` conversation key.
+The request is processed on the `api-simulator` conversation key.
 
-### GET /api/g2/notifications
+### GET /api/notifications
 
 List pending notifications (overdue routines and due alarms).
 
 ```sh
-curl http://localhost:3000/api/g2/notifications
+curl http://localhost:3000/api/notifications
 ```
 
 Response:
@@ -221,12 +221,12 @@ Response:
 
 Up to 10 routine notifications and 5 alarm notifications are returned.
 
-### POST /api/g2/notifications/:id/action
+### POST /api/notifications/:id/action
 
 Act on a notification. The notification ID format is `<type>:<itemId>` (e.g. `routine:r2` or `alarm:a1`).
 
 ```sh
-curl -X POST http://localhost:3000/api/g2/notifications/routine:r2/action \
+curl -X POST http://localhost:3000/api/notifications/routine:r2/action \
   -H "Content-Type: application/json" \
   -d '{"action": "done"}'
 ```
@@ -245,7 +245,7 @@ Service-level API routes are generated automatically from function definitions i
 
 ### Path prefix
 
-Function definitions use relative paths (e.g. `/routines/:id/done`). The `API_PATH_PREFIX` constant in [`define-function.ts`](../../src/functions/define-function.ts) (currently `/api/g2`) is prepended automatically during route and OpenAPI generation.
+Function definitions use relative paths (e.g. `/routines/:id/done`). The `API_PATH_PREFIX` constant in [`define-function.ts`](../../src/functions/define-function.ts) (currently `/api`) is prepended automatically during route and OpenAPI generation.
 
 ### Adding endpoints
 
@@ -261,7 +261,7 @@ Run `bun run generate:client` (or `bun src/functions/generate-client.ts`) to pro
 
 Write to a specific file: `bun src/functions/generate-client.ts --out path/to/client.ts`
 
-The OpenAPI spec is also available at runtime: `GET /api/g2/openapi.json`.
+The OpenAPI spec is also available at runtime: `GET /api/openapi.json`.
 
 ## Error Responses
 
@@ -280,7 +280,7 @@ The same server also handles:
 - `GET /healthz` -- returns `{ "ok": true }` for liveness probes.
 - Vonage voice and messaging webhooks under the configured `webhookBasePath` (default `/webhooks/vonage`).
 
-These are separate from the G2 API and documented in [communications.md](communications.md) and [configuration.md](configuration.md).
+These are separate from the API and documented in [communications.md](communications.md) and [configuration.md](configuration.md).
 
 ## Read Next
 

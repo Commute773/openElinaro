@@ -102,18 +102,18 @@ function matchRoute(
 }
 
 /**
- * Handles G2 API requests.
- * Returns a Response if the request matched a G2 route, or null if it didn't.
+ * Handles API requests.
+ * Returns a Response if the request matched an API route, or null if it didn't.
  *
  * Routes are checked in order: generated (function-layer) first, then static (legacy).
  * This ensures function-layer routes take priority for migrated endpoints.
  */
-export async function handleG2ApiRequest(
+export async function handleApiRequest(
   request: Request,
   pathname: string,
   app: OpenElinaroApp,
 ): Promise<Response | null> {
-  if (request.method === "OPTIONS" && pathname.startsWith("/api/g2")) {
+  if (request.method === "OPTIONS" && pathname.startsWith("/api")) {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 

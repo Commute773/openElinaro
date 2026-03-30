@@ -12,7 +12,7 @@ This directory is the documentation graph for the repository. Use it for progres
 <!-- docs-index:start:inventory -->
 - Assistant docs index: [Assistant Docs](assistant/README.md)
 - Research notes index: [Research Notes](research/README.md)
-- G2 API reference: [G2 API](assistant/api.md)
+- HTTP API reference: [HTTP API](assistant/api.md)
 - Coverage snapshot: 26 docs indexed.
 <!-- docs-index:end:inventory -->
 

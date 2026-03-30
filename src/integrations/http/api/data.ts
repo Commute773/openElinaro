@@ -4,7 +4,7 @@ import { json } from "./helpers";
 export const dataRoutes: RouteDefinition[] = [
   {
     method: "GET",
-    pattern: "/api/g2/openapi.json",
+    pattern: "/api/openapi.json",
     handler: async (_request, _params, app) => {
       const fnRegistry = app.getFunctionRegistry?.();
       if (!fnRegistry) return json({ error: "Function registry not ready" }, 503);

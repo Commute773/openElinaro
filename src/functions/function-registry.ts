@@ -10,7 +10,7 @@
 import type { FunctionDefinition, FunctionDomainBuilder } from "./define-function";
 import type { ToolBuildContext } from "./context";
 import type { ToolContext } from "./tool-registry";
-import type { RouteDefinition } from "../integrations/http/g2/router";
+import type { RouteDefinition } from "../integrations/http/api/router";
 import type { ToolAuthorizationDeclaration, ToolCatalogCard, AgentToolScope } from "../domain/tool-catalog";
 import type { FeatureId } from "../services/feature-config-service";
 import { generateAgentTools, type FunctionContextExtras, type ToolEntry } from "./generate-tools";

@@ -121,6 +121,6 @@ See [Loading Lifecycle](#loading-lifecycle) above. The implementation lives in [
 
 ## Read Next
 
-- G2 API: [api.md](api.md)
+- HTTP API: [api.md](api.md)
 - Configuration and features: [configuration.md](configuration.md)
 - Runtime domain model: [runtime-domain-model.md](runtime-domain-model.md)
