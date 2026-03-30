@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.24
+- Released at: 2026-03-30T23:29:07Z
+- Release id: 20260330T232907Z-cb3b3ce
+- Previous version: 2026.03.30.23
+- Trigger: ci/release workflow
+
+- remove remaining openelinaro_require_agent_service_control calls
+
 ## 2026.03.30.23
 - Released at: 2026-03-30T23:27:45Z
 - Release id: 20260330T232745Z-566afd2
