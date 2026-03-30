@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.26
+- Released at: 2026-03-30T23:43:51Z
+- Release id: 20260330T234351Z-26fc229
+- Previous version: 2026.03.30.25
+- Trigger: ci/release workflow
+
+- remove stale migrations and finance.sqlite from USER_DATA_TOP_LEVEL
+
 ## 2026.03.30.25
 - Released at: 2026-03-30T23:41:05Z
 - Release id: 20260330T234105Z-d232c10
