@@ -25,14 +25,7 @@ import type { ReflectionService } from "../reflection-service";
 import type { MemoryManagementAgent } from "../memory/memory-management-agent";
 import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS } from "../../config/service-constants";
 import { wrapInjectedMessage } from "../injected-message-service";
-import type { CoreFactory, CoreToolExecutor } from "../../core/types";
-import {
-  piMessagesToCore,
-  piToolToCoreDef,
-  coreMessagesToPi,
-  coreAssistantMessageToPi,
-  coreToolCallToPi,
-} from "../../core/message-bridge";
+import type { CoreFactory, CoreToolExecutor, CoreToolDefinition } from "../../core/types";
 import { splitToolsForCore } from "../../core/tool-split";
 
 const QUEUED_WHILE_COMPACTING_MESSAGE = "message queued as we are currently compacting";
@@ -695,22 +688,21 @@ export class AgentChatService {
 
         // Build the core tool executor that delegates to ToolRegistry
         const coreToolExecutor: CoreToolExecutor = async (toolCall, signal) => {
-          const piToolCall = coreToolCallToPi(toolCall);
-          const piResult = await this.deps.routineTools.executeTool(piToolCall, toolSet.context, signal);
+          const result = await this.deps.routineTools.executeTool(toolCall, toolSet.context, signal);
           return {
             role: "toolResult" as const,
-            toolCallId: piResult.toolCallId,
-            toolName: piResult.toolName,
-            content: piResult.content,
-            details: piResult.details,
-            isError: piResult.isError,
-            timestamp: piResult.timestamp,
+            toolCallId: result.toolCallId,
+            toolName: result.toolName,
+            content: result.content,
+            details: result.details,
+            isError: result.isError,
+            timestamp: result.timestamp,
           };
         };
 
-        // Convert harness tools to core format, filtering out core-native tools
+        // Filter out tools the core handles natively
         const coreToolDefs = splitToolsForCore(
-          toolSet.tools.map(piToolToCoreDef),
+          toolSet.tools as CoreToolDefinition[],
           core.manifest,
         );
 
@@ -744,7 +736,7 @@ export class AgentChatService {
           const result = await this.runAbortableModelCall(session, (signal) =>
             core.run({
               systemPrompt: systemPrompt.text,
-              messages: piMessagesToCore(inputMessages),
+              messages: inputMessages,
               tools: coreToolDefs,
               executeTool: coreToolExecutor,
               maxSteps: CHAT_MAX_STEPS,
@@ -764,14 +756,11 @@ export class AgentChatService {
             };
           }
 
-          // Convert core messages back to pi-ai format for storage
-          const piNewMessages = coreMessagesToPi(result.newMessages, resolved.runtimeModel.api);
-
           // Persist response messages BEFORE checking stop
           if (job.execution.persistConversation) {
             await this.deps.conversations.appendMessages(
               job.conversationKey,
-              [...pendingTurnMessages, ...piNewMessages],
+              [...pendingTurnMessages, ...result.newMessages],
             );
           }
 
@@ -779,9 +768,7 @@ export class AgentChatService {
           this.throwIfStopRequested(session);
 
           const responseText = result.finalMessage
-            ? extractAssistantText(
-                coreAssistantMessageToPi(result.finalMessage, resolved.runtimeModel.api),
-              )
+            ? extractAssistantText(result.finalMessage)
             : "";
 
           const combinedWarnings = promptWarning ? [promptWarning] : [];
@@ -799,7 +786,7 @@ export class AgentChatService {
             warnings: combinedWarnings,
           };
         } finally {
-          // No thinking callback cleanup needed — pi-ai doesn't have this
+          // No thinking callback cleanup needed
         }
       },
       {

@@ -1,5 +1,4 @@
-import type { Tool, ToolCall } from "@mariozechner/pi-ai";
-import type { ToolResultMessage } from "../messages/types";
+import type { Tool, ToolCall, ToolResultMessage } from "../messages/types";
 import { toolResultMessage } from "../messages/types";
 import {
   renderShellExecResult,

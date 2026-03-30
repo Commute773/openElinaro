@@ -58,7 +58,6 @@ export class ScriptedProviderConnector {
  */
 export function scriptedAssistantMessage(text: string): AssistantMessage {
   return assistantTextMessage(text, {
-    api: "scripted",
     provider: "scripted-test",
     model: "scripted-model",
   });

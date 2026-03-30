@@ -1,35 +1,35 @@
 /**
  * Canonical message types for the agent system.
  *
- * Re-exports Pi's plain JSON message types as the single source of truth.
- * These replace LangChain's BaseMessage class hierarchy.
+ * Re-exports core types as the single source of truth.
+ * pi-ai types are an implementation detail of PiCore only.
  */
 export type {
-  Message,
-  UserMessage,
-  AssistantMessage,
-  ToolResultMessage,
-  TextContent,
-  ThinkingContent,
-  ImageContent,
-  ToolCall,
-  Usage,
-  StopReason,
-  Context,
-  Tool,
-} from "@mariozechner/pi-ai";
+  CoreMessage as Message,
+  CoreUserMessage as UserMessage,
+  CoreAssistantMessage as AssistantMessage,
+  CoreToolResultMessage as ToolResultMessage,
+  CoreTextContent as TextContent,
+  CoreThinkingContent as ThinkingContent,
+  CoreImageContent as ImageContent,
+  CoreToolCall as ToolCall,
+  CoreUsage as Usage,
+  CoreStopReason as StopReason,
+  CoreToolDefinition as Tool,
+  CoreThinkingLevel as ThinkingLevel,
+} from "../core/types";
 
 import type {
-  Message,
-  UserMessage,
-  AssistantMessage,
-  ToolResultMessage,
-  TextContent,
-  ImageContent,
-} from "@mariozechner/pi-ai";
+  CoreMessage as Message,
+  CoreUserMessage as UserMessage,
+  CoreAssistantMessage as AssistantMessage,
+  CoreToolResultMessage as ToolResultMessage,
+  CoreTextContent as TextContent,
+  CoreImageContent as ImageContent,
+} from "../core/types";
 
 // ---------------------------------------------------------------------------
-// Helper constructors — drop-in replacements for new HumanMessage() etc.
+// Helper constructors
 // ---------------------------------------------------------------------------
 
 export function userMessage(content: string | (TextContent | ImageContent)[]): UserMessage {
@@ -37,14 +37,12 @@ export function userMessage(content: string | (TextContent | ImageContent)[]): U
 }
 
 export function assistantTextMessage(text: string, meta?: {
-  api?: string;
   provider?: string;
   model?: string;
 }): AssistantMessage {
   return {
     role: "assistant",
     content: [{ type: "text", text }],
-    api: meta?.api ?? "unknown",
     provider: meta?.provider ?? "unknown",
     model: meta?.model ?? "unknown",
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },

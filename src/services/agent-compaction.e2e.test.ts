@@ -110,7 +110,7 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
       return assistantTextMessage(JSON.stringify({
         summary: "Conversation compacted for e2e.",
         memory_markdown: "- User prefers terse replies.",
-      }), { api: "scripted", provider: "scripted-compaction-e2e", model: "scripted-model" });
+      }), { provider: "scripted-compaction-e2e", model: "scripted-model" });
     }
 
     if (options.onReply) {
@@ -122,7 +122,6 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
     }
 
     return assistantTextMessage("Reply after compaction.", {
-      api: "scripted",
       provider: "scripted-compaction-e2e",
       model: "scripted-model",
     });
@@ -243,14 +242,14 @@ describe("agent compaction e2e", () => {
     await harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
     await harness.conversations.appendMessages(conversationKey, [
       userMessage("Earlier user request."),
-      assistantTextMessage("Earlier assistant reply.", { api: "scripted", provider: "scripted", model: "scripted" }),
+      assistantTextMessage("Earlier assistant reply.", { provider: "scripted", model: "scripted" }),
       toolResultMessage({
         toolCallId: "done-1",
         toolName: "routine_done",
         content: "Marked done.",
       }),
       userMessage("Second user request."),
-      assistantTextMessage("Second assistant reply.", { api: "scripted", provider: "scripted", model: "scripted" }),
+      assistantTextMessage("Second assistant reply.", { provider: "scripted", model: "scripted" }),
     ]);
 
     const result = await harness.service.reply({
@@ -288,7 +287,6 @@ describe("agent compaction e2e", () => {
         throw new Error("Model request was aborted. Request was aborted.");
       },
       onReply: async () => assistantTextMessage("Reply despite compaction failure.", {
-        api: "scripted",
         provider: "scripted-compaction-e2e",
         model: "scripted-model",
       }),
@@ -298,7 +296,7 @@ describe("agent compaction e2e", () => {
     await harness.conversations.ensureSystemPrompt(conversationKey, harness.systemPrompts.load());
     await harness.conversations.appendMessages(conversationKey, [
       userMessage("Earlier user request."),
-      assistantTextMessage("Earlier assistant reply.", { api: "scripted", provider: "scripted", model: "scripted" }),
+      assistantTextMessage("Earlier assistant reply.", { provider: "scripted", model: "scripted" }),
     ]);
 
     const result = await harness.service.reply({

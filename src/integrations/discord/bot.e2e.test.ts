@@ -233,13 +233,12 @@ function defaultScriptedHandler(request: ScriptedConnectorRequest): AssistantMes
         summary: "Conversation compacted for the Discord e2e harness.",
         memory_markdown: "",
       }),
-      { api: "scripted", provider: "scripted-discord-test", model: "scripted-model" },
+      { provider: "scripted-discord-test", model: "scripted-model" },
     );
   }
 
   if (request.usagePurpose === "conversation_opening") {
     return assistantTextMessage("What do you want to work on next?", {
-      api: "scripted",
       provider: "scripted-discord-test",
       model: "scripted-model",
     });
@@ -248,7 +247,6 @@ function defaultScriptedHandler(request: ScriptedConnectorRequest): AssistantMes
   const latestMessage = request.messages.at(-1);
   if (isToolResultMessage(latestMessage!) && latestMessage!.toolName === "new_chat") {
     return assistantTextMessage("Fresh thread prepared.", {
-      api: "scripted",
       provider: "scripted-discord-test",
       model: "scripted-model",
     });
@@ -271,7 +269,6 @@ function defaultScriptedHandler(request: ScriptedConnectorRequest): AssistantMes
           arguments: {},
         },
       ],
-      api: "scripted",
       provider: "scripted-discord-test",
       model: "scripted-model",
       usage,
@@ -281,7 +278,6 @@ function defaultScriptedHandler(request: ScriptedConnectorRequest): AssistantMes
   }
 
   return assistantTextMessage(`Acknowledged: ${text}`, {
-    api: "scripted",
     provider: "scripted-discord-test",
     model: "scripted-model",
   });
@@ -898,7 +894,6 @@ if (RUN_CHILD_SUITE) {
         const text = latestHumanMsg ? extractTrailingUserText(lastTextContent(latestHumanMsg)) : "";
         seenTexts.push(text);
         return assistantTextMessage(`Acknowledged: ${text}`, {
-          api: "scripted",
           provider: "scripted-discord-test",
           model: "scripted-model",
         });
@@ -1196,13 +1191,11 @@ if (RUN_CHILD_SUITE) {
           firstTurnSeen = true;
           await firstTurnGate;
           return assistantTextMessage("First turn finished.", {
-            api: "scripted",
             provider: "scripted-discord-test",
             model: "scripted-model",
           });
         }
         return assistantTextMessage(`Acknowledged: ${text}`, {
-          api: "scripted",
           provider: "scripted-discord-test",
           model: "scripted-model",
         });

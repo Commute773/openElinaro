@@ -1,4 +1,4 @@
-import type { Usage } from "@mariozechner/pi-ai";
+import type { Usage } from "../../messages/types";
 import type { ProfileRecord, ModelProviderId } from "../../domain/profiles";
 import { CacheMissMonitor, type CacheMissWarning } from "../cache-miss-monitor";
 import { telemetry } from "../infrastructure/telemetry";

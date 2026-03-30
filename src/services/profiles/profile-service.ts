@@ -2,7 +2,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { ConfigurationError, NotFoundError } from "../../domain/errors";
-import type { ThinkingLevel } from "@mariozechner/pi-ai";
+import type { ThinkingLevel } from "../../messages/types";
 import type { ProfileRecord, ProfileRegistry } from "../../domain/profiles";
 import { ProfileRegistrySchema } from "../../domain/profiles";
 import { getRuntimeConfig } from "../../config/runtime-config";

@@ -1,11 +1,10 @@
 import type { z } from "zod";
-import type { Tool } from "@mariozechner/pi-ai";
 import type {
   AgentToolScope,
   ToolAuthorizationAccess,
   ToolAuthorizationBehavior,
 } from "../domain/tool-catalog";
-import type { Message } from "../messages/types";
+import type { Message, Tool } from "../messages/types";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
 import type { ToolLibraryDefinition } from "../services/tool-library-service";

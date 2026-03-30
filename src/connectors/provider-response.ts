@@ -1,4 +1,4 @@
-import type { AssistantMessage } from "@mariozechner/pi-ai";
+import type { AssistantMessage } from "../messages/types";
 import { telemetry } from "../services/infrastructure/telemetry";
 
 function truncate(value: string, maxChars: number) {
@@ -48,7 +48,6 @@ function summarizeProviderResponse(response: AssistantMessage) {
     .map((block) => block.name);
 
   return {
-    api: response.api,
     provider: response.provider,
     model: response.model,
     stopReason: response.stopReason,

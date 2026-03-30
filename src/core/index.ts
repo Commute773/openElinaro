@@ -22,6 +22,7 @@ export type {
   CoreRunResult,
   CoreFactory,
   CoreModelConfig,
+  CoreThinkingLevel,
 } from "./types";
 
 export { PiCore, PI_CORE_MANIFEST } from "./pi-core";

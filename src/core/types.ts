@@ -227,12 +227,15 @@ export type CoreFactory = (params: {
   modelConfig: CoreModelConfig;
 }) => AgentCore;
 
+/** Thinking/reasoning level for model inference. */
+export type CoreThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhigh";
+
 export interface CoreModelConfig {
   providerId: string;
   modelId: string;
   apiKey?: string;
-  reasoning?: string;
+  reasoning?: CoreThinkingLevel;
   providerOptions?: Record<string, unknown>;
-  /** Pi-ai Model object — passed through opaquely for the Pi core. */
+  /** Opaque runtime model object for adapter-specific cores (e.g., pi-ai Model). */
   runtimeModel?: unknown;
 }
