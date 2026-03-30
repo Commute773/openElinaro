@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.2
+- Released at: 2026-03-30T00:38:45Z
+- Release id: 20260330T003845Z-0f963c3
+- Previous version: 2026.03.30
+- Trigger: ci/release workflow
+
+- fix: MLX KV cache persistence for Qwen3.5 hybrid architecture
+
 ## 2026.03.30
 - Released at: 2026-03-30T00:03:31Z
 - Release id: 20260330T000331Z-3796b0f
