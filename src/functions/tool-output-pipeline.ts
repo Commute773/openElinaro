@@ -416,4 +416,3 @@ export async function reportProgress(context: ToolContext | undefined, summary: 
     );
   }
 }
-

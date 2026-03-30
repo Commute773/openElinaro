@@ -3,8 +3,8 @@ import { z } from "zod";
 import { generateAgentTool, generateAgentTools } from "./generate-tools";
 import type { FunctionDefinition } from "./define-function";
 import { formatResult } from "./formatters";
-import type { ToolBuildContext } from "../tools/groups/tool-group-types";
-import type { ToolContext } from "../tools/tool-registry";
+import type { ToolBuildContext } from "./context";
+import type { ToolContext } from "./tool-registry";
 
 // ---------------------------------------------------------------------------
 // Helpers

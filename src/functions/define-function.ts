@@ -5,8 +5,8 @@ import type {
   ToolAuthorizationBehavior,
 } from "../domain/tool-catalog";
 import type { Message, Tool } from "../messages/types";
-import type { ToolBuildContext } from "../tools/groups/tool-group-types";
-import type { ToolContext } from "../tools/tool-registry";
+import type { ToolBuildContext } from "./context";
+import type { ToolContext } from "./tool-registry";
 import type { ToolLibraryDefinition } from "../services/tool-library-service";
 import type { FeatureId } from "../services/feature-config-service";
 

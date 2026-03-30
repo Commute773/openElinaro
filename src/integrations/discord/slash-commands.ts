@@ -5,7 +5,7 @@ import {
   type SlashCommandOptionsOnlyBuilder,
 } from "discord.js";
 import { getRuntimeConfig } from "../../config/runtime-config";
-import { getRuntimeUserFacingToolNames } from "../../tools/tool-registry";
+import { getRuntimeUserFacingToolNames } from "../../functions/tool-registry";
 import { telemetry } from "../../services/infrastructure/telemetry";
 import {
   MODEL_PROVIDER_CHOICES,

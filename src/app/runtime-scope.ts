@@ -26,7 +26,7 @@ import { LocalShellBackend } from "../services/shell-backend-local";
 import { SoulService } from "../services/soul-service";
 import type { SystemPromptService } from "../services/system-prompt-service";
 import { ToolResolutionService } from "../services/tool-resolution-service";
-import { ToolRegistry } from "../tools/tool-registry";
+import { ToolRegistry } from "../functions/tool-registry";
 import { telemetry } from "../services/infrastructure/telemetry";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { PiCore, ClaudeSdkCore } from "../core";

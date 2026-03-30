@@ -43,7 +43,7 @@ let systemPromptModule: typeof import("../../services/system-prompt-service");
 let memoryServiceModule: typeof import("../../services/memory-service");
 let modelServiceModule: typeof import("../../services/models/model-service");
 let transitionServiceModule: typeof import("../../services/conversation/conversation-state-transition-service");
-let toolRegistryModule: typeof import("../../tools/tool-registry");
+let toolRegistryModule: typeof import("../../functions/tool-registry");
 let toolResolutionModule: typeof import("../../services/tool-resolution-service");
 let agentChatModule: typeof import("../../services/conversation/agent-chat-service");
 
@@ -653,7 +653,7 @@ if (RUN_CHILD_SUITE) {
     memoryServiceModule = await importFresh("src/services/memory-service.ts");
     modelServiceModule = await importFresh("src/services/models/model-service.ts");
     transitionServiceModule = await importFresh("src/services/conversation/conversation-state-transition-service.ts");
-    toolRegistryModule = await importFresh("src/tools/tool-registry.ts");
+    toolRegistryModule = await importFresh("src/functions/tool-registry.ts");
     toolResolutionModule = await importFresh("src/services/tool-resolution-service.ts");
     agentChatModule = await importFresh("src/services/conversation/agent-chat-service.ts");
   });

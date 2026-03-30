@@ -8,10 +8,10 @@
 import { z } from "zod";
 import type { FunctionDefinition, FunctionContext } from "./define-function";
 import type { Tool } from "../messages/types";
-import type { ToolBuildContext } from "../tools/groups/tool-group-types";
-import type { ToolContext } from "../tools/tool-registry";
+import type { ToolBuildContext } from "./context";
+import type { ToolContext } from "./tool-registry";
 import type { FeatureId } from "../services/feature-config-service";
-import { TOOL_CALL_BEHAVIOR_SCHEMA } from "../tools/tool-output-pipeline";
+import { TOOL_CALL_BEHAVIOR_SCHEMA } from "./tool-output-pipeline";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { telemetry } from "../services/infrastructure/telemetry";
 

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { ToolResolutionService } from "./tool-resolution-service";
 import type { ToolCatalogCard } from "../domain/tool-catalog";
-import type { ToolRegistry } from "../tools/tool-registry";
+import type { ToolRegistry } from "../functions/tool-registry";
 
 function makeFakeTool(name: string) {
   return { name } as any;

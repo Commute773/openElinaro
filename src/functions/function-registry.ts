@@ -8,8 +8,8 @@
  * - Tool catalog cards (for catalog metadata)
  */
 import type { FunctionDefinition, FunctionDomainBuilder } from "./define-function";
-import type { ToolBuildContext } from "../tools/groups/tool-group-types";
-import type { ToolContext } from "../tools/tool-registry";
+import type { ToolBuildContext } from "./context";
+import type { ToolContext } from "./tool-registry";
 import type { RouteDefinition } from "../integrations/http/g2/router";
 import type { ToolAuthorizationDeclaration, ToolCatalogCard, AgentToolScope } from "../domain/tool-catalog";
 import type { FeatureId } from "../services/feature-config-service";

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import type { FunctionDefinition } from "./define-function";
 import { formatResult } from "./formatters";
-import type { ToolBuildContext } from "../tools/groups/tool-group-types";
+import type { ToolBuildContext } from "./context";
 import { generateApiRoute, generateApiRoutes } from "./generate-api-routes";
 
 // ---------------------------------------------------------------------------
