@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.17
+- Released at: 2026-03-30T21:08:46Z
+- Release id: 20260330T210846Z-1d5755c
+- Previous version: 2026.03.30.16
+- Trigger: ci/release workflow
+
+- refactor: extract automation orchestrators from OpenElinaroApp
+
 ## 2026.03.30.16
 - Released at: 2026-03-30T21:00:06Z
 - Release id: 20260330T210006Z-e2f57fe
