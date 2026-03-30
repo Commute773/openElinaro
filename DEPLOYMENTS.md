@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.27
+- Released at: 2026-03-30T23:52:31Z
+- Release id: 20260330T235231Z-cd0590d
+- Previous version: 2026.03.30.26
+- Trigger: ci/release workflow
+
+- add Discord DM e2e test with real model auth (#245)
+
 ## 2026.03.30.26
 - Released at: 2026-03-30T23:43:51Z
 - Release id: 20260330T234351Z-26fc229
