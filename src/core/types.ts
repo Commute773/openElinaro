@@ -197,6 +197,8 @@ export interface CoreRunOptions {
   onToolResult?: (result: CoreToolResultMessage) => void;
   /** Harness hooks the core should call at lifecycle points (if supported). */
   hooks?: CoreHarnessHooks;
+  /** Structured log callback for core-internal events (SDK tool calls, system messages, etc.). */
+  onLog?: (event: string, data: Record<string, unknown>) => void;
 }
 
 export interface CoreRunResult {

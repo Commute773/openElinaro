@@ -786,6 +786,13 @@ export class AgentChatService {
                   }, { level: "debug" });
                 },
               },
+              onLog: (event, data) => {
+                agentChatTelemetry.event(`agent_chat.core.${event}`, {
+                  conversationKey: job.conversationKey,
+                  coreId: core.manifest.id,
+                  ...data,
+                }, { level: "debug" });
+              },
             })
           );
 

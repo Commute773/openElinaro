@@ -186,6 +186,7 @@ export class ClaudeSdkCore implements AgentCore {
     let finalText = "";
     let totalUsage: CoreUsage = emptyUsage();
     let steps = 0;
+    const onLog = options.onLog;
 
     const queryStream = query({ prompt, options: sdkOptions });
 
@@ -197,27 +198,88 @@ export class ClaudeSdkCore implements AgentCore {
         const usage = extractUsage(message);
         totalUsage = mergeUsage(totalUsage, usage);
 
+        // Extract content blocks from the BetaMessage for logging
+        const betaMsg = (message as any).message;
+        const contentBlocks = betaMsg?.content ?? [];
+        const textBlocks = contentBlocks.filter((b: any) => b.type === "text");
+        const toolUseBlocks = contentBlocks.filter((b: any) => b.type === "tool_use");
+        const thinkingBlocks = contentBlocks.filter((b: any) => b.type === "thinking");
+
         const coreMsg: CoreAssistantMessage = {
           role: "assistant",
-          content: [{ type: "text", text: "" }], // SDK manages content internally
+          content: [
+            ...thinkingBlocks.map((b: any) => ({
+              type: "thinking" as const,
+              thinking: b.thinking ?? "",
+              thinkingSignature: b.signature,
+            })),
+            ...textBlocks.map((b: any) => ({
+              type: "text" as const,
+              text: b.text ?? "",
+            })),
+            ...toolUseBlocks.map((b: any) => ({
+              type: "toolCall" as const,
+              id: b.id ?? "",
+              name: b.name ?? "",
+              arguments: b.input ?? {},
+            })),
+          ],
           provider: "claude",
           model: this.config.model,
-          responseId: message.message?.id,
+          responseId: betaMsg?.id,
           usage,
-          stopReason: "stop",
+          stopReason: betaMsg?.stop_reason === "tool_use" ? "toolUse" : "stop",
           timestamp: Date.now(),
         };
 
         newMessages.push(coreMsg);
         onAssistantMessage?.(coreMsg);
         harnessHooks?.onUsage?.(usage);
+
+        onLog?.("sdk_assistant_message", {
+          responseId: betaMsg?.id,
+          step: steps,
+          textBlockCount: textBlocks.length,
+          toolUseBlockCount: toolUseBlocks.length,
+          thinkingBlockCount: thinkingBlocks.length,
+          toolNames: toolUseBlocks.map((b: any) => b.name),
+          stopReason: betaMsg?.stop_reason,
+          inputTokens: usage.input,
+          outputTokens: usage.output,
+        });
+      }
+
+      if (message.type === "tool_use_summary") {
+        const summary = (message as any).summary as string;
+        const toolUseIds = (message as any).preceding_tool_use_ids as string[];
+        onLog?.("sdk_tool_use_summary", { summary, toolUseIds });
       }
 
       if (message.type === "result") {
         if (message.subtype === "success") {
           finalText = message.result;
           totalUsage = extractResultUsage(message);
+          onLog?.("sdk_result_success", {
+            numTurns: (message as any).num_turns,
+            durationMs: (message as any).duration_ms,
+            durationApiMs: (message as any).duration_api_ms,
+            totalCostUsd: (message as any).total_cost_usd,
+            inputTokens: totalUsage.input,
+            outputTokens: totalUsage.output,
+            cacheReadTokens: totalUsage.cacheRead,
+            resultChars: finalText.length,
+          });
+        } else {
+          onLog?.("sdk_result_error", {
+            error: (message as any).error ?? "unknown",
+          });
         }
+      }
+
+      if (message.type === "system") {
+        onLog?.("sdk_system", {
+          message: (message as any).message ?? (message as any).text ?? "",
+        });
       }
     }
 
