@@ -459,7 +459,7 @@ export const buildProjectFunctions: FunctionDomainBuilder = (ctx) => {
         ].join("\n");
       },
       format: formatResult,
-      auth: { ...PROJECT_AUTH, note: "Returned profiles are limited to subagent targets the active profile can launch." },
+      auth: { ...PROJECT_AUTH, note: "Returned profiles are limited to the active profile." },
       domains: PROJECT_DOMAINS,
       agentScopes: PROJECT_SCOPES,
       examples: ["list launchable profiles", "which subprofiles can I launch"],

@@ -178,12 +178,8 @@ export const ROUTINE_TOOL_NAMES = [
   "update",
   "service_rollback",
   "launch_agent",
-  "resume_agent",
-  "steer_agent",
   "cancel_agent",
   "agent_status",
-  "agent_summary",
-  "read_agent_terminal",
 ] as const;
 
 const BASE_USER_FACING_TOOL_NAMES = [
@@ -254,11 +250,7 @@ const BASE_USER_FACING_TOOL_NAMES = [
   "secret_generate_password",
   "secret_delete",
   "agent_status",
-  "agent_summary",
-  "read_agent_terminal",
   "launch_agent",
-  "resume_agent",
-  "steer_agent",
   "cancel_agent",
 ] as const;
 
@@ -316,11 +308,8 @@ const DYNAMIC_TOOL_CATALOG: Record<string, Partial<ToolCatalogCard>> = {
   reload: { domains: ["system", "session"], agentScopes: ["chat", "direct"], examples: ["reload system prompt", "refresh instructions"], mutatesState: true },
   new_chat: { domains: ["system", "session"], agentScopes: ["chat", "direct"], examples: ["start a fresh conversation", "force a fresh chat without durable memory"], mutatesState: true },
   launch_agent: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["launch background coding task", "run longer code workflow"], supportsBackground: true, mutatesState: true },
-  resume_agent: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["send follow-up to returned subagent", "resume an existing coding run"], supportsBackground: true, mutatesState: true },
-  steer_agent: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["tell the subagent to focus tests first", "send a new instruction to a running agent"], mutatesState: true },
   cancel_agent: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["stop run-123", "abort a running coding agent"], mutatesState: true },
   agent_status: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["spot-check coding agent run", "list recent workflows"] },
-  read_agent_terminal: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["read agent terminal output", "see what an agent is doing"] },
 };
 
 function buildDynamicToolCatalogCard(entry: PiToolEntry): ToolCatalogCard {
@@ -383,7 +372,6 @@ export type ToolContext = {
   invocationSource?: "chat" | "direct";
   activateToolNames?: (toolNames: string[]) => void;
   getActiveToolNames?: () => string[];
-  subagentDepth?: number;
 };
 
 function shellQuote(value: string) {

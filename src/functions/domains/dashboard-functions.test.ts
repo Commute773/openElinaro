@@ -10,9 +10,6 @@ describe("buildDashboardFunctions", () => {
 
     const result = await fn.handler({}, {
       services: {
-        subagents: {
-          listAgentRuns: () => [],
-        },
         routines: {
           assessNow: () => ({
             context: { mode: "personal" },
@@ -27,7 +24,6 @@ describe("buildDashboardFunctions", () => {
     } as never) as Record<string, unknown>;
 
     expect(result).not.toHaveProperty("streak");
-    expect(result.activeAgentCount).toBe(0);
     expect(result.pendingNotificationCount).toBe(0);
   });
 });

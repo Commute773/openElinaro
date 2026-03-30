@@ -27,6 +27,9 @@ export type {
 export { PiCore, PI_CORE_MANIFEST } from "./pi-core";
 export type { PiCoreConfig } from "./pi-core";
 
+export { ClaudeSdkCore, CLAUDE_SDK_MANIFEST } from "./claude-sdk-core";
+export type { ClaudeSdkCoreConfig } from "./claude-sdk-core";
+
 export {
   piMessageToCore,
   piMessagesToCore,

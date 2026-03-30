@@ -11,7 +11,7 @@ import type {
   RoutineStatus,
   RoutineStoreData,
 } from "../../domain/routines";
-import { AuthorizationError, NotFoundError, ValidationError } from "../../domain/errors";
+import { NotFoundError, ValidationError } from "../../domain/errors";
 import { ProfileService } from "../profiles";
 import { ProjectsService } from "../projects-service";
 import { RoutinesStore } from "./routines-store";
@@ -234,7 +234,7 @@ export class RoutinesService {
 
   getItem(id: string) {
     const item = this.store.load().items[id];
-    return item && this.canAccessProfile(item.profileId) ? item : undefined;
+    return item ?? undefined;
   }
 
   updateItem(
@@ -423,14 +423,8 @@ export class RoutinesService {
     return this.profiles.getProfile(profileId).id;
   }
 
-  private canAccessProfile(_profileId: string) {
-    return true;
-  }
-
-  private assertProfileAccess(profileId: string) {
-    if (!this.canAccessProfile(profileId)) {
-      throw new AuthorizationError(`Profile not accessible for routine item: ${profileId}`);
-    }
+  private assertProfileAccess(_profileId: string) {
+    // Single-identity-per-install: all profiles on this instance are accessible.
   }
 
   private filterVisibleItems(items: RoutineItem[], requestedProfileId?: string | "all") {
@@ -443,7 +437,7 @@ export class RoutinesService {
 
   private requireAccessibleItem(data: RoutineStoreData, id: string) {
     const item = data.items[id];
-    if (!item || !this.canAccessProfile(item.profileId)) {
+    if (!item) {
       throw new NotFoundError("Routine item", id);
     }
     return item;
@@ -868,7 +862,7 @@ export class RoutinesService {
 
     itemIds.forEach((id, index) => {
       const item = data.items[id];
-      if (!item || !this.canAccessProfile(item.profileId)) {
+      if (!item) {
         return;
       }
       const occurrenceKey = occurrenceKeys[index];

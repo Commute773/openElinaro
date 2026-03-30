@@ -167,11 +167,9 @@ export const TOOL_LIBRARY_DEFINITIONS: readonly ToolLibraryDefinition[] = [
   },
   {
     id: "coding_agents",
-    description: "Background coding-agent launch, steering, status, and cancellation.",
+    description: "Background coding-agent launch, status, and cancellation.",
     toolNames: [
       "launch_agent",
-      "resume_agent",
-      "steer_agent",
       "cancel_agent",
       "agent_status",
     ],
