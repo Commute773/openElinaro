@@ -28,7 +28,6 @@ import { HealthTrackingService } from "../services/health-tracking-service";
 import { DeploymentVersionService } from "../services/deployment-version-service";
 import { EmailService } from "../services/email-service";
 import { MediaService } from "../services/media-service";
-import { MemoryService } from "../services/memory-service";
 import {
   ModelService,
 } from "../services/models/model-service";
@@ -85,7 +84,6 @@ export const ROUTINE_TOOL_NAMES = [
   "project_get",
   "profile_list_launchable",
   "profile_set_defaults",
-  "conversation_search",
   "routine_check",
   "routine_list",
   "routine_get",
@@ -140,8 +138,6 @@ export const ROUTINE_TOOL_NAMES = [
   "move_path",
   "copy_path",
   "delete_path",
-  "memory_import",
-  "memory_search",
   "telemetry_query",
   "web_search",
   "web_fetch",
@@ -159,7 +155,6 @@ export const ROUTINE_TOOL_NAMES = [
   "secret_delete",
   "config_edit",
   "feature_manage",
-  "memory_reindex",
   "reflect",
   "compact",
   "reload",
@@ -186,7 +181,6 @@ const BASE_USER_FACING_TOOL_NAMES = [
   "project_list",
   "project_get",
   "profile_set_defaults",
-  "conversation_search",
   "model",
   "routine_check",
   "routine_list",
@@ -428,7 +422,6 @@ export class ToolRegistry {
     private readonly projects: ProjectsService,
     private readonly models: ModelService,
     private readonly conversations: ConversationStore,
-    private readonly memory: MemoryService,
     private readonly systemPrompts: SystemPromptService,
     private readonly transitions: ConversationStateTransitionService,
     private readonly access: AccessControlService,
@@ -470,7 +463,6 @@ export class ToolRegistry {
       get projects() { return self.projects; },
       get models() { return self.models; },
       get conversations() { return self.conversations; },
-      get memory() { return self.memory; },
       get access() { return self.access; },
       get finance() { return self.finance; },
       get health() { return self.health; },

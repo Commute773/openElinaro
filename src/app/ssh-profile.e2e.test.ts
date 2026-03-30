@@ -161,17 +161,6 @@ beforeAll(async () => {
   originalShellExec = shellServiceModule.ShellService.prototype.exec;
 
   memoryServiceModule.MemoryService.prototype.ensureReady = async function ensureReadyStub() {
-    return {
-      version: 1,
-      builtAt: new Date().toISOString(),
-      modelId: "stub",
-      sourceRoot: path.join(tempRoot, ".openelinarotest", "memory/documents"),
-      documentRoot: path.join(tempRoot, ".openelinarotest", "memory/documents"),
-      documents: [],
-      chunks: [],
-      documentFrequencies: {},
-      averageChunkLength: 0,
-    };
   };
 
   shellServiceModule.ShellService.prototype.exec = async function execStub(params) {

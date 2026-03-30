@@ -3,7 +3,6 @@ import type { ProfileRecord } from "../domain/profiles";
 import { AccessControlService } from "../services/profiles";
 import { AgentChatService } from "../services/conversation/agent-chat-service";
 import { AutonomousTimeService } from "../services/autonomous-time-service";
-import { ConversationMemoryService } from "../services/conversation/conversation-memory-service";
 import { ConversationStateTransitionService } from "../services/conversation/conversation-state-transition-service";
 import type { ConversationStore } from "../services/conversation/conversation-store";
 import { FilesystemService } from "../services/infrastructure/filesystem-service";
@@ -55,7 +54,6 @@ export type RuntimeScope = {
   projects: ProjectsService;
   models: ModelService;
   memory: MemoryService;
-  conversationMemory: ConversationMemoryService;
   reflection: ReflectionService;
   autonomousTime: AutonomousTimeService;
   shell: ShellRuntime;
@@ -73,7 +71,6 @@ const K = {
   access: "access",
   models: "models",
   memory: "memory",
-  conversationMemory: "conversationMemory",
   soul: "soul",
   reflection: "reflection",
   autonomousTime: "autonomousTime",
@@ -169,16 +166,6 @@ export function createRuntimeScope(ctx: {
     new MemoryService(c.resolve<ProfileRecord>(K.profile), profiles),
   );
 
-  c.register<ConversationMemoryService>(K.conversationMemory, () =>
-    new ConversationMemoryService(
-      c.resolve<ProfileRecord>(K.profile),
-      conversations,
-      c.resolve<MemoryService>(K.memory),
-      c.resolve<ModelService>(K.models),
-      profiles,
-    ),
-  );
-
   c.register<SoulService>(K.soul, () =>
     new SoulService(
       c.resolve<ProfileRecord>(K.profile),
@@ -242,7 +229,6 @@ export function createRuntimeScope(ctx: {
   c.register<StructuredMemoryManager>(K.structuredMemoryManager, () =>
     new StructuredMemoryManager(
       c.resolve<ProfileRecord>(K.profile),
-      c.resolve<MemoryService>(K.memory),
       profiles,
     ),
   );
@@ -260,7 +246,6 @@ export function createRuntimeScope(ctx: {
       c.resolve<ProjectsService>(K.projects),
       c.resolve<ModelService>(K.models),
       conversations,
-      c.resolve<MemoryService>(K.memory),
       systemPrompts,
       c.resolve<ConversationStateTransitionService>(K.transitions),
       c.resolve<AccessControlService>(K.access),
@@ -341,7 +326,6 @@ export function createRuntimeScope(ctx: {
     projects: c.resolve<ProjectsService>(K.projects),
     models: c.resolve<ModelService>(K.models),
     memory: c.resolve<MemoryService>(K.memory),
-    conversationMemory: c.resolve<ConversationMemoryService>(K.conversationMemory),
     reflection: c.resolve<ReflectionService>(K.reflection),
     autonomousTime: c.resolve<AutonomousTimeService>(K.autonomousTime),
     shell: c.resolve<ShellRuntime>(K.shell),

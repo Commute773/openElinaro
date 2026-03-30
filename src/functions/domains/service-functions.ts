@@ -18,8 +18,6 @@ import type { ToolBuildContext } from "../context";
 const benchmarkSchema = z.object({
   prompt: z.string().min(1).optional(),
   maxTokens: z.number().int().min(32).max(1_024).optional(),
-  embeddingItems: z.number().int().min(8).max(512).optional(),
-  embeddingChars: z.number().int().min(64).max(4_000).optional(),
 });
 
 const serviceActionSchema = z.object({
@@ -224,16 +222,12 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
     defineFunction({
       name: "benchmark",
       description:
-        "Run a live benchmark for the currently active chat model and the local memory embedding model, reporting TTFT, TPS, and embedding items per second.",
+        "Run a live benchmark for the currently active chat model, reporting TTFT and TPS.",
       input: benchmarkSchema,
       handler: async (input, fnCtx) => {
         const modelBenchmark = await fnCtx.services.models.benchmarkActiveModel({
           prompt: input.prompt,
           maxTokens: input.maxTokens,
-        });
-        const embeddingBenchmark = await fnCtx.services.memory.benchmarkEmbedding({
-          itemCount: input.embeddingItems,
-          charsPerItem: input.embeddingChars,
         });
 
         return [
@@ -250,19 +244,10 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
           `Stop reason: ${modelBenchmark.stopReason}`,
           `Prompt length: ${modelBenchmark.prompt.length} chars`,
           `Max tokens cap: ${modelBenchmark.maxTokens}`,
-          "",
-          `Memory embedding model: ${embeddingBenchmark.modelId}`,
-          `Embedding throughput: ${embeddingBenchmark.itemsPerSecond.toFixed(2)} items/s`,
-          `Items benchmarked: ${embeddingBenchmark.itemCount}`,
-          `Chars per item: ${embeddingBenchmark.charsPerItem}`,
-          `Embedding batch size: ${embeddingBenchmark.batchSize}`,
-          `Vector dimensions: ${embeddingBenchmark.vectorDimensions}`,
-          `Warmup: ${formatDurationMs(embeddingBenchmark.warmupMs)}`,
-          `Benchmark duration: ${formatDurationMs(embeddingBenchmark.durationMs)}`,
         ].join("\n");
       },
       format: formatResult,
-      auth: { access: "anyone" as const, behavior: "role-sensitive" as const, note: "Benchmark uses the active profile model and memory index." },
+      auth: { access: "anyone" as const, behavior: "role-sensitive" as const, note: "Benchmark uses the active profile model." },
       domains: SERVICE_DOMAINS,
       agentScopes: SERVICE_SCOPES,
       examples: ["benchmark model latency", "compare provider performance"],

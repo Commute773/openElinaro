@@ -67,7 +67,7 @@ If a tool is missing from the library, the corresponding feature is not enabled 
 - `openbrowser` tool-use progress now prints each action in a readable list instead of collapsing nested action objects into `{n keys}` summaries.
 - Each `openbrowser` step now writes a screenshot artifact for operator progress updates; Discord progress messages can attach those step images without sending them back into the agent context.
 - When `openbrowser` fails, inspect the structured tool error details before retrying. They can include the failing action index/type, current page title/url, and failure screenshot path, which is usually enough to detect page-shape changes or unexpected navigation.
-- Do not go looking for secret values with `memory_search`, docs reads, or web tools. The intended flow is `secret_list` -> secret refs in `openbrowser`.
+- Do not go looking for secret values with docs reads or web tools. The intended flow is `secret_list` -> secret refs in `openbrowser`.
 - For DOM-fill JavaScript in `evaluate`, set `captureResult: false` unless you specifically need the return value in the tool result.
 
 Example:

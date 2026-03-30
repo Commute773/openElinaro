@@ -46,11 +46,6 @@ export const TOOL_LIBRARY_DEFINITIONS: readonly ToolLibraryDefinition[] = [
     toolNames: ["model"],
   },
   {
-    id: "memory",
-    description: "Conversation history, memory search, imports, and reindexing.",
-    toolNames: ["conversation_search", "memory_search", "memory_import", "memory_reindex"],
-  },
-  {
     id: "observability",
     description: "Telemetry, usage, context budgeting, and benchmarking.",
     toolNames: ["context", "usage_summary", "telemetry_query", "benchmark"],

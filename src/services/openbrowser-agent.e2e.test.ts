@@ -237,7 +237,6 @@ function createHarness(expectedArtifactDir: string) {
     projects,
     models,
     conversations,
-    memory,
     systemPrompts,
     transitions,
     access,

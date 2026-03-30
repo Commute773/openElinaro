@@ -435,27 +435,6 @@ export const TEST_CASES: E2eTestCase[] = [
   },
 
   // ===========================================================================
-  // MEMORY & SEARCH
-  // ===========================================================================
-  {
-    name: "memory-search",
-    prompt: "Search your memory for anything about 'test'.",
-    assertions: [
-      { type: "tool_called", toolName: "memory_search" },
-      { type: "response_non_empty" },
-    ],
-    tags: ["memory", "tools"],
-  },
-  {
-    name: "conversation-search",
-    prompt: "Search past conversations for mentions of 'hello'.",
-    assertions: [
-      { type: "tool_called", toolName: "conversation_search" },
-      { type: "response_non_empty" },
-    ],
-    tags: ["memory", "tools"],
-  },
-
   // ===========================================================================
   // SECRETS (read-only surface)
   // ===========================================================================
