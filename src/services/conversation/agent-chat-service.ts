@@ -21,7 +21,7 @@ import { ToolRegistry } from "../../functions/tool-registry";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { ToolResolutionService } from "../tool-resolution-service";
-import type { ReflectionService } from "../reflection-service";
+import type { AutonomousTimeService } from "../autonomous-time-service";
 import type { MemoryManagementAgent } from "../memory/memory-management-agent";
 import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS } from "../../config/service-constants";
 import { wrapInjectedMessage } from "../injected-message-service";
@@ -161,7 +161,7 @@ export type ChatDependencies = {
   conversations: ConversationStore;
   systemPrompts: SystemPromptService;
   models: ModelService;
-  reflection?: Pick<ReflectionService, "queueCompactionReflection">;
+  autonomousTime?: Pick<AutonomousTimeService, "queueCompactionReflection">;
   structuredMemory?: Pick<MemoryManagementAgent, "processTranscript">;
   coreFactory: CoreFactory;
 };
@@ -605,7 +605,7 @@ export class AgentChatService {
         queuedMessages: session.queue.length,
         utilizationPercent: effectiveUtilizationPercent,
       });
-      this.deps.reflection?.queueCompactionReflection({
+      this.deps.autonomousTime?.queueCompactionReflection({
         summary: compacted.summary,
         conversationKey: job.conversationKey,
       });
@@ -758,7 +758,7 @@ export class AgentChatService {
               hooks: {
                 onPreCompact: async (summary) => {
                   // When the core handles compaction, persist memory via hook
-                  this.deps.reflection?.queueCompactionReflection({
+                  this.deps.autonomousTime?.queueCompactionReflection({
                     summary,
                     conversationKey: job.conversationKey,
                   });

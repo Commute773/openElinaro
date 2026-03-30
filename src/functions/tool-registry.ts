@@ -32,7 +32,7 @@ import {
   ModelService,
 } from "../services/models/model-service";
 import { ProjectsService } from "../services/projects-service";
-import type { ReflectionService } from "../services/reflection-service";
+import type { AutonomousTimeService } from "../services/autonomous-time-service";
 import { RoutinesService } from "../services/scheduling/routines-service";
 import { ShellService } from "../services/infrastructure/shell-service";
 import { AccessControlService } from "../services/profiles";
@@ -409,7 +409,7 @@ export class ToolRegistry {
   private readonly serviceRestartNotices = new ServiceRestartNoticeService();
   private readonly workPlanning: WorkPlanningService;
   private readonly pendingConversationResets = new Map<string, string>();
-  private readonly reflection?: Pick<ReflectionService, "runExplicitReflection">;
+  private readonly reflection?: Pick<AutonomousTimeService, "runExplicitReflection">;
   private _peerClient: import("../instance/peer-client").PeerClient | undefined;
   private _peerRegistry: import("../instance/peer-registry").PeerRegistry | undefined;
   private readonly _toolBuildContext: import("./context").ToolBuildContext;
@@ -429,7 +429,7 @@ export class ToolRegistry {
     filesystem?: FilesystemRuntime,
     finance?: FinanceService,
     health?: HealthTrackingService,
-    reflection?: Pick<ReflectionService, "runExplicitReflection">,
+    reflection?: Pick<AutonomousTimeService, "runExplicitReflection">,
     media?: MediaService,
     runtimePlatform?: RuntimePlatform,
     tickets?: TicketsRuntime,
