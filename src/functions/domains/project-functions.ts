@@ -22,7 +22,7 @@ import {
   ModelService,
   type ModelProviderId,
 } from "../../services/models/model-service";
-import type { ThinkingLevel } from "@mariozechner/pi-ai";
+import type { ThinkingLevel } from "../../messages/types";
 
 // ---------------------------------------------------------------------------
 // Shared schemas (same as project-tools.ts)

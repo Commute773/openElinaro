@@ -1,4 +1,4 @@
-import type { Tool } from "@mariozechner/pi-ai";
+import type { Tool } from "../messages/types";
 import type { AgentToolScope, ResolvedToolBundle, ToolCatalogCard } from "../domain/tool-catalog";
 import type { ToolContext } from "../tools/tool-registry";
 import { ToolRegistry } from "../tools/tool-registry";

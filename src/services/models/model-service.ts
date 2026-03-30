@@ -5,20 +5,24 @@ import {
   getModels,
   streamSimple,
   type Api,
-  type Context,
+  type Context as PiContext,
   type KnownProvider,
-  type Message,
+  type Message as PiMessage,
   type Model,
-  type ThinkingLevel,
+  type ThinkingLevel as PiThinkingLevel,
   type Tool as PiTool,
-  type Usage,
+  type Usage as PiUsage,
 } from "@mariozechner/pi-ai";
 import type {
+  Message,
   AssistantMessage,
   ToolResultMessage,
   TextContent,
   ImageContent,
   ToolCall,
+  Tool,
+  Usage,
+  ThinkingLevel,
 } from "../../messages/types";
 import { getOAuthApiKey, type OAuthCredentials } from "@mariozechner/pi-ai/oauth";
 import { approximateTextTokens } from "../../utils/text-utils";
@@ -326,7 +330,7 @@ function getListedContextWindow(
     : uncapped;
 }
 
-function toolSchemaToJson(tool: PiTool) {
+function toolSchemaToJson(tool: Tool) {
   return tool.parameters;
 }
 
@@ -465,7 +469,7 @@ function hrtimeMs(startedAt: bigint, endedAt: bigint) {
 function approximateConversationTokens(params: {
   systemPrompt: string;
   messages: Message[];
-  tools: PiTool[];
+  tools: Tool[];
 }) {
   const breakdown = approximateConversationTokenBreakdown(params);
   const latestAssistant = [...params.messages]
@@ -483,7 +487,7 @@ function approximateConversationTokens(params: {
 function approximateConversationTokenBreakdown(params: {
   systemPrompt: string;
   messages: Message[];
-  tools: PiTool[];
+  tools: Tool[];
 }) {
   const breakdown = {
     systemPromptTokens: approximateTextTokens(params.systemPrompt),
@@ -900,7 +904,7 @@ export class ModelService {
     conversationKey: string;
     systemPrompt: string;
     messages: Message[];
-    tools: PiTool[];
+    tools: Tool[];
   }): Promise<ContextWindowUsage> {
     const resolved = await this.resolveActiveRuntimeModel();
     const maxContextTokens = getSelectedContextWindow(
@@ -992,7 +996,7 @@ export class ModelService {
       "model.benchmark",
       async () => {
         const resolved = await this.resolveActiveRuntimeModel();
-        const context: Context = {
+        const context: PiContext = {
           systemPrompt:
             "You are running a throughput benchmark. Follow the user instruction exactly and return only the requested output.",
           messages: [
@@ -1000,7 +1004,7 @@ export class ModelService {
               role: "user",
               content: prompt,
               timestamp: Date.now(),
-            } satisfies Message,
+            } satisfies PiMessage,
           ],
         };
 
@@ -1075,7 +1079,7 @@ export class ModelService {
     apiKey: string;
     systemPrompt: string;
     messages: Message[];
-    tools: PiTool[];
+    tools: Tool[];
   }) {
     // The Anthropic count_tokens API requires at least one message.
     // When the conversation is empty, fall back to heuristic estimation.

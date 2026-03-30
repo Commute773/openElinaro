@@ -33,7 +33,7 @@ import { PiCore, ClaudeSdkCore } from "../core";
 import type { CoreFactory } from "../core";
 import { PeerClient } from "../instance/peer-client";
 import { PeerRegistry } from "../instance/peer-registry";
-import type { ThinkingLevel, Model, Api } from "@mariozechner/pi-ai";
+import type { Model, Api, ThinkingLevel } from "@mariozechner/pi-ai";
 
 type ShellRuntime = Pick<
   ShellService,

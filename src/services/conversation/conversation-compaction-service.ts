@@ -233,7 +233,6 @@ function keepRecentMessages(messages: Message[]): Message[] {
   return retained.slice(-COMPACTION_TAIL_MESSAGES).map((msg) => {
     if (isAssistantMessage(msg)) {
       return assistantTextMessage(extractAssistantText(msg), {
-        api: msg.api,
         provider: msg.provider,
         model: msg.model,
       });

@@ -7,8 +7,8 @@
  * - Handler map for tool execution by the agent loop
  */
 import { z } from "zod";
-import type { Tool } from "@mariozechner/pi-ai";
 import type { FunctionDefinition, FunctionContext } from "./define-function";
+import type { Tool } from "../messages/types";
 import type { ToolBuildContext } from "../tools/groups/tool-group-types";
 import type { ToolContext } from "../tools/tool-registry";
 import type { FeatureId } from "../services/feature-config-service";
