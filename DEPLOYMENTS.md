@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.13
+- Released at: 2026-03-30T20:49:30Z
+- Release id: 20260330T204930Z-c3d0b6d
+- Previous version: 2026.03.30.12
+- Trigger: ci/release workflow
+
+- fix: derive proper MCP tool schemas from Zod definitions
+
 ## 2026.03.30.12
 - Released at: 2026-03-30T20:46:04Z
 - Release id: 20260330T204604Z-adb019d
