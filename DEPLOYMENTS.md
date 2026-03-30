@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.25
+- Released at: 2026-03-30T23:41:05Z
+- Release id: 20260330T234105Z-d232c10
+- Previous version: 2026.03.30.24
+- Trigger: ci/release workflow
+
+- remove stale entries from USER_DATA_TOP_LEVEL (#244)
+
 ## 2026.03.30.24
 - Released at: 2026-03-30T23:29:07Z
 - Release id: 20260330T232907Z-cb3b3ce
