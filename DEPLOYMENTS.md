@@ -1,5 +1,25 @@
 # Deployments
 
+## 2026.03.30.23
+- Released at: 2026-03-30T23:27:45Z
+- Release id: 20260330T232745Z-566afd2
+- Previous version: 2026.03.30.22
+- Trigger: ci/release workflow
+
+- fix CI: regenerate lockfile, fix test type errors, remove OPENELINARO_AGENT_SERVICE_CONTROL gate
+- add functions test suite: generate-tools, generate-api-routes, generate-discord-commands, function-registry
+- add scheduling and config tests: routine-helpers, schema-introspect
+- add core and conversation helper tests: tool-split, message-bridge, chat-helpers
+- add utils test suite: time-helpers, text-utils, sqlite-helpers, http-helpers, image-compression
+- rewrite documentation to reflect current architecture
+- decompose AgentChatService into session manager, turn runner, and facade
+- decouple finance: make optional in tool context and function registration
+- unify soul + reflection + autonomous time into single service
+- simplify system prompt: strict universal + custom separation
+- collapse AppRequest to chat-only
+- delete all tests for fresh test suite rewrite
+- cleanup: remove memory search/recall/embedding infrastructure, keep compaction memory writes + file tree
+
 ## 2026.03.30.22
 - Released at: 2026-03-30T22:01:49Z
 - Release id: 20260330T220149Z-5ea8b48
