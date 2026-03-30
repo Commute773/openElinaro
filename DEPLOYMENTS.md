@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.3
+- Released at: 2026-03-30T03:32:44Z
+- Release id: 20260330T033244Z-fee7cec
+- Previous version: 2026.03.30.2
+- Trigger: ci/release workflow
+
+- refactor: replace LLM/vector memory recall with file tree in system prompt
+
 ## 2026.03.30.2
 - Released at: 2026-03-30T00:38:45Z
 - Release id: 20260330T003845Z-0f963c3
