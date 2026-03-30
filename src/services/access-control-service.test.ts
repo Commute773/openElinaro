@@ -21,7 +21,7 @@ beforeEach(() => {
   tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-acl-test-"));
   mockRuntimeRootDir = tempRoot;
   mockUserDataPath = path.join(tempRoot, ".openelinarotest");
-  mockMemoryDocumentRoot = path.join(mockUserDataPath, "memory", "documents");
+  mockMemoryDocumentRoot = path.join(mockUserDataPath, "memory");
   fs.mkdirSync(mockMemoryDocumentRoot, { recursive: true });
   process.env.OPENELINARO_ROOT_DIR = mockRuntimeRootDir;
   process.env.OPENELINARO_USER_DATA_DIR = mockUserDataPath;

@@ -31,7 +31,7 @@ function getMemoryStoreRoot() {
 }
 
 function getMemoryDocumentRoot() {
-  return path.join(getMemoryStoreRoot(), "documents");
+  return getMemoryStoreRoot();
 }
 
 const traceSpan = createTraceSpan(memoryTelemetry);

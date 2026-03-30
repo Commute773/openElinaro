@@ -135,7 +135,7 @@ function writeProjectRegistry(tempRoot: string) {
 }
 
 function writeWorkspaceFixture(tempRoot: string) {
-  fs.mkdirSync(resolveTestPath(tempRoot, "memory", "documents", "root"), { recursive: true });
+  fs.mkdirSync(resolveTestPath(tempRoot, "memory", "root"), { recursive: true });
   fs.writeFileSync(path.join(tempRoot, "README.md"), "# e2e case workspace\n", "utf8");
   fs.writeFileSync(
     path.join(tempRoot, "package.json"),

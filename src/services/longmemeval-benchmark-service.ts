@@ -389,7 +389,6 @@ export class LongMemEvalBenchmarkService {
 
     const documentsRoot = path.join(
       memoryRoot,
-      "documents",
       params.profiles.getWriteMemoryNamespace(params.profile),
     );
     await fs.mkdir(documentsRoot, { recursive: true });
