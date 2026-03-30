@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.30.20
+- Released at: 2026-03-30T21:31:29Z
+- Release id: 20260330T213129Z-88e321b
+- Previous version: 2026.03.30.19
+- Trigger: ci/release workflow
+
+- cleanup: remove tool programs system (service, worker, domain types, function)
+- cleanup: remove legacy subagent/tmux artifacts and references
+
 ## 2026.03.30.19
 - Released at: 2026-03-30T21:29:04Z
 - Release id: 20260330T212904Z-17f4d09
