@@ -1,9 +1,3 @@
-import { z } from "zod";
-
-export const RequestKindSchema = z.enum(["chat", "todo", "medication"]);
-
-export type RequestKind = z.infer<typeof RequestKindSchema>;
-
 export interface ChatTextContentBlock {
   type: "text";
   text: string;
@@ -36,12 +30,8 @@ export type AppProgressEvent = string | AppProgressUpdate;
 export interface AppRequest {
   id: string;
   text: string;
-  kind: RequestKind;
   conversationKey?: string;
   chatContent?: ChatPromptContent;
-  todoTitle?: string;
-  medicationName?: string;
-  medicationDueAt?: string;
 }
 
 export interface AppResponse {

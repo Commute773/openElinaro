@@ -133,7 +133,6 @@ export class OpenElinaroApp {
         try {
           await this.handleRequest({
             id: `instance:${message.from}:${Date.now()}`,
-            kind: "chat",
             text: message.content,
             conversationKey: message.conversationKey,
           });
@@ -190,87 +189,50 @@ export class OpenElinaroApp {
       "app.handle_request",
       {
         requestId: request.id,
-        kind: request.kind,
         conversationKey: request.conversationKey,
         profileId: scope.profile.id,
       },
       async () => {
-        if (request.kind === "chat") {
-          const conversationKey = request.conversationKey ?? request.id;
-          const contextConversationKey = options?.chatOptions?.contextConversationKey ?? conversationKey;
-          const systemContext = options?.chatOptions?.enableThreadStartContext === false
-            ? undefined
-            : await buildThreadStartSystemContext(scope, contextConversationKey, this.appTelemetry, this.conversations, this.profiles);
-          const result = await scope.chat.reply({
-            conversationKey,
-            contextConversationKey,
-            content: request.chatContent ?? request.text,
-            systemContext,
-            typingEligible: options?.typingEligible,
-            onBackgroundResponse: options?.onBackgroundResponse
-              ? async (result) => {
-                  const finalized = finalizeAppResponse(scope, {
-                    requestId: request.id,
-                    mode: result.mode,
-                    message: result.message,
-                    warnings: result.warnings,
-                  });
-                  await options.onBackgroundResponse?.(finalized);
-                  await this.injectAttachmentErrorFeedback(scope, conversationKey, finalized);
-                }
-              : undefined,
-            onToolUse: options?.onToolUse,
-            persistConversation: options?.chatOptions?.persistConversation,
-            background: options?.chatOptions?.background,
-            enableMemoryIngestion: options?.chatOptions?.enableMemoryIngestion,
-            enableCompaction: options?.chatOptions?.enableCompaction,
-            includeBackgroundExecNotifications: options?.chatOptions?.includeBackgroundExecNotifications,
-            providerSessionId: options?.chatOptions?.providerSessionId,
-            usagePurpose: options?.chatOptions?.usagePurpose,
-          });
-          const response = finalizeAppResponse(scope, {
-            requestId: request.id,
-            mode: result.mode,
-            message: result.message,
-            warnings: result.warnings,
-          });
-          await this.injectAttachmentErrorFeedback(scope, conversationKey, response);
-          return response;
-        }
-
-        if (request.kind === "todo") {
-          const message = await this.invokeRoutineTool("routine_add", {
-            title: request.todoTitle ?? request.text,
-            kind: "todo",
-            priority: "medium",
-            description: request.text,
-            scheduleKind: "once",
-            dueAt: new Date().toISOString(),
-          });
-          return finalizeAppResponse(scope, {
-            requestId: request.id,
-            mode: "immediate",
-            message,
-          });
-        }
-
-        if (request.kind === "medication") {
-          const message = await this.invokeRoutineTool("routine_add", {
-            title: request.medicationName ?? request.text,
-            kind: "med",
-            priority: "high",
-            description: request.text,
-            scheduleKind: request.medicationDueAt ? "once" : "manual",
-            dueAt: request.medicationDueAt,
-          });
-          return finalizeAppResponse(scope, {
-            requestId: request.id,
-            mode: "immediate",
-            message,
-          });
-        }
-
-        throw new Error(`Unsupported request kind: ${request.kind}`);
+        const conversationKey = request.conversationKey ?? request.id;
+        const contextConversationKey = options?.chatOptions?.contextConversationKey ?? conversationKey;
+        const systemContext = options?.chatOptions?.enableThreadStartContext === false
+          ? undefined
+          : await buildThreadStartSystemContext(scope, contextConversationKey, this.appTelemetry, this.conversations, this.profiles);
+        const result = await scope.chat.reply({
+          conversationKey,
+          contextConversationKey,
+          content: request.chatContent ?? request.text,
+          systemContext,
+          typingEligible: options?.typingEligible,
+          onBackgroundResponse: options?.onBackgroundResponse
+            ? async (result) => {
+                const finalized = finalizeAppResponse(scope, {
+                  requestId: request.id,
+                  mode: result.mode,
+                  message: result.message,
+                  warnings: result.warnings,
+                });
+                await options.onBackgroundResponse?.(finalized);
+                await this.injectAttachmentErrorFeedback(scope, conversationKey, finalized);
+              }
+            : undefined,
+          onToolUse: options?.onToolUse,
+          persistConversation: options?.chatOptions?.persistConversation,
+          background: options?.chatOptions?.background,
+          enableMemoryIngestion: options?.chatOptions?.enableMemoryIngestion,
+          enableCompaction: options?.chatOptions?.enableCompaction,
+          includeBackgroundExecNotifications: options?.chatOptions?.includeBackgroundExecNotifications,
+          providerSessionId: options?.chatOptions?.providerSessionId,
+          usagePurpose: options?.chatOptions?.usagePurpose,
+        });
+        const response = finalizeAppResponse(scope, {
+          requestId: request.id,
+          mode: result.mode,
+          message: result.message,
+          warnings: result.warnings,
+        });
+        await this.injectAttachmentErrorFeedback(scope, conversationKey, response);
+        return response;
       },
     );
   }
@@ -644,7 +606,6 @@ export class OpenElinaroApp {
       void this.handleRequest(
         {
           id: `playback-end-${event.speakerId}-${Date.now()}`,
-          kind: "chat",
           text,
           conversationKey,
         },
