@@ -26,7 +26,10 @@ import {
   finalizeAppResponse,
   buildThreadStartSystemContext,
   buildHeartbeatWorkFocus,
-  buildAutomationSessionKey,
+  runHourlyHeartbeat as runHourlyHeartbeatImpl,
+  runAutonomousTimeSession as runAutonomousTimeSessionImpl,
+  runAlarmNotification as runAlarmNotificationImpl,
+  type AutomationContext,
 } from "./runtime-automation";
 import { ATTACHMENT_FAILED_PREFIX } from "../services/discord-response-service";
 
@@ -480,175 +483,7 @@ export class OpenElinaroApp {
       onBackgroundResponse?: (message: string) => Promise<void>;
     },
   ) {
-    await this.calendar.syncIfNeeded({ reference: options?.reference }).catch((error) => {
-      this.appTelemetry.recordError(error, {
-        profileId: this.activeProfile.id,
-        operation: "calendar.heartbeat_sync",
-      });
-    });
-
-    if (!this.routines.shouldRunHeartbeat(options?.reference)) {
-      return {
-        requestId: `heartbeat-${Date.now()}`,
-        mode: "immediate" as const,
-        message: "",
-        warnings: [],
-        completed: true,
-      };
-    }
-
-    const requestId = `heartbeat-${Date.now()}`;
-    const scope = this.getScope();
-    const heartbeatConfig = getRuntimeConfig().core.app.heartbeat;
-    const useFullContext = heartbeatConfig.contextMode === "full";
-    const workFocus = this.buildHeartbeatWorkFocus(options?.reference);
-    const reminderSnapshot = this.routines.getHeartbeatReminderSnapshot(options?.reference);
-    const localTime = reminderSnapshot.currentLocalTime;
-    const reflectionEligible = scope.reflection.isDailyReflectionEligible(options?.reference);
-    const heartbeatConversationKey = buildAutomationSessionKey("heartbeat", conversationKey);
-    let reminderMarked = false;
-    let userFacingMessageSent = false;
-    const recordedMainThreadMessages = new Set<string>();
-    const recordHeartbeatMessageToMainThread = async (message: string, source: string) => {
-      try {
-        await this.recordAssistantMessage(conversationKey, message);
-        this.appTelemetry.event("app.heartbeat.main_thread_handoff", {
-          conversationKey,
-          heartbeatConversationKey,
-          requestId,
-          source,
-          messageChars: message.length,
-        });
-      } catch (error) {
-        this.appTelemetry.recordError(error, {
-          conversationKey,
-          heartbeatConversationKey,
-          requestId,
-          source,
-          messageChars: message.length,
-          eventName: "app.heartbeat.main_thread_handoff",
-        });
-      }
-    };
-    const finalizeHeartbeatMessage = async (rawMessage: string | undefined, source: string) => {
-      const normalized = this.heartbeats.normalizeAssistantReply(rawMessage) ?? "";
-      if (!normalized) {
-        return "";
-      }
-      if (!recordedMainThreadMessages.has(normalized)) {
-        recordedMainThreadMessages.add(normalized);
-        await recordHeartbeatMessageToMainThread(normalized, source);
-      }
-      userFacingMessageSent = true;
-      if (!reminderMarked && reminderSnapshot.requiredCandidates.length > 0) {
-        this.routines.markReminded(
-          reminderSnapshot.itemIds,
-          reminderSnapshot.occurrenceKeys,
-          options?.reference,
-        );
-        reminderMarked = true;
-      }
-      return normalized;
-    };
-    const buildHeartbeatPrompt = (deliveryRequirement?: string) => {
-      const prompt = this.heartbeats.buildInjectedMessage(options?.reference, {
-        workFocus,
-        localTime,
-        timezone: reminderSnapshot.timezone,
-        reminderSnapshot,
-        reflectionTrigger: reflectionEligible
-          ? "A private daily reflection is eligible after this heartbeat if no user-facing heartbeat reminder is needed."
-          : undefined,
-        deliveryRequirement,
-      });
-      this.appTelemetry.event("app.heartbeat.prompt_prepared", {
-        conversationKey,
-        heartbeatConversationKey,
-        requestId,
-        promptChars: prompt.length,
-        workFocusChars: workFocus?.length ?? 0,
-        requiredCandidateCount: reminderSnapshot.requiredCandidates.length,
-        optionalCandidateCount: reminderSnapshot.optionalCandidates.length,
-        reflectionEligible,
-        hasDeliveryRequirement: Boolean(deliveryRequirement),
-        contextMode: heartbeatConfig.contextMode,
-        isolatedFromMainConversation: !useFullContext,
-      });
-      return prompt;
-    };
-    const runHeartbeatTurn = async (turnId: string, deliveryRequirement?: string) =>
-      this.handleRequest(
-        {
-          id: turnId,
-          kind: "chat",
-          text: buildHeartbeatPrompt(deliveryRequirement),
-          conversationKey: heartbeatConversationKey,
-        },
-        {
-          onBackgroundResponse: options?.onBackgroundResponse
-            ? async (backgroundResponse) => {
-                const message = await finalizeHeartbeatMessage(backgroundResponse.message, "background");
-                if (!message) {
-                  return;
-                }
-                await options.onBackgroundResponse?.(message);
-              }
-            : undefined,
-          onToolUse: async () => {},
-          typingEligible: false,
-          chatOptions: {
-            contextConversationKey: useFullContext ? conversationKey : undefined,
-            persistConversation: false,
-            enableMemoryIngestion: false,
-            enableThreadStartContext: useFullContext,
-            enableCompaction: false,
-            includeBackgroundExecNotifications: false,
-            providerSessionId: `${heartbeatConversationKey}-${turnId}`,
-            usagePurpose: "automation_heartbeat_turn",
-          },
-        },
-      );
-
-    let response = await runHeartbeatTurn(requestId);
-
-    const message = response.mode === "accepted" && !response.message.trim()
-      ? ""
-      : await finalizeHeartbeatMessage(response.message, "immediate");
-    let finalMessage = message;
-    if (!finalMessage && reminderSnapshot.requiredCandidates.length > 0) {
-      this.appTelemetry.event("app.heartbeat.model_violation", {
-        conversationKey,
-        requestId,
-        phase: "initial",
-        requiredCandidateCount: reminderSnapshot.requiredCandidates.length,
-      });
-      const retryResponse = await runHeartbeatTurn(
-        `${requestId}-retry`,
-        "Required reminder candidates are present right now. Do not reply with HEARTBEAT_OK. Write one concise user-facing reminder now.",
-      );
-      response = retryResponse;
-      finalMessage = retryResponse.mode === "accepted" && !retryResponse.message.trim()
-        ? ""
-        : await finalizeHeartbeatMessage(retryResponse.message, "retry");
-      if (!finalMessage) {
-        this.appTelemetry.event("app.heartbeat.model_violation", {
-          conversationKey,
-          requestId,
-          phase: "retry",
-          requiredCandidateCount: reminderSnapshot.requiredCandidates.length,
-        });
-      }
-    }
-    const completed = userFacingMessageSent || reminderSnapshot.requiredCandidates.length === 0;
-    if (completed && response.mode !== "accepted" && !userFacingMessageSent && reflectionEligible) {
-      scope.reflection.queueDailyReflectionIfEligible(options?.reference);
-    }
-
-    return {
-      ...response,
-      message: finalMessage,
-      completed,
-    };
+    return runHourlyHeartbeatImpl(this.getAutomationContext(), conversationKey, options);
   }
 
   getNextAutonomousTimeAt(reference?: Date) {
@@ -657,50 +492,7 @@ export class OpenElinaroApp {
   }
 
   async runAutonomousTimeSession(options?: { reference?: Date }) {
-    const scope = this.getScope();
-    const reference = options?.reference ?? new Date();
-    if (!scope.autonomousTime.isEligible(reference)) {
-      return {
-        requestId: `autonomous-time-${Date.now()}`,
-        mode: "immediate" as const,
-        message: "",
-        warnings: [],
-        triggered: false,
-      };
-    }
-
-    const requestId = `autonomous-time-${Date.now()}`;
-    const { text } = await scope.autonomousTime.buildInjectedMessage(reference);
-    const localDate = scope.autonomousTime.getTriggerLocalDate(reference);
-    const conversationKey = buildAutomationSessionKey(`autonomous-time-${localDate}`, scope.profile.id);
-    const response = await this.handleRequest(
-      {
-        id: requestId,
-        kind: "chat",
-        text,
-        conversationKey,
-      },
-      {
-        onToolUse: async () => {},
-        typingEligible: false,
-        chatOptions: {
-          background: true,
-          persistConversation: true,
-          enableMemoryIngestion: true,
-          enableThreadStartContext: false,
-          enableCompaction: true,
-          includeBackgroundExecNotifications: true,
-          providerSessionId: conversationKey,
-          usagePurpose: "automation_autonomous_time",
-        },
-      },
-    );
-    scope.autonomousTime.markTriggered(reference);
-
-    return {
-      ...response,
-      triggered: true,
-    };
+    return runAutonomousTimeSessionImpl(this.getAutomationContext(), options);
   }
 
   async runAlarmNotification(
@@ -711,40 +503,7 @@ export class OpenElinaroApp {
       onBackgroundResponse?: (message: string) => Promise<void>;
     },
   ) {
-    return this.handleRequest(
-      {
-        id: `alarm-notification-${alarm.id}`,
-        kind: "chat",
-        text: this.alarmNotifications.buildInjectedMessage(alarm, options?.reference),
-        conversationKey: buildAutomationSessionKey(alarm.kind, conversationKey),
-      },
-      {
-        onBackgroundResponse: options?.onBackgroundResponse
-          ? async (backgroundResponse) => {
-              const message = this.alarmNotifications.normalizeAssistantReply(backgroundResponse.message);
-              if (!message) {
-                return;
-              }
-              await options.onBackgroundResponse?.(message);
-            }
-          : undefined,
-        onToolUse: async () => {},
-        typingEligible: false,
-        chatOptions: {
-          contextConversationKey: conversationKey,
-          persistConversation: false,
-          enableMemoryIngestion: false,
-          enableThreadStartContext: false,
-          enableCompaction: false,
-          includeBackgroundExecNotifications: false,
-          providerSessionId: `${buildAutomationSessionKey(alarm.kind, conversationKey)}-alarm-notification-${alarm.id}`,
-          usagePurpose: `automation_${alarm.kind}_turn`,
-        },
-      },
-    ).then((response) => ({
-      ...response,
-      message: this.alarmNotifications.normalizeAssistantReply(response.message) ?? "",
-    }));
+    return runAlarmNotificationImpl(this.getAutomationContext(), conversationKey, alarm, options);
   }
 
   prepareProactiveRoutineReminder() {
@@ -809,6 +568,22 @@ export class OpenElinaroApp {
       messageCount: c.messages.length,
       updatedAt: c.updatedAt,
     }));
+  }
+
+  private getAutomationContext(): AutomationContext {
+    return {
+      handleRequest: this.handleRequest.bind(this),
+      recordAssistantMessage: (conversationKey, message) =>
+        this.recordAssistantMessage(conversationKey, message),
+      getScope: () => this.getScope(),
+      buildHeartbeatWorkFocus: (reference) => this.buildHeartbeatWorkFocus(reference),
+      routines: this.routines,
+      heartbeats: this.heartbeats,
+      calendar: this.calendar,
+      alarmNotifications: this.alarmNotifications,
+      activeProfile: this.activeProfile,
+      appTelemetry: this.appTelemetry,
+    };
   }
 
   private getScope(): RuntimeScope {
