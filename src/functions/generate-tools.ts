@@ -1,9 +1,8 @@
 /**
- * Generates pi-ai Tool definitions + handler map from FunctionDefinitions.
+ * Generates tool definitions + handler map from FunctionDefinitions.
  *
- * Replaces the old LangChain StructuredToolInterface generation.
  * Produces:
- * - pi-ai Tool[] (name + description + JSON Schema parameters) for the model API
+ * - Tool[] (name + description + JSON Schema parameters + optional Zod schema) for the model API
  * - Handler map for tool execution by the agent loop
  */
 import { z } from "zod";
@@ -30,12 +29,12 @@ export type FunctionContextExtras = Partial<Omit<FunctionContext, "services" | "
 export type ToolRawResult = string | number | boolean | null | Record<string, unknown> | Array<unknown>;
 
 /**
- * A tool entry combining the pi-ai tool schema with its execution handler.
+ * A tool entry combining the tool schema with its execution handler.
  * The handler returns the raw structured result; format converts it to a
  * human-readable string for the model.
  */
-export interface PiToolEntry {
-  /** pi-ai tool definition (name + description + JSON Schema parameters) for the model API. */
+export interface ToolEntry {
+  /** Tool definition (name + description + JSON Schema parameters) for the model API. */
   tool: Tool;
   /** The execution handler. Receives parsed input, returns the raw structured result. */
   handler: (input: Record<string, unknown>) => Promise<ToolRawResult>;
@@ -43,9 +42,11 @@ export interface PiToolEntry {
   format: (result: ToolRawResult) => string;
 }
 
+/** @deprecated Use ToolEntry instead. */
+export type PiToolEntry = ToolEntry;
+
 /**
- * Convert a Zod schema to a JSON Schema object suitable for pi-ai's Tool parameters.
- * Pi-ai uses TypeBox TSchema which is structurally a JSON Schema object at runtime.
+ * Convert a Zod schema to a JSON Schema object for tool parameters.
  */
 function zodToToolParameters(schema: z.ZodType): Record<string, unknown> {
   const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
@@ -57,7 +58,7 @@ function zodToToolParameters(schema: z.ZodType): Record<string, unknown> {
 }
 
 /**
- * Convert a single FunctionDefinition into a PiToolEntry.
+ * Convert a single FunctionDefinition into a ToolEntry.
  * - Input schema extended with TOOL_CALL_BEHAVIOR_SCHEMA (silent flag)
  * - Handler wrapped in traceSpan for telemetry
  * - Receives services via closure over the ToolBuildContext getter
@@ -67,7 +68,7 @@ export function generateAgentTool(
   resolveServices: () => ToolBuildContext,
   resolveToolContext?: () => ToolContext | undefined,
   resolveExtras?: () => FunctionContextExtras,
-): PiToolEntry | null {
+): ToolEntry | null {
   const surfaces = def.surfaces ?? ["api", "discord", "agent"];
   if (!surfaces.includes("agent")) return null;
 
@@ -107,7 +108,7 @@ export function generateAgentTool(
 }
 
 /**
- * Convert all agent-surface FunctionDefinitions into PiToolEntry[].
+ * Convert all agent-surface FunctionDefinitions into ToolEntry[].
  * Feature-gated functions are excluded when the gate is inactive.
  */
 export function generateAgentTools(
@@ -116,8 +117,8 @@ export function generateAgentTools(
   resolveToolContext?: () => ToolContext | undefined,
   featureChecker?: (featureId: FeatureId) => boolean,
   resolveExtras?: () => FunctionContextExtras,
-): PiToolEntry[] {
-  const entries: PiToolEntry[] = [];
+): ToolEntry[] {
+  const entries: ToolEntry[] = [];
   for (const def of definitions) {
     if (def.featureGate && featureChecker && !featureChecker(def.featureGate)) continue;
     const entry = generateAgentTool(def, resolveServices, resolveToolContext, resolveExtras);

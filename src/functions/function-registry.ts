@@ -13,7 +13,7 @@ import type { ToolContext } from "../tools/tool-registry";
 import type { RouteDefinition } from "../integrations/http/g2/router";
 import type { ToolAuthorizationDeclaration, ToolCatalogCard, AgentToolScope } from "../domain/tool-catalog";
 import type { FeatureId } from "../services/feature-config-service";
-import { generateAgentTools, type FunctionContextExtras, type PiToolEntry } from "./generate-tools";
+import { generateAgentTools, type FunctionContextExtras, type ToolEntry } from "./generate-tools";
 import { generateApiRoutes } from "./generate-api-routes";
 import { generateDiscordCommands, type DiscordCommandDescriptor } from "./generate-discord-commands";
 import { generateOpenApiSpec } from "./generate-openapi";
@@ -80,13 +80,13 @@ export class FunctionRegistry {
   // Surface generators
   // -------------------------------------------------------------------------
 
-  /** Generate pi-ai Tool entries (schema + handler) for the agent tool surface. */
+  /** Generate tool entries (schema + handler) for the agent tool surface. */
   generateAgentTools(
     resolveServices: () => ToolBuildContext,
     resolveToolContext?: () => ToolContext | undefined,
     featureChecker?: (featureId: FeatureId) => boolean,
     resolveExtras?: () => FunctionContextExtras,
-  ): PiToolEntry[] {
+  ): ToolEntry[] {
     return generateAgentTools(
       [...this.definitions.values()],
       resolveServices,
