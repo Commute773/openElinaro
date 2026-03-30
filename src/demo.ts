@@ -30,9 +30,7 @@ console.log(
     {
       name: "openelinaro",
       runtime: "bun",
-      orchestration: "tmux-subagent",
       immediateResponses,
-      agentRuns: app.listAgentRuns(),
     },
     null,
     2,

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { mock, afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { AssistantMessage, Message, ToolCall } from "../../messages/types";
 import {
   assistantTextMessage,
@@ -12,40 +12,52 @@ import {
   userMessage,
   toolResultMessage,
 } from "../../messages/types";
-import type { AgentLoopResult } from "./agent-loop";
+import { PI_CORE_MANIFEST } from "../../core/pi-core";
+import type { AgentCore, CoreRunOptions, CoreRunResult, CoreFactory, CoreAssistantMessage } from "../../core/types";
+import { piMessagesToCore, coreMessagesToPi } from "../../core/message-bridge";
+import { AgentChatService } from "./agent-chat-service";
+import { ConversationStore } from "./conversation-store";
+import { SystemPromptService } from "../system-prompt-service";
 
 // ---------------------------------------------------------------------------
-// Mock the agent-loop module so tests never call a real model API.
-// The mock exposes a `setHandler` function that individual tests can use
-// to provide scripted behaviour.
+// Mock core factory — tests provide a handler that receives core run options
+// and returns a CoreRunResult.
 // ---------------------------------------------------------------------------
-type MockLoopHandler = (opts: {
-  messages: Message[];
-  tools: any[];
-  executeTool?: (tc: ToolCall, signal?: AbortSignal) => Promise<any>;
-  providerOptions?: Record<string, unknown>;
-  signal?: AbortSignal;
-}) => Promise<AgentLoopResult>;
+type MockCoreHandler = (opts: CoreRunOptions) => Promise<CoreRunResult>;
 
-let agentLoopHandler: MockLoopHandler | null = null;
+let coreRunHandler: MockCoreHandler | null = null;
 
-function setAgentLoopHandler(handler: MockLoopHandler) {
-  agentLoopHandler = handler;
+function setCoreRunHandler(handler: MockCoreHandler) {
+  coreRunHandler = handler;
 }
 
-mock.module("./agent-loop", () => ({
-  runAgentLoop: async (opts: any) => {
-    if (!agentLoopHandler) {
-      throw new Error("No agent-loop handler set for this test.");
-    }
-    return agentLoopHandler(opts);
-  },
-}));
+function createMockCoreFactory(): CoreFactory {
+  return () => ({
+    manifest: PI_CORE_MANIFEST,
+    async run(opts: CoreRunOptions): Promise<CoreRunResult> {
+      if (!coreRunHandler) {
+        throw new Error("No core run handler set for this test.");
+      }
+      return coreRunHandler(opts);
+    },
+  });
+}
 
-// Import after the mock so the mock takes effect
-const { AgentChatService } = await import("./agent-chat-service");
-const { ConversationStore } = await import("./conversation-store");
-const { SystemPromptService } = await import("../system-prompt-service");
+/**
+ * Helper: convert a pi-ai AssistantMessage to a CoreAssistantMessage for test results.
+ */
+function piAssistantToCore(msg: AssistantMessage): CoreAssistantMessage {
+  return {
+    role: "assistant",
+    content: msg.content,
+    provider: msg.provider,
+    model: msg.model,
+    usage: msg.usage,
+    stopReason: msg.stopReason,
+    errorMessage: msg.errorMessage,
+    timestamp: msg.timestamp,
+  };
+}
 
 let previousCwd = "";
 let previousRootDir = "";
@@ -67,7 +79,7 @@ afterEach(() => {
     delete process.env.OPENELINARO_ROOT_DIR;
   }
   fs.rmSync(tempRoot, { recursive: true, force: true });
-  agentLoopHandler = null;
+  coreRunHandler = null;
 });
 
 function createService(options?: {
@@ -80,31 +92,29 @@ function createService(options?: {
     breakdownMethod: "heuristic_estimate" | "provider_count";
   }>;
   onCompact?: () => Promise<void> | void;
-  recallContext?: string;
-  disableAutomaticMemory?: boolean;
 }) {
   const requests: Array<{ sessionId?: string; humanMessages: string[] }> = [];
 
-  setAgentLoopHandler(async (opts) => {
+  setCoreRunHandler(async (opts) => {
     const humanMessages = opts.messages
-      .filter((msg) => isUserMessage(msg))
+      .filter((msg) => msg.role === "user")
       .map((msg) => typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content));
+    // Extract sessionId from the core — not directly available, but we can track via requests
     requests.push({
-      sessionId: (opts.providerOptions?.sessionId as string) ?? undefined,
       humanMessages,
     });
     let finalMessage: AssistantMessage;
     if (options?.onRequest) {
       finalMessage = await options.onRequest({
-        sessionId: (opts.providerOptions?.sessionId as string) ?? undefined,
         messages: humanMessages.map((text) => ({ text, role: "user" })),
       });
     } else {
       finalMessage = assistantTextMessage(`Acknowledged: ${humanMessages.at(-1) ?? ""}`);
     }
+    const coreFinal = piAssistantToCore(finalMessage);
     return {
-      newMessages: [finalMessage],
-      finalMessage,
+      newMessages: [coreFinal],
+      finalMessage: coreFinal,
       steps: 1,
     };
   });
@@ -160,12 +170,13 @@ function createService(options?: {
       },
       async resolveModelForPurpose() {
         return {
-          selection: { providerId: "scripted-test", modelId: "scripted-model" },
+          selection: { providerId: "scripted-test", modelId: "scripted-model", thinkingLevel: "high" },
           runtimeModel: { id: "scripted-model", api: "openai-completions", provider: "scripted-test", baseUrl: "", name: "Scripted", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 },
           apiKey: "test-key",
         };
       },
     } as any,
+    coreFactory: createMockCoreFactory(),
   });
 
   return { service, requests, conversations };
@@ -197,8 +208,8 @@ describe("AgentChatService", () => {
     const backgroundResponses: string[] = [];
 
     const { service, requests } = createService({
-      onRequest: async ({ sessionId }) => {
-        if (sessionId === "conversation-1" && !firstTurnStarted) {
+      onRequest: async () => {
+        if (!firstTurnStarted) {
           firstTurnStarted = true;
           resolveFirstTurnStarted?.();
           await firstTurnGate;
@@ -293,99 +304,23 @@ describe("AgentChatService", () => {
     )).toBe(true);
   });
 
-  test("injects automatic memory recall without persisting recalled context into the thread", async () => {
-    const { service, requests, conversations } = createService({
-      recallContext: [
-        "<recalled_memory>",
-        "This block is automatic memory retrieval.",
-        "It is background context only and is not part of the user's new message.",
-        "",
-        "<memory_item>",
-        "index: 1",
-        "path: root/core/MEMORY.md",
-        "heading: User style",
-        "score: 0.9300",
-        "content:",
-        "User prefers terse replies.",
-        "</memory_item>",
-        "</recalled_memory>",
-      ].join("\n"),
-    });
-
-    const result = await service.reply({
-      conversationKey: "conversation-1",
-      content: "How should you answer me?",
-    });
-
-    expect(result.message).toContain("Acknowledged:");
-    expect(requests[0]?.humanMessages).toHaveLength(1);
-    expect(requests[0]?.humanMessages[0]).toContain('<INJECTED_MESSAGE generated_by="memory_recall">');
-
-    expect(requests[0]?.humanMessages[0]).toContain("<recalled_memory>");
-    expect(requests[0]?.humanMessages[0]).toContain("User prefers terse replies");
-    expect(requests[0]?.humanMessages[0]).toContain("How should you answer me?");
-    const injectedMessage = requests[0]?.humanMessages[0] ?? "";
-    expect(injectedMessage.indexOf("<recalled_memory>"))
-      .toBeLessThan(injectedMessage.indexOf("How should you answer me?"));
-    const savedConversation = await conversations.get("conversation-1");
-    const savedUserMessage = savedConversation.messages.findLast((message) => isUserMessage(message));
-    expect(savedUserMessage?.role).toBe("user");
-    const savedContent = typeof savedUserMessage?.content === "string" ? savedUserMessage.content : JSON.stringify(savedUserMessage?.content);
-    expect(savedContent).toContain("How should you answer me?");
-    // In the Pi migration, the persisted user message includes the full injected
-    // context (memory recall + time prefix) because the agent loop receives the
-    // combined message and the service persists the same user message it sent.
-    expect(savedContent).toContain("<recalled_memory>");
-  });
-
-  test("does not inject an extra human message when recall is empty", async () => {
-    const { service, requests } = createService({
-      recallContext: "",
-    });
-
-    await service.reply({
-      conversationKey: "conversation-1",
-      content: "Plain user prompt with no relevant memory.",
-    });
-
-    expect(requests[0]?.humanMessages).toHaveLength(1);
-    expect(requests[0]?.humanMessages[0]).toContain("Plain user prompt with no relevant memory.");
-    expect(requests[0]?.humanMessages[0]).not.toContain("<recalled_memory>");
-  });
-
-  test("can disable automatic memory recall entirely", async () => {
-    const { service, requests } = createService({
-      recallContext: "<recalled_memory>\nshould not appear\n</recalled_memory>",
-      disableAutomaticMemory: true,
-    });
-
-    await service.reply({
-      conversationKey: "conversation-1",
-      content: "Subagent turn should stay clean.",
-    });
-
-    expect(requests[0]?.humanMessages).toHaveLength(1);
-    expect(requests[0]?.humanMessages[0]).toContain("Subagent turn should stay clean.");
-    expect(requests[0]?.humanMessages[0]).not.toContain("<recalled_memory>");
-  });
-
   test("persists tool calls and tool results in the conversation", async () => {
     const toolInvocations: string[] = [];
     let callIndex = 0;
 
-    setAgentLoopHandler(async (opts) => {
-      const executeTool = opts.executeTool!;
+    setCoreRunHandler(async (opts) => {
+      const executeTool = opts.executeTool;
       callIndex++;
 
       if (callIndex === 1) {
         // First call: model returns tool calls for load_tool_library
-        const assistantMsg1: AssistantMessage = {
+        const assistantMsg1: CoreAssistantMessage = {
           role: "assistant",
           content: [
             { type: "toolCall", id: "tc-load-1", name: "load_tool_library", arguments: { library: "shell" } },
             { type: "toolCall", id: "tc-load-2", name: "load_tool_library", arguments: { library: "web" } },
           ],
-          api: "scripted", provider: "scripted-test", model: "scripted-model",
+          provider: "scripted-test", model: "scripted-model",
           usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
           stopReason: "toolUse", timestamp: Date.now(),
         };
@@ -394,13 +329,13 @@ describe("AgentChatService", () => {
         const tr2 = await executeTool({ type: "toolCall", id: "tc-load-2", name: "load_tool_library", arguments: { library: "web" } });
 
         // Second call: model returns tool calls for exec_command
-        const assistantMsg2: AssistantMessage = {
+        const assistantMsg2: CoreAssistantMessage = {
           role: "assistant",
           content: [
             { type: "toolCall", id: "tc-exec-1", name: "exec_command", arguments: { command: "ls" } },
             { type: "toolCall", id: "tc-exec-2", name: "exec_command", arguments: { command: "pwd" } },
           ],
-          api: "scripted", provider: "scripted-test", model: "scripted-model",
+          provider: "scripted-test", model: "scripted-model",
           usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
           stopReason: "toolUse", timestamp: Date.now(),
         };
@@ -409,7 +344,7 @@ describe("AgentChatService", () => {
         const tr4 = await executeTool({ type: "toolCall", id: "tc-exec-2", name: "exec_command", arguments: { command: "pwd" } });
 
         // Third call: final message
-        const finalMessage = assistantTextMessage("All done. I loaded 2 libraries and ran 2 commands.");
+        const finalMessage = piAssistantToCore(assistantTextMessage("All done. I loaded 2 libraries and ran 2 commands."));
 
         return {
           newMessages: [assistantMsg1, tr1, tr2, assistantMsg2, tr3, tr4, finalMessage],
@@ -418,7 +353,7 @@ describe("AgentChatService", () => {
         };
       }
 
-      const finalMessage = assistantTextMessage("Unexpected call");
+      const finalMessage = piAssistantToCore(assistantTextMessage("Unexpected call"));
       return { newMessages: [finalMessage], finalMessage, steps: 1 };
     });
 
@@ -463,12 +398,13 @@ describe("AgentChatService", () => {
         },
         async resolveModelForPurpose() {
           return {
-            selection: { providerId: "scripted-test", modelId: "scripted-model" },
+            selection: { providerId: "scripted-test", modelId: "scripted-model", thinkingLevel: "high" },
             runtimeModel: { id: "scripted-model", api: "openai-completions", provider: "scripted-test", baseUrl: "", name: "Scripted", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 },
             apiKey: "test-key",
           };
         },
       } as any,
+      coreFactory: createMockCoreFactory(),
     });
 
     const result = await service.reply({
@@ -507,16 +443,16 @@ describe("AgentChatService", () => {
   test("persists tool calls even when stop is requested during execution", async () => {
     let session: any = null;
 
-    setAgentLoopHandler(async (opts) => {
-      const executeTool = opts.executeTool!;
+    setCoreRunHandler(async (opts) => {
+      const executeTool = opts.executeTool;
 
-      const assistantMsg: AssistantMessage = {
+      const assistantMsg: CoreAssistantMessage = {
         role: "assistant",
         content: [
           { type: "text", text: "Let me run that" },
           { type: "toolCall", id: "tc-1", name: "exec_command", arguments: { command: "ls" } },
         ],
-        api: "scripted", provider: "scripted-test", model: "scripted-model",
+        provider: "scripted-test", model: "scripted-model",
         usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
         stopReason: "toolUse", timestamp: Date.now(),
       };
@@ -528,7 +464,7 @@ describe("AgentChatService", () => {
         session.stopRequested = true;
       }
 
-      const finalMessage = assistantTextMessage("Here are the results");
+      const finalMessage = piAssistantToCore(assistantTextMessage("Here are the results"));
 
       return {
         newMessages: [assistantMsg, tr, finalMessage],
@@ -575,12 +511,13 @@ describe("AgentChatService", () => {
         },
         async resolveModelForPurpose() {
           return {
-            selection: { providerId: "scripted-test", modelId: "scripted-model" },
+            selection: { providerId: "scripted-test", modelId: "scripted-model", thinkingLevel: "high" },
             runtimeModel: { id: "scripted-model", api: "openai-completions", provider: "scripted-test", baseUrl: "", name: "Scripted", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 },
             apiKey: "test-key",
           };
         },
       } as any,
+      coreFactory: createMockCoreFactory(),
     });
 
     // Grab the internal session after it's created

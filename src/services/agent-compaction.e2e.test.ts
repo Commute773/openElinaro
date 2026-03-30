@@ -13,6 +13,7 @@ import {
   isToolResultMessage,
   extractAssistantText,
 } from "../messages/types";
+import { PiCore } from "../core/pi-core";
 
 const repoRoot = process.cwd();
 
@@ -178,6 +179,13 @@ async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
     conversations,
     systemPrompts,
     models: modelHelpers as any,
+    coreFactory: ({ modelConfig }) =>
+      new PiCore({
+        model: modelConfig.runtimeModel as any,
+        apiKey: modelConfig.apiKey,
+        reasoning: modelConfig.reasoning as any,
+        providerOptions: modelConfig.providerOptions,
+      }),
   });
 
   return {

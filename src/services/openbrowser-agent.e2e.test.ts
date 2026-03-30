@@ -15,6 +15,7 @@ import {
 import type { ChatPromptContentBlock } from "../domain/assistant";
 import type { ScriptedConnectorRequest } from "../test/scripted-provider-connector";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
+import { PiCore } from "../core/pi-core";
 
 const repoRoot = process.cwd();
 
@@ -210,72 +211,6 @@ function createScriptedOpenBrowserHandler(expectedArtifactDir: string) {
   };
 }
 
-function createWorkflowStub() {
-  return {
-    launchAgent: async () => ({
-      id: "workflow-test-run",
-      profileId: "root",
-      provider: "codex" as const,
-      goal: "test goal",
-      status: "starting" as const,
-      tmuxSession: "openelinaro",
-      tmuxWindow: "workflow-test-run",
-      workspaceCwd: "/tmp/test",
-      createdAt: new Date().toISOString(),
-      launchDepth: 1,
-      timeoutMs: 300_000,
-      eventLog: [],
-    }),
-    resumeAgent: async () => ({
-      id: "workflow-test-run",
-      profileId: "root",
-      provider: "codex" as const,
-      goal: "test goal",
-      status: "running" as const,
-      tmuxSession: "openelinaro",
-      tmuxWindow: "workflow-test-run",
-      workspaceCwd: "/tmp/test",
-      createdAt: new Date().toISOString(),
-      launchDepth: 1,
-      timeoutMs: 300_000,
-      eventLog: [],
-    }),
-    steerAgent: async () => ({
-      id: "workflow-test-run",
-      profileId: "root",
-      provider: "codex" as const,
-      goal: "test goal",
-      status: "running" as const,
-      tmuxSession: "openelinaro",
-      tmuxWindow: "workflow-test-run",
-      workspaceCwd: "/tmp/test",
-      createdAt: new Date().toISOString(),
-      launchDepth: 1,
-      timeoutMs: 300_000,
-      eventLog: [],
-    }),
-    cancelAgent: async () => ({
-      id: "workflow-test-run",
-      profileId: "root",
-      provider: "codex" as const,
-      goal: "test goal",
-      status: "cancelled" as const,
-      tmuxSession: "openelinaro",
-      tmuxWindow: "workflow-test-run",
-      workspaceCwd: "/tmp/test",
-      createdAt: new Date().toISOString(),
-      launchDepth: 1,
-      timeoutMs: 300_000,
-      eventLog: [],
-    }),
-    getAgentRun: () => undefined,
-    listAgentRuns: () => [],
-    captureAgentPane: async () => "",
-    readAgentTerminal: async () => "",
-    listAvailableProviders: () => [],
-  };
-}
-
 function createHarness(expectedArtifactDir: string) {
   const profiles = new profileServiceModule.ProfileService("root");
   const profile = profiles.getActiveProfile();
@@ -305,7 +240,6 @@ function createHarness(expectedArtifactDir: string) {
     memory,
     systemPrompts,
     transitions,
-    createWorkflowStub(),
     access,
   );
   const toolResolver = new toolResolutionModule.ToolResolutionService(toolRegistry);
@@ -316,6 +250,13 @@ function createHarness(expectedArtifactDir: string) {
     conversations,
     systemPrompts,
     models,
+    coreFactory: ({ modelConfig }) =>
+      new PiCore({
+        model: modelConfig.runtimeModel as any,
+        apiKey: modelConfig.apiKey,
+        reasoning: modelConfig.reasoning as any,
+        providerOptions: modelConfig.providerOptions,
+      }),
   });
 
   return { chat };

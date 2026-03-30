@@ -1,6 +1,5 @@
 import type { AppProgressEvent, AppRequest, AppResponse } from "../domain/assistant";
 import type { ProfileRecord } from "../domain/profiles";
-import type { SubagentRun } from "../domain/subagent-run";
 import { ConversationStore } from "../services/conversation/conversation-store";
 import { FinanceService } from "../services/finance-service";
 import { HealthTrackingService } from "../services/health-tracking-service";
@@ -19,20 +18,8 @@ import { WorkPlanningService } from "../services/work-planning-service";
 import { CalendarSyncService } from "../services/calendar-sync-service";
 import { getRuntimeConfig } from "../config/runtime-config";
 import type { FeatureId } from "../services/feature-config-service";
-import { resolveRuntimePath } from "../services/runtime-root";
 
 import { type RuntimeScope, createRuntimeScope } from "./runtime-scope";
-import {
-  buildSubagentCompletionTurn,
-  createSubagentController,
-  recoverSubagentRuns,
-} from "./runtime-subagent";
-import {
-  SubagentRegistry,
-  SubagentSidecar,
-  SubagentTimeoutManager,
-  TmuxManager,
-} from "../subagent";
 import {
   finalizeAppResponse,
   buildThreadStartSystemContext,
@@ -48,9 +35,6 @@ type BackgroundConversationResponseNotifier = (params: {
 
 export class OpenElinaroApp {
   private readonly appTelemetry = telemetry.child({ component: "app" });
-  private readonly subagentRegistry = this.appTelemetry.instrumentMethods(new SubagentRegistry(), {
-    component: "subagent_registry",
-  });
   private readonly routines = this.appTelemetry.instrumentMethods(new RoutinesService(), {
     component: "routine",
   });
@@ -94,103 +78,12 @@ export class OpenElinaroApp {
     conversationKey: string;
     active: boolean;
   }) => Promise<void> | void;
-  private readonly tmux: TmuxManager;
-  private readonly subagentTimeouts: SubagentTimeoutManager;
-  private readonly subagentSidecar: SubagentSidecar;
 
   constructor(options?: { profileId?: string }) {
     this.profiles = this.appTelemetry.instrumentMethods(new ProfileService(options?.profileId), {
       component: "profile",
     });
     this.activeProfile = this.profiles.getActiveProfile();
-
-    // Initialize subagent infrastructure
-    const subagentConfig = getRuntimeConfig().core.app.subagent;
-    this.tmux = new TmuxManager(subagentConfig.tmuxSession);
-    const sidecarSocketPath = subagentConfig.sidecarSocketPath || resolveRuntimePath("subagent-sidecar.sock");
-    this.subagentSidecar = new SubagentSidecar(sidecarSocketPath);
-    this.subagentTimeouts = new SubagentTimeoutManager(this.tmux, subagentConfig.timeoutGraceMs);
-
-    // Start sidecar and subscribe to events
-    this.subagentSidecar.start();
-    this.subagentSidecar.onEvent(async (event) => {
-      const run = this.subagentRegistry.get(event.runId);
-      if (!run) return;
-
-      this.subagentRegistry.appendEvent(event.runId, {
-        kind: event.kind,
-        timestamp: event.timestamp,
-        summary: (event.payload.result as string) || (event.payload.output as string) || undefined,
-      });
-
-      if (event.kind === "worker.completed") {
-        this.subagentTimeouts.clear(event.runId);
-        const completedRun = this.subagentRegistry.markCompleted(
-          event.runId,
-          (event.payload.result as string) || (event.payload.output as string) || undefined,
-        );
-        // Clean up remain-on-exit window (process succeeded, no need to keep)
-        void this.tmux.killWindow(event.runId);
-        if (completedRun) {
-          void this.injectSubagentCompletion(completedRun);
-        }
-      }
-
-      if (event.kind === "worker.failed") {
-        this.subagentTimeouts.clear(event.runId);
-
-        // Build verbose error from all available sources
-        const exitCode = event.payload.exitCode;
-        const errorField = (event.payload.error as string) || "";
-
-        const errorParts: string[] = [];
-        if (errorField) {
-          errorParts.push(errorField);
-        } else {
-          errorParts.push(`Agent failed with exit code ${exitCode ?? "unknown"}.`);
-        }
-
-        // Capture tmux pane output for additional diagnostics (window stays
-        // alive thanks to remain-on-exit)
-        try {
-          let paneOutput = await this.tmux.readTerminal(event.runId);
-          if (!paneOutput.trim()) {
-            paneOutput = await this.tmux.capturePane(event.runId, 80);
-          }
-          if (paneOutput) {
-            errorParts.push(`\nTerminal output (last 80 lines):\n${paneOutput}`);
-          }
-        } catch {
-          // Pane capture is best-effort
-        }
-
-        // Clean up remain-on-exit window after capturing
-        void this.tmux.killWindow(event.runId);
-
-        const verboseError = errorParts.join("\n");
-        const failedRun = this.subagentRegistry.markFailed(event.runId, verboseError);
-        if (failedRun) {
-          void this.injectSubagentCompletion(failedRun);
-        }
-      }
-    });
-
-    // Recover any in-flight runs from previous session
-    void recoverSubagentRuns({
-      registry: this.subagentRegistry,
-      tmux: this.tmux,
-      timeouts: this.subagentTimeouts,
-      onTimeout: (runId) => {
-        const run = this.subagentRegistry.get(runId);
-        if (run && run.status !== "completed" && run.status !== "failed" && run.status !== "cancelled") {
-          this.subagentRegistry.markFailed(runId, "Agent timed out.");
-        }
-      },
-    }).catch((error) => {
-      this.appTelemetry.recordError(error, {
-        operation: "subagent.recovery",
-      });
-    });
 
     void this.getScope().memory.ensureReady().catch((error) => {
       this.appTelemetry.recordError(error, {
@@ -313,44 +206,6 @@ export class OpenElinaroApp {
         throw new Error(`Unsupported request kind: ${request.kind}`);
       },
     );
-  }
-
-  listAgentRuns(): SubagentRun[] {
-    return this.buildSubagentController(this.activeProfile.id).listAgentRuns();
-  }
-
-  launchAgent(params: {
-    goal: string;
-    cwd?: string;
-    profileId?: string;
-    provider?: "claude" | "codex";
-    originConversationKey?: string;
-    requestedBy?: string;
-    timeoutMs?: number;
-    subagentDepth?: number;
-  }) {
-    return this.buildSubagentController(this.activeProfile.id).launchAgent(params);
-  }
-
-  resumeAgent(params: {
-    runId: string;
-    message?: string;
-    timeoutMs?: number;
-  }) {
-    return this.buildSubagentController(this.activeProfile.id).resumeAgent(params);
-  }
-
-  steerAgent(params: {
-    runId: string;
-    message: string;
-  }) {
-    return this.buildSubagentController(this.activeProfile.id).steerAgent(params);
-  }
-
-  cancelAgent(params: {
-    runId: string;
-  }) {
-    return this.buildSubagentController(this.activeProfile.id).cancelAgent(params);
   }
 
   noteDiscordUser(userId: string) {
@@ -848,14 +703,6 @@ export class OpenElinaroApp {
     return this.routines.getNextRoutineAttentionAt(reference);
   }
 
-  getAgentRun(runId: string): SubagentRun | undefined {
-    return this.buildSubagentController(this.activeProfile.id).getAgentRun(runId);
-  }
-
-  captureAgentOutput(runId: string, lines?: number): Promise<string> {
-    return this.buildSubagentController(this.activeProfile.id).captureAgentPane(runId, lines);
-  }
-
   getRoutineTimezone(): string {
     return this.routines.getTimezone();
   }
@@ -947,7 +794,6 @@ export class OpenElinaroApp {
             });
           }
         : undefined,
-      createSubagentController: (pid: string) => this.buildSubagentController(pid),
     });
     this.scopes.set(scopeKey, scope);
     this.wirePlaybackEndNotification(scope);
@@ -1009,63 +855,4 @@ export class OpenElinaroApp {
     }
   }
 
-  private async injectSubagentCompletion(run: SubagentRun) {
-    if (!run.originConversationKey || !run.completionMessage) return;
-
-    const conversationKey = run.originConversationKey;
-    const text = buildSubagentCompletionTurn(this.activeProfile.id, run);
-
-    try {
-      const response = await this.handleRequest(
-        {
-          id: `subagent-complete-${run.id}`,
-          kind: "chat",
-          text,
-          conversationKey,
-        },
-        {
-          typingEligible: false,
-          onBackgroundResponse: async (queuedResponse: AppResponse) => {
-            if (this.onBackgroundConversationResponse) {
-              await this.onBackgroundConversationResponse({
-                conversationKey,
-                response: queuedResponse,
-              });
-            }
-          },
-        },
-      );
-
-      // Also handle immediate responses
-      if (response.mode === "immediate" && this.onBackgroundConversationResponse) {
-        await this.onBackgroundConversationResponse({
-          conversationKey,
-          response,
-        });
-      }
-    } catch (error) {
-      this.appTelemetry.recordError(error, {
-        conversationKey,
-        subagentRunId: run.id,
-        operation: "subagent.completion_injection",
-      });
-    }
-  }
-
-  private buildSubagentController(sourceProfileId: string) {
-    const getNotifier = () => this.onBackgroundConversationResponse;
-    return createSubagentController({
-      sourceProfileId,
-      profiles: this.profiles,
-      activeProfile: this.activeProfile,
-      registry: this.subagentRegistry,
-      tmux: this.tmux,
-      timeouts: this.subagentTimeouts,
-      sidecar: this.subagentSidecar,
-      workspaces: this.workspaces,
-      getScope: (profileId, options) => this.getScope(profileId, options),
-      handleRequest: (request: AppRequest, options?: any) => this.handleRequest(request, options),
-      get onBackgroundConversationResponse() { return getNotifier(); },
-    });
-  }
 }

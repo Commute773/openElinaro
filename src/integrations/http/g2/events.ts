@@ -1,6 +1,6 @@
 import type { OpenElinaroApp } from "../../../app/runtime";
 import type { RouteDefinition } from "./router";
-import { CORS_HEADERS, g2Telemetry, truncateGoal } from "./helpers";
+import { CORS_HEADERS, g2Telemetry } from "./helpers";
 
 const SSE_HEADERS: Record<string, string> = {
   "Content-Type": "text/event-stream",
@@ -17,14 +17,10 @@ function sseEvent(type: string, data: unknown): string {
 }
 
 function createEventStream(app: OpenElinaroApp, request: Request): Response {
-  const knownAgentStatuses = new Map<string, string>();
   const knownRoutineReminders = new Set<string>();
   const knownAlarms = new Set<string>();
 
   // Seed initial state so only deltas are sent after connection
-  for (const run of app.listAgentRuns()) {
-    knownAgentStatuses.set(run.id, run.status);
-  }
   for (const entry of app.assessRoutines().items.filter((a) => a.shouldRemindNow)) {
     knownRoutineReminders.add(entry.item.id);
   }
@@ -48,7 +44,7 @@ function createEventStream(app: OpenElinaroApp, request: Request): Response {
       pollTimer = setInterval(() => {
         if (cancelled) return;
         try {
-          const events = collectEvents(app, knownAgentStatuses, knownRoutineReminders, knownAlarms);
+          const events = collectEvents(app, knownRoutineReminders, knownAlarms);
           for (const evt of events) {
             controller.enqueue(evt);
           }
@@ -78,46 +74,10 @@ function createEventStream(app: OpenElinaroApp, request: Request): Response {
 
 function collectEvents(
   app: OpenElinaroApp,
-  knownAgentStatuses: Map<string, string>,
   knownRoutineReminders: Set<string>,
   knownAlarms: Set<string>,
 ): string[] {
   const events: string[] = [];
-
-  // --- Agent events ---
-  const currentRuns = app.listAgentRuns();
-  const currentRunIds = new Set<string>();
-  for (const run of currentRuns) {
-    currentRunIds.add(run.id);
-    const previousStatus = knownAgentStatuses.get(run.id);
-
-    if (!previousStatus) {
-      knownAgentStatuses.set(run.id, run.status);
-      events.push(sseEvent("agent.started", {
-        id: run.id,
-        goal: truncateGoal(run.goal),
-        status: run.status,
-        startedAt: run.startedAt ?? run.createdAt,
-      }));
-    } else if (previousStatus !== run.status) {
-      knownAgentStatuses.set(run.id, run.status);
-      if (run.status === "completed" || run.status === "failed" || run.status === "cancelled") {
-        events.push(sseEvent("agent.completed", {
-          id: run.id,
-          goal: truncateGoal(run.goal),
-          status: run.status,
-          completedAt: run.completedAt,
-          resultSummary: run.resultSummary,
-          error: run.error,
-        }));
-      }
-    }
-  }
-  for (const id of knownAgentStatuses.keys()) {
-    if (!currentRunIds.has(id)) {
-      knownAgentStatuses.delete(id);
-    }
-  }
 
   // --- Routine reminder events ---
   const assessment = app.assessRoutines();

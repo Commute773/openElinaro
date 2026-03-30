@@ -1,4 +1,3 @@
-import type { Tool, ToolCall } from "@mariozechner/pi-ai";
 import type { Message, AssistantMessage } from "../../messages/types";
 import {
   userMessage,
@@ -9,7 +8,6 @@ import {
 import type { AppProgressEvent, ChatPromptContent, ChatPromptContentBlock } from "../../domain/assistant";
 import { ConversationStore } from "./conversation-store";
 import { ConversationStateTransitionService } from "./conversation-state-transition-service";
-import { runAgentLoop, type ToolExecutor } from "./agent-loop";
 import { ModelService } from "../models/model-service";
 import { guardUntrustedText } from "../prompt-injection-guard-service";
 import { prependTextToChatPromptContent } from "../message-content-service";
@@ -27,6 +25,15 @@ import type { ReflectionService } from "../reflection-service";
 import type { MemoryManagementAgent } from "../memory/memory-management-agent";
 import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS } from "../../config/service-constants";
 import { wrapInjectedMessage } from "../injected-message-service";
+import type { CoreFactory, CoreToolExecutor } from "../../core/types";
+import {
+  piMessagesToCore,
+  piToolToCoreDef,
+  coreMessagesToPi,
+  coreAssistantMessageToPi,
+  coreToolCallToPi,
+} from "../../core/message-bridge";
+import { splitToolsForCore } from "../../core/tool-split";
 
 const QUEUED_WHILE_COMPACTING_MESSAGE = "message queued as we are currently compacting";
 const STEERING_ACCEPTED_MESSAGE = "message accepted and will steer the current agent at the next turn";
@@ -163,6 +170,7 @@ export type ChatDependencies = {
   models: ModelService;
   reflection?: Pick<ReflectionService, "queueCompactionReflection">;
   structuredMemory?: Pick<MemoryManagementAgent, "processTranscript">;
+  coreFactory: CoreFactory;
 };
 
 export class AgentChatService {
@@ -668,18 +676,49 @@ export class AgentChatService {
 
         const toolSet = this.buildChatToolSet(job.conversationKey, session, job.onToolUse);
 
-        // Build the tool executor that delegates to ToolRegistry
-        const toolExecutor: ToolExecutor = async (toolCall, signal) => {
-          return this.deps.routineTools.executeTool(toolCall, toolSet.context, signal);
-        };
-
         // Resolve the model for this turn
         const resolved = await this.deps.models.resolveModelForPurpose(job.execution.usagePurpose);
+
+        // Create the core for this turn via the factory
+        const core = this.deps.coreFactory({
+          modelConfig: {
+            providerId: resolved.selection.providerId,
+            modelId: resolved.selection.modelId,
+            apiKey: resolved.apiKey,
+            reasoning: resolved.selection.thinkingLevel,
+            providerOptions: {
+              sessionId: job.execution.providerSessionId ?? job.conversationKey,
+            },
+            runtimeModel: resolved.runtimeModel,
+          },
+        });
+
+        // Build the core tool executor that delegates to ToolRegistry
+        const coreToolExecutor: CoreToolExecutor = async (toolCall, signal) => {
+          const piToolCall = coreToolCallToPi(toolCall);
+          const piResult = await this.deps.routineTools.executeTool(piToolCall, toolSet.context, signal);
+          return {
+            role: "toolResult" as const,
+            toolCallId: piResult.toolCallId,
+            toolName: piResult.toolName,
+            content: piResult.content,
+            details: piResult.details,
+            isError: piResult.isError,
+            timestamp: piResult.timestamp,
+          };
+        };
+
+        // Convert harness tools to core format, filtering out core-native tools
+        const coreToolDefs = splitToolsForCore(
+          toolSet.tools.map(piToolToCoreDef),
+          core.manifest,
+        );
 
         agentChatTelemetry.event(
           "agent_chat.run_turn",
           {
             conversationKey: job.conversationKey,
+            coreId: core.manifest.id,
             messageCount: (
               conversation.messages.length
               + backgroundExecMessages.length
@@ -703,18 +742,13 @@ export class AgentChatService {
 
         try {
           const result = await this.runAbortableModelCall(session, (signal) =>
-            runAgentLoop({
-              model: resolved.runtimeModel,
+            core.run({
               systemPrompt: systemPrompt.text,
-              messages: inputMessages,
-              tools: toolSet.tools,
-              executeTool: toolExecutor,
+              messages: piMessagesToCore(inputMessages),
+              tools: coreToolDefs,
+              executeTool: coreToolExecutor,
               maxSteps: CHAT_MAX_STEPS,
               signal,
-              apiKey: resolved.apiKey,
-              providerOptions: {
-                sessionId: job.execution.providerSessionId ?? job.conversationKey,
-              },
             })
           );
 
@@ -730,11 +764,14 @@ export class AgentChatService {
             };
           }
 
+          // Convert core messages back to pi-ai format for storage
+          const piNewMessages = coreMessagesToPi(result.newMessages, resolved.runtimeModel.api);
+
           // Persist response messages BEFORE checking stop
           if (job.execution.persistConversation) {
             await this.deps.conversations.appendMessages(
               job.conversationKey,
-              [...pendingTurnMessages, ...result.newMessages],
+              [...pendingTurnMessages, ...piNewMessages],
             );
           }
 
@@ -742,7 +779,9 @@ export class AgentChatService {
           this.throwIfStopRequested(session);
 
           const responseText = result.finalMessage
-            ? extractAssistantText(result.finalMessage)
+            ? extractAssistantText(
+                coreAssistantMessageToPi(result.finalMessage, resolved.runtimeModel.api),
+              )
             : "";
 
           const combinedWarnings = promptWarning ? [promptWarning] : [];

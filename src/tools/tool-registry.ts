@@ -4,7 +4,6 @@ import { toolResultMessage } from "../messages/types";
 import {
   renderShellExecResult,
 } from "./groups";
-import type { SubagentController } from "./groups";
 import type { PiToolEntry } from "../functions/generate-tools";
 import {
   stripToolControlInput,
@@ -451,7 +450,6 @@ export class ToolRegistry {
     private readonly memory: MemoryService,
     private readonly systemPrompts: SystemPromptService,
     private readonly transitions: ConversationStateTransitionService,
-    private readonly subagents: SubagentController,
     private readonly access: AccessControlService,
     shell?: ShellRuntime,
     filesystem?: FilesystemRuntime,
@@ -516,7 +514,6 @@ export class ToolRegistry {
       resolvePhoneCallBackend: (requestedBackend) => this.resolvePhoneCallBackend(requestedBackend),
       createWebSearchService: () => this.createWebSearchService(),
       requestManagedServiceRestart: (source) => this.requestManagedServiceRestart(source),
-      get subagents() { return self.subagents; },
       get systemPrompts() { return self.systemPrompts; },
       get transitions() { return self.transitions; },
       get reflection() { return self.reflection; },

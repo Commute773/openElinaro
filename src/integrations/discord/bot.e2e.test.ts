@@ -21,6 +21,7 @@ import {
   extractAssistantText,
 } from "../../messages/types";
 import type { AppProgressEvent, ChatPromptContentBlock } from "../../domain/assistant";
+import { PiCore } from "../../core/pi-core";
 import { getTestFixturesDir } from "../../test/fixtures";
 
 const repoRoot = process.cwd();
@@ -289,72 +290,6 @@ function defaultScriptedHandler(request: ScriptedConnectorRequest): AssistantMes
   });
 }
 
-function createWorkflowStub() {
-  return {
-    launchAgent: async () => ({
-      id: "workflow-test-run",
-      profileId: "root",
-      provider: "codex" as const,
-      goal: "test goal",
-      status: "starting" as const,
-      tmuxSession: "openelinaro",
-      tmuxWindow: "workflow-test-run",
-      workspaceCwd: "/tmp/test",
-      createdAt: new Date().toISOString(),
-      launchDepth: 1,
-      timeoutMs: 300_000,
-      eventLog: [],
-    }),
-    resumeAgent: async () => ({
-      id: "workflow-test-run",
-      profileId: "root",
-      provider: "codex" as const,
-      goal: "test goal",
-      status: "running" as const,
-      tmuxSession: "openelinaro",
-      tmuxWindow: "workflow-test-run",
-      workspaceCwd: "/tmp/test",
-      createdAt: new Date().toISOString(),
-      launchDepth: 1,
-      timeoutMs: 300_000,
-      eventLog: [],
-    }),
-    steerAgent: async () => ({
-      id: "workflow-test-run",
-      profileId: "root",
-      provider: "codex" as const,
-      goal: "test goal",
-      status: "running" as const,
-      tmuxSession: "openelinaro",
-      tmuxWindow: "workflow-test-run",
-      workspaceCwd: "/tmp/test",
-      createdAt: new Date().toISOString(),
-      launchDepth: 1,
-      timeoutMs: 300_000,
-      eventLog: [],
-    }),
-    cancelAgent: async () => ({
-      id: "workflow-test-run",
-      profileId: "root",
-      provider: "codex" as const,
-      goal: "test goal",
-      status: "cancelled" as const,
-      tmuxSession: "openelinaro",
-      tmuxWindow: "workflow-test-run",
-      workspaceCwd: "/tmp/test",
-      createdAt: new Date().toISOString(),
-      launchDepth: 1,
-      timeoutMs: 300_000,
-      eventLog: [],
-    }),
-    getAgentRun: () => undefined,
-    listAgentRuns: () => [],
-    captureAgentPane: async () => "",
-    readAgentTerminal: async () => "",
-    listAvailableProviders: () => [],
-  };
-}
-
 function createDiscordAppHarness(options?: {
   connectorHandler?: (request: ScriptedConnectorRequest) => AssistantMessage | Promise<AssistantMessage>;
 }) {
@@ -418,7 +353,6 @@ function createDiscordAppHarness(options?: {
     memory,
     systemPrompts,
     transitions,
-    createWorkflowStub(),
     access,
   );
   const toolResolver = new toolResolutionModule.ToolResolutionService(toolRegistry);
@@ -429,6 +363,13 @@ function createDiscordAppHarness(options?: {
     conversations,
     systemPrompts,
     models,
+    coreFactory: ({ modelConfig }) =>
+      new PiCore({
+        model: modelConfig.runtimeModel as any,
+        apiKey: modelConfig.apiKey,
+        reasoning: modelConfig.reasoning as any,
+        providerOptions: modelConfig.providerOptions,
+      }),
   });
 
   return {
@@ -527,12 +468,6 @@ function createDiscordAppHarness(options?: {
       },
       getActiveProfile() {
         return profile;
-      },
-      getAgentRun() {
-        return undefined;
-      },
-      listAgentRuns() {
-        return [] as never[];
       },
     },
   };
@@ -1028,12 +963,6 @@ if (RUN_CHILD_SUITE) {
         getActiveProfile() {
           return { id: "root" };
         },
-          getAgentRun() {
-          return undefined;
-        },
-        listAgentRuns() {
-          return [];
-        },
       },
       authManager,
       profileId: "root",
@@ -1074,12 +1003,6 @@ if (RUN_CHILD_SUITE) {
         },
         getActiveProfile() {
           return { id: "root" };
-        },
-          getAgentRun() {
-          return undefined;
-        },
-        listAgentRuns() {
-          return [];
         },
       },
       authManager,
@@ -1124,12 +1047,6 @@ if (RUN_CHILD_SUITE) {
         getActiveProfile() {
           return { id: "root" };
         },
-          getAgentRun() {
-          return undefined;
-        },
-        listAgentRuns() {
-          return [];
-        },
       },
       authManager,
       profileId: "root",
@@ -1172,12 +1089,6 @@ if (RUN_CHILD_SUITE) {
         },
         getActiveProfile() {
           return { id: "root" };
-        },
-          getAgentRun() {
-          return undefined;
-        },
-        listAgentRuns() {
-          return [];
         },
       },
       authManager,

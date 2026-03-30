@@ -100,12 +100,6 @@ function createFakeApp(calls: Array<{ name: string; input: unknown }>): DiscordA
     getActiveProfile() {
       return { id: "root" };
     },
-    getAgentRun() {
-      return undefined;
-    },
-    listAgentRuns() {
-      return [];
-    },
   };
 }
 

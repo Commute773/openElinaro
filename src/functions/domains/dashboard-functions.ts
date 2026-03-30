@@ -14,12 +14,7 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
     input: z.object({}),
     surfaces: ["api"],
     handler: async (_input, fnCtx) => {
-      const { subagents, routines, alarms } = fnCtx.services;
-
-      const runs = subagents.listAgentRuns();
-      const activeAgents = runs.filter(
-        (r) => r.status === "running" || r.status === "starting",
-      );
+      const { routines, alarms } = fnCtx.services;
 
       const assessment = routines.assessNow();
 
@@ -48,7 +43,6 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
 
       return {
         timeContext: { ...ctx, dayOfWeek, localDate, localTime, dayPeriod },
-        activeAgentCount: activeAgents.length,
         nextRoutine,
         pendingNotificationCount,
       };
@@ -57,7 +51,6 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
       const tc = result.timeContext;
       const lines = [
         `${tc.dayOfWeek} ${tc.localDate} ${tc.localTime} (${tc.dayPeriod})`,
-        `Active agents: ${result.activeAgentCount}`,
         result.nextRoutine ? `Next: ${result.nextRoutine.name} at ${result.nextRoutine.time}` : "Next: none",
         `Pending notifications: ${result.pendingNotificationCount}`,
       ];
