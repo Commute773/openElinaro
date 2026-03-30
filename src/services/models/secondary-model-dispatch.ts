@@ -2,6 +2,7 @@ import {
   getModel,
   getModels,
   streamSimple,
+  type AssistantMessage,
   type Context,
   type KnownProvider,
   type Message,
@@ -10,7 +11,6 @@ import {
   type ThinkingLevel,
   type Usage,
 } from "@mariozechner/pi-ai";
-import { assertSuccessfulProviderResponse } from "../../connectors/provider-response";
 import type { ProfileRecord } from "../../domain/profiles";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
@@ -53,6 +53,96 @@ const DEFAULT_REFLECTION_MODEL_IDS: Record<ModelProviderId, string> = {
   claude: "claude-sonnet-4-5",
   zai: "glm-5",
 };
+
+function truncateString(value: string, maxChars: number) {
+  return value.length > maxChars
+    ? `${value.slice(0, Math.max(0, maxChars - 1))}...`
+    : value;
+}
+
+function normalizeProviderErrorDetail(errorMessage: string | undefined) {
+  const detail = errorMessage?.trim();
+  if (!detail) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(detail) as {
+      detail?: unknown;
+      message?: unknown;
+      error?: {
+        message?: unknown;
+      };
+    };
+    if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+      return parsed.detail.trim();
+    }
+    if (typeof parsed.message === "string" && parsed.message.trim()) {
+      return parsed.message.trim();
+    }
+    if (typeof parsed.error?.message === "string" && parsed.error.message.trim()) {
+      return parsed.error.message.trim();
+    }
+  } catch {
+    // Keep the original message when the provider returned plain text.
+  }
+
+  return detail;
+}
+
+function summarizeProviderResponse(response: AssistantMessage) {
+  const partialText = response.content
+    .filter((block): block is Extract<AssistantMessage["content"][number], { type: "text" }> => block.type === "text")
+    .map((block) => block.text)
+    .join("")
+    .trim();
+  const toolCalls = response.content
+    .filter((block): block is Extract<AssistantMessage["content"][number], { type: "toolCall" }> => block.type === "toolCall")
+    .map((block) => block.name);
+
+  return {
+    provider: response.provider,
+    model: response.model,
+    stopReason: response.stopReason,
+    errorMessage: response.errorMessage?.trim() || null,
+    usage: response.usage,
+    contentBlockTypes: response.content.map((block) => block.type),
+    partialTextPreview: partialText ? truncateString(partialText, 280) : null,
+    toolCalls,
+  };
+}
+
+export function assertSuccessfulProviderResponse(
+  response: AssistantMessage,
+  context?: {
+    connector: string;
+    sessionId?: string;
+    conversationKey?: string;
+    usagePurpose?: string;
+    inputMessages?: number;
+    toolCount?: number;
+  },
+): AssistantMessage {
+  if (response.stopReason !== "error" && response.stopReason !== "aborted") {
+    return response;
+  }
+
+  telemetry.event("connector.provider_response.failed", {
+    ...context,
+    response: summarizeProviderResponse(response),
+    provider: response.provider,
+  }, {
+    level: "error",
+    outcome: "error",
+    message: response.errorMessage ?? "Provider response failed.",
+  });
+
+  const prefix = response.stopReason === "aborted"
+    ? "Model request was aborted."
+    : "Model request failed.";
+  const detail = normalizeProviderErrorDetail(response.errorMessage);
+  throw new Error(detail ? `${prefix} ${detail}` : prefix);
+}
 
 export interface ResolvedRuntimeModel {
   selection: ActiveModelSelection;

@@ -111,7 +111,9 @@ Further reading:
 The short version:
 
 - Discord is the primary surface; `src/index.ts` starts that runtime.
-- The app uses a foreground lane for immediate chat/routine work and a background lane for instance-peered workers.
+- The app uses a swappable `AgentCore` interface: ClaudeSdkCore (primary, Claude Agent SDK) and PiCore (adapter for non-Claude providers).
+- Each core declares a manifest with feature ownership. The harness skips its own compaction/context management when the core handles them.
+- Tools are defined as `FunctionDefinition` objects and adapted per core. Native tools (file ops, shell, web for ClaudeSdkCore) are filtered out automatically.
 - Profiles, projects, auth, and tool access are explicit runtime objects with local single sources of truth.
 - Prompt guidance is intentionally compact and uses docs for progressive disclosure instead of a huge base prompt.
 

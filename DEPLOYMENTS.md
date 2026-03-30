@@ -1,5 +1,30 @@
 # Deployments
 
+## 2026.03.30.19
+- Released at: 2026-03-30T21:29:04Z
+- Release id: 20260330T212904Z-17f4d09
+- Previous version: 2026.03.30.18
+- Trigger: ci/release workflow
+
+- cleanup: remove src/connectors, inline provider-response into secondary-model-dispatch
+
+## 2026.03.30.18
+- Released at: 2026-03-30T21:17:59Z
+- Release id: 20260330T211759Z-4e55deb
+- Previous version: 2026.03.30.17
+- Trigger: ci/release workflow
+
+- docs: update AGENTS.md architectural summary for swappable core
+- docs: update architecture docs for swappable core, remove dead subagent refs
+
+## 2026.03.30.17
+- Released at: 2026-03-30T21:08:46Z
+- Release id: 20260330T210846Z-1d5755c
+- Previous version: 2026.03.30.16
+- Trigger: ci/release workflow
+
+- refactor: extract automation orchestrators from OpenElinaroApp
+
 ## 2026.03.30.16
 - Released at: 2026-03-30T21:00:06Z
 - Release id: 20260330T210006Z-e2f57fe

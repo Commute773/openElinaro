@@ -17,26 +17,18 @@ Feature config and onboarding now live here:
 
 Profiles are explicit runtime objects, not vague personas.
 
-- Shape: `id`, `name`, `roles`, `memoryNamespace`, optional `shellUser`, optional `pathRoots`, optional `execution`, optional `preferredProvider`, optional `defaultModelId`, optional `toolSummarizerProvider`, optional `toolSummarizerModelId`, optional `memoryProvider`, optional `memoryModelId`, optional `defaultThinkingLevel`, optional `maxContextTokens`, optional `subagentPreferredProvider`, optional `subagentDefaultModelId`, optional `maxSubagentDepth`
+- Shape: `id`, `name`, `memoryNamespace`, optional `shellUser`, optional `pathRoots`, optional `execution`, optional `preferredProvider`, optional `defaultModelId`, optional `toolSummarizerProvider`, optional `toolSummarizerModelId`, optional `memoryProvider`, optional `memoryModelId`, optional `defaultThinkingLevel`, optional `maxContextTokens`
 - Profiles may also declare optional `pathRoots` plus an `execution` block for SSH-backed execution.
-- Current pattern:
-  - `root` is unrestricted
-  - non-root profiles are constrained by `roles`, project access, tool access, and memory namespace access
+- Each install is one identity — a single active profile per process
 - Access rules come from `src/services/profiles/profile-service.ts` and `src/services/profiles/access-control-service.ts`
-  - root can access all projects and tools
-  - non-root project access is allowed only when a project's `allowedRoles` overlaps the profile's `roles`
-  - non-root memory reads are limited to namespaces derived from the profile roles
-  - non-root shell tools run either as the profile's configured local `shellUser` or through the profile's configured SSH execution backend
+  - shell tools run either as the profile's configured local `shellUser` or through the profile's configured SSH execution backend
   - `pathRoots` define extra allowed path roots for that profile's file tools; for SSH-backed profiles these are remote paths
-  - spawning another profile is only allowed when the source profile can cover every role on the target profile
-  - subagent launches are also capped by `maxSubagentDepth`; default depth is `1`, and `0` disables subagent launches for that profile
-  - use `profile_list_launchable` when the agent needs the concrete set of subagent profiles it may launch right now, including current default model/thinking/auth status
+  - use `profile_list_launchable` when the agent needs the concrete set of launchable profiles, including current default model/thinking/auth status
   - use `profile_set_defaults` when the agent needs to change a launchable profile's default provider/model/thinking settings without hand-editing the registry
 
 When changing profile-related code or docs, preserve the distinction between:
 
 - the active runtime profile
-- the roles attached to that profile
 - the memory namespace used for writes
 - the shell user used for `exec_command`
 - the preferred/default model settings attached to that profile
@@ -44,8 +36,6 @@ When changing profile-related code or docs, preserve the distinction between:
 - the memory extraction provider/model attached to that profile
 - the default thinking level attached to that profile
 - the optional artificial max-context cap attached to that profile
-- the subagent-only default model settings attached to that profile
-- the subagent depth limit attached to that profile
 
 ## Auth
 
@@ -57,6 +47,7 @@ Provider auth is stored per profile under `~/.openelinaro/secret-store.json`.
 - Supported providers today:
   - `openai-codex` with `type: "oauth"` and stored OAuth credentials
   - `claude` with `type: "token"` and a setup token
+  - `zai` with `type: "token"` and an API key
 - A provider entry only counts as configured when the required secret is actually present. A partial object without a token or OAuth credentials is invalid state and should be treated as missing auth.
 - Auth setup flows are handled through Discord DMs in `src/integrations/discord/auth-session-manager.ts`
   - Codex uses an OAuth flow
@@ -153,6 +144,17 @@ When changing model/provider code:
 - only send request fields that are explicitly supported by the adapter or provider contract
 - add a focused test for the request option shape whenever a new provider parameter is introduced
 
+### Swappable core and feature ownership
+
+Model routing determines which `AgentCore` implementation runs each turn:
+
+- `providerId === "claude"` routes to `ClaudeSdkCore` (Claude Agent SDK)
+- All other providers route to `PiCore` (pi-ai adapter)
+
+Each core declares a manifest with feature ownership. When ClaudeSdkCore owns compaction and context management, the harness skips its own implementations. The harness uses hooks (`onPreCompact`, `onUsage`, `onLog`) to maintain visibility into core-internal operations.
+
+Tool definitions are filtered per core: `splitToolsForCore()` removes tools the core handles natively (file ops, shell, web for ClaudeSdkCore). The remaining harness domain tools are sent as MCP tools with proper Zod schema passthrough.
+
 ## Conversation history and memory search
 
 Conversation snapshots still live in `~/.openelinaro/conversations.json`, but live chat traffic is also appended to `~/.openelinaro/conversation-history/events.<profile>.jsonl` as it happens.
@@ -190,31 +192,22 @@ Thread-start continuity now combines:
 
 The generic recent-thread digest intentionally excludes `identity/` documents so the journal is only surfaced through the dedicated reflection bootstrap formatter.
 
-## Background subagent runs
+## Inter-instance messaging
 
-Subagents are external CLI processes (Claude Code or Codex) that run in individual tmux windows. Run state is persisted in `~/.openelinaro/subagent-runs.json`. The domain model is `SubagentRun` in `src/domain/subagent-run.ts`.
+Multiple OpenElinaro instances can communicate peer-to-peer over Unix sockets.
 
-Each profile can configure subagent binary paths via `subagentPaths.claude` and `subagentPaths.codex` in the profile registry. The `subagentPreferredProvider` field determines which agent type to use by default.
+- Each instance runs an `InstanceSocketServer` that listens on `~/.openelinaro/instance.sock`
+- `PeerClient` sends messages to known peers via `PeerRegistry`
+- Peer messages arrive as regular `handleRequest` calls — indistinguishable from Discord messages from the receiving core's perspective
+- Instance config lives in `~/.openelinaro/config.json` under `core.app.instance`
+- Tools: `send_message`, `instance_status`, `instance_list`
 
-The subagent subsystem lives under `src/subagent/`:
+Where to look:
 
-- **Sidecar** (`sidecar.ts`): In-process Bun HTTP server on a Unix domain socket (`~/.openelinaro/subagent-sidecar.sock`) that receives structured events from Claude Code hooks and Codex notify scripts.
-- **tmux** (`tmux.ts`): Manages a single tmux session with one window per active agent. Provides `runInWindow`, `sendKeys`, `killWindow`, `hasWindow`, and `capturePane` for debugging.
-- **Spawn** (`spawn.ts`): Builds spawn commands for Claude (interactive mode) and Codex (`--approval-mode full-auto`). Writes Claude hook configs (`.claude/settings.json`) and Codex notify scripts into the worktree before spawning.
-- **Registry** (`registry.ts`): Tracks `SubagentRun` objects with status transitions (`starting` → `running` → `completed`/`failed`/`cancelled`).
-- **Timeouts** (`timeout.ts`): Per-run `setTimeout` timers. On timeout: polite stop via tmux send-keys, grace period, then kill.
-
-Key behaviors:
-
-- `launch_agent` defaults to a one-hour timeout when `timeoutMs` is omitted.
-- Each launch creates an isolated linked Git worktree via `ProjectWorkspaceService`.
-- Completion is detected via the sidecar event stream (Claude Stop hook or Codex notify), not by polling tmux.
-- On completion or failure, a synthetic message is injected into the parent conversation automatically.
-- `steer_agent` injects text into the running agent's stdin via `tmux send-keys`.
-- `resume_agent` spawns a fresh agent process in the same worktree with continuation instructions.
-- `cancel_agent` kills the tmux window immediately.
-- On runtime restart, in-flight runs are recovered by checking if their tmux windows still exist; surviving agents get their timeouts re-registered for the remaining duration.
-- A nightly docs indexer can sync generated markdown inventories and write `~/.openelinaro/docs-index.json`; it only runs when `core.app.docsIndexerEnabled` is true.
+- `src/instance/socket-server.ts`
+- `src/instance/peer-client.ts`
+- `src/instance/peer-registry.ts`
+- `src/instance/types.ts`
 
 ## Routines, alarms, and timers
 
