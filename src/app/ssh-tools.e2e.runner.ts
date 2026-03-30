@@ -207,7 +207,7 @@ function writeAssistantContextFixture() {
 }
 
 function writeMemoryFixture() {
-  fs.mkdirSync(resolveTestPath("memory", "documents", "ssh-test"), { recursive: true });
+  fs.mkdirSync(resolveTestPath("memory", "ssh-test"), { recursive: true });
 }
 
 async function main() {

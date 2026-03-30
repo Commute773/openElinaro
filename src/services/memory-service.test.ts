@@ -46,7 +46,7 @@ beforeEach(() => {
     }),
     "utf8",
   );
-  fs.mkdirSync(path.join(userDataDir, "memory/documents/test-ns"), { recursive: true });
+  fs.mkdirSync(path.join(userDataDir, "memory/test-ns"), { recursive: true });
 
   process.env.OPENELINARO_USER_DATA_DIR = userDataDir;
   process.env.OPENELINARO_ROOT_DIR = tempRoot;
@@ -82,7 +82,7 @@ async function getMemoryService() {
 
 function writeMemoryDoc(relativePath: string, content: string) {
   const userDataDir = process.env.OPENELINARO_USER_DATA_DIR!;
-  const fullPath = path.join(userDataDir, "memory/documents", relativePath);
+  const fullPath = path.join(userDataDir, "memory", relativePath);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, content, "utf8");
 }

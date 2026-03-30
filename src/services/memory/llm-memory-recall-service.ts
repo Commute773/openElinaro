@@ -173,7 +173,7 @@ export class LlmMemoryRecallService {
    */
   private async loadCorpus(): Promise<string | null> {
     const namespace = this.profiles.getWriteMemoryNamespace(this.profile);
-    const memoryDocRoot = path.join(resolveRuntimePath("memory"), "documents", namespace);
+    const memoryDocRoot = path.join(resolveRuntimePath("memory"), namespace);
 
     // Check root mtime as a cheap staleness signal
     const rootStat = await stat(memoryDocRoot).catch(() => null);

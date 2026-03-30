@@ -133,7 +133,7 @@ export class StructuredMemoryManager {
    */
   private getStructuredRoot() {
     const namespace = this.profiles.getWriteMemoryNamespace(this.profile);
-    const memoryDocRoot = path.join(resolveRuntimePath("memory"), "documents");
+    const memoryDocRoot = resolveRuntimePath("memory");
     return path.join(memoryDocRoot, namespace, STRUCTURED_ROOT);
   }
 

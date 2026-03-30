@@ -367,8 +367,8 @@ function writeProjectRegistry() {
 }
 
 function writeWorkspaceFixture(workspaceRoot: string) {
-  fs.mkdirSync(resolveTestPath("memory", "documents", "root"), { recursive: true });
-  fs.mkdirSync(resolveTestPath("memory", "documents", "swebench-smoke"), { recursive: true });
+  fs.mkdirSync(resolveTestPath("memory", "root"), { recursive: true });
+  fs.mkdirSync(resolveTestPath("memory", "swebench-smoke"), { recursive: true });
 
   fs.mkdirSync(path.join(workspaceRoot, "sphinx", "ext", "autodoc"), { recursive: true });
   fs.mkdirSync(path.join(workspaceRoot, "tests", "roots", "test-ext-autodoc", "target"), { recursive: true });
