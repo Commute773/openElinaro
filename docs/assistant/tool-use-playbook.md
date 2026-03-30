@@ -32,37 +32,6 @@ Avoid:
 - Calling shell commands when a dedicated tool probably exists
 - Loading too many tools for a narrow task
 
-## When To Use `run_tool_program`
-
-Prefer `run_tool_program` when the task involves any of these:
-
-- 3 or more dependent tool calls
-- loops over many files, search hits, or URLs
-- filtering, deduping, ranking, or aggregation
-- large intermediate results that would clutter model context
-- producing a compact summary plus saved artifacts
-
-Avoid `run_tool_program` for:
-
-- a single direct tool call
-- a one-off read or lookup
-- simple edits where normal tool calls are already enough
-
-## Program Shape
-
-Inside `run_tool_program`, the runtime exposes:
-
-- `tools.invokeTool(name, input?, options?)`
-- `tools.saveArtifact(name, content, mediaType?)`
-- `tools.getAvailableTools()`
-- `tools.log(value)`
-
-Return shape:
-
-- Prefer `return { summary: "..." }`
-- You may also return additional structured fields
-- Large outputs should go to artifacts, not the return payload
-
 ## Stored Tool Results
 
 - Normal tool outputs are now stored out of band and replayed into the model context as compact refs instead of full raw payloads.
@@ -71,27 +40,6 @@ Return shape:
 - `tool_result_read` supports three modes: `partial` for a bounded line slice, `full` for the stored payload, and `summary` for a summarizer-backed extraction over up to 10k chars of the stored content.
 - In `summary` mode, pass a `goal` that says what information you need. Prefer `summary` over `full` when you only need targeted facts, a verdict, or a compact recap from a large ref.
 - `tool_result_read` is the escape hatch for raw content, so repeated large reads should go through it instead of forcing every past tool result to stay in context.
-
-## Template: Multi-Step Research
-
-```js
-const search = await tools.invokeTool("web_search", {
-  query: "latest updates on X",
-  count: 5,
-}, { artifactName: "web-search.json" });
-
-const hits = Array.isArray(search?.results) ? search.results : [];
-const top = hits.slice(0, 3).map((entry) => ({
-  title: entry.title,
-  url: entry.url,
-}));
-
-await tools.saveArtifact("top-hits.json", top, "application/json");
-
-return {
-  summary: `Collected ${hits.length} web hits and saved the top results.`,
-};
-```
 
 ## Web Ladder
 
@@ -195,69 +143,14 @@ Example:
 - `set_timer` accepts `s`, `m`, `h`, and `d` suffixes such as `30s`, `10m`, `2h`, or `1d`.
 - Use `alarm_list` to inspect pending, delivered, or cancelled alerts and `alarm_cancel` to stop one by id.
 
-## Template: Repository Scan And Reduction
-
-```js
-const matches = await tools.invokeTool("grep", {
-  pattern: "load_tool_library|run_tool_program",
-  path: ".",
-  include: "*.ts",
-  limit: 200,
-}, { artifactName: "grep-results.txt", mediaType: "text/plain" });
-
-const files = String(matches)
-  .split("\\n")
-  .map((line) => line.split(":")[0]?.trim())
-  .filter(Boolean);
-
-const uniqueFiles = [...new Set(files)].slice(0, 10);
-const previews = [];
-
-for (const file of uniqueFiles) {
-  const content = await tools.invokeTool("read_file", {
-    path: file,
-    limit: 80,
-  });
-  previews.push({ file, preview: String(content).slice(0, 600) });
-}
-
-await tools.saveArtifact("file-previews.json", previews, "application/json");
-
-return {
-  summary: `Scanned ${uniqueFiles.length} relevant files and saved previews.`,
-};
-```
-
-## Template: Structured Routine Triage
-
-```js
-const routines = await tools.invokeTool("routine_list", {
-  status: "all",
-  kind: "all",
-  limit: 20,
-}, { artifactName: "routines.txt", mediaType: "text/plain" });
-
-const urgent = String(routines)
-  .split("\\n")
-  .filter((line) => /urgent|overdue|high/i.test(line))
-  .slice(0, 10);
-
-await tools.saveArtifact("urgent-routines.txt", urgent.join("\\n"), "text/plain");
-
-return {
-  summary: `Found ${urgent.length} urgent or overdue routine items.`,
-};
-```
-
 ## Template: Load Then Act
 
-Use `load_tool_library` first in a normal turn when the needed tool family is not already visible, then call the tools directly or via `run_tool_program`.
+Use `load_tool_library` first in a normal turn when the needed tool family is not already visible, then call the tools directly.
 
 Example sequence:
 
 1. `load_tool_library` with `library="filesystem_read"`
 2. Use `glob`, `grep`, `read_file`
-3. If the task turns into many repeated searches/reads, switch to `run_tool_program`
 
 ## Rules Of Thumb
 
@@ -265,7 +158,6 @@ Example sequence:
 - Keep the visible bundle small.
 - Use dedicated tools before shell.
 - Prefer omitting arguments that already match tool defaults. Example: coding-agent launch/resume defaults to a one-hour timeout.
-- Use `run_tool_program` to compress many tool calls into one model-visible result.
 - Save bulky intermediate data as artifacts.
 - Every tool call accepts `silent: true`; treat that as an exception path for background housekeeping like heartbeat checks, not the default.
 - Do not ask ordinary tools for ad hoc extraction. If a stored result comes back as `[tool_result_ref ...]`, use `tool_result_read` with `mode=\"summary\"` plus a `goal` describing what information you need instead.

@@ -1486,7 +1486,6 @@ describe("ToolRegistry tool catalog", () => {
     expect(codingTools).toContain("edit_file");
     expect(codingTools).toContain("apply_patch");
     expect(codingTools).toContain("exec_command");
-    expect(codingTools).toContain("run_tool_program");
     expect(codingTools).not.toContain("web_search");
     expect(codingTools).not.toContain("service_version");
   });
@@ -1502,7 +1501,6 @@ describe("ToolRegistry tool catalog", () => {
     expect(planningTools).toContain("load_tool_library");
     expect(planningTools).toContain("read_file");
     expect(planningTools).toContain("grep");
-    expect(planningTools).toContain("run_tool_program");
     expect(planningTools).not.toContain("apply_patch");
     expect(planningTools).not.toContain("write_file");
     expect(planningTools).not.toContain("exec_command");
@@ -1576,7 +1574,6 @@ describe("ToolRegistry tool catalog", () => {
     expect(userFacingTools).toContain("routine_add");
     expect(userFacingTools).not.toContain("load_tool_library");
     expect(defaultChatTools).toContain("load_tool_library");
-    expect(defaultChatTools).toContain("run_tool_program");
     expect(defaultChatTools).not.toContain("routine_add");
   });
 

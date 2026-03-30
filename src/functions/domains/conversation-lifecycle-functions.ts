@@ -67,14 +67,6 @@ const toolResultReadSchema = z.object({
   }
 });
 
-const runToolProgramSchema = z.object({
-  objective: z.string().min(8),
-  code: z.string().min(1),
-  scope: z.enum(["chat", "coding-planner", "coding-worker", "direct"]).optional(),
-  allowedTools: z.array(z.string().min(1)).max(24).optional(),
-  timeoutMs: z.number().int().min(1_000).max(180_000).optional(),
-});
-
 const TOOL_RESULT_SUMMARY_INPUT_CHAR_LIMIT = 10_000;
 
 // ---------------------------------------------------------------------------
@@ -714,47 +706,4 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
     examples: ["reopen a stored tool result", "summarize a saved tool output by ref"],
   }),
 
-  // -------------------------------------------------------------------------
-  // run_tool_program
-  // -------------------------------------------------------------------------
-  defineFunction({
-    name: "run_tool_program",
-    description:
-      "Execute JavaScript that orchestrates many tool calls internally and returns only a compact summary plus artifact paths. Use tools.invokeTool(name, input) inside the code and return an object with a summary field. Prefer this for loops, filtering, aggregation, repeated searches/reads, or large intermediate results.",
-    input: runToolProgramSchema,
-    handler: async (input, fnCtx) => {
-      const result = await fnCtx.services.toolPrograms.run({
-        objective: input.objective,
-        code: input.code,
-        scope: input.scope,
-        allowedTools: input.allowedTools,
-        timeoutMs: input.timeoutMs,
-        context: fnCtx.toolContext,
-      });
-
-      return [
-        `Tool program completed: ${result.runId}`,
-        `Scope: ${result.scope}`,
-        `Summary: ${result.summary}`,
-        result.allowedTools.length > 0
-          ? `Allowed tools: ${result.allowedTools.join(", ")}`
-          : "Allowed tools: (none)",
-        result.toolCalls.length > 0
-          ? `Tool calls:\n${result.toolCalls.map((entry) =>
-              `- ${entry.name}${entry.artifactPath ? ` -> ${entry.artifactPath}` : ""}: ${entry.preview}`).join("\n")}`
-          : "Tool calls: (none)",
-        result.artifacts.length > 0
-          ? `Artifacts:\n${result.artifacts.map((artifact) =>
-              `- ${artifact.path} (${artifact.mediaType}, ${artifact.byteLength} bytes)`).join("\n")}`
-          : "Artifacts: (none)",
-        `Manifest: ${result.manifestPath}`,
-      ].join("\n");
-    },
-    format: formatResult,
-    auth: { ...TOOLING_AUTH, note: "The callable tool bundle is filtered by profile." },
-    domains: ["meta", "orchestration", "tooling"],
-    agentScopes: TOOLING_ALL_SCOPES,
-    defaultVisibleScopes: ["chat", "coding-planner", "coding-worker", "direct"],
-    examples: ["loop over many tool calls", "aggregate repeated search results"],
-  }),
 ];

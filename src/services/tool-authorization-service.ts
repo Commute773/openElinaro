@@ -3,7 +3,6 @@ import type { ToolAuthorizationDeclaration } from "../domain/tool-catalog";
 export const TOOL_AUTH_DECLARATIONS = {
   load_tool_library: { access: "anyone", behavior: "role-sensitive", note: "Visible libraries and activated tools depend on the active profile and scope." },
   tool_result_read: { access: "anyone", behavior: "role-sensitive", note: "Stored tool-result refs are scoped to the active conversation or worker session unless the operator reads them directly." },
-  run_tool_program: { access: "anyone", behavior: "role-sensitive", note: "The callable tool bundle is filtered by profile." },
   job_list: { access: "anyone", behavior: "role-sensitive", note: "Only jobs attached to accessible projects are listed." },
   job_get: { access: "anyone", behavior: "role-sensitive", note: "Only jobs attached to accessible projects are readable." },
   work_summary: { access: "anyone", behavior: "role-sensitive", note: "Work summaries only include projects and jobs visible to the active profile." },
