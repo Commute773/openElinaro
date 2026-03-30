@@ -41,7 +41,7 @@ Where to look:
 
 - `src/services/conversation/agent-chat-service.ts`
 - `src/core/`
-- `src/connectors/`
+- `src/services/models/secondary-model-dispatch.ts`
 
 ## 5. Profiles, Projects, And Auth Are Explicit Runtime Objects
 
