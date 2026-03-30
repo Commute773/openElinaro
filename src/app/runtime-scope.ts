@@ -29,6 +29,9 @@ import { ToolResolutionService } from "../services/tool-resolution-service";
 import { ToolRegistry } from "../tools/tool-registry";
 import { telemetry } from "../services/infrastructure/telemetry";
 import { getRuntimeConfig } from "../config/runtime-config";
+import { PiCore } from "../core/pi-core";
+import type { CoreFactory } from "../core/types";
+import type { ThinkingLevel, Model, Api } from "@mariozechner/pi-ai";
 
 type ShellRuntime = Pick<
   ShellService,
@@ -289,6 +292,18 @@ export function createRuntimeScope(ctx: {
   c.register<AgentChatService>(K.chat, () => {
     const automaticConversationMemoryDisabled = isAutomaticConversationMemoryDisabled();
     const profile = c.resolve<ProfileRecord>(K.profile);
+
+    // Core factory: creates an AgentCore instance per turn based on the resolved model.
+    // Currently always returns PiCore. Future: select ClaudeSdkCore based on provider.
+    const coreFactory: CoreFactory = ({ modelConfig }) => {
+      return new PiCore({
+        model: modelConfig.runtimeModel as Model<Api>,
+        apiKey: modelConfig.apiKey,
+        reasoning: modelConfig.reasoning as ThinkingLevel | undefined,
+        providerOptions: modelConfig.providerOptions,
+      });
+    };
+
     const chat = new AgentChatService(
       {
         routineTools: c.resolve<ToolRegistry>(K.routineTools),
@@ -301,6 +316,7 @@ export function createRuntimeScope(ctx: {
         structuredMemory: mode === "subagent" || automaticConversationMemoryDisabled
           ? undefined
           : c.resolve<MemoryManagementAgent>(K.memoryManagementAgent),
+        coreFactory,
       },
       mode === "interactive" && profile.id === "root",
       ctx.onConversationActivityChange

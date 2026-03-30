@@ -21,6 +21,7 @@ import {
   extractAssistantText,
 } from "../../messages/types";
 import type { AppProgressEvent, ChatPromptContentBlock } from "../../domain/assistant";
+import { PiCore } from "../../core/pi-core";
 import { getTestFixturesDir } from "../../test/fixtures";
 
 const repoRoot = process.cwd();
@@ -429,6 +430,13 @@ function createDiscordAppHarness(options?: {
     conversations,
     systemPrompts,
     models,
+    coreFactory: ({ modelConfig }) =>
+      new PiCore({
+        model: modelConfig.runtimeModel as any,
+        apiKey: modelConfig.apiKey,
+        reasoning: modelConfig.reasoning as any,
+        providerOptions: modelConfig.providerOptions,
+      }),
   });
 
   return {

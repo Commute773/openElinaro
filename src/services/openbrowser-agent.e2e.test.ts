@@ -15,6 +15,7 @@ import {
 import type { ChatPromptContentBlock } from "../domain/assistant";
 import type { ScriptedConnectorRequest } from "../test/scripted-provider-connector";
 import { updateTestRuntimeConfig } from "../test/runtime-config-test-helpers";
+import { PiCore } from "../core/pi-core";
 
 const repoRoot = process.cwd();
 
@@ -316,6 +317,13 @@ function createHarness(expectedArtifactDir: string) {
     conversations,
     systemPrompts,
     models,
+    coreFactory: ({ modelConfig }) =>
+      new PiCore({
+        model: modelConfig.runtimeModel as any,
+        apiKey: modelConfig.apiKey,
+        reasoning: modelConfig.reasoning as any,
+        providerOptions: modelConfig.providerOptions,
+      }),
   });
 
   return { chat };
