@@ -11,7 +11,7 @@ function asZod(s: unknown): ZodTypeAny {
 // Path parsing — supports "foo.bar[0].baz" notation
 // ---------------------------------------------------------------------------
 
-function parsePathSegments(expr: string): string[] {
+export function parsePathSegments(expr: string): string[] {
   const s = expr.trim();
   if (!s) return [];
   const segments: string[] = [];
@@ -45,7 +45,7 @@ interface SchemaMeta {
   defaultValue: unknown;
 }
 
-function analyze(schema: ZodTypeAny): SchemaMeta {
+export function analyze(schema: ZodTypeAny): SchemaMeta {
   let cur = schema;
   let optional = false;
   let nullable = false;
@@ -101,7 +101,7 @@ function navigateSegment(schema: ZodTypeAny, seg: string): ZodTypeAny {
   throw new Error(`Cannot navigate "${seg}" on ${baseTypeName(inner)}.`);
 }
 
-function resolveSchemaAtPath(root: ZodTypeAny, pathExpression: string): ZodTypeAny {
+export function resolveSchemaAtPath(root: ZodTypeAny, pathExpression: string): ZodTypeAny {
   let cur = root;
   for (const seg of parsePathSegments(pathExpression)) {
     cur = navigateSegment(cur, seg);
