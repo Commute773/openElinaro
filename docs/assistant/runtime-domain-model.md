@@ -157,17 +157,13 @@ Tool definitions are filtered per core: `splitToolsForCore()` removes tools the 
 
 ## Conversation history and memory search
 
-Conversation snapshots still live in `~/.openelinaro/conversations.json`, but live chat traffic is also appended to `~/.openelinaro/conversation-history/events.<profile>.jsonl` as it happens.
+Conversation snapshots live in `~/.openelinaro/conversations.json`.
 
 - The JSON snapshot store is the mutable working state for active threads.
-- The JSONL conversation archive is append-only and preserves past chat traffic even when a thread is compacted, reset, or rolled back.
 - If a provider aborts a compaction attempt, the foreground chat turn now logs the compaction failure and continues the turn without mutating the conversation snapshot.
-- `conversation_search` reads that archive for the active profile and uses BM25 as the first-pass retrieval path, then opportunistically applies dense vector reranking on a bounded candidate set when the local embedding model is already warm, returning the most recent relevant matches with local context around the hit.
-- `memory_search` uses the same hybrid retrieval pattern against `~/.openelinaro/memory/documents`.
-- foreground chat turns now do automatic memory recall before the reply and queue background durable-memory extraction after the reply.
-- background coding subagents do not do per-turn automatic memory recall or post-turn automatic memory ingestion.
-- automatic per-turn memories are written under `~/.openelinaro/memory/documents/<namespace>/auto/`.
-- Both search surfaces are designed to degrade to lexical BM25 if embedding generation fails, rather than turning search into a hard error.
+- Compaction extracts durable memory and writes it to `~/.openelinaro/memory/<namespace>/core/MEMORY.md`.
+- Structured memory entities are written under `~/.openelinaro/memory/<namespace>/structured/`.
+- The memory file tree is injected into the system prompt so the agent can reference durable facts without search tools.
 
 ## Reflection and continuity
 

@@ -1,7 +1,6 @@
 import { mkdir, chmod } from "node:fs/promises";
 import path from "node:path";
 import type { Message } from "../../messages/types";
-import { ConversationHistoryService } from "./conversation-history-service";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../runtime-root";
 import type { SystemPromptSnapshot } from "../system-prompt-service";
 import { telemetry } from "../infrastructure/telemetry";
@@ -13,10 +12,6 @@ export interface ConversationState {
   updatedAt: string;
   systemPrompt?: SystemPromptSnapshot;
 }
-
-type ConversationStoreOptions = {
-  history?: ConversationHistoryService;
-};
 
 type StoredConversationState = {
   key: string;
@@ -88,12 +83,6 @@ function describeMutation(current: Message[], next: Message[]) {
 }
 
 export class ConversationStore {
-  private readonly history: ConversationHistoryService;
-
-  constructor(options?: ConversationStoreOptions) {
-    this.history = options?.history ?? new ConversationHistoryService();
-  }
-
   async list(): Promise<ConversationState[]> {
     const store = await readStore();
     return Object.values(store.conversations)
@@ -155,33 +144,6 @@ export class ConversationStore {
     };
     store.conversations[state.key] = nextState;
     await writeStore(store);
-
-    try {
-      if (isMessagePrefix(currentMessages, state.messages) && state.messages.length > currentMessages.length) {
-        this.history.recordAppendedMessages({
-          conversationKey: state.key,
-          messages: state.messages.slice(currentMessages.length),
-          startingIndex: currentMessages.length,
-          occurredAt: nextState.updatedAt,
-        });
-      } else if (
-        isMessagePrefix(state.messages, currentMessages) &&
-        currentMessages.length > state.messages.length
-      ) {
-        this.history.recordRollback({
-          conversationKey: state.key,
-          removedCount: currentMessages.length - state.messages.length,
-          occurredAt: nextState.updatedAt,
-        });
-      }
-    } catch (error) {
-      telemetry.recordError(error, {
-        conversationKey: state.key,
-        entityType: "conversation",
-        entityId: state.key,
-        operation: "conversation_store.history_write",
-      });
-    }
 
     return {
       key: state.key,
@@ -262,21 +224,5 @@ export class ConversationStore {
       ...conversation,
       systemPrompt: snapshot,
     });
-  }
-
-  searchHistory(params: {
-    query: string;
-    limit?: number;
-    contextChars?: number;
-  }) {
-    return this.history.search(params);
-  }
-
-  listRecentHistory(params?: {
-    limit?: number;
-    since?: string;
-    conversationKey?: string;
-  }) {
-    return this.history.listRecentMessages(params);
   }
 }

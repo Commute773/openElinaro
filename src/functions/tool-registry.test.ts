@@ -4,7 +4,6 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { assistantTextMessage, isAssistantMessage, userMessage } from "../messages/types";
 import { AccessControlService } from "../services/profiles";
-import { ConversationHistoryService } from "../services/conversation/conversation-history-service";
 import { ConversationStateTransitionService } from "../services/conversation/conversation-state-transition-service";
 import { ConversationStore } from "../services/conversation/conversation-store";
 import { FinanceService } from "../services/finance-service";
@@ -287,7 +286,6 @@ function createHarnessWithOptions(options?: {
     projects,
     models,
     conversations,
-    memory,
     systemPrompts,
     transitions,
     access,
@@ -649,33 +647,6 @@ describe("ToolRegistry tool catalog", () => {
     expect(result).toContain("Durable memory flush was intentionally skipped.");
     expect(storedConversation.messages).toHaveLength(1);
     expect(isAssistantMessage(storedConversation.messages[0]!)).toBe(true);
-  });
-
-  test("conversation_search queries the append-only conversation archive", async () => {
-    const conversations = new ConversationStore({
-      history: new ConversationHistoryService({
-        embedTexts: async (texts) =>
-          texts.map((text) => {
-            const lower = text.toLowerCase();
-            return [
-              lower.includes("cache") ? 1 : 0,
-              lower.includes("graph") ? 1 : 0,
-            ];
-          }),
-      }),
-    });
-    await conversations.appendMessages("thread-1", [userMessage("cache graph regression")]);
-    await conversations.appendMessages("thread-2", [userMessage("older note about graph memory")]);
-
-    const harness = createHarnessWithOptions({ conversations });
-    const result = await harness.registry.invoke("conversation_search", {
-      query: "cache graph",
-      limit: 1,
-      contextChars: 80,
-    });
-
-    expect(result).toContain('Conversation hits for "cache graph"');
-    expect(result).toContain("conversation=thread-2");
   });
 
   test("documents English defaults for web_search", () => {

@@ -17,8 +17,7 @@
 - Prefer omitting tool arguments that already have an obvious default. Example: coding-agent launch/resume defaults to a one-hour timeout unless you need something else.
 - Every tool call accepts `silent: true`, but use it rarely if ever. Default to visible tool progress. Reserve `silent: true` for background housekeeping such as heartbeat checks where intermediate tool echoes would be noise, and never use it to hide meaningful work from the user.
 - Be resourceful before asking questions: read the file, inspect the repo, search docs, search memory, then ask only if still blocked.
-- When you lack durable background on a person, project, or prior decision, check local docs or `memory_search` before making the user restate it.
-- When you need older chat context that may have been compacted out of the active thread, use `conversation_search`.
+- When you lack durable background on a person, project, or prior decision, check the memory file tree in the system prompt or read local docs before making the user restate it.
 - When chatting over Discord and you want the user to receive a local file, include a standalone directive like `<discord-file path="relative/or/absolute/path" />` in the final response. You may also add `name="filename.ext"`. Relative local paths resolve from the runtime root, not a managed-service release cwd. Only use this for files the user explicitly wants delivered.
 - Treat auth, profiles, and projects as first-class runtime objects with local SSOTs. Use the registries and schemas before guessing fields or relationships.
 - Profiles: `profiles/registry.json` is the inventory SSOT. Keep profile reasoning aligned with `src/domain/profiles.ts` and the access rules in `src/services/profiles/profile-service.ts`.

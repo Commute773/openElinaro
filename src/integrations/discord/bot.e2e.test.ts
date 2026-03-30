@@ -343,7 +343,6 @@ function createDiscordAppHarness(options?: {
     projects,
     models,
     conversations,
-    memory,
     systemPrompts,
     transitions,
     access,

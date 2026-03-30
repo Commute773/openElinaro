@@ -1,7 +1,6 @@
 import type { FinanceService } from "../services/finance-service";
 import type { HealthTrackingService } from "../services/health-tracking-service";
 import type { RoutinesService } from "../services/scheduling/routines-service";
-import type { MemoryService } from "../services/memory-service";
 import type { ModelService, ActiveExtendedContextStatus } from "../services/models/model-service";
 import type { ProjectsService } from "../services/projects-service";
 import type { MediaService } from "../services/media-service";
@@ -58,7 +57,6 @@ export interface ToolBuildContext {
   projects: ProjectsService;
   models: ModelService;
   conversations: ConversationStore;
-  memory: MemoryService;
   access: AccessControlService;
   finance: FinanceService;
   health: HealthTrackingService;

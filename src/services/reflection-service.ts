@@ -7,7 +7,7 @@ import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { ReflectionPromptService } from "./reflection-prompt-service";
 import { ReflectionStateService } from "./reflection-state-service";
-import { nowInTimezone, localDateKey, startOfDay as startOfLocalDay } from "../utils/time-helpers";
+import { nowInTimezone, localDateKey } from "../utils/time-helpers";
 
 export type ReflectionTrigger = "daily" | "compaction" | "explicit";
 
@@ -26,7 +26,6 @@ type ReflectionResponse = {
   bring_up_next_time?: string;
 };
 
-const MAX_RECENT_HISTORY_ENTRIES = 18;
 const MAX_BOOTSTRAP_ENTRIES = 3;
 const reflectionTelemetry = telemetry.child({ component: "reflection" });
 
@@ -140,18 +139,8 @@ function renderJournal(entries: ReflectionEntry[]) {
   ].join("\n").trimEnd()).join("\n\n")}\n`;
 }
 
-function formatRecentHistory(entries: Awaited<ReturnType<ConversationStore["listRecentHistory"]>>) {
-  if (entries.length === 0) {
-    return "(no recent archived conversation entries)";
-  }
-  return entries
-    .map((entry) =>
-      [
-        `[${entry.occurredAt}] ${entry.role} (${entry.conversationKey} #${entry.messageIndex})`,
-        compactText(entry.text, 320),
-      ].join("\n")
-    )
-    .join("\n\n");
+function formatRecentHistory() {
+  return "(no recent archived conversation entries)";
 }
 
 export class ReflectionService {
@@ -286,15 +275,9 @@ export class ReflectionService {
         const localDate = localDateKey(localNow);
         const recentEntries = (await this.readJournalEntries()).slice(-2);
         const soul = await this.memory.readProfileDocument("identity/SOUL.md");
-        const since = params.trigger === "daily"
-          ? startOfLocalDay(localNow).toISOString()
-          : undefined;
         const recentHistory = params.suppliedContext?.trim()
           ? params.suppliedContext.trim()
-          : formatRecentHistory(await this.conversations.listRecentHistory({
-              limit: MAX_RECENT_HISTORY_ENTRIES,
-              since,
-            }));
+          : formatRecentHistory();
         const reflectionPrompt = this.prompts.buildReflectionSystemPrompt();
 
         const responseText = await this.models.generateMemoryText({

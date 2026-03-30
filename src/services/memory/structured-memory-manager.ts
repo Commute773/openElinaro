@@ -5,8 +5,6 @@ import { ProfileService } from "../profiles";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../runtime-root";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
-import { MemoryService } from "../memory-service";
-
 const structuredMemoryTelemetry = telemetry.child({ component: "structured_memory" });
 const traceSpan = createTraceSpan(structuredMemoryTelemetry);
 
@@ -121,7 +119,6 @@ export class StructuredMemoryManager {
 
   constructor(
     private readonly profile: ProfileRecord,
-    private readonly memory: MemoryService,
     profiles?: ProfileService,
   ) {
     this.profiles = profiles ?? new ProfileService(profile.id);
@@ -214,15 +211,6 @@ export class StructuredMemoryManager {
         // Update the category index and main index
         await this.rebuildCategoryIndex(params.category);
         await this.rebuildMainIndex();
-
-        // Trigger reindex in the memory service so hybrid search picks up changes
-        this.memory.reindex().catch((error) => {
-          structuredMemoryTelemetry.event(
-            "structured_memory.reindex_failed",
-            { error: error instanceof Error ? error.message : String(error) },
-            { level: "warn", outcome: "error" },
-          );
-        });
 
         structuredMemoryTelemetry.event("structured_memory.entry_upserted", {
           category: params.category,
