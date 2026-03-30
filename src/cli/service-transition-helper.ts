@@ -78,11 +78,6 @@ if ((action !== "update" && action !== "rollback") || !statusPath?.trim()) {
   process.exit(1);
 }
 
-if (process.env.OPENELINARO_AGENT_SERVICE_CONTROL !== "1") {
-  console.error("Managed-service update and rollback scripts are internal. Use the root-only agent update flow instead.");
-  process.exit(1);
-}
-
 const rootDir = process.env.OPENELINARO_ROOT_DIR?.trim() || process.cwd();
 const delayMs = parsePositiveInt(process.env.OPENELINARO_DETACHED_HELPER_DELAY_MS, 5_000);
 const scriptPath = path.join(rootDir, "scripts", `service-${action}.sh`);
@@ -103,7 +98,6 @@ try {
     cwd: rootDir,
     env: {
       ...process.env,
-      OPENELINARO_AGENT_SERVICE_CONTROL: "1",
     },
     maxBuffer: 1024 * 1024 * 4,
   });

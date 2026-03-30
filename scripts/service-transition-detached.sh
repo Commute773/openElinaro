@@ -13,7 +13,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${OPENELINARO_ROOT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 OPENELINARO_REPO_ROOT="${ROOT_DIR}"
 source "${ROOT_DIR}/scripts/service-common.sh"
-openelinaro_require_agent_service_control || exit 1
 
 openelinaro_ensure_deployment_dirs
 
@@ -99,7 +98,6 @@ case "$(openelinaro_service_manager)" in
       "OPENELINARO_HEALTHCHECK_TIMEOUT_MS=${OPENELINARO_HEALTHCHECK_TIMEOUT_MS}"
       "OPENELINARO_DETACHED_HELPER_DELAY_MS=${OPENELINARO_DETACHED_HELPER_DELAY_MS:-5000}"
       "OPENELINARO_NOTIFY_DISCORD_USER_ID=${OPENELINARO_NOTIFY_DISCORD_USER_ID:-}"
-      "OPENELINARO_AGENT_SERVICE_CONTROL=1"
       "${NODE_BIN}"
       "${NODE_WRAPPER_PATH}"
       "${BUN_BIN}"
@@ -138,7 +136,6 @@ case "$(openelinaro_service_manager)" in
       --setenv="OPENELINARO_HEALTHCHECK_TIMEOUT_MS=${OPENELINARO_HEALTHCHECK_TIMEOUT_MS}" \
       --setenv="OPENELINARO_DETACHED_HELPER_DELAY_MS=${OPENELINARO_DETACHED_HELPER_DELAY_MS:-5000}" \
       --setenv="OPENELINARO_NOTIFY_DISCORD_USER_ID=${OPENELINARO_NOTIFY_DISCORD_USER_ID:-}" \
-      --setenv="OPENELINARO_AGENT_SERVICE_CONTROL=1" \
       /usr/bin/env bash "${ROOT_DIR}/scripts/service-transition-run.sh" "${ACTION}" "${STATUS_PATH}" "${TARGET_RELEASE_DIR}"
     echo "Scheduled detached ${ACTION} helper."
     echo "helperUnit: ${HELPER_UNIT}"
