@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.9
+- Released at: 2026-03-30T17:59:25Z
+- Release id: 20260330T175925Z-63b0d84
+- Previous version: 2026.03.30.8
+- Trigger: ci/release workflow
+
+- cleanup: remove dead subagent/tmux references and simplify multi-profile remnants (#215)
+
 ## 2026.03.30.8
 - Released at: 2026-03-30T17:41:49Z
 - Release id: 20260330T174149Z-867cc6e
