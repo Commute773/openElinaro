@@ -1,7 +1,12 @@
 import { z } from "zod";
 
-const ModelProviderSchema = z.enum(["openai-codex", "claude", "zai"]);
-export const ThinkingLevelSchema = z.enum(["minimal", "low", "medium", "high", "xhigh"]);
+export const MODEL_PROVIDER_IDS = ["openai-codex", "claude", "zai"] as const;
+export type ModelProviderId = (typeof MODEL_PROVIDER_IDS)[number];
+const ModelProviderSchema = z.enum(MODEL_PROVIDER_IDS);
+
+export const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh"] as const;
+export type ThinkingLevelId = (typeof THINKING_LEVELS)[number];
+export const ThinkingLevelSchema = z.enum(THINKING_LEVELS);
 const ProfileExecutionSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("ssh"),

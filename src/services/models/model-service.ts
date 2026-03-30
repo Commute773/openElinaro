@@ -39,7 +39,7 @@ import {
   type RecordedUsageDailyInspection,
 } from "./model-usage-service";
 import { getClaudeSetupToken, getCodexCredentials, getZaiApiKey, saveCodexCredentials } from "../../auth/store";
-import type { ProfileRecord } from "../../domain/profiles";
+import type { ProfileRecord, ModelProviderId } from "../../domain/profiles";
 import { getRuntimeConfig } from "../../config/runtime-config";
 import { resolveRuntimePath } from "../runtime-root";
 import { telemetry } from "../infrastructure/telemetry";
@@ -50,7 +50,7 @@ import { SecondaryModelDispatch, type ResolvedRuntimeModel } from "./secondary-m
 export type { RecordedUsageInspection, RecordedUsageDailyInspection } from "./model-usage-service";
 export { ModelUsageService } from "./model-usage-service";
 
-export type ModelProviderId = "openai-codex" | "claude" | "zai";
+export type { ModelProviderId } from "../../domain/profiles";
 const modelTelemetry = telemetry.child({ component: "model" });
 const MAX_ANTHROPIC_BASE64_BYTES = 5 * 1024 * 1024;
 

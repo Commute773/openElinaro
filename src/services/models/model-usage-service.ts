@@ -1,5 +1,5 @@
 import type { Usage } from "@mariozechner/pi-ai";
-import type { ProfileRecord } from "../../domain/profiles";
+import type { ProfileRecord, ModelProviderId } from "../../domain/profiles";
 import { CacheMissMonitor, type CacheMissWarning } from "../cache-miss-monitor";
 import { telemetry } from "../infrastructure/telemetry";
 import {
@@ -9,7 +9,7 @@ import {
   type UsagePromptDiagnostics,
 } from "../usage-tracking-service";
 
-export type ModelProviderId = "openai-codex" | "claude" | "zai";
+export type { ModelProviderId } from "../../domain/profiles";
 
 export interface RecordedUsageInspection {
   conversation: UsageLedgerSummary;
