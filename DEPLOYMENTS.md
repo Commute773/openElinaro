@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.19
+- Released at: 2026-03-30T21:29:04Z
+- Release id: 20260330T212904Z-17f4d09
+- Previous version: 2026.03.30.18
+- Trigger: ci/release workflow
+
+- cleanup: remove src/connectors, inline provider-response into secondary-model-dispatch
+
 ## 2026.03.30.18
 - Released at: 2026-03-30T21:17:59Z
 - Release id: 20260330T211759Z-4e55deb
