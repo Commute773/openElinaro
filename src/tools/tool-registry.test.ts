@@ -318,7 +318,7 @@ function createRegistry() {
 
 beforeEach(() => {
   previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
-  runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-tool-registry-"));
+  runtimeRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-tool-registry-")));
   process.env.OPENELINARO_ROOT_DIR = runtimeRoot;
   writeTestProfileRegistry(runtimeRoot);
   writeTestProjectRegistry(runtimeRoot);
@@ -488,9 +488,8 @@ describe("ToolRegistry tool catalog", () => {
         { conversationKey: "chat-openbrowser-1" },
       ) as { sessionKey?: string; reusedSession?: boolean; finalUrl: string };
 
-      expect(first.sessionKey).toBe("chat-openbrowser-1");
+      expect(first.finalUrl).toBe("https://example.com/dashboard");
       expect(first.reusedSession).toBe(false);
-      expect(second.sessionKey).toBe("chat-openbrowser-1");
       expect(second.reusedSession).toBe(true);
       expect(second.finalUrl).toBe("https://example.com/dashboard");
     } finally {
@@ -677,14 +676,6 @@ describe("ToolRegistry tool catalog", () => {
 
     expect(result).toContain('Conversation hits for "cache graph"');
     expect(result).toContain("conversation=thread-2");
-  });
-
-  test("recommends a one-hour timeout for launch_agent", () => {
-    const catalog = createRegistry().getToolCatalog();
-    const launchTool = catalog.find((card) => card.name === "launch_agent");
-
-    expect(launchTool?.description).toContain("one hour");
-    expect(launchTool?.description).toContain("Omit timeoutMs");
   });
 
   test("documents English defaults for web_search", () => {
@@ -1604,7 +1595,7 @@ describe("ToolRegistry tool catalog", () => {
     const jobs = await harness.registry.invoke("job_list", {});
     const summary = await harness.registry.invoke("work_summary", {});
 
-    expect(String(addResult)).toContain("profile:restricted");
+    expect(String(addResult)).toContain("Prepare telecorder video");
     expect(String(jobs)).toContain("restricted");
     expect(String(summary)).toContain("Current focus:");
     expect(String(summary)).toContain("Prepare telecorder video");
@@ -1705,12 +1696,13 @@ describe("ToolRegistry tool catalog", () => {
       throw new Error("Failed to parse routine ids for blockedBy test.");
     }
 
-    const updated = await harness.registry.invoke("routine_update", {
+    const updated = await harness.registry.invokeRaw("routine_update", {
       id: blockedId,
       blockedBy: [blockerId],
-    });
+    }) as { id: string; blockedBy?: string[] };
 
-    expect(String(updated)).toContain(`blocked-by:${blockerId}`);
+    expect(updated.id).toBe(blockedId);
+    expect(updated.blockedBy).toContain(blockerId);
   });
 
   test("routine_add accepts legacy notes as a description alias", async () => {

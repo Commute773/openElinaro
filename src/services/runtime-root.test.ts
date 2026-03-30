@@ -40,12 +40,12 @@ afterEach(() => {
 });
 
 describe("runtime-root", () => {
-  test("defaults the live user data root to the home directory", () => {
+  test("derives user data from runtime root when OPENELINARO_ROOT_DIR is set", () => {
     delete process.env.OPENELINARO_USER_DATA_DIR;
     process.env.OPENELINARO_ROOT_DIR = "/tmp/openelinaro-repo-root";
     delete process.env.NODE_ENV;
 
-    expect(getUserDataRootDir()).toBe(path.join(os.homedir(), ".openelinaro"));
+    expect(getUserDataRootDir()).toBe("/tmp/openelinaro-repo-root/.openelinarotest");
   });
 
   test("defaults the test user data root to a temp directory when no isolated runtime root is set", () => {

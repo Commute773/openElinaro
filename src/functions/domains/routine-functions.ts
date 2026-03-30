@@ -198,6 +198,7 @@ interface SerializedRoutineItem {
   labels?: string[];
   jobId?: string;
   projectId?: string;
+  blockedBy?: string[];
   schedule: RoutineSchedule;
   state: RoutineState;
 }
@@ -231,6 +232,7 @@ function serializeItem(item: RoutineItem): SerializedRoutineItem {
     labels: item.labels,
     jobId: item.jobId,
     projectId: item.projectId,
+    blockedBy: item.blockedBy,
     schedule: item.schedule,
     state: item.state,
   };

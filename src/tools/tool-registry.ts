@@ -597,11 +597,12 @@ export class ToolRegistry {
     const strippedInput = stripToolControlInput(nextInput) as Record<string, unknown>;
 
     try {
-      const result = await entry.handler(strippedInput);
+      const rawResult = await entry.handler(strippedInput);
       if (context?.onToolUse) {
-        await notifyToolResultProgress(context, call.name, result, rawInput);
+        await notifyToolResultProgress(context, call.name, rawResult, rawInput);
       }
-      const content = await finalizeToolResult(result, call.name, rawInput, this.toolResults);
+      const formatted = entry.format ? entry.format(rawResult) : rawResult;
+      const content = await finalizeToolResult(formatted, call.name, rawInput, this.toolResults);
       return toolResultMessage({
         toolCallId: call.id,
         toolName: call.name,
@@ -789,10 +790,12 @@ export class ToolRegistry {
     return this.toolEntries.filter((entry) => this.access.canUseTool(entry.tool.name));
   }
 
-  async invoke(name: string, input: unknown, context?: ToolContext) {
+  async invoke(name: string, input: Record<string, unknown>, context?: ToolContext) {
     try {
-      const result = await this.invokeRaw(name, input, context);
-      return await finalizeToolResult(result, name, input, this.toolResults);
+      const entry = this.toolsByName.get(name === "model_context_usage" ? "context" : name);
+      const rawResult = await this.invokeRaw(name, input, context);
+      const formatted = entry?.format ? entry.format(rawResult) : rawResult;
+      return await finalizeToolResult(formatted, name, input, this.toolResults);
     } catch (error) {
       return await normalizeToolResult(normalizeToolFailure(name, error));
     }

@@ -26,14 +26,21 @@ const traceSpan = createTraceSpan(fnTelemetry);
  */
 export type FunctionContextExtras = Partial<Omit<FunctionContext, "services" | "toolContext" | "conversationKey">>;
 
+/** The raw result type returned by a tool handler before formatting. */
+export type ToolRawResult = string | number | boolean | null | Record<string, unknown> | Array<unknown>;
+
 /**
  * A tool entry combining the pi-ai tool schema with its execution handler.
+ * The handler returns the raw structured result; format converts it to a
+ * human-readable string for the model.
  */
 export interface PiToolEntry {
   /** pi-ai tool definition (name + description + JSON Schema parameters) for the model API. */
   tool: Tool;
-  /** The execution handler. Receives raw input from the model, returns the result. */
-  handler: (input: Record<string, unknown>) => Promise<unknown>;
+  /** The execution handler. Receives parsed input, returns the raw structured result. */
+  handler: (input: Record<string, unknown>) => Promise<ToolRawResult>;
+  /** Format the raw result into a human-readable string for the model. */
+  format: (result: ToolRawResult) => string;
 }
 
 /**
@@ -80,7 +87,7 @@ export function generateAgentTool(
       description: def.description,
       parameters: parameters as Tool["parameters"],
     },
-    handler: async (input: Record<string, unknown>) => {
+    handler: async (input: Record<string, unknown>): Promise<ToolRawResult> => {
       return traceSpan(`tool.${def.name}`, async () => {
         const extras = resolveExtras?.() ?? {};
         const toolContext = resolveToolContext?.();
@@ -90,10 +97,11 @@ export function generateAgentTool(
           conversationKey: toolContext?.conversationKey,
           ...extras,
         };
-        const result = await def.handler(input, ctx);
-        return def.format(result);
+        const parsed = def.input.parse(input);
+        return await def.handler(parsed, ctx) as ToolRawResult;
       }, { attributes: input });
     },
+    format: (result: ToolRawResult): string => def.format(result as Parameters<typeof def.format>[0]),
   };
 }
 

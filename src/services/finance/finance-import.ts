@@ -502,9 +502,10 @@ export async function executeImportTransactions(
       if (!spreadsheetId || !accountsGid || !transactionsGid) {
         throw new Error("Missing Fintable sheet settings.");
       }
+      const fetch = options.fetcher ?? fetchText;
       const [accountsCsv, transactionsCsv] = await Promise.all([
-        fetchText(sheetCsvUrl(spreadsheetId, accountsGid)),
-        fetchText(sheetCsvUrl(spreadsheetId, transactionsGid)),
+        fetch(sheetCsvUrl(spreadsheetId, accountsGid)),
+        fetch(sheetCsvUrl(spreadsheetId, transactionsGid)),
       ]);
       const accounts = parseCsvText(accountsCsv);
       const transactions = parseCsvText(transactionsCsv);

@@ -436,7 +436,7 @@ export class OpenElinaroApp {
 
   async invokeRoutineTool(
     name: string,
-    input: unknown,
+    input: Record<string, unknown>,
     options?: {
       conversationKey?: string;
       onToolUse?: (event: AppProgressEvent) => Promise<void>;

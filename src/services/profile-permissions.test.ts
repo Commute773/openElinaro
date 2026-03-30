@@ -147,7 +147,7 @@ function initGitRepo(repoRoot: string) {
 
 beforeAll(async () => {
   previousCwd = process.cwd();
-  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-profile-test-"));
+  tempRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-profile-test-")));
   previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
   process.env.OPENELINARO_ROOT_DIR = tempRoot;
   process.chdir(tempRoot);
