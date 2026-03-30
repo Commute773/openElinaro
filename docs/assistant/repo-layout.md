@@ -1,6 +1,6 @@
 # Repo Layout And Boundaries
 
-Use this doc when you need the quick answer to "what lives where?" and "what is actually part of the agent system?"
+Quick reference for "what lives where?" and "what is part of the agent system?"
 
 ## Core Boundary
 
@@ -8,50 +8,117 @@ The agent system is the runtime under `src/` plus its local configuration, promp
 
 It includes:
 
-- `src/` for runtime code, orchestration, services, tools, and integrations
-- `system_prompt/universal/` for universal platform prompts that apply to every agent and cannot be overridden
-- `~/.openelinaro/system_prompt/` for operator-managed agent-specific prompts (identity, user profile, etc.) that are appended alongside universal prompts
-- `~/.openelinaro/assistant_context/` for internal prompt-like runtime instructions that are injected selectively, such as heartbeat guidance, rather than compiled into every thread snapshot
-- `~/.openelinaro/docs/assistant/` for operator-specific assistant docs such as persona, profile, and local vision notes
-- `~/.openelinaro/` for live local operator data, including config, secrets, profiles, projects, logs, memory, and workflow state
-- `profiles/` and `projects/` for bundled starter defaults that are copied into `~/.openelinaro/` on first run
-- `docs/assistant/` for platform docs that describe the shared runtime architecture
+- `src/` -- runtime code, orchestration, services, tools, and integrations
+- `system_prompt/universal/` -- universal platform prompts that ship with the app, always included first
+- `~/.openelinaro/system_prompt/` -- operator-managed custom prompts, optional and appended after universal
+- `~/.openelinaro/assistant_context/` -- internal prompt-like runtime instructions injected selectively (heartbeat guidance, autonomous time prompts)
+- `~/.openelinaro/docs/assistant/` -- operator-specific assistant docs (persona, profile, local notes)
+- `~/.openelinaro/` -- live local operator data: config, secrets, profiles, projects, logs, memory, workflow state
+- `profiles/` and `projects/` -- bundled starter defaults copied into `~/.openelinaro/` on first run
+- `docs/assistant/` -- platform docs describing the shared runtime architecture
 
-It does not include live project data as platform code. `~/.openelinaro/projects/` is a context surface:
+`~/.openelinaro/projects/` is a context surface, not platform code:
 
-- `~/.openelinaro/projects/registry.json` is the inventory of known projects
-- `~/.openelinaro/projects/<id>/` holds project-specific docs copied or maintained for context
-- a project's `workspacePath` may point outside this repo to the real codebase
-
-That means `projects/` is part of the assistant's world model, but not part of the agent system architecture unless you are explicitly working on a project stored there.
+- `~/.openelinaro/projects/registry.json` -- inventory of known projects
+- `~/.openelinaro/projects/<id>/` -- project-specific docs
+- A project's `workspacePath` may point outside this repo to the real codebase
 
 ## Runtime Map
 
-- `src/index.ts`: Discord entrypoint
-- `src/demo.ts`: local demo runner without Discord
-- `src/app/`: runtime composition and request handling
-- `src/core/`: swappable core system — AgentCore interface, ClaudeSdkCore (Claude Agent SDK), PiCore (pi-ai adapter), canonical message types, core-aware tool filtering, message bridge
-- `src/instance/`: inter-instance peer messaging — Unix socket server, peer client, peer registry
-- `src/services/`: stateful application services, persistence, auth, model routing, tools, memory, logging, shell, and access control. Includes subdirectories `finance/` (extracted finance modules) and `gemini-live/` (extracted live phone modules)
-- `src/config/`: runtime configuration and extracted constants (`runtime-config.ts`, `service-constants.ts`)
-- `src/utils/`: shared utility modules (`timestamp.ts`, `text-utils.ts`, `file-utils.ts`, `time-helpers.ts`, `telemetry-helpers.ts`, `sqlite-helpers.ts`)
-- `src/domain/`: schemas, runtime domain objects, and structured error types (`errors.ts`)
-- `src/messages/`: canonical message type re-exports from core types, helper constructors and predicates
-- `src/functions/`: unified function and tool layer — `FunctionDefinition` types (`define-function.ts`), domain builders (`domains/`), a central registry (`function-registry.ts`), the `ToolRegistry` class (`tool-registry.ts`), tool output pipeline (`tool-output-pipeline.ts`), shared build context (`context.ts`), and generators that produce agent tools (`generate-tools.ts`), HTTP API routes (`generate-api-routes.ts`), Discord commands (`generate-discord-commands.ts`), and OpenAPI specs (`generate-openapi.ts`) from the same function definitions
-- `src/auth/`: provider-specific auth helpers
-- `src/integrations/`: external surfaces such as Discord and the local HTTP webhook listener
-- `src/workers/`: background worker entrypoints
+### `src/app/` -- Runtime composition and request handling
+
+- `runtime.ts` -- `OpenElinaroApp` class, service instantiation, request dispatch
+- `runtime-scope.ts` -- `RuntimeScope` per-profile scope, `CoreFactory` routing to ClaudeSdkCore or PiCore
+- `runtime-automation.ts` -- automation orchestration: heartbeats, autonomous time sessions, alarm notifications
+
+### `src/core/` -- Swappable agent core system
+
+- `types.ts` -- `AgentCore` interface, `CoreManifest`, canonical `CoreMessage` types, `CoreRunOptions`/`CoreRunResult`
+- `claude-sdk-core.ts` -- Claude Agent SDK core (primary), owns agent loop, compaction, context management
+- `pi-core.ts` -- pi-ai adapter for non-Claude providers (OpenAI/Codex, ZAI/GLM)
+- `tool-split.ts` -- core-aware tool filtering (removes native tools from harness definitions)
+- `message-bridge.ts` -- pi-ai message adapter (PiCore-internal)
+
+### `src/services/conversation/` -- Chat pipeline (decomposed)
+
+- `agent-chat-service.ts` -- thin facade, public API for chat operations
+- `chat-session-manager.ts` -- session lifecycle, queue management, concurrency control
+- `chat-turn-runner.ts` -- single turn execution: prompt assembly, core invocation, response extraction
+- `chat-types.ts` -- shared types: `ChatDependencies`, `ChatReplyResult`, `ChatExecutionOptions`, queue job types
+- `chat-helpers.ts` -- utility functions shared across the pipeline
+- `conversation-store.ts` -- mutable conversation snapshot persistence
+- `conversation-state-transition-service.ts` -- conversation state machine (new, compact, reset)
+- `conversation-compaction-service.ts` -- conversation compaction with memory extraction
+
+### `src/services/` -- Domain services
+
+- `finance-service.ts` -- finance tracking (optional, feature-gated)
+- `health-tracking-service.ts` -- health/food tracking
+- `scheduling/routines-service.ts` -- routines, todos, reminders, calendar events
+- `alarm-service.ts`, `alarm-notification-service.ts` -- alarms and timers
+- `system-prompt-service.ts` -- strict universal + custom prompt concatenation
+- `autonomous-time-service.ts` -- unified autonomous time: reflection, journal, soul rewrites, self-directed work
+- `autonomous-time-prompt-service.ts`, `autonomous-time-state-service.ts` -- prompt loading and state tracking
+- `memory-service.ts` -- core memory file management
+- `memory/structured-memory-manager.ts`, `memory/memory-management-agent.ts` -- structured memory entities
+- `heartbeat-service.ts` -- hourly heartbeat cadence
+- `calendar-sync-service.ts` -- ICS calendar ingestion
+- `work-planning-service.ts` -- coding agent launch/management
+- `models/model-service.ts` -- model routing and selection
+- `infrastructure/telemetry.ts` -- structured telemetry (SQLite spans/events)
+
+### `src/functions/` -- Unified function and tool layer
+
+- `define-function.ts` -- `FunctionDefinition` type, `defineFunction` helper, `FunctionDomainBuilder` signature
+- `function-registry.ts` -- central registry, generates each surface from definitions
+- `domains/` -- per-domain builders (shell, finance, health, routines, media, web, communication, etc.)
+- `generate-tools.ts` -- agent tool surface generator
+- `generate-api-routes.ts` -- HTTP API route generator
+- `generate-discord-commands.ts` -- Discord slash command generator
+- `generate-openapi.ts` -- OpenAPI spec generator
+- `tool-registry.ts` -- runtime `ToolRegistry` class, wires context into function handlers
+- `context.ts` -- `ToolBuildContext` shared service dependency interface
+
+### `src/integrations/` -- External surfaces
+
+- `discord/` -- Discord bot, auth sessions, message handling, notifier
+- `http/` -- Bun HTTP listener for API, webhooks, health checks
+
+### `src/instance/` -- Peer-to-peer messaging
+
+- `socket-server.ts` -- Unix socket server per instance
+- `peer-client.ts` -- sends messages to known peers
+- `peer-registry.ts` -- peer discovery and registration
+
+### `src/domain/` -- Type definitions
+
+- `assistant.ts` -- `AppRequest`, `AppResponse`, chat content types
+- `profiles.ts`, `projects.ts` -- profile and project schemas
+- `tool-catalog.ts` -- tool authorization and scope types
+- `extensions.ts` -- extension manifest schema
+- `errors.ts` -- structured error types
+
+### `src/config/` -- Runtime configuration
+
+- `runtime-config.ts` -- config loading from `~/.openelinaro/config.yaml`
+- `service-constants.ts` -- extracted constants
+
+### Other `src/` directories
+
+- `src/auth/` -- provider-specific auth helpers
+- `src/messages/` -- canonical message type re-exports, helpers, predicates
+- `src/utils/` -- shared utilities (timestamp, text, file, time, telemetry, sqlite)
+- `src/workers/` -- background worker entrypoints
 
 ## Supporting Material
 
-- `scripts/`: deployment and local runtime scripts, including managed-service install helpers, internal update/rollback transition scripts, and the Linux bootstrap installer
-- `references/`: local reference repos and external source material
-- `media/`: non-code assets
-- `README.md`: quick human overview and command list
+- `scripts/` -- deployment scripts, managed-service install helpers, Linux bootstrap installer
+- `references/` -- local reference repos and external source material
+- `media/` -- non-code assets (audio files, catalog)
+- `README.md` -- quick human overview
 
 ## Read Next
 
-- Architecture decisions: [architecture-decisions.md](architecture-decisions.md)
-- Runtime objects and SSOTs: [runtime-domain-model.md](runtime-domain-model.md)
-- Project-specific conventions: [projects.md](projects.md)
-- Communications runtime: [communications.md](communications.md)
+- [Architecture Decisions](architecture-decisions.md)
+- [Runtime Domain Model](runtime-domain-model.md)
+- [Projects](projects.md)

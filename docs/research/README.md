@@ -1,12 +1,11 @@
 # Research Notes
 
-These notes explain why certain directions were chosen or are being considered. They are not the same as the current operating contract.
+Historical analysis and exploration notes. These explain why certain directions were chosen or considered. They are not operating guidance -- see [assistant docs](../assistant/README.md) for current architecture.
 
-## Generated Inventory
-<!-- docs-index:start:inventory -->
-- [Architectural Recommendations](architectural-recommendations.md)
-- [OpenClaw Auth And Framework Research](openclaw-auth-and-frameworks.md)
-- [SWE-bench Difficulty Analysis](swebench-difficulty-analysis.md)
-- [Unified Runtime Instrumentation](unified-runtime-instrumentation.md)
-- [Worktree-First Agent Workflow Research](worktree-first-agent-workflows.md)
-<!-- docs-index:end:inventory -->
+## Index
+
+- [Architectural Recommendations](architectural-recommendations.md) -- early system design analysis
+- [OpenClaw Auth And Framework Research](openclaw-auth-and-frameworks.md) -- auth patterns and framework evaluation from the OpenClaw era
+- [SWE-bench Difficulty Analysis](swebench-difficulty-analysis.md) -- coding agent benchmark analysis
+- [Unified Runtime Instrumentation](unified-runtime-instrumentation.md) -- telemetry design research
+- [Worktree-First Agent Workflows](worktree-first-agent-workflows.md) -- git worktree workflow patterns for agent development

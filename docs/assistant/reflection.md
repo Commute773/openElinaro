@@ -1,28 +1,52 @@
-# Autonomous Time & Reflection Runtime
+# Autonomous Time & Reflection
 
-Use this doc when working on autonomous time, private continuity, journal writing, soul rewrites, or thread-start self-context.
+Unified system for private reflection, journal writing, soul rewrites, and self-directed work.
 
-## Current shape
+## Architecture
 
-Autonomous time, reflection, and soul rewrites are unified into a single service: `src/services/autonomous-time-service.ts`. The agent gets one autonomous-time trigger per day (currently at 4 AM local time) and decides what to do during that session.
+All autonomous-time behavior is unified in a single service: `src/services/autonomous-time-service.ts`. The agent gets one autonomous-time trigger per day (currently at 4 AM local time) and decides what to do during that session.
 
 Related files:
+
 - `src/services/autonomous-time-service.ts` -- the unified service
-- `src/services/autonomous-time-prompt-service.ts` -- loads prompt assets for autonomous time, reflection, and soul rewrite
-- `src/services/autonomous-time-state-service.ts` -- tracks last trigger date, last reflection date, last soul rewrite date
+- `src/services/autonomous-time-prompt-service.ts` -- loads prompt assets
+- `src/services/autonomous-time-state-service.ts` -- tracks last trigger, reflection, and soul rewrite dates
 
-Runtime paths:
-- journal path: `~/.openelinaro/memory/documents/<namespace>/identity/JOURNAL.md`
-- optional self-model path: `~/.openelinaro/memory/documents/<namespace>/identity/SOUL.md`
-- state file: `~/.openelinaro/autonomous-time-state.json`
-- authored prompt assets:
-  - `~/.openelinaro/assistant_context/autonomous-time.md`
-  - `~/.openelinaro/assistant_context/reflection.md`
-  - `~/.openelinaro/assistant_context/reflection-mood-notes.md`
-  - `~/.openelinaro/assistant_context/reflection-seeds.md`
-  - `~/.openelinaro/assistant_context/soul.md` for SOUL rewrite guidance
+## Runtime Paths
 
-`JOURNAL.md` is append-only and stores one timestamped entry per reflection in a stable markdown format:
+- Journal: `~/.openelinaro/memory/documents/<namespace>/identity/JOURNAL.md`
+- Self-model: `~/.openelinaro/memory/documents/<namespace>/identity/SOUL.md`
+- State: `~/.openelinaro/autonomous-time-state.json`
+- Prompt assets under `~/.openelinaro/assistant_context/`:
+  - `autonomous-time.md`
+  - `reflection.md`
+  - `reflection-mood-notes.md`
+  - `reflection-seeds.md`
+  - `soul.md`
+
+## Autonomous Time Sessions
+
+During a session (4 AM local, once per day), the agent receives a prompt declaring the session is its own. The agent can:
+
+- Reflect on recent conversations and write journal entries
+- Review and rewrite its soul document
+- Do self-directed work on active projects
+- Review and plan routines
+- Explore ideas or research topics
+
+The session runs with full tool access, memory ingestion, and compaction enabled. Configuration: `autonomousTime.enabled` and `autonomousTime.promptPath` in `~/.openelinaro/config.yaml`.
+
+## Reflection Triggers
+
+- `daily` -- first eligible idle heartbeat after 18:00 in the routines timezone, once per local day, only when no user-facing reminder is needed
+- `compaction` -- after successful conversation compaction, best-effort background
+- `explicit` -- via `reflect` tool or Discord `/reflect`, optional focus string
+
+Automatic reflections do not notify the user.
+
+## Journal Format
+
+`JOURNAL.md` is append-only with timestamped entries:
 
 ```md
 ## 2026-03-17T20:14:00.000Z [daily]
@@ -33,81 +57,33 @@ Runtime paths:
 I noticed...
 ```
 
-The journal is private-first. Automatic reflections are durable runtime state, not user-facing messages.
+The model returns strict JSON: `body`, `mood`, `bring_up_next_time`. Reflection uses the memory-writing model path (`ModelService.generateMemoryText`).
 
-## Reflection Triggers
+## Soul Rewrites
 
-Current reflection triggers are:
+- Source: `~/.openelinaro/memory/documents/<namespace>/identity/SOUL.md`
+- Prompt: `~/.openelinaro/assistant_context/soul.md`
+- Cadence: best-effort weekly, triggered after daily reflection when 7+ days since last rewrite
+- Full-file rewrite (not append-only)
 
-- `daily`
-  - first eligible idle heartbeat after `18:00` in the routines timezone
-  - only once per local day
-  - only queued when the heartbeat does not need to send a user-facing reminder
-- `compaction`
-  - queued after successful conversation compaction
-  - best-effort background work; failures must not fail the user turn
-- `explicit`
-  - invoked through the `reflect` runtime tool or Discord `/reflect`
-  - may include an optional focus string
+## Thread Bootstrap
 
-Automatic daily and compaction reflections do not notify the user.
+On the first human turn of a thread, the runtime injects a private continuity block:
 
-## Generation path
+- Last 2-3 journal entries
+- Last mood continuity
+- One initiative seed from the most recent non-empty `bring_up_next_time`
 
-`src/services/autonomous-time-service.ts` owns the reflection flow.
-`src/services/autonomous-time-prompt-service.ts` loads the authored reflection prompt assets.
+The generic startup digest excludes `identity/` docs so journal content is only surfaced through the dedicated bootstrap formatter.
 
-- recent archived conversation history is pulled from the append-only conversation store
-- the last journal entries are included for self-continuity
-- `SOUL.md` is read if present, but the reflection phase does not rewrite it automatically
-- the reflection system prompt is assembled from the markdown files under `~/.openelinaro/assistant_context/`
-- runtime code still owns the strict JSON contract so prose authors only control voice and introspection guidance
-- the model returns strict JSON with:
-  - `body`
-  - `mood`
-  - `bring_up_next_time`
+## Operator Surfaces
 
-Reflection generation uses the memory-writing model path (`ModelService.generateMemoryText(...)`) rather than the normal foreground chat path.
-
-## Thread bootstrap
-
-On the first human turn of a thread, the runtime injects a private continuity block built from the latest journal entries.
-
-That bootstrap currently includes:
-
-- the last 2-3 journal entries
-- last mood continuity
-- one initiative seed from the most recent non-empty `bring_up_next_time`
-
-This reflection continuity is combined with the existing recent-thread digest. The generic digest intentionally excludes `identity/` documents so raw journal content is not duplicated.
-
-## Operator-facing surfaces
-
-Manual reflection is available through:
-
-- runtime tool: `reflect`
+- Runtime tool: `reflect`
 - Discord slash command: `/reflect`
 
-The explicit path returns the written entry so it is inspectable on demand. Automatic paths only append to the journal.
+The explicit path returns the written entry. Automatic paths only append to the journal.
 
-## SOUL Rewrites
+## Read Next
 
-`SOUL.md` is a separate durable self-model path, managed by the same autonomous-time service.
-
-- source file: `~/.openelinaro/memory/documents/<namespace>/identity/SOUL.md`
-- prose prompt: `~/.openelinaro/assistant_context/soul.md`
-- cadence: best-effort weekly background rewrite, triggered after a successful daily reflection when the profile has gone at least 7 local days since the last rewrite
-
-The rewrite path is full-file, not append-only. The current file plus recent journal history are provided to the model, and the resulting markdown replaces the previous `SOUL.md`.
-
-## Autonomous Time Sessions
-
-During an autonomous-time session (triggered at 4 AM local time, once per day), the agent receives a prompt that tells it this session is its own. The agent can:
-
-- Reflect on recent conversations and write journal entries
-- Review and rewrite its soul document
-- Do self-directed work on active projects
-- Review and plan routines
-- Explore ideas or research topics
-
-The autonomous-time prompt is loaded from `~/.openelinaro/assistant_context/autonomous-time.md` with a built-in fallback. The session runs with full tool access, memory ingestion, and compaction enabled.
+- [Memory](memory.md)
+- [Runtime Domain Model](runtime-domain-model.md)

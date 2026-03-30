@@ -1,25 +1,22 @@
 # Docs
 
-This directory is the documentation graph for the repository. Use it for progressive disclosure: short indexes at the top, deeper detail in linked docs.
+Documentation graph for the OpenElinaro agent platform.
 
 ## Read Order
 
-- Agent/runtime docs: [assistant/README.md](assistant/README.md)
-- Research notes: [research/README.md](research/README.md)
-- E2E CLI test suite: [../src/e2e/README.md](../src/e2e/README.md)
+1. Start with [CLAUDE.md](../CLAUDE.md) for the top-level map and workflow rules.
+2. Read [assistant/repo-layout.md](assistant/repo-layout.md) for directory structure and system boundaries.
+3. Read [assistant/architecture-decisions.md](assistant/architecture-decisions.md) for key design decisions.
+4. Dive into specific topics as needed from the [assistant docs index](assistant/README.md).
 
-## Generated Inventory
-<!-- docs-index:start:inventory -->
-- Assistant docs index: [Assistant Docs](assistant/README.md)
-- Research notes index: [Research Notes](research/README.md)
-- HTTP API reference: [HTTP API](assistant/api.md)
-- Coverage snapshot: 26 docs indexed.
-<!-- docs-index:end:inventory -->
+## Sections
+
+- [Assistant docs](assistant/README.md) -- current operating architecture, runtime model, tools, services
+- [Research notes](research/README.md) -- historical analysis and exploration, not operating guidance
 
 ## Documentation Rules
 
 - Keep docs up to date when behavior, architecture, or workflows change.
-- Every doc under `docs/` must be referenced by `AGENTS.md` or by another doc under `docs/`.
+- Every doc under `docs/` must be referenced by `CLAUDE.md` or by another doc under `docs/`.
 - Do not leave orphan docs nodes.
 - Prefer concise index pages that link to canonical detail pages.
-- The nightly docs indexer maintains the generated inventory blocks and writes a machine-readable report to `~/.openelinaro/docs-index.json` when enabled.

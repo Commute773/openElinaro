@@ -17,15 +17,15 @@ Useful docs:
 - `docs/assistant/communications.md`
 - `docs/assistant/configuration.md`
 - `docs/assistant/decision-support.md`
-- `docs/assistant/harness-smoke-tests.md`
+- `docs/assistant/extensions.md`
 - `docs/assistant/media.md`
 - `docs/assistant/memory.md`
 - `docs/assistant/observability.md`
-- `docs/assistant/openclaw-migration.md`
 - `docs/assistant/projects.md`
 - `docs/assistant/reflection.md`
 - `docs/assistant/repo-layout.md`
 - `docs/assistant/runtime-domain-model.md`
 - `docs/assistant/tickets.md`
 - `docs/assistant/tool-use-playbook.md`
+- `docs/assistant/api.md`
 <!-- docs-index:end:assistant-docs -->
