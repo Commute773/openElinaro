@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.6
+- Released at: 2026-03-30T17:19:46Z
+- Release id: 20260330T171946Z-58ededb
+- Previous version: 2026.03.30.5
+- Trigger: ci/release workflow
+
+- refactor: simplify profile system to single-identity-per-install
+
 ## 2026.03.30.5
 - Released at: 2026-03-30T16:40:38Z
 - Release id: 20260330T164038Z-3f6221a
