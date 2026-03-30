@@ -21,6 +21,7 @@ import { buildConversationLifecycleFunctions } from "./conversation-lifecycle-fu
 import { buildDashboardFunctions } from "./dashboard-functions";
 import { buildNotificationFunctions } from "./notification-functions";
 import { buildRedditFunctions } from "./reddit-functions";
+import { buildInstanceFunctions } from "./instance-functions";
 
 /**
  * All domain builders.
@@ -44,4 +45,5 @@ export const ALL_FUNCTION_BUILDERS: FunctionDomainBuilder[] = [
   buildDashboardFunctions,
   buildNotificationFunctions,
   buildRedditFunctions,
+  buildInstanceFunctions,
 ];

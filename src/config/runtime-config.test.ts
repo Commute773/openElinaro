@@ -100,12 +100,10 @@ describe("RuntimeConfigSchema", () => {
     expect(() => RuntimeConfigSchema.parse({ email: { imapPort: 0 } })).toThrow();
   });
 
-  test("applies subagent defaults", () => {
+  test("applies instance defaults", () => {
     const config = RuntimeConfigSchema.parse({});
-    expect(config.core.app.subagent.tmuxSession).toBe("openelinaro");
-    expect(config.core.app.subagent.defaultTimeoutMs).toBe(3_600_000);
-    expect(config.core.app.subagent.timeoutGraceMs).toBe(30_000);
-    expect(config.core.app.subagent.sidecarSocketPath).toBe("");
+    expect(config.core.app.instance.socketPath).toBe("");
+    expect(config.core.app.instance.peers).toEqual([]);
   });
 
   test("applies cache miss monitor defaults", () => {

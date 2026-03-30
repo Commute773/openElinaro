@@ -31,6 +31,8 @@ import { telemetry } from "../services/infrastructure/telemetry";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { PiCore } from "../core/pi-core";
 import type { CoreFactory } from "../core/types";
+import { PeerClient } from "../instance/peer-client";
+import { PeerRegistry } from "../instance/peer-registry";
 import type { ThinkingLevel, Model, Api } from "@mariozechner/pi-ai";
 
 type ShellRuntime = Pick<
@@ -262,8 +264,8 @@ export function createRuntimeScope(ctx: {
     ),
   );
 
-  c.register<ToolRegistry>(K.routineTools, () =>
-    new ToolRegistry(
+  c.register<ToolRegistry>(K.routineTools, () => {
+    const registry = new ToolRegistry(
       routines,
       c.resolve<ProjectsService>(K.projects),
       c.resolve<ModelService>(K.models),
@@ -277,8 +279,11 @@ export function createRuntimeScope(ctx: {
       finance,
       health,
       c.resolve<ReflectionService>(K.reflection),
-    ),
-  );
+    );
+    const peerRegistry = new PeerRegistry();
+    registry.setInstanceMessaging(new PeerClient(peerRegistry), peerRegistry);
+    return registry;
+  });
 
   c.register<ToolResolutionService>(K.toolResolver, () =>
     appTelemetry.instrumentMethods(

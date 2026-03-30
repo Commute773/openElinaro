@@ -18,6 +18,8 @@ import { WorkPlanningService } from "../services/work-planning-service";
 import { CalendarSyncService } from "../services/calendar-sync-service";
 import { getRuntimeConfig } from "../config/runtime-config";
 import type { FeatureId } from "../services/feature-config-service";
+import { InstanceSocketServer } from "../instance/socket-server";
+import { resolveRuntimePath } from "../services/runtime-root";
 
 import { type RuntimeScope, createRuntimeScope } from "./runtime-scope";
 import {
@@ -71,6 +73,8 @@ export class OpenElinaroApp {
   private readonly profiles: ProfileService;
   private readonly activeProfile: ProfileRecord;
   private readonly scopes = new Map<string, RuntimeScope>();
+  private readonly startedAt = Date.now();
+  private instanceServer: InstanceSocketServer | null = null;
   private onCacheMissWarning?: (warning: CacheMissWarning) => Promise<void> | void;
   private onPromptDriftWarning?: (warning: InferencePromptDriftWarning) => Promise<void> | void;
   private onBackgroundConversationResponse?: BackgroundConversationResponseNotifier;
@@ -97,6 +101,66 @@ export class OpenElinaroApp {
         operation: "calendar.initial_sync",
       });
     });
+
+    try {
+      this.startInstanceServer();
+    } catch (error) {
+      this.appTelemetry.recordError(error, {
+        profileId: this.activeProfile.id,
+        operation: "instance_server.start",
+      });
+    }
+  }
+
+  /**
+   * Start the inter-instance messaging socket server.
+   * Listens on a Unix socket for messages from peer instances.
+   */
+  startInstanceServer(): void {
+    if (this.instanceServer) {
+      return;
+    }
+    const config = getRuntimeConfig();
+    const socketPath = config.core.app.instance.socketPath || resolveRuntimePath("instance.sock");
+
+    this.instanceServer = new InstanceSocketServer({
+      socketPath,
+      profileId: this.activeProfile.id,
+      onMessage: async (message) => {
+        try {
+          await this.handleRequest({
+            id: `instance:${message.from}:${Date.now()}`,
+            kind: "chat",
+            text: message.content,
+            conversationKey: message.conversationKey,
+          });
+          return { accepted: true, conversationKey: message.conversationKey };
+        } catch (error) {
+          return {
+            accepted: false,
+            conversationKey: message.conversationKey,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      },
+      onStatus: () => ({
+        profileId: this.activeProfile.id,
+        uptime: Date.now() - this.startedAt,
+        activeConversations: [...this.scopes.keys()],
+      }),
+    });
+
+    this.instanceServer.start();
+    this.appTelemetry.event("instance_server.started", {
+      socketPath,
+      profileId: this.activeProfile.id,
+    });
+  }
+
+  /** Stop the inter-instance messaging socket server. */
+  stopInstanceServer(): void {
+    this.instanceServer?.stop();
+    this.instanceServer = null;
   }
 
   async handleRequest(
