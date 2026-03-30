@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.10
+- Released at: 2026-03-30T18:02:41Z
+- Release id: 20260330T180241Z-470396d
+- Previous version: 2026.03.30.9
+- Trigger: ci/release workflow
+
+- refactor: unify provider IDs and thinking levels to single source (#216)
+
 ## 2026.03.30.9
 - Released at: 2026-03-30T17:59:25Z
 - Release id: 20260330T175925Z-63b0d84
