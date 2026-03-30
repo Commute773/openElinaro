@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { parse, stringify } from "yaml";
 import { telemetry } from "../services/infrastructure/telemetry";
 
-export const CURRENT_CONFIG_VERSION = 2;
+export const CURRENT_CONFIG_VERSION = 3;
 
 type RawConfig = Record<string, unknown>;
 type Migration = (config: RawConfig) => RawConfig;
@@ -64,9 +64,37 @@ function migrationV2(config: RawConfig): RawConfig {
   return { ...config, configVersion: 2 };
 }
 
+/**
+ * Migration 3 (v2 → v3): Replace core.app.subagent with core.app.instance.
+ *
+ * The tmux subagent infrastructure was removed in Phase 2. This migration
+ * drops the dead subagent config and adds the inter-instance messaging config.
+ */
+function migrationV3(config: RawConfig): RawConfig {
+  const core = config.core as RawConfig | undefined;
+  if (!core) return { ...config, configVersion: 3 };
+
+  const app = core.app as RawConfig | undefined;
+  if (!app) return { ...config, configVersion: 3 };
+
+  const { subagent: _dropped, ...restApp } = app;
+  return {
+    ...config,
+    configVersion: 3,
+    core: {
+      ...core,
+      app: {
+        ...restApp,
+        instance: { socketPath: "", peers: [] },
+      },
+    },
+  };
+}
+
 const MIGRATIONS: Migration[] = [
   migrationV1,
   migrationV2,
+  migrationV3,
 ];
 
 /**

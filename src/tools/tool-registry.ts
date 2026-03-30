@@ -437,6 +437,8 @@ export class ToolRegistry {
   private readonly workPlanning: WorkPlanningService;
   private readonly pendingConversationResets = new Map<string, string>();
   private readonly reflection?: Pick<ReflectionService, "runExplicitReflection">;
+  private _peerClient: import("../instance/peer-client").PeerClient | undefined;
+  private _peerRegistry: import("../instance/peer-registry").PeerRegistry | undefined;
   private readonly _toolBuildContext: import("./groups/tool-group-types").ToolBuildContext;
 
   /** The unified function registry, built alongside legacy tool groups. */
@@ -519,6 +521,8 @@ export class ToolRegistry {
       get reflection() { return self.reflection; },
       get toolResults() { return self.toolResults; },
       get toolPrograms() { return self.toolPrograms; },
+      get peerClient() { return self._peerClient; },
+      get peerRegistry() { return self._peerRegistry; },
     };
     // Build the unified function registry and register its auth declarations
     this.functionRegistry = new FunctionRegistry(ALL_FUNCTION_BUILDERS);
@@ -642,6 +646,15 @@ export class ToolRegistry {
     if (!entry) return null;
     // pi-ai tool parameters are already JSON Schema objects
     return entry.tool.parameters as Record<string, unknown>;
+  }
+
+  /** Inject PeerClient + PeerRegistry for inter-instance messaging tools. */
+  setInstanceMessaging(
+    client: import("../instance/peer-client").PeerClient,
+    registry: import("../instance/peer-registry").PeerRegistry,
+  ): void {
+    this._peerClient = client;
+    this._peerRegistry = registry;
   }
 
   /** Expose the ToolBuildContext for the function-layer API route generator. */

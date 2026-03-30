@@ -18,11 +18,15 @@ const DEFAULT_CORE_CACHE_MISS = {
   maxCacheReadRatio: 0.2,
   discordCooldownMs: 15 * 60 * 1_000,
 };
-const DEFAULT_CORE_SUBAGENT = {
-  tmuxSession: "openelinaro",
-  defaultTimeoutMs: 3_600_000,
-  timeoutGraceMs: 30_000,
-  sidecarSocketPath: "",
+const DEFAULT_CORE_INSTANCE = {
+  socketPath: "",
+  peers: [] as Array<{
+    profileId: string;
+    transport: "local" | "ssh";
+    socketPath?: string;
+    sshHost?: string;
+    sshUser?: string;
+  }>,
 };
 const DEFAULT_CORE_HEARTBEAT = {
   model: "",
@@ -34,7 +38,7 @@ const DEFAULT_CORE_APP = {
   heartbeatEnabled: true,
   docsIndexerEnabled: false,
   cacheMissMonitor: DEFAULT_CORE_CACHE_MISS,
-  subagent: DEFAULT_CORE_SUBAGENT,
+  instance: DEFAULT_CORE_INSTANCE,
   heartbeat: DEFAULT_CORE_HEARTBEAT,
 };
 const DEFAULT_CORE_HTTP = { host: "0.0.0.0", port: 3000, apiKey: "" };
@@ -142,12 +146,16 @@ export const RuntimeConfigSchema = z.object({
         maxCacheReadRatio: z.number().min(0).max(1).default(0.2),
         discordCooldownMs: z.number().int().nonnegative().default(15 * 60 * 1_000),
       }).default(DEFAULT_CORE_CACHE_MISS),
-      subagent: z.object({
-        tmuxSession: z.string().min(1).default("openelinaro"),
-        defaultTimeoutMs: z.number().int().positive().default(3_600_000),
-        timeoutGraceMs: z.number().int().nonnegative().default(30_000),
-        sidecarSocketPath: z.string().default(""),
-      }).default(DEFAULT_CORE_SUBAGENT),
+      instance: z.object({
+        socketPath: z.string().default(""),
+        peers: z.array(z.object({
+          profileId: z.string().min(1),
+          transport: z.enum(["local", "ssh"]),
+          socketPath: z.string().optional(),
+          sshHost: z.string().optional(),
+          sshUser: z.string().optional(),
+        })).default([]),
+      }).default(DEFAULT_CORE_INSTANCE),
       heartbeat: z.object({
         model: z.string().default(""),
         provider: z.string().default(""),

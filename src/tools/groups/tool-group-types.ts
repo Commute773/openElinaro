@@ -32,6 +32,8 @@ import type { ConversationStateTransitionService } from "../../services/conversa
 import type { ReflectionService } from "../../services/reflection-service";
 import type { ToolResultStore } from "../../services/tool-result-store";
 import type { ToolProgramService } from "../../services/tool-program-service";
+import type { PeerClient } from "../../instance/peer-client";
+import type { PeerRegistry } from "../../instance/peer-registry";
 
 export type ShellRuntime = Pick<
   ShellService,
@@ -86,6 +88,8 @@ export interface ToolBuildContext {
   reflection: Pick<ReflectionService, "runExplicitReflection"> | undefined;
   toolResults: ToolResultStore;
   toolPrograms: ToolProgramService;
+  peerClient: PeerClient | undefined;
+  peerRegistry: PeerRegistry | undefined;
 }
 
 export function formatDurationMs(durationMs: number | null) {
