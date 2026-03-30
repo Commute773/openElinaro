@@ -5,7 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${OPENELINARO_ROOT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 OPENELINARO_REPO_ROOT="${ROOT_DIR}"
 source "${ROOT_DIR}/scripts/service-common.sh"
-openelinaro_require_agent_service_control || exit 1
 BUN_BIN="$(openelinaro_ensure_bun_bin)"
 export OPENELINARO_HEALTHCHECK_TIMEOUT_MS
 
