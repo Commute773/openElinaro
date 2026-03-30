@@ -411,27 +411,6 @@ export async function buildMessageRequest(
   text: string,
   attachments: IterableIterator<Attachment>,
 ): Promise<AppRequest> {
-  if (text.toLowerCase().startsWith("todo ")) {
-    const title = text.slice(5).trim();
-    return {
-      id: nextRequestId("todo"),
-      kind: "todo",
-      text,
-      conversationKey,
-      todoTitle: title,
-    };
-  }
-
-  if (text.toLowerCase().startsWith("med ")) {
-    return {
-      id: nextRequestId("med"),
-      kind: "medication",
-      text,
-      conversationKey,
-      medicationName: text.slice(4).trim(),
-    };
-  }
-
   const attachmentBlocks = await buildAttachmentBlocks(attachments);
   const chatContent = attachmentBlocks.length > 0
     ? buildChatPromptContent({ text, blocks: attachmentBlocks })
@@ -439,7 +418,6 @@ export async function buildMessageRequest(
 
   return {
     id: nextRequestId("chat"),
-    kind: "chat",
     text,
     chatContent,
     conversationKey,

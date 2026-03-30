@@ -12,7 +12,6 @@ export const chatRoutes: RouteDefinition[] = [
 
         const response = await app.handleRequest({
           id: `api-ask-${Date.now()}`,
-          kind: "chat",
           text: body.text,
           conversationKey: "api-simulator",
         });

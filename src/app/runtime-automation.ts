@@ -219,7 +219,6 @@ export async function runHourlyHeartbeat(
     ctx.handleRequest(
       {
         id: turnId,
-        kind: "chat",
         text: buildHeartbeatPrompt(deliveryRequirement),
         conversationKey: heartbeatConversationKey,
       },
@@ -316,7 +315,6 @@ export async function runAutonomousTimeSession(
   const response = await ctx.handleRequest(
     {
       id: requestId,
-      kind: "chat",
       text,
       conversationKey: automationConversationKey,
     },
@@ -358,7 +356,6 @@ export async function runAlarmNotification(
   return ctx.handleRequest(
     {
       id: `alarm-notification-${alarm.id}`,
-      kind: "chat",
       text: ctx.alarmNotifications.buildInjectedMessage(alarm, options?.reference),
       conversationKey: buildAutomationSessionKey(alarm.kind, conversationKey),
     },

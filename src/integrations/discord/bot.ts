@@ -214,7 +214,6 @@ export async function startDiscordBot(options?: { app?: OpenElinaroApp }) {
       app.handleRequest(
         {
           id: requestId,
-          kind: "chat",
           text: prompt,
           conversationKey,
         },
@@ -284,7 +283,6 @@ export function createDiscordEventHandlers(params: {
         userId: message.author.id,
         channelId: message.channelId,
         isDirectMessage: true,
-        requestKind: request.kind,
         contentLength: content.length,
         attachmentCount: attachments.length,
         requestId: request.id,
@@ -295,7 +293,6 @@ export function createDiscordEventHandlers(params: {
         userId: message.author.id,
         channelId: message.channelId,
         isDirectMessage: true,
-        requestKind: request.kind,
         contentLength: content.length,
         attachmentCount: attachments.length,
         requestId: request.id,
@@ -317,7 +314,6 @@ export function createDiscordEventHandlers(params: {
         {
           attributes: {
             userId: message.author.id,
-            requestKind: request.kind,
             requestId: request.id,
             batchReason: reason,
           },
@@ -678,7 +674,6 @@ async function handleSlashCommand(params: {
     const response = await app.handleRequest(
       {
         id: nextRequestId("chat"),
-        kind: "chat",
         text,
         conversationKey: interaction.user.id,
       },
