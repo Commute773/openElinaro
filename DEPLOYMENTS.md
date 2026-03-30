@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.14
+- Released at: 2026-03-30T20:53:09Z
+- Release id: 20260330T205309Z-81a5827
+- Previous version: 2026.03.30.13
+- Trigger: ci/release workflow
+
+- feat: harness respects core manifest feature ownership
+
 ## 2026.03.30.13
 - Released at: 2026-03-30T20:49:30Z
 - Release id: 20260330T204930Z-c3d0b6d
