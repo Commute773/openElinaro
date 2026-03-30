@@ -3,7 +3,8 @@ import {
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { RoutineItemKind, RoutinePriority } from "../../domain/routines";
-import type { ModelProviderId } from "../../services/models/model-service";
+import { MODEL_PROVIDER_IDS, THINKING_LEVELS } from "../../domain/profiles";
+import type { ModelProviderId } from "../../domain/profiles";
 import { getAuthStatus } from "../../auth/store";
 import { ProfileService } from "../../services/profiles";
 
@@ -23,11 +24,8 @@ export const ROUTINE_PRIORITY_CHOICES: { name: string; value: RoutinePriority }[
   { name: "urgent", value: "urgent" },
 ];
 
-export const MODEL_PROVIDER_CHOICES: { name: string; value: ModelProviderId }[] = [
-  { name: "openai-codex", value: "openai-codex" },
-  { name: "claude", value: "claude" },
-  { name: "zai", value: "zai" },
-];
+export const MODEL_PROVIDER_CHOICES: { name: string; value: ModelProviderId }[] =
+  MODEL_PROVIDER_IDS.map((id) => ({ name: id, value: id }));
 
 export const PROFILE_ACTION_CHOICES = [
   { name: "show", value: "show" },
@@ -43,13 +41,8 @@ export const PROFILE_AUTH_PROVIDER_CHOICES = [
   { name: "zai", value: "zai" },
 ] as const;
 
-export const THINKING_LEVEL_CHOICES = [
-  { name: "minimal", value: "minimal" },
-  { name: "low", value: "low" },
-  { name: "medium", value: "medium" },
-  { name: "high", value: "high" },
-  { name: "xhigh", value: "xhigh" },
-] as const;
+export const THINKING_LEVEL_CHOICES =
+  THINKING_LEVELS.map((level) => ({ name: level, value: level }));
 
 const DEFAULT_PROFILE_THINKING_LEVEL = "low";
 

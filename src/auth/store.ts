@@ -7,7 +7,8 @@ import { type ProviderAuthSecret, SecretStoreService } from "../services/infrast
 import { telemetry } from "../services/infrastructure/telemetry";
 import { timestamp } from "../utils/timestamp";
 
-export type ProviderId = "openai-codex" | "claude" | "zai";
+import type { ModelProviderId } from "../domain/profiles";
+export type ProviderId = ModelProviderId;
 
 export type ProviderAuthStatus = {
   profileId: string;
