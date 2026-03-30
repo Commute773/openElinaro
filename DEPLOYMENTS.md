@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.30.18
+- Released at: 2026-03-30T21:17:59Z
+- Release id: 20260330T211759Z-4e55deb
+- Previous version: 2026.03.30.17
+- Trigger: ci/release workflow
+
+- docs: update AGENTS.md architectural summary for swappable core
+- docs: update architecture docs for swappable core, remove dead subagent refs
+
 ## 2026.03.30.17
 - Released at: 2026-03-30T21:08:46Z
 - Release id: 20260330T210846Z-1d5755c
