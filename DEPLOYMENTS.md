@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.12
+- Released at: 2026-03-30T20:46:04Z
+- Release id: 20260330T204604Z-adb019d
+- Previous version: 2026.03.30.11
+- Trigger: ci/release workflow
+
+- refactor: make core types canonical, demote pi-ai to adapter
+
 ## 2026.03.30.11
 - Released at: 2026-03-30T19:01:23Z
 - Release id: 20260330T190123Z-2d51e6d
