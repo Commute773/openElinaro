@@ -5,10 +5,8 @@ This README stays as a quick operator-side overview of the current runtime.
 
 - `src/index.ts` starts the Discord surface plus the local HTTP webhook listener.
 - `src/demo.ts` demonstrates the app runtime without Discord.
-- `src/app/runtime.ts` owns the foreground chat lane and background subagent lane.
+- `src/app/runtime.ts` owns the foreground chat lane.
 - `src/app/runtime-scope.ts` and `src/app/runtime-automation.ts` cover runtime scope setup and automation logic.
-- `src/app/runtime-subagent.ts` manages background subagent lifecycle: launching, resuming, steering, cancelling, and timeout recovery.
-- `src/subagent/` contains the tmux-based subagent infrastructure: `sidecar.ts` (Unix socket event receiver), `tmux.ts` (session/window management), `spawn.ts` (command builders for Claude and Codex), `registry.ts` (JSON-persisted run state), `timeout.ts` (timeout manager with grace period), and `events.ts` (event normalization).
 - `src/integrations/discord/bot.ts` exposes the app over Discord.
 - `src/integrations/http/server.ts` exposes local machine-to-machine webhook ingress for Vonage voice/messages.
 - `src/services/routines-service.ts` is the native routines engine for todos, meds, deadlines, reminders, and completion state.
@@ -90,17 +88,6 @@ The app treats routines as a first-class subsystem rather than scattered chat st
 - The Discord bot records the active user as the notification target and sends a proactive DM on the hour when the routines engine decides something is worth surfacing.
 - Use `context` or the relevant subsystem tools to inspect live routines, finance, health, and project state on demand.
 
-## Background subagents
-
-- Background subagents are real CLI processes (Claude Code or Codex) running in tmux windows with native hook-based completion tracking via a local Unix socket sidecar.
-- Subagent runs are persisted under `~/.openelinaro/subagent-runs.json`, so status survives process restarts.
-- Each subagent gets an isolated git worktree to avoid conflicts with the parent workspace.
-- The sidecar listens on `~/.openelinaro/subagent-sidecar.sock` and receives completion/progress events from Claude hooks or Codex notify scripts.
-- Subagents have configurable wall-clock timeouts (default 1 hour) with a 30-second grace period before force-kill.
-- Completed or failed subagent runs inject a completion message back into the originating conversation so the foreground agent can see what happened on the next turn.
-- Use `launch_agent`, `resume_agent`, `steer_agent`, `cancel_agent`, and `agent_status` tools to manage background work.
-- Multi-provider support: profiles can declare multiple subagent providers (e.g. Claude for reasoning, Codex for coding) with descriptions to help the agent choose.
-
 ## System prompt
 
 - New conversations snapshot the concatenated contents of universal platform prompts (`system_prompt/universal/*.md`) plus operator-managed agent prompts (`~/.openelinaro/system_prompt/*.md`) as their base system prompt. Universal prompts cannot be overridden; operator prompts are additive.
@@ -118,10 +105,9 @@ The app treats routines as a first-class subsystem rather than scattered chat st
 ## Profiles
 
 - The app launches with the active profile from `~/.openelinaro/config.yaml` at `core.profile.activeProfileId`, defaulting to `root`.
-- A profile contains roles, auth state, memory namespace, preferred model defaults, and optional subagent provider paths with descriptions.
-- `root` means unrestricted access and bypasses project, memory, and subagent role checks.
+- A profile contains roles, auth state, memory namespace, and preferred model defaults.
+- `root` means unrestricted access and bypasses project and memory role checks.
 - SSH-backed profiles keep their private/public keypair in `~/.openelinaro/secret-store.json`.
-- Subagents may launch only profiles whose roles are a subset of the caller's roles, unless the caller is `root`.
 
 ## Logging
 

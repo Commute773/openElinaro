@@ -111,8 +111,7 @@ Further reading:
 The short version:
 
 - Discord is the primary surface; `src/index.ts` starts that runtime.
-- The app uses a foreground lane for immediate chat/routine work and a background lane for subagent workers.
-- Background subagents are real CLI processes (Claude Code or Codex) running in tmux windows with native hook-based completion tracking via a local Unix socket sidecar.
+- The app uses a foreground lane for immediate chat/routine work and a background lane for instance-peered workers.
 - Profiles, projects, auth, and tool access are explicit runtime objects with local single sources of truth.
 - Prompt guidance is intentionally compact and uses docs for progressive disclosure instead of a huge base prompt.
 

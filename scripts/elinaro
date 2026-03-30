@@ -127,8 +127,6 @@ if (isolate) {
       id: 'root', name: 'Root', roles: ['root'], memoryNamespace: 'root',
       preferredProvider: pid, defaultModelId: modelId,
       toolSummarizerProvider: pid, toolSummarizerModelId: summarizerId,
-      subagentPreferredProvider: pid, subagentDefaultModelId: modelId,
-      maxSubagentDepth: 1,
     }],
   }, null, 2));
 }
