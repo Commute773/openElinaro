@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.21
+- Released at: 2026-03-30T21:41:49Z
+- Release id: 20260330T214149Z-290165c
+- Previous version: 2026.03.30.20
+- Trigger: ci/release workflow
+
+- refactor: move src/tools/ into src/functions/, single tool definition system
+
 ## 2026.03.30.20
 - Released at: 2026-03-30T21:31:29Z
 - Release id: 20260330T213129Z-88e321b
