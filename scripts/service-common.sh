@@ -18,13 +18,6 @@ readonly OPENELINARO_HEALTHCHECK_TIMEOUT_MS="${OPENELINARO_HEALTHCHECK_TIMEOUT_M
 readonly OPENELINARO_DEPLOY_VERSION_FILE="VERSION.json"
 readonly OPENELINARO_DEPLOY_CHANGELOG_FILE="DEPLOYMENTS.md"
 
-openelinaro_require_agent_service_control() {
-  if [[ "${OPENELINARO_AGENT_SERVICE_CONTROL:-}" != "1" ]]; then
-    echo "Managed-service update and rollback scripts are internal. Use the root-only agent update flow instead." >&2
-    return 1
-  fi
-}
-
 openelinaro_platform() {
   case "$(uname -s)" in
     Darwin)

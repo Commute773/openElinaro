@@ -328,7 +328,7 @@ describe("piToolToCoreDef", () => {
       name: "my_tool",
       description: "Does things",
       parameters: { type: "object", properties: { x: { type: "string" } } },
-    } as PiTool;
+    } as unknown as PiTool;
     const result = piToolToCoreDef(piTool);
     expect(result.name).toBe("my_tool");
     expect(result.description).toBe("Does things");

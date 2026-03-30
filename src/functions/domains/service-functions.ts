@@ -90,7 +90,6 @@ function buildServiceCommand(
 
   const envParts = [
     `OPENELINARO_HEALTHCHECK_TIMEOUT_MS=${shellQuote(String(timeoutMs))}`,
-    `OPENELINARO_AGENT_SERVICE_CONTROL=${shellQuote("1")}`,
   ];
   const passthroughEnv = [
     "OPENELINARO_ROOT_DIR",

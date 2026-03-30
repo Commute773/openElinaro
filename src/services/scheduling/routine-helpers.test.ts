@@ -145,7 +145,7 @@ describe("makeRoutineId", () => {
   test("ends with a base36 timestamp", () => {
     const id = makeRoutineId("habit", "Read");
     const parts = id.split("_");
-    const ts = parts[parts.length - 1];
+    const ts = parts[parts.length - 1]!;
     // base36 timestamp should be parseable
     expect(parseInt(ts, 36)).toBeGreaterThan(0);
   });
@@ -930,21 +930,21 @@ describe("sortAssessments", () => {
     const a = makeAssessment({ shouldRemindNow: true, priorityScore: 10 });
     const b = makeAssessment({ shouldRemindNow: false, priorityScore: 100 });
     const sorted = sortAssessments([b, a]);
-    expect(sorted[0].shouldRemindNow).toBe(true);
+    expect(sorted[0]!.shouldRemindNow).toBe(true);
   });
 
   test("higher priority scores come first among same shouldRemindNow", () => {
     const a = makeAssessment({ shouldRemindNow: false, priorityScore: 70 });
     const b = makeAssessment({ shouldRemindNow: false, priorityScore: 40 });
     const sorted = sortAssessments([b, a]);
-    expect(sorted[0].priorityScore).toBe(70);
+    expect(sorted[0]!.priorityScore).toBe(70);
   });
 
   test("earlier due items come first when priority and shouldRemindNow are equal", () => {
     const a = makeAssessment({ shouldRemindNow: false, priorityScore: 40, minutesUntilDue: 10 });
     const b = makeAssessment({ shouldRemindNow: false, priorityScore: 40, minutesUntilDue: 60 });
     const sorted = sortAssessments([b, a]);
-    expect(sorted[0].minutesUntilDue).toBe(10);
+    expect(sorted[0]!.minutesUntilDue).toBe(10);
   });
 });
 

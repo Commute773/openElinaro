@@ -49,13 +49,13 @@ describe("generateAgentTool", () => {
 
     const props = params.properties as Record<string, Record<string, unknown>>;
     // String field
-    expect(props.title.type).toBe("string");
-    expect(props.title.description).toBe("The title");
+    expect(props.title!.type).toBe("string");
+    expect(props.title!.description).toBe("The title");
     // Number field
-    expect(props.count.type).toBe("number");
-    expect(props.count.description).toBe("How many");
+    expect(props.count!.type).toBe("number");
+    expect(props.count!.description).toBe("How many");
     // Boolean field
-    expect(props.enabled.type).toBe("boolean");
+    expect(props.enabled!.type).toBe("boolean");
     // Optional field — not in required
     const required = params.required as string[];
     expect(required).toContain("title");
@@ -64,8 +64,8 @@ describe("generateAgentTool", () => {
     expect(required).toContain("status");
     expect(required).not.toContain("note");
     // Enum field
-    expect(props.status.type).toBe("string");
-    expect(props.status.enum).toEqual(["active", "inactive"]);
+    expect(props.status!.type).toBe("string");
+    expect(props.status!.enum).toEqual(["active", "inactive"]);
   });
 
   test("strips $schema from JSON Schema output", () => {
@@ -121,10 +121,10 @@ describe("generateAgentTool", () => {
     });
     const entry = generateAgentTool(def, resolveServices)!;
     const props = (entry.tool.parameters as Record<string, unknown>).properties as Record<string, Record<string, unknown>>;
-    expect(props.config.type).toBe("object");
-    const nested = props.config.properties as Record<string, Record<string, unknown>>;
-    expect(nested.host.type).toBe("string");
-    expect(nested.port.type).toBe("number");
+    expect(props.config!.type).toBe("object");
+    const nested = props.config!.properties as Record<string, Record<string, unknown>>;
+    expect(nested.host!.type).toBe("string");
+    expect(nested.port!.type).toBe("number");
   });
 
   test("includes zodSchema on the tool entry", () => {

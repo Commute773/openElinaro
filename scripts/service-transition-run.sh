@@ -10,11 +10,6 @@ if [[ -z "${ACTION}" || -z "${STATUS_PATH}" ]]; then
   exit 1
 fi
 
-if [[ "${OPENELINARO_AGENT_SERVICE_CONTROL:-}" != "1" ]]; then
-  echo "Managed-service update and rollback scripts are internal. Use the root-only agent update flow instead." >&2
-  exit 1
-fi
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${OPENELINARO_ROOT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 OPENELINARO_REPO_ROOT="${ROOT_DIR}"
