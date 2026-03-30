@@ -429,11 +429,6 @@ function createDiscordAppHarness(options?: {
     conversations,
     systemPrompts,
     models,
-    memory: {
-      async buildRecallContext() {
-        return "";
-      },
-    },
   });
 
   return {

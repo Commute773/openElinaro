@@ -11,6 +11,7 @@ import {
   getUniversalSystemPromptRoot,
   getUserSystemPromptRoot,
 } from "./runtime-user-content";
+import { resolveRuntimePath } from "./runtime-root";
 import { timestamp } from "../utils/timestamp";
 
 const SYSTEM_PROMPT_EXTENSION = ".md";
@@ -211,6 +212,74 @@ function buildRuntimeOverviewPrompt() {
   ].join("\n");
 }
 
+const MEMORY_SKIP_DIRS = new Set(["identity", "compactions"]);
+
+/**
+ * Build a memory section for the system prompt.
+ * Includes the full MEMORY.md content and a file tree of all structured
+ * memory files so the agent knows what exists and can read_file to recall.
+ */
+async function buildMemorySection(): Promise<string | null> {
+  const memoryRoot = resolveRuntimePath("memory");
+  // Find the first namespace directory (e.g. "root")
+  const namespaces = await readdir(memoryRoot, { withFileTypes: true }).catch(() => []);
+  const nsDir = namespaces.find((e) => e.isDirectory() && !e.name.startsWith("."));
+  if (!nsDir) return null;
+
+  const nsPath = path.join(memoryRoot, nsDir.name);
+
+  // Read MEMORY.md (core memory index)
+  let coreMemory = "";
+  const coreMemoryPath = path.join(nsPath, "core", "MEMORY.md");
+  try {
+    coreMemory = (await Bun.file(coreMemoryPath).text()).trim();
+  } catch {
+    // Try root-level MEMORY.md as fallback
+    try {
+      coreMemory = (await Bun.file(path.join(nsPath, "MEMORY.md")).text()).trim();
+    } catch {
+      // no core memory
+    }
+  }
+
+  // Build file tree
+  const tree: string[] = [];
+  async function walk(dir: string, prefix: string) {
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    const sorted = entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of sorted) {
+      if (entry.name.startsWith(".") || entry.name === "INDEX.md") continue;
+      if (entry.isDirectory()) {
+        if (MEMORY_SKIP_DIRS.has(entry.name)) continue;
+        tree.push(`${prefix}${entry.name}/`);
+        await walk(path.join(dir, entry.name), prefix + "  ");
+      } else if (entry.name.endsWith(".md")) {
+        tree.push(`${prefix}${entry.name}`);
+      }
+    }
+  }
+  await walk(nsPath, "  ");
+
+  if (!coreMemory && tree.length === 0) return null;
+
+  const memoryDir = formatUserDataRelativePath(`memory/${nsDir.name}`);
+  const sections: string[] = ["## Memory"];
+
+  if (coreMemory) {
+    sections.push("### Core Memory", coreMemory);
+  }
+
+  if (tree.length > 0) {
+    sections.push(
+      "### Memory Files",
+      `Use \`read_file\` on any file below (under ${memoryDir}/) when its topic is relevant to the conversation.`,
+      tree.join("\n"),
+    );
+  }
+
+  return sections.join("\n\n");
+}
+
 async function readSourceContent(source: SystemPromptSource): Promise<string> {
   if (source.content !== undefined) {
     return source.content.trim();
@@ -221,17 +290,28 @@ async function readSourceContent(source: SystemPromptSource): Promise<string> {
 async function compileFiles(files: SystemPromptSource[]) {
   const runtimeOverview = buildRuntimeOverviewPrompt();
   const identityContext = buildAssistantIdentityPromptContext();
+  const memorySection = await buildMemorySection();
+
+  const parts = [runtimeOverview];
+
   if (files.length === 0) {
-    return `${runtimeOverview}\n\n${buildFallbackSystemPrompt()}\n\n${identityContext}`;
+    parts.push(buildFallbackSystemPrompt());
+  } else {
+    const compiled = (await Promise.all(files
+      .map(async (file) => {
+        const content = await readSourceContent(file);
+        return `<!-- ${file.displayPath} -->\n${content}`;
+      })))
+      .join("\n\n");
+    parts.push(compiled);
   }
 
-  const compiled = (await Promise.all(files
-    .map(async (file) => {
-      const content = await readSourceContent(file);
-      return `<!-- ${file.displayPath} -->\n${content}`;
-    })))
-    .join("\n\n");
-  return `${runtimeOverview}\n\n${compiled}\n\n${identityContext}`;
+  if (memorySection) {
+    parts.push(memorySection);
+  }
+
+  parts.push(identityContext);
+  return parts.join("\n\n");
 }
 
 function capSystemPrompt(text: string): ComposedSystemPrompt {

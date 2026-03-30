@@ -15,7 +15,6 @@ import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { wrapInjectedMessage } from "../injected-message-service";
 import { MEMORY_RECALL_LIMIT } from "../../config/service-constants";
-import type { LlmMemoryRecallService, LlmRecallMatch } from "../memory/llm-memory-recall-service";
 const MEMORY_RECALL_MIN_SCORE = 0.05;
 const MEMORY_RECALL_MIN_QUERY_TOKENS = 2;
 const MEMORY_RECALL_MIN_TOP_SCORE = 0.09;
@@ -213,17 +212,11 @@ function formatRecallMatch(match: MemorySearchMatch, index: number) {
   ].join("\n");
 }
 
-function formatLlmRecallMatch(match: LlmRecallMatch, index: number) {
+function formatLlmRecallBlock(content: string) {
   return [
-    "<memory_item>",
-    `index: ${index + 1}`,
-    `path: ${match.path}`,
-    `heading: ${match.heading}`,
-    `source: llm_recall`,
-    `reason: ${match.reason}`,
-    "content:",
-    match.content,
-    "</memory_item>",
+    "<llm_recalled_memory>",
+    content,
+    "</llm_recalled_memory>",
   ].join("\n");
 }
 
@@ -234,208 +227,6 @@ export class ConversationMemoryService {
     private readonly memory: MemoryService,
     private readonly models: Pick<ModelService, "generateMemoryText">,
     private readonly profiles = new ProfileService(profile.id),
-    private readonly llmRecall?: LlmMemoryRecallService,
   ) {}
 
-  async buildRecallContext(params: {
-    conversationKey: string;
-    userContent: ChatPromptContent;
-    conversationMessages: Message[];
-    limit?: number;
-  }) {
-    return traceSpan(
-      "conversation_memory.recall",
-      async () => {
-        const userText = extractTextFromContent(params.userContent);
-        if (this.shouldSkipRecallForConversation(params.conversationKey, userText)) {
-          return "";
-        }
-        const query = buildRecallQuery(userText, params.conversationMessages);
-        if (query.length < 3) {
-          return "";
-        }
-        const queryTokens = extractRecallTokens(query);
-        const explicitRecallIntent = hasExplicitRecallIntent(query);
-        if (!explicitRecallIntent && queryTokens.length < MEMORY_RECALL_MIN_QUERY_TOKENS) {
-          return "";
-        }
-
-        // Run both recall systems in parallel
-        const [vectorMatches, llmMatches] = await Promise.all([
-          this.runVectorRecall(query, queryTokens, explicitRecallIntent, params.limit),
-          this.runLlmRecall(userText, params.conversationKey),
-        ]);
-
-        if (vectorMatches.length === 0 && llmMatches.length === 0) {
-          return "";
-        }
-
-        // Build combined recall context
-        const recallItems: string[] = [];
-
-        // Add vector+BM25 matches
-        for (const [index, match] of vectorMatches.entries()) {
-          recallItems.push(formatRecallMatch(match, index));
-        }
-
-        // Add LLM matches that aren't already covered by vector results
-        const vectorPaths = new Set(vectorMatches.map((m) => m.relativePath));
-        let llmIndex = vectorMatches.length;
-        for (const match of llmMatches) {
-          if (vectorPaths.has(match.path)) continue;
-          recallItems.push(formatLlmRecallMatch(match, llmIndex));
-          llmIndex += 1;
-        }
-
-        if (recallItems.length === 0) {
-          return "";
-        }
-
-        const recallContext = [
-          "<recalled_memory>",
-          "This block is automatic memory retrieval from two systems (vector search + LLM recall).",
-          "It is background context only and is not part of the user's new message.",
-          "",
-          ...recallItems,
-          "</recalled_memory>",
-        ].join("\n");
-
-        conversationMemoryTelemetry.event(
-          "conversation_memory.recall.injected",
-          {
-            conversationKey: params.conversationKey,
-            queryLength: query.length,
-            queryTokenCount: queryTokens.length,
-            explicitRecallIntent,
-            vectorHitCount: vectorMatches.length,
-            llmHitCount: llmMatches.length,
-            combinedHitCount: recallItems.length,
-            contextChars: recallContext.length,
-            estimatedContextTokens: approximateTextTokens(recallContext),
-          },
-          { level: "debug" },
-        );
-
-        return wrapInjectedMessage("memory_recall", recallContext);
-      },
-      {
-        attributes: {
-          conversationKey: params.conversationKey,
-          userLength: extractTextFromContent(params.userContent).length,
-        },
-      },
-    );
-  }
-
-  private async runVectorRecall(
-    query: string,
-    queryTokens: string[],
-    explicitRecallIntent: boolean,
-    limit?: number,
-  ): Promise<MemorySearchMatch[]> {
-    const recallPrefixes = this.getRecallPathPrefixes();
-    const matches = uniqueRecallMatches(await this.memory.searchStructured({
-      query,
-      limit: Math.max((limit ?? MEMORY_RECALL_LIMIT) * 5, 10),
-      pathPrefixes: recallPrefixes,
-      excludePathPrefixes: this.getRecallExcludedPrefixes(),
-      minScore: MEMORY_RECALL_MIN_SCORE,
-    }))
-      .map((match) => ({
-        ...match,
-        score: match.score + recallPathBonus(match.relativePath),
-      }))
-      .sort((left, right) => right.score - left.score)
-      .filter((match) => this.isUsableRecallMatch(match, queryTokens))
-      .filter((match) => sanitizeRecallContent(match.text, match.heading).length > 0);
-
-    if (matches.length === 0) return [];
-
-    const topMatch = matches[0];
-    const topOverlap = topMatch ? this.getRecallOverlap(topMatch, queryTokens) : 0;
-    if (
-      !explicitRecallIntent &&
-      (!topMatch || topMatch.score < MEMORY_RECALL_MIN_TOP_SCORE || topOverlap < MEMORY_RECALL_MIN_TOP_OVERLAP)
-    ) {
-      return [];
-    }
-
-    return matches.slice(0, limit ?? MEMORY_RECALL_LIMIT);
-  }
-
-  private async runLlmRecall(
-    userText: string,
-    conversationKey: string,
-  ): Promise<LlmRecallMatch[]> {
-    if (!this.llmRecall) return [];
-
-    try {
-      return await this.llmRecall.recall({
-        userMessage: userText,
-        conversationKey,
-      });
-    } catch (error) {
-      conversationMemoryTelemetry.event(
-        "conversation_memory.llm_recall.failed",
-        {
-          conversationKey,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        { level: "warn", outcome: "error" },
-      );
-      return [];
-    }
-  }
-
-  private getRecallPathPrefixes() {
-    const namespace = this.profiles.getWriteMemoryNamespace(this.profile);
-    return [
-      path.posix.join(namespace, "core"),
-      path.posix.join(namespace, "structured"),
-      path.posix.join(namespace, "legacy", "USER.md"),
-      path.posix.join(namespace, "legacy", "MEMORY.md"),
-      path.posix.join(namespace, "shahara-psychology.md"),
-      path.posix.join(namespace, "shahara-substances.md"),
-      path.posix.join(namespace, "health.md"),
-    ];
-  }
-
-  private getRecallExcludedPrefixes() {
-    const namespace = this.profiles.getWriteMemoryNamespace(this.profile);
-    return [
-      "compactions",
-      path.posix.join(namespace, "compactions"),
-    ];
-  }
-
-  private isUsableRecallMatch(match: MemorySearchMatch, queryTokens: string[]) {
-    const overlap = this.getRecallOverlap(match, queryTokens);
-    if (match.score < 0.055 && overlap < 2) {
-      return false;
-    }
-    if (overlap >= 2) {
-      return true;
-    }
-
-    if (!isPreferredRecallPath(match.relativePath)) {
-      return false;
-    }
-
-    return overlap >= 1 && match.score >= 0.05;
-  }
-
-  private shouldSkipRecallForConversation(conversationKey: string, userText: string) {
-    if (conversationKey.startsWith("agent-healthcheck-")) {
-      return true;
-    }
-
-    return isInternalAutomationMessage(userText);
-  }
-
-  private getRecallOverlap(match: MemorySearchMatch, queryTokens: string[]) {
-    return countTokenOverlap(
-      queryTokens,
-      `${match.heading}\n${match.text}\n${match.relativePath}`,
-    );
-  }
 }

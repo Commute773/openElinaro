@@ -23,7 +23,6 @@ import { ToolRegistry } from "../../tools/tool-registry";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { ToolResolutionService } from "../tool-resolution-service";
-import { ConversationMemoryService } from "./conversation-memory-service";
 import type { ReflectionService } from "../reflection-service";
 import type { MemoryManagementAgent } from "../memory/memory-management-agent";
 import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS } from "../../config/service-constants";
@@ -162,7 +161,6 @@ export type ChatDependencies = {
   conversations: ConversationStore;
   systemPrompts: SystemPromptService;
   models: ModelService;
-  memory?: Pick<ConversationMemoryService, "buildRecallContext">;
   reflection?: Pick<ReflectionService, "queueCompactionReflection">;
   structuredMemory?: Pick<MemoryManagementAgent, "processTranscript">;
 };
@@ -788,21 +786,6 @@ export class AgentChatService {
     const sections: string[] = [];
     if (params.systemContext?.trim()) {
       sections.push(params.systemContext.trim());
-    }
-
-    if (params.enableMemoryRecall && this.deps.memory) {
-      const memoryContext = await this.deps.memory.buildRecallContext({
-        conversationKey: params.conversationKey,
-        userContent: params.combinedUserContent,
-        conversationMessages: params.conversationMessages,
-      });
-      if (memoryContext) {
-        sections.push(
-          isWrappedInjectedMessage(memoryContext)
-            ? memoryContext
-            : wrapInjectedMessage("memory_recall", memoryContext),
-        );
-      }
     }
 
     const automaticContext = sections.join("\n\n").trim();

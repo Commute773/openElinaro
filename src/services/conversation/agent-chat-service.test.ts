@@ -166,13 +166,6 @@ function createService(options?: {
         };
       },
     } as any,
-    memory: options?.disableAutomaticMemory
-      ? undefined
-      : {
-          async buildRecallContext() {
-            return options?.recallContext ?? "";
-          },
-        } as any,
   });
 
   return { service, requests, conversations };

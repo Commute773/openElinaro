@@ -316,11 +316,6 @@ function createHarness(expectedArtifactDir: string) {
     conversations,
     systemPrompts,
     models,
-    memory: {
-      async buildRecallContext() {
-        return "";
-      },
-    },
   });
 
   return { chat };
