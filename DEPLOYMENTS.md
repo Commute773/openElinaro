@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.30.11
+- Released at: 2026-03-30T19:01:23Z
+- Release id: 20260330T190123Z-2d51e6d
+- Previous version: 2026.03.30.10
+- Trigger: ci/release workflow
+
+- feat: default to Claude Agent SDK core, fix tool pipeline and tests
+
 ## 2026.03.30.10
 - Released at: 2026-03-30T18:02:41Z
 - Release id: 20260330T180241Z-470396d
