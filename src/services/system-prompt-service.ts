@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { readdir, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { getRuntimeConfig } from "../config/runtime-config";
-import { buildAssistantIdentityPromptContext, getAssistantDisplayName } from "../config/runtime-identity";
+import { buildAssistantIdentityPromptContext } from "../config/runtime-identity";
 import { FeatureConfigService, type FeatureId } from "./feature-config-service";
 import { getPromptToolLibraries } from "./tool-library-service";
 import {
@@ -16,43 +16,6 @@ import { timestamp } from "../utils/timestamp";
 
 const SYSTEM_PROMPT_EXTENSION = ".md";
 export const MAX_SYSTEM_PROMPT_CHARS = 100_000;
-
-/**
- * Default agent prompts used on fresh installs when the operator has not yet
- * created any files in `~/.openelinaro/system_prompt/`. These live in code so
- * they ship with the app and stay version-controlled alongside the runtime.
- */
-export const DEFAULT_AGENT_PROMPTS: readonly DefaultAgentPrompt[] = [
-  {
-    fileName: "00-foundation.md",
-    content: [
-      "# Foundation",
-      "",
-      "You are a local-first personal assistant.",
-      "",
-      "- Be genuinely useful, not performatively helpful. Skip canned niceties and filler.",
-      "- Be direct, competent, and warm when it is real. Personality is good; fake softness is not.",
-      "- Have views and make judgments. Say what you think, including likely failure modes.",
-      "- Be resourceful before asking. Read files, inspect local state, search docs or memory, then ask only if still blocked.",
-      "- Do not claim actions were taken unless a tool call or runtime action actually completed them.",
-      "- Continuity does not live only in the current thread. Treat local docs, memory, projects, and runtime state as the durable background.",
-    ].join("\n"),
-  },
-] as const;
-
-export interface DefaultAgentPrompt {
-  fileName: string;
-  content: string;
-}
-
-function buildFallbackSystemPrompt() {
-  return [
-    `You are ${getAssistantDisplayName()}, a concise personal assistant.`,
-    "Be direct and helpful.",
-    "Use tools when they are the correct way to inspect or update state.",
-    "Do not claim to have performed actions unless they were completed through a tool call.",
-  ].join(" ");
-}
 
 export interface SystemPromptSnapshot {
   text: string;
@@ -74,7 +37,6 @@ type SystemPromptSource = {
   absolutePath: string;
   fileName: string;
   displayPath: string;
-  content?: string;
 };
 
 async function listSystemPromptSources(root: string, displayPath: (fileName: string) => string) {
@@ -92,77 +54,35 @@ async function listSystemPromptSources(root: string, displayPath: (fileName: str
 }
 
 /**
- * Build virtual sources from in-code default agent prompts.
- * These have no file on disk — the content is embedded.
- */
-function getDefaultAgentSources(): SystemPromptSource[] {
-  return DEFAULT_AGENT_PROMPTS.map((prompt) => ({
-    absolutePath: "",
-    fileName: prompt.fileName,
-    displayPath: `(default) ${prompt.fileName}`,
-    content: prompt.content,
-  }));
-}
-
-/**
- * Assemble system prompt sources from three layers:
+ * Assemble system prompt sources from two layers:
  *
- * 1. **Universal** (`system_prompt/universal/`): Platform prompts that apply to
- *    every agent — operating model, docs-and-reload guidance, etc. These are
- *    always included and cannot be overridden by the operator.
+ * 1. **Universal** (`system_prompt/universal/`): Platform prompts that ship
+ *    with the app. Sorted by filename, always included first.
  *
- * 2. **Operator** (`~/.openelinaro/system_prompt/`): Agent-specific prompts
- *    managed by the operator — identity, user profile, personality, etc.
- *    These are appended alongside universal prompts. Operator files whose
- *    filename collides with a universal file are skipped (universal wins) to
- *    prevent accidental duplication after migration from the old flat layout.
+ * 2. **Custom** (`~/.openelinaro/system_prompt/`): Operator-managed prompts.
+ *    Sorted by filename, appended after universal. Optional and additive.
  *
- * 3. **Defaults** (in-code): Bundled default agent prompts used only when the
- *    operator has not provided any prompts of their own (fresh install).
- *
- * All sources are sorted alphabetically by filename and compiled into the
- * final prompt text.
+ * No merge logic, no override filtering, no in-code defaults.
  */
 async function getSystemPromptSources() {
-  const userPromptRoot = getUserSystemPromptRoot();
-  await mkdir(userPromptRoot, { recursive: true });
+  const customPromptRoot = getUserSystemPromptRoot();
+  await mkdir(customPromptRoot, { recursive: true });
 
-  const universalSources = await listSystemPromptSources(
+  const universalSources = (await listSystemPromptSources(
     getUniversalSystemPromptRoot(),
     (fileName) => path.posix.join("system_prompt", "universal", fileName),
-  );
+  )).sort((a, b) => a.fileName.localeCompare(b.fileName));
 
-  const universalFileNames = new Set(universalSources.map((s) => s.fileName));
-
-  const rawOperatorSources = await listSystemPromptSources(
-    userPromptRoot,
+  const customSources = (await listSystemPromptSources(
+    customPromptRoot,
     (fileName) => formatUserDataRelativePath("system_prompt", fileName),
-  );
+  )).sort((a, b) => a.fileName.localeCompare(b.fileName));
 
-  // Skip operator files that collide with universal filenames. These are
-  // stale overrides from the old flat layout where operator files could
-  // replace repo files. Under the new model universal prompts are
-  // authoritative and cannot be overridden.
-  const operatorSources = rawOperatorSources.filter(
-    (source) => !universalFileNames.has(source.fileName),
-  );
-
-  // If the operator has no agent-specific prompts at all, include the
-  // in-code defaults so a fresh install still gets a usable foundation.
-  const defaultSources = operatorSources.length === 0
-    ? getDefaultAgentSources()
-    : [];
-
-  const allSources = [...universalSources, ...defaultSources, ...operatorSources];
-  return allSources.sort((left, right) => left.fileName.localeCompare(right.fileName));
+  return [...universalSources, ...customSources];
 }
 
 function sha256(value: string) {
   return crypto.createHash("sha256").update(value).digest("hex");
-}
-
-function formatPromptList(values: string[]) {
-  return values.length > 0 ? values.join(", ") : "none";
 }
 
 const FEATURE_TOOL_LIBRARY: Record<FeatureId, string> = {
@@ -280,13 +200,6 @@ async function buildMemorySection(): Promise<string | null> {
   return sections.join("\n\n");
 }
 
-async function readSourceContent(source: SystemPromptSource): Promise<string> {
-  if (source.content !== undefined) {
-    return source.content.trim();
-  }
-  return (await Bun.file(source.absolutePath).text()).trim();
-}
-
 async function compileFiles(files: SystemPromptSource[]) {
   const runtimeOverview = buildRuntimeOverviewPrompt();
   const identityContext = buildAssistantIdentityPromptContext();
@@ -294,12 +207,10 @@ async function compileFiles(files: SystemPromptSource[]) {
 
   const parts = [runtimeOverview];
 
-  if (files.length === 0) {
-    parts.push(buildFallbackSystemPrompt());
-  } else {
+  if (files.length > 0) {
     const compiled = (await Promise.all(files
       .map(async (file) => {
-        const content = await readSourceContent(file);
+        const content = (await Bun.file(file.absolutePath).text()).trim();
         return `<!-- ${file.displayPath} -->\n${content}`;
       })))
       .join("\n\n");
