@@ -3,7 +3,7 @@ import { toolResultMessage } from "../messages/types";
 import {
   renderShellExecResult,
 } from "./groups";
-import type { PiToolEntry } from "../functions/generate-tools";
+import type { ToolEntry } from "../functions/generate-tools";
 import {
   stripToolControlInput,
   normalizeToolFailure,
@@ -311,7 +311,7 @@ const DYNAMIC_TOOL_CATALOG: Record<string, Partial<ToolCatalogCard>> = {
   agent_status: { domains: ["workflow", "agents"], agentScopes: ["chat", "direct"], examples: ["spot-check coding agent run", "list recent workflows"] },
 };
 
-function buildDynamicToolCatalogCard(entry: PiToolEntry): ToolCatalogCard {
+function buildDynamicToolCatalogCard(entry: ToolEntry): ToolCatalogCard {
   const meta = DYNAMIC_TOOL_CATALOG[entry.tool.name] ?? {};
   const authorization = getToolAuthorizationDeclaration(entry.tool.name);
   const defaultVisibleScopes = (Object.entries(DYNAMIC_TOOL_DEFAULT_VISIBLE_SCOPES) as Array<[AgentToolScope, readonly string[]]>)
@@ -392,8 +392,8 @@ function requiresPrivilegedServiceControl(runtimePlatform: RuntimePlatform, acti
 }
 
 export class ToolRegistry {
-  private readonly toolEntries: PiToolEntry[];
-  private readonly toolsByName: Map<string, PiToolEntry>;
+  private readonly toolEntries: ToolEntry[];
+  private readonly toolsByName: Map<string, ToolEntry>;
   /**
    * Mutable reference to the ToolContext that should be used by function-layer
    * tools during the current invocation. Set by getTools/executeTool/invoke
@@ -785,7 +785,7 @@ export class ToolRegistry {
     ].join("\n\n");
   }
 
-  private getAccessibleEntries(context?: ToolContext): PiToolEntry[] {
+  private getAccessibleEntries(context?: ToolContext): ToolEntry[] {
     return this.toolEntries.filter((entry) => this.access.canUseTool(entry.tool.name));
   }
 
