@@ -21,7 +21,7 @@ function makeDef(overrides: Partial<FunctionDefinition> = {}): FunctionDefinitio
     auth: { access: "public", behavior: "allow" },
     domains: ["test"],
     agentScopes: ["foreground"],
-    http: { method: "POST", path: "/api/g2/test" },
+    http: { method: "POST", path: "/api/test" },
     ...overrides,
   } as FunctionDefinition;
 }
@@ -50,7 +50,7 @@ describe("generateApiRoute", () => {
 
     expect(route).not.toBeNull();
     expect(route!.method).toBe("POST");
-    expect(route!.pattern).toBe("/api/g2/test");
+    expect(route!.pattern).toBe("/api/test");
     expect(typeof route!.handler).toBe("function");
   });
 
@@ -60,7 +60,7 @@ describe("generateApiRoute", () => {
 
     expect(route).not.toBeNull();
     expect(route!.method).toBe("GET"); // not mutatesState, so GET
-    expect(route!.pattern).toBe("/api/g2/finance/summary");
+    expect(route!.pattern).toBe("/api/finance/summary");
   });
 
   test("auto-derives POST method when mutatesState is true", () => {
@@ -69,7 +69,7 @@ describe("generateApiRoute", () => {
 
     expect(route).not.toBeNull();
     expect(route!.method).toBe("POST");
-    expect(route!.pattern).toBe("/api/g2/health/log/checkin");
+    expect(route!.pattern).toBe("/api/health/log/checkin");
   });
 
   test("returns null for functions whose surfaces exclude api", () => {
@@ -99,7 +99,7 @@ describe("route handler: input parsing", () => {
     const def = makeDef();
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/test", {
+    const request = makeRequest("http://localhost/api/test", {
       method: "POST",
       body: { greeting: "hello" },
     });
@@ -114,11 +114,11 @@ describe("route handler: input parsing", () => {
     const def = makeDef({
       input: z.object({ q: z.string().optional() }),
       handler: async (input) => ({ query: (input as Record<string, string>).q ?? "none" }),
-      http: { method: "GET", path: "/api/g2/search" },
+      http: { method: "GET", path: "/api/search" },
     });
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/search?q=bun", { method: "GET" });
+    const request = makeRequest("http://localhost/api/search?q=bun", { method: "GET" });
     const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(200);
@@ -130,12 +130,12 @@ describe("route handler: input parsing", () => {
     const def = makeDef({
       input: z.object({ id: z.string(), action: z.string() }),
       handler: async (input) => ({ id: (input as Record<string, string>).id, action: (input as Record<string, string>).action }),
-      http: { method: "POST", path: "/api/g2/items/:id" },
+      http: { method: "POST", path: "/api/items/:id" },
     });
 
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/items/42", {
+    const request = makeRequest("http://localhost/api/items/42", {
       method: "POST",
       body: { action: "archive" },
     });
@@ -151,12 +151,12 @@ describe("route handler: input parsing", () => {
     const def = makeDef({
       input: z.object({ id: z.string(), format: z.string().optional() }),
       handler: async (input) => ({ id: (input as Record<string, string>).id, format: (input as Record<string, string>).format }),
-      http: { method: "GET", path: "/api/g2/items/:id" },
+      http: { method: "GET", path: "/api/items/:id" },
     });
 
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/items/99?format=json", { method: "GET" });
+    const request = makeRequest("http://localhost/api/items/99?format=json", { method: "GET" });
     const response = await route.handler(request, { id: "99" }, null!);
 
     expect(response.status).toBe(200);
@@ -168,13 +168,13 @@ describe("route handler: input parsing", () => {
     const def = makeDef({
       input: z.object({ id: z.string() }),
       handler: async (input) => ({ id: (input as Record<string, string>).id }),
-      http: { method: "GET", path: "/api/g2/items/:id" },
+      http: { method: "GET", path: "/api/items/:id" },
     });
 
     const route = generateApiRoute(def, stubServices)!;
 
     // Query has id=query-val, path params have id=path-val; path should win
-    const request = makeRequest("http://localhost/api/g2/items/path-val?id=query-val", { method: "GET" });
+    const request = makeRequest("http://localhost/api/items/path-val?id=query-val", { method: "GET" });
     const response = await route.handler(request, { id: "path-val" }, null!);
 
     const data = await response.json();
@@ -185,12 +185,12 @@ describe("route handler: input parsing", () => {
     const def = makeDef({
       input: z.object({ id: z.string() }),
       handler: async (input) => ({ id: (input as Record<string, string>).id }),
-      http: { method: "POST", path: "/api/g2/items/:id" },
+      http: { method: "POST", path: "/api/items/:id" },
     });
 
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/items/7", { method: "POST" });
+    const request = makeRequest("http://localhost/api/items/7", { method: "POST" });
     const response = await route.handler(request, { id: "7" }, null!);
 
     expect(response.status).toBe(200);
@@ -206,7 +206,7 @@ describe("route handler: Zod validation", () => {
     });
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/test", {
+    const request = makeRequest("http://localhost/api/test", {
       method: "POST",
       body: { greeting: "hi" },
     });
@@ -223,7 +223,7 @@ describe("route handler: Zod validation", () => {
     });
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/test", {
+    const request = makeRequest("http://localhost/api/test", {
       method: "POST",
       body: {},
     });
@@ -238,7 +238,7 @@ describe("route handler: Zod validation", () => {
     });
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/test", {
+    const request = makeRequest("http://localhost/api/test", {
       method: "POST",
       body: { greeting: "hello" },
     });
@@ -259,7 +259,7 @@ describe("route handler: error handling", () => {
     });
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/test", {
+    const request = makeRequest("http://localhost/api/test", {
       method: "POST",
       body: { greeting: "boom" },
     });
@@ -278,7 +278,7 @@ describe("route handler: error handling", () => {
     });
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/test", {
+    const request = makeRequest("http://localhost/api/test", {
       method: "POST",
       body: { greeting: "boom" },
     });
@@ -295,13 +295,13 @@ describe("route handler: response transform, custom status, and string wrapping"
     const def = makeDef({
       http: {
         method: "POST",
-        path: "/api/g2/test",
+        path: "/api/test",
         responseTransform: (result: unknown) => ({ wrapped: result }),
       },
     });
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/test", {
+    const request = makeRequest("http://localhost/api/test", {
       method: "POST",
       body: { greeting: "hi" },
     });
@@ -316,13 +316,13 @@ describe("route handler: response transform, custom status, and string wrapping"
     const def = makeDef({
       http: {
         method: "POST",
-        path: "/api/g2/test",
+        path: "/api/test",
         successStatus: 201,
       },
     });
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/test", {
+    const request = makeRequest("http://localhost/api/test", {
       method: "POST",
       body: { greeting: "hi" },
     });
@@ -340,7 +340,7 @@ describe("route handler: response transform, custom status, and string wrapping"
     });
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/string/fn", { method: "GET" });
+    const request = makeRequest("http://localhost/api/string/fn", { method: "GET" });
     const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(200);
@@ -357,7 +357,7 @@ describe("route handler: response transform, custom status, and string wrapping"
     });
     const route = generateApiRoute(def, stubServices)!;
 
-    const request = makeRequest("http://localhost/api/g2/object/fn", { method: "GET" });
+    const request = makeRequest("http://localhost/api/object/fn", { method: "GET" });
     const response = await route.handler(request, {}, null!);
 
     expect(response.status).toBe(200);
@@ -370,7 +370,7 @@ describe("generateApiRoutes", () => {
   test("converts multiple API-surface functions to routes", () => {
     const defs = [
       makeDef({ name: "fn_a" }),
-      makeDef({ name: "fn_b", http: { method: "GET", path: "/api/g2/b" } }),
+      makeDef({ name: "fn_b", http: { method: "GET", path: "/api/b" } }),
     ];
     const routes = generateApiRoutes(defs, stubServices);
 

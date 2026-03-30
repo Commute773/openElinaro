@@ -234,7 +234,7 @@ function generateClientSource(definitions: FunctionDefinition[]): string {
   lines.push(`export class OpenElinaroClient {`);
   lines.push(`  constructor(`);
   lines.push(`    private baseUrl: string = "http://localhost:3000",`);
-  lines.push(`    private prefix: string = "/api/g2",`);
+  lines.push(`    private prefix: string = "/api",`);
   lines.push(`    private headers: Record<string, string> = {},`);
   lines.push(`  ) {}`);
   lines.push(``);

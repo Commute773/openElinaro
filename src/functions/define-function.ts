@@ -24,7 +24,7 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
  * Function definitions use relative paths (e.g. "/routines/:id/done")
  * and this prefix is applied during route and OpenAPI generation.
  */
-export const API_PATH_PREFIX = "/api/g2";
+export const API_PATH_PREFIX = "/api";
 
 export interface FunctionHttpAnnotation {
   method: HttpMethod;
@@ -100,7 +100,7 @@ export interface FunctionDefinition<
   /**
    * Convert the handler result to a human-readable display string.
    * Required for every function — ensures structured output is always
-   * presentable as text for agent tool surfaces, the G2 glasses UI,
+   * presentable as text for agent tool surfaces, the simulator UI,
    * and API consumers. For handlers that already return strings,
    * use `formatResult` as the identity-safe default.
    */

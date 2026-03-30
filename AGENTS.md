@@ -104,7 +104,7 @@ Further reading:
 - Project conventions: [docs/assistant/projects.md](docs/assistant/projects.md)
 - Runtime domain model: [docs/assistant/runtime-domain-model.md](docs/assistant/runtime-domain-model.md)
 - Configuration and features: [docs/assistant/configuration.md](docs/assistant/configuration.md)
-- G2 API reference: [docs/assistant/api.md](docs/assistant/api.md)
+- HTTP API reference: [docs/assistant/api.md](docs/assistant/api.md)
 
 ## Architectural Decisions
 

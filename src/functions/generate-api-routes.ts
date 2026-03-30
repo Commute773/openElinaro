@@ -1,6 +1,6 @@
 /**
  * Generates HTTP route definitions from FunctionDefinitions.
- * The output is compatible with the existing G2 router's RouteDefinition interface.
+ * The output is compatible with the API router's RouteDefinition interface.
  *
  * Functions with explicit `http` annotations use those settings.
  * Functions without `http` get an auto-derived route:
@@ -12,10 +12,10 @@
 import { z } from "zod";
 import type { FunctionDefinition, FunctionContext, HttpMethod } from "./define-function";
 import { API_PATH_PREFIX, deriveHttpAnnotation } from "./define-function";
-import type { RouteDefinition } from "../integrations/http/g2/router";
+import type { RouteDefinition } from "../integrations/http/api/router";
 import type { ToolBuildContext } from "./context";
 import type { FeatureId } from "../services/feature-config-service";
-import { json, error } from "../integrations/http/g2/helpers";
+import { json, error } from "../integrations/http/api/helpers";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { telemetry } from "../services/infrastructure/telemetry";
 import { formatResult } from "./formatters";

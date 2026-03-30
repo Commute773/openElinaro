@@ -9,7 +9,7 @@ const NOTIFICATION_AUTH = { access: "anyone" as const, behavior: "uniform" as co
 
 export const buildNotificationFunctions: FunctionDomainBuilder = (_ctx) => [
   // -------------------------------------------------------------------------
-  // GET /api/g2/notifications
+  // GET /api/notifications
   // -------------------------------------------------------------------------
   defineFunction({
     name: "api_notifications_list",
@@ -72,7 +72,7 @@ export const buildNotificationFunctions: FunctionDomainBuilder = (_ctx) => [
   }),
 
   // -------------------------------------------------------------------------
-  // POST /api/g2/notifications/:id/action
+  // POST /api/notifications/:id/action
   // -------------------------------------------------------------------------
   defineFunction({
     name: "api_notification_action",

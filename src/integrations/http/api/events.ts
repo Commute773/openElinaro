@@ -1,6 +1,6 @@
 import type { OpenElinaroApp } from "../../../app/runtime";
 import type { RouteDefinition } from "./router";
-import { CORS_HEADERS, g2Telemetry } from "./helpers";
+import { CORS_HEADERS, apiTelemetry } from "./helpers";
 
 const SSE_HEADERS: Record<string, string> = {
   "Content-Type": "text/event-stream",
@@ -49,7 +49,7 @@ function createEventStream(app: OpenElinaroApp, request: Request): Response {
             controller.enqueue(evt);
           }
         } catch (err) {
-          g2Telemetry.recordError(err, { operation: "g2_api.events.poll" });
+          apiTelemetry.recordError(err, { operation: "api.events.poll" });
         }
       }, POLL_INTERVAL_MS);
 
@@ -128,7 +128,7 @@ function collectEvents(
 export const eventRoutes: RouteDefinition[] = [
   {
     method: "GET",
-    pattern: "/api/g2/events",
+    pattern: "/api/events",
     handler: async (request, _params, app) => {
       return createEventStream(app, request);
     },

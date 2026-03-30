@@ -63,7 +63,7 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
   }),
 
   // -----------------------------------------------------------------------
-  // api_health — migrated from static route in g2/data.ts
+  // api_health — migrated from static route in api/data.ts
   // -----------------------------------------------------------------------
   defineFunction({
     name: "api_health",
@@ -101,7 +101,7 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
   }),
 
   // -----------------------------------------------------------------------
-  // api_projects — migrated from static route in g2/data.ts
+  // api_projects — migrated from static route in api/data.ts
   // -----------------------------------------------------------------------
   defineFunction({
     name: "api_projects",
@@ -130,7 +130,7 @@ export const buildDashboardFunctions: FunctionDomainBuilder = (_ctx) => [
   }),
 
   // -----------------------------------------------------------------------
-  // api_conversations — migrated from static route in g2/data.ts
+  // api_conversations — migrated from static route in api/data.ts
   // -----------------------------------------------------------------------
   defineFunction({
     name: "api_conversations",

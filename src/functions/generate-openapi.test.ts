@@ -405,8 +405,8 @@ describe("generateOpenApiSpec", () => {
       delete (def as any).http;
       const spec = generateOpenApiSpec([def]);
       const paths = spec.paths as Record<string, Record<string, unknown>>;
-      expect(paths["/api/g2/noHttp"]).toBeDefined();
-      const op = paths["/api/g2/noHttp"]!["get"] as Record<string, unknown>;
+      expect(paths["/api/noHttp"]).toBeDefined();
+      const op = paths["/api/noHttp"]!["get"] as Record<string, unknown>;
       expect(op.operationId).toBe("noHttp");
     });
   });

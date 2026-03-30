@@ -1,9 +1,9 @@
 /**
  * Shared display formatters for domain objects.
  *
- * Used by both agent text output (display) and G2 glasses UI.
+ * Used by both agent text output (display) and the simulator UI.
  * Each formatter produces a single-line string suitable for:
- * - G2 display rendering (one item per line)
+ * - Simulator display rendering (one item per line)
  * - Agent tool output: items.map(formatXxx).join('\n')
  *
  * When adding a new domain, add a formatter here so both surfaces

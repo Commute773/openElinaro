@@ -1,6 +1,6 @@
 import { telemetry } from "../../../services/infrastructure/telemetry";
 
-export const g2Telemetry = telemetry.child({ component: "g2_api" });
+export const apiTelemetry = telemetry.child({ component: "http_api" });
 
 export const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
