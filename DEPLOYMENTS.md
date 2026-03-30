@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.30.4
+- Released at: 2026-03-30T16:08:05Z
+- Release id: 20260330T160805Z-850d3ed
+- Previous version: 2026.03.30.3
+- Trigger: ci/release workflow
+
+- refactor: remove tmux subagent infrastructure
+- refactor: extract swappable AgentCore interface with manifest system
+
 ## 2026.03.30.3
 - Released at: 2026-03-30T03:32:44Z
 - Release id: 20260330T033244Z-fee7cec
