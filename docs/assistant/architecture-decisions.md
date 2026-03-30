@@ -25,18 +25,13 @@ Where to look:
 
 Immediate chat and routine work stay in the foreground path. Longer-running or multi-step work is handed off into background workflows.
 
-Background coding-agent runs are wall-clock bounded only; the default timeout is one hour and there is no fixed model-step cap. New coding-agent launches start immediately as self-owned async runs instead of waiting in a scheduler queue. Planner and worker sessions are persisted step by step so a harness restart can resume an in-flight run instead of discarding it, and transient harness/provider outages or 429s move the run into `running/backoff` with automatic retry metadata instead of failing it outright. Near timeout, the runtime reserves a final handoff turn so the child agent stops work, summarizes what it accomplished, and returns that summary to the originating conversation instead of surfacing a bare abort. If the child is still hanging after the soft timeout plus a five-minute grace window, the runtime hard-times it out and reports that failure back to the parent thread. Task-level execution and verification problems are treated as run warnings first and only become terminal after the consecutive task error threshold is reached. Their completions are routed back into the originating conversation as a new follow-up turn so the foreground agent can decide what to do next instead of leaving the result as passive state. That parent decision now includes resuming the same run with `resume_agent`, steering a live run with `steer_agent`, or stopping it with `cancel_agent` instead of always launching a fresh worker. `agent_status` also surfaces when a run is actively working, backing off, or stuck because no tool or task progress has been recorded for too long.
+Background work runs through the core's agent loop (ClaudeSdkCore or PiCore), bounded by maxSteps. Automation (heartbeats, autonomous-time, alarms) runs as standalone orchestration functions in `runtime-automation.ts`.
 
 Where to look:
 
 - `src/app/runtime.ts`
 - `src/app/runtime-scope.ts`
-- `src/app/runtime-workflow.ts`
 - `src/app/runtime-automation.ts`
-- `src/orchestration/workflow-graph.ts`
-- `src/orchestration/workflow-executor.ts`
-- `src/orchestration/workflow-planner.ts`
-- `src/orchestration/workflow-agent-runner.ts`
 
 ## 4. Agent Execution Is Loop-Based
 
@@ -44,8 +39,8 @@ Foreground chat and background subagents run as imperative tool-using loops over
 
 Where to look:
 
-- `src/orchestration/`
-- `src/services/agent-chat-service.ts`
+- `src/services/conversation/agent-chat-service.ts`
+- `src/core/`
 - `src/connectors/`
 
 ## 5. Profiles, Projects, And Auth Are Explicit Runtime Objects
@@ -93,9 +88,8 @@ That includes queryable observability state. Structured spans and events are wri
 Where to look:
 
 - `~/.openelinaro/`
-- `src/services/conversation-store.ts`
-- `src/services/workflow-registry.ts`
-- `src/services/telemetry.ts`
+- `src/services/conversation/conversation-store.ts`
+- `src/services/infrastructure/telemetry.ts`
 
 ## 9. Conversation History Mutates By Append Or Explicit Rollback
 
@@ -108,8 +102,8 @@ The runtime now keeps two conversation persistence layers on purpose:
 
 Where to look:
 
-- `src/services/conversation-store.ts`
-- `src/services/agent-chat-service.ts`
+- `src/services/conversation/conversation-store.ts`
+- `src/services/conversation/agent-chat-service.ts`
 - `src/services/conversation-state-transition-service.ts`
 
 ## 10. Managed-Service Deploys Must Be Healthchecked And Reversible
@@ -126,20 +120,29 @@ Prepared-update commits must be made from a real branch tip, not a detached `HEA
 
 When an update or rollback is triggered from inside the live managed-service process itself, the runtime must hand that transition off to a detached helper job first. The managed service cannot safely restart itself in-process and still finish the transition sequence. Detached updates now acknowledge the request immediately in chat, then DM the operator again once the new version finishes booting and passes healthcheck. On macOS, those helpers must run as one-shot launchd agents rather than keepalive submitted jobs so a successful transition is not replayed in a loop.
 
-## 11. Subagents Run As External CLI Processes In tmux
+## 11. Swappable Core Architecture
 
-Subagents are real CLI processes (Claude Code or Codex) running in individual tmux windows with isolated Git worktrees. Each profile can configure binary paths for one or both agent types via `subagentPaths` in the profile registry.
+The agent system uses a swappable `AgentCore` interface that separates the harness (Discord, profiles, tools, conversation storage) from the core (agent loop, model interaction, native tools). Each core declares a `CoreManifest` with:
 
-Completion tracking uses each agent's native event surface — Claude Code hooks (Stop, Notification) and Codex notify — which POST structured events to a local Unix socket sidecar. The runtime watches the event stream, not tmux pane output. tmux provides persistence across runtime restarts and manual attach for debugging.
+- **Native tools**: tools the core handles internally (e.g., ClaudeSdkCore has Read, Write, Bash, Glob, Grep, WebSearch, WebFetch). The harness does not send these as tool definitions.
+- **Feature ownership**: which features the core owns (`core_owns`), shares (`shared`), or leaves to the harness (`harness_owns`). When the core owns compaction, context management, or session persistence, the harness skips its own implementation and uses hooks for visibility.
+- **Requirements**: what the core needs from the harness (system prompt, message history, tool definitions, tool execution).
 
-The source workspace must be clean before forking a linked worktree. Worktrees are preserved after completion so unfinished edits or local commits remain recoverable.
+Two core implementations exist:
+
+- **ClaudeSdkCore** (primary): wraps the Claude Agent SDK. Owns the agent loop, compaction, context management, streaming, and thinking. Harness domain tools are bridged via an in-process MCP server with proper Zod schema passthrough.
+- **PiCore** (adapter): wraps `@mariozechner/pi-ai` for non-Claude providers (OpenAI/Codex, ZAI/GLM). The harness owns all features; the core only runs the model loop.
+
+Core types (`src/core/types.ts`) are the canonical message types. The `messages/types.ts` barrel re-exports core types. pi-ai types are internal to PiCore.
 
 Where to look:
 
-- `src/subagent/` — sidecar, tmux manager, spawning, registry, timeouts
-- `src/app/runtime-subagent.ts` — controller and completion injection
-- `src/services/project-workspace-service.ts` — worktree isolation
-- `src/domain/subagent-run.ts` — run domain model
+- `src/core/types.ts` — AgentCore interface, CoreManifest, canonical message types
+- `src/core/claude-sdk-core.ts` — Claude Agent SDK core implementation
+- `src/core/pi-core.ts` — pi-ai adapter core implementation
+- `src/core/tool-split.ts` — core-aware tool filtering
+- `src/core/message-bridge.ts` — pi-ai message adapter (PiCore-internal)
+- `src/app/runtime-scope.ts` — CoreFactory that routes to the right core
 
 Where to look:
 
@@ -159,6 +162,8 @@ Where to look:
 All agent capabilities are defined as `FunctionDefinition` objects using Zod schemas, authorization metadata, domain tags, and surface annotations. A central `FunctionRegistry` collects definitions from per-domain builder functions and generates agent tools, HTTP routes, Discord slash commands, and OpenAPI specs from the same source of truth.
 
 This eliminates duplication between the tool, API, and Discord command layers. Metadata such as domains, scopes, examples, auth declarations, and behavioral flags lives alongside the handler instead of in separate inference maps or parallel registration sites.
+
+Tool definitions carry their original Zod schema alongside JSON Schema parameters. When tools are sent to the core, `splitToolsForCore()` removes tools the core handles natively (based on the manifest's `nativeTools`). For ClaudeSdkCore, the Zod schema is passed through to the SDK's `tool()` function for proper parameter definitions.
 
 Where to look:
 
