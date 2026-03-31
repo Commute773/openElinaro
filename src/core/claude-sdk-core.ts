@@ -15,6 +15,7 @@ import {
   type HookCallback,
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { attemptOrAsync } from "../utils/result";
 import type {
   AgentCore,
   CoreManifest,
@@ -254,7 +255,7 @@ export class ClaudeSdkCore implements AgentCore {
 
     // Helper to emit progress without blocking the stream
     const progress = onProgress
-      ? (msg: string) => { onProgress(msg).catch(() => {}); }
+      ? (msg: string) => { void attemptOrAsync(() => onProgress(msg), undefined); }
       : undefined;
 
     try {
