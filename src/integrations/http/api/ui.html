@@ -505,7 +505,6 @@ function makeApiScreen(title, path, opts = {}) {
 // ── Home Screen ──────────────────────────────────────────────────────
 function makeHomeScreen() {
   const menuItems = [
-    { text: 'Agent Chat',    screen: () => makeAgentChatScreen() },
     { text: 'Routines',      screen: () => makeRoutinesScreen() },
     { text: 'Notifications', screen: () => makeNotificationsScreen() },
     { text: 'Agents',        screen: () => makeAgentsScreen() },
@@ -513,7 +512,6 @@ function makeHomeScreen() {
     { text: 'Finance',       screen: () => makeApiScreen('Finance', '/api/finance/summary') },
     { text: 'Projects',      screen: () => makeApiScreen('Projects', '/api/projects') },
     { text: 'Todos',         screen: () => makeTodosScreen() },
-    { text: 'Ask (Voice)',   screen: () => { input('voice'); return null; } },
   ];
 
   return {
@@ -558,7 +556,7 @@ function makeHomeScreen() {
         if (s) pushScreen(s);
       }
     },
-    onLongPress() { /* home is root, no back */ },
+    onLongPress() { pushScreen(makeAgentChatScreen()); },
   };
 }
 

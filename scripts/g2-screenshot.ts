@@ -141,8 +141,8 @@ async function shot(name: string) {
 await page.goto(`${base}/g2`);
 await shot("home");
 
-// Cursor starts on first menu item (Agent Chat) — just press Enter
-await page.keyboard.press("Enter");
+// Long press to enter Agent Chat
+await page.keyboard.press("Escape");
 await page.waitForTimeout(500);
 await shot("agent-chat-empty");
 
@@ -159,29 +159,26 @@ await shot("agent-chat");
 for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowUp");
 await shot("agent-chat-scrolled");
 
-// Go back to home
+// Long press to go back to home from agent chat
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
 
-// Navigate to Routines (1 down from current cursor on Agent Chat)
-await page.keyboard.press("ArrowDown");
+// Cursor is on first menu item (Routines) — press Enter
 await page.keyboard.press("Enter");
 await shot("routines");
 
-// Go back — cursor is now on Routines (index 6)
+// Go back
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
 
-// Navigate to Notifications (1 more down from Routines)
+// Navigate to Notifications (1 down from Routines)
 await page.keyboard.press("ArrowDown");
 await page.keyboard.press("Enter");
 await shot("notifications");
 
-// Go back — cursor is now on Notifications (index 7)
+// Go back, navigate to Agents
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
-
-// Navigate to Agents (1 more down from Notifications)
 await page.keyboard.press("ArrowDown");
 await page.keyboard.press("Enter");
 await shot("agents");
