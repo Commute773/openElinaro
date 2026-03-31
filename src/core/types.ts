@@ -18,6 +18,8 @@ export interface CoreManifest {
   id: string;
   /** Tool names this core handles natively. Harness won't send these as tool definitions. */
   nativeTools: NativeToolMapping[];
+  /** Harness tool names that should not be provided to this core at all. */
+  suppressedTools?: string[];
   /** Features this core handles internally. Harness disables its own implementation for "core_owns". */
   nativeFeatures: CoreFeatureDeclaration[];
   /** What this core needs from the harness. */

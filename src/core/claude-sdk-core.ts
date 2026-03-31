@@ -49,6 +49,9 @@ export const CLAUDE_SDK_MANIFEST: CoreManifest = {
     { harnessToolName: "web_fetch",    coreToolName: "WebFetch",  reportResultsToHarness: false },
   ],
 
+  // The SDK manages its own tool loading; harness tool libraries are not applicable.
+  suppressedTools: ["load_tool_library"],
+
   nativeFeatures: [
     { feature: "agent_loop",               mode: "core_owns" },
     { feature: "compaction",               mode: "shared", integrationPoint: "PreCompact hook" },
