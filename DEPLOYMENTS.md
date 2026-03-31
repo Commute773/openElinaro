@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.12
+- Released at: 2026-03-31T17:29:30Z
+- Release id: 20260331T172930Z-099b32a
+- Previous version: 2026.03.31.11
+- Trigger: ci/release workflow
+
+- refactor: per-core system prompts, strip tool-specific guidance from universal prompt
+
 ## 2026.03.31.11
 - Released at: 2026-03-31T17:05:26Z
 - Release id: 20260331T170526Z-8b9ee2e
