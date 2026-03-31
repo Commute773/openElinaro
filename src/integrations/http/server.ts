@@ -7,6 +7,7 @@ import {
 } from "../../services/gemini-live-phone-service";
 import { VonageService, getVonageWebhookPath } from "../../services/vonage-service";
 import type { OpenElinaroApp } from "../../app/runtime";
+import { getUserDataRootDir } from "../../services/runtime-root";
 import { handleApiRequest } from "./api";
 import { authenticateApiRequest } from "./api-auth";
 import { CORS_HEADERS } from "./api/helpers";
@@ -44,6 +45,17 @@ export function createHttpRequestHandler(
       return new Response(file, {
         headers: { "Content-Type": "text/html; charset=utf-8", ...CORS_HEADERS },
       });
+    }
+
+    // Bad Apple video
+    if (pathname === "/g2/bad-apple.mp4") {
+      const vidPath = `${getUserDataRootDir()}/bad-apple.mp4`;
+      const file = Bun.file(vidPath);
+      if (await file.exists()) {
+        return new Response(file, {
+          headers: { "Content-Type": "video/mp4", ...CORS_HEADERS },
+        });
+      }
     }
 
     // API routes

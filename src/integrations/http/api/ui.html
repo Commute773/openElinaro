@@ -724,19 +724,6 @@ function makeBadAppleScreen() {
     if (badAppleVideo) { badAppleVideo.pause(); }
   }
 
-  function promptForFile() {
-    return new Promise(resolve => {
-      const inp = document.createElement('input');
-      inp.type = 'file';
-      inp.accept = 'video/*';
-      inp.onchange = () => {
-        if (inp.files[0]) resolve(URL.createObjectURL(inp.files[0]));
-        else resolve(null);
-      };
-      inp.click();
-    });
-  }
-
   const screen = {
     title: 'Bad Apple!!',
     lines: [],
@@ -746,15 +733,11 @@ function makeBadAppleScreen() {
       const v = ensureVideo();
 
       if (!badAppleReady) {
-        // Show loading prompt
         clr();
-        txt('Select Bad Apple video file...', 20, H/2 - LH, 3);
+        txt('Loading Bad Apple...', 20, H/2 - LH, 3);
         blit();
 
-        const url = await promptForFile();
-        if (!url) { popScreen(); return; }
-
-        v.src = url;
+        v.src = '/g2/bad-apple.mp4';
         badAppleReady = true;
 
         await new Promise((res, rej) => {
