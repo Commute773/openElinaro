@@ -33,6 +33,8 @@ export class AgentChatService {
       processJob: async (job) => {
         // Resolve the core early so we can check feature ownership
         const resolved = await this.deps.models.resolveModelForPurpose(job.execution.usagePurpose);
+        // Load the SDK session ID from the conversation for cross-turn continuity
+        const conversation = await this.deps.conversations.get(job.conversationKey);
         const core = this.deps.coreFactory({
           modelConfig: {
             providerId: resolved.selection.providerId,
@@ -41,6 +43,7 @@ export class AgentChatService {
             reasoning: resolved.selection.thinkingLevel,
             providerOptions: {
               sessionId: job.execution.providerSessionId ?? job.conversationKey,
+              sdkSessionId: conversation.sdkSessionId,
             },
             runtimeModel: resolved.runtimeModel,
           },

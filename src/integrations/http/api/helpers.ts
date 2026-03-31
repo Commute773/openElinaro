@@ -1,6 +1,10 @@
 import { telemetry } from "../../../services/infrastructure/telemetry";
 
-export const apiTelemetry = telemetry.child({ component: "http_api" });
+let _apiTelemetry: ReturnType<typeof telemetry.child> | undefined;
+export function getApiTelemetry() {
+  _apiTelemetry ??= telemetry.child({ component: "http_api" });
+  return _apiTelemetry;
+}
 
 export const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",

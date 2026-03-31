@@ -1,15 +1,23 @@
 import { test, expect, mock } from "bun:test";
 
+const sharedMockTelemetry: Record<string, unknown> = {
+  recordError: mock(() => {}),
+  event: mock(() => {}),
+  span: mock((_op: string, _attrs: unknown, fn?: () => unknown) => {
+    const f = typeof _attrs === "function" ? _attrs : fn;
+    return f ? f() : undefined;
+  }),
+  run: mock((_ctx: unknown, fn: () => unknown) => fn()),
+  instrumentMethods: mock((target: unknown) => target),
+};
+sharedMockTelemetry.child = mock(() => sharedMockTelemetry);
 mock.module("../services/infrastructure/telemetry", () => ({
-  telemetry: {
-    recordError: mock(() => {}),
-    event: mock(() => {}),
-  },
+  telemetry: sharedMockTelemetry,
+  TelemetryService: class {},
 }));
 
 const { ok, fail, tryCatch, tryCatchAsync, attempt, attemptAsync, attemptOr, attemptOrAsync, fireAndForget, unwrap, unwrapOr, mapResult } = await import("./result");
-const { telemetry } = await import("../services/infrastructure/telemetry");
-const recordErrorMock = telemetry.recordError as ReturnType<typeof mock>;
+const recordErrorMock = sharedMockTelemetry.recordError as ReturnType<typeof mock>;
 
 test("ok() creates success result", () => {
   const result = ok(42);

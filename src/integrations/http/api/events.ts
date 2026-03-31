@@ -1,6 +1,6 @@
 import type { OpenElinaroApp } from "../../../app/runtime";
 import type { RouteDefinition } from "./router";
-import { CORS_HEADERS, apiTelemetry } from "./helpers";
+import { CORS_HEADERS, getApiTelemetry } from "./helpers";
 import { attempt } from "../../../utils/result";
 
 const SSE_HEADERS: Record<string, string> = {
@@ -50,7 +50,7 @@ function createEventStream(app: OpenElinaroApp, request: Request): Response {
             controller.enqueue(evt);
           }
         } catch (err) {
-          apiTelemetry.recordError(err, { operation: "api.events.poll" });
+          getApiTelemetry().recordError(err, { operation: "api.events.poll" });
         }
       }, POLL_INTERVAL_MS);
 

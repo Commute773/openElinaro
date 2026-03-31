@@ -15,8 +15,16 @@ import { TOOL_CALL_BEHAVIOR_SCHEMA } from "./tool-output-pipeline";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { telemetry } from "../services/infrastructure/telemetry";
 
-const fnTelemetry = telemetry.child({ component: "function" });
-const traceSpan = createTraceSpan(fnTelemetry);
+let _fnTelemetry: typeof telemetry | undefined;
+function getFnTelemetry() {
+  _fnTelemetry ??= telemetry.child({ component: "function" });
+  return _fnTelemetry;
+}
+let _traceSpan: ReturnType<typeof createTraceSpan> | undefined;
+function getTraceSpan() {
+  _traceSpan ??= createTraceSpan(getFnTelemetry());
+  return _traceSpan;
+}
 
 /**
  * Optional extras that ToolRegistry injects into FunctionContext at call time.
@@ -90,7 +98,7 @@ export function generateAgentTool(
       zodSchema: schema,
     },
     handler: async (input: Record<string, unknown>): Promise<ToolRawResult> => {
-      return traceSpan(`tool.${def.name}`, async () => {
+      return getTraceSpan()(`tool.${def.name}`, async () => {
         const extras = resolveExtras?.() ?? {};
         const toolContext = resolveToolContext?.();
         const ctx: FunctionContext = {

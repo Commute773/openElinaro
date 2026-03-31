@@ -11,7 +11,7 @@ import {
   getUniversalSystemPromptRoot,
   getUserSystemPromptRoot,
 } from "./runtime-user-content";
-import { resolveRuntimePath } from "./runtime-root";
+import { getRuntimeRootDir, getServiceRootDir, getUserDataRootDir, resolveRuntimePath } from "./runtime-root";
 import { timestamp } from "../utils/timestamp";
 import { attemptOrAsync } from "../utils/result";
 
@@ -101,6 +101,42 @@ const FEATURE_TOOL_LIBRARY: Record<FeatureId, string> = {
   zigbee2mqtt: "lights",
 };
 
+function buildEnvironmentSection() {
+  const userDataDir = getUserDataRootDir();
+  const runtimeRootDir = getRuntimeRootDir();
+  const serviceRootDir = getServiceRootDir();
+  const isManagedService = Boolean(process.env.OPENELINARO_SERVICE_ROOT_DIR?.trim());
+  const serviceIsSameAsCodebase = path.resolve(serviceRootDir) === path.resolve(runtimeRootDir);
+
+  const lines = [
+    "## Environment",
+    "",
+    `**Workspace** (\`${userDataDir}\`): All mutable state — config, memory, conversations, auth, projects, routines, logs. This is where you live. Read from and write to paths here for anything that persists across conversations.`,
+    "",
+    `**Codebase** (\`${runtimeRootDir}\`): The source repository that defines the runtime — \`src/\`, \`system_prompt/\`, \`profiles/\`, \`projects/\` (bundled defaults). System prompt files, tool definitions, domain logic, and platform docs all live here.`,
+    "",
+  ];
+
+  if (serviceIsSameAsCodebase) {
+    lines.push(
+      `**Deployed service**: Running directly from the codebase. Code changes here take effect on restart.`,
+    );
+  } else {
+    lines.push(
+      `**Deployed service** (\`${serviceRootDir}\`): The installed/deployed copy of the runtime that is actually executing. This is separate from the codebase — changes to the codebase do not affect the running service until explicitly deployed via \`/update\`.`,
+    );
+  }
+
+  if (isManagedService) {
+    lines.push(
+      "",
+      "This is a managed deployment. The codebase is the development checkout; the service root is the deployed release. Use `service_version` to check deployed state.",
+    );
+  }
+
+  return lines.join("\n");
+}
+
 function buildRuntimeOverviewPrompt() {
   const config = getRuntimeConfig();
   const featureConfig = new FeatureConfigService();
@@ -121,6 +157,8 @@ function buildRuntimeOverviewPrompt() {
   });
 
   return [
+    buildEnvironmentSection(),
+    "",
     "## Runtime",
     "Runtime: OpenElinaro local-first agent runtime.",
     `Core toggles: ${coreToggles}.`,
