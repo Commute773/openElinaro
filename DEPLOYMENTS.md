@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.03.31.6
+- Released at: 2026-03-31T01:25:21Z
+- Release id: 20260331T012521Z-e37fb76
+- Previous version: 2026.03.31.5
+- Trigger: ci/release workflow
+
+- fix: add missing utils/result.ts to repo
+- debug: add pre_core_run telemetry event to trace the hang point
+
 ## 2026.03.31.5
 - Released at: 2026-03-31T01:17:52Z
 - Release id: 20260331T011752Z-e7e07c5
