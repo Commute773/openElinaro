@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.8
+- Released at: 2026-03-31T01:33:39Z
+- Release id: 20260331T013339Z-8249016
+- Previous version: 2026.03.31.7
+- Trigger: ci/release workflow
+
+- fix: add PATH to launchd service env, remove debug logging
+
 ## 2026.03.31.7
 - Released at: 2026-03-31T01:27:06Z
 - Release id: 20260331T012706Z-61e48a8
