@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.7
+- Released at: 2026-03-31T01:27:06Z
+- Release id: 20260331T012706Z-61e48a8
+- Previous version: 2026.03.31.6
+- Trigger: ci/release workflow
+
+- enforce typed error handling: every catch must log or use Result utilities
+
 ## 2026.03.31.6
 - Released at: 2026-03-31T01:25:21Z
 - Release id: 20260331T012521Z-e37fb76
