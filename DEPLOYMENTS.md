@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31
+- Released at: 2026-03-31T00:28:56Z
+- Release id: 20260331T002856Z-d7b8b28
+- Previous version: 2026.03.30.27
+- Trigger: ci/release workflow
+
+- fix: use CLAUDE_CODE_OAUTH_TOKEN for setup tokens in Claude SDK core (#246)
+
 ## 2026.03.30.27
 - Released at: 2026-03-30T23:52:31Z
 - Release id: 20260330T235231Z-cd0590d
