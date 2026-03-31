@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.22
+- Released at: 2026-03-31T19:52:41Z
+- Release id: 20260331T195241Z-a6cda08
+- Previous version: 2026.03.31.21
+- Trigger: ci/release workflow
+
+- feat: serve Bad Apple video from ~/.openelinaro, auto-load in G2
+
 ## 2026.03.31.21
 - Released at: 2026-03-31T19:46:51Z
 - Release id: 20260331T194651Z-90ff0f2
