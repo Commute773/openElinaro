@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.23
+- Released at: 2026-03-31T19:57:40Z
+- Release id: 20260331T195740Z-e93a7b8
+- Previous version: 2026.03.31.22
+- Trigger: ci/release workflow
+
+- feat: Floyd-Steinberg dithering for video player, add Nyan Cat
+
 ## 2026.03.31.22
 - Released at: 2026-03-31T19:52:41Z
 - Release id: 20260331T195241Z-a6cda08
