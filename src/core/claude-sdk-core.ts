@@ -15,7 +15,6 @@ import {
   type HookCallback,
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { telemetry } from "../services/infrastructure/telemetry";
 import type {
   AgentCore,
   CoreManifest,
@@ -216,15 +215,8 @@ export class ClaudeSdkCore implements AgentCore {
     const onLog = options.onLog;
 
     const FIRST_MESSAGE_TIMEOUT_MS = 120_000;
-    telemetry.event("claude_sdk.query_start", {
-      model: sdkOptions.model,
-      promptPrefix: prompt.slice(0, 80),
-      hasOAuth: !!sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN,
-      hasApiKey: !!sdkOptions.env?.ANTHROPIC_API_KEY,
-    });
     const queryStream = query({ prompt, options: sdkOptions });
     let receivedFirstMessage = false;
-    telemetry.event("claude_sdk.stream_created", {});
 
     const firstMessageTimer = setTimeout(() => {
       if (!receivedFirstMessage && !signal?.aborted) {

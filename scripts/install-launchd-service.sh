@@ -25,8 +25,15 @@ for _ in {1..50}; do
   sleep 0.1
 done
 
+SERVICE_PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$(dirname "${BUN_BIN}"):$(dirname "${NODE_BIN}")"
+# Add homebrew paths if present (macOS)
+for dir in /opt/homebrew/bin /opt/homebrew/sbin; do
+  [ -d "${dir}" ] && SERVICE_PATH="${dir}:${SERVICE_PATH}"
+done
+
 launchctl submit -l "${LABEL}" -- \
   /usr/bin/env \
+  "PATH=${SERVICE_PATH}" \
   "OPENELINARO_ROOT_DIR=${ROOT_DIR}" \
   "OPENELINARO_SERVICE_ROOT_DIR=${SERVICE_ROOT_DIR}" \
   "OPENELINARO_SERVICE_LABEL=${LABEL}" \

@@ -153,12 +153,6 @@ export class ChatTurnRunner {
           ];
 
         try {
-          agentChatTelemetry.event("agent_chat.pre_core_run", {
-            conversationKey: job.conversationKey,
-            coreId: core.manifest.id,
-            inputMessageCount: inputMessages.length,
-            toolCount: coreToolDefs.length,
-          }, { level: "debug" });
           const result = await this.sessionManager.runAbortableModelCall(session, (signal) =>
             core.run({
               systemPrompt: systemPrompt.text,
