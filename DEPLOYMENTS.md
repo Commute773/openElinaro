@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.19
+- Released at: 2026-03-31T19:31:41Z
+- Release id: 20260331T193141Z-3114359
+- Previous version: 2026.03.31.18
+- Trigger: ci/release workflow
+
+- feat: reduce G2 palette to 4 green levels and add Bad Apple animation
+
 ## 2026.03.31.18
 - Released at: 2026-03-31T19:29:49Z
 - Release id: 20260331T192949Z-25144dd
