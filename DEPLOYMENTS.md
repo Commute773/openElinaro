@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.14
+- Released at: 2026-03-31T17:58:23Z
+- Release id: 20260331T175823Z-6e22fdd
+- Previous version: 2026.03.31.13
+- Trigger: ci/release workflow
+
+- feat: structured agent stream events and G2 agent chat UI
+
 ## 2026.03.31.13
 - Released at: 2026-03-31T17:32:32Z
 - Release id: 20260331T173232Z-4ad7501
