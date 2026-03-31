@@ -393,15 +393,8 @@ function render() {
     return;
   }
 
-  // Title bar (menu screens only)
-  rect(0, 0, W, TH, 4);
-  txt(screen.title, pad, 0, 15);
-  const ts = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  txt(ts, W - ts.length * font.charWidth - pad, 0, 7);
-
-  const contentStart = TH + 1;
-  hline(TH, 3);
-  const contentLines = maxLines - 1;
+  const contentStart = 0;
+  const contentLines = maxLines;
 
   // ── Standard menu rendering ──
   const items = screen.lines || [];
@@ -705,6 +698,7 @@ function makeHomeScreen() {
     { text: 'Finance',       screen: () => makeApiScreen('Finance', '/api/finance/summary') },
     { text: 'Projects',      screen: () => makeApiScreen('Projects', '/api/projects') },
     { text: 'Todos',         screen: () => makeTodosScreen() },
+    { text: 'Settings',      screen: () => makeSettingsScreen() },
   ];
 
   return {
@@ -816,6 +810,35 @@ function makeTodosScreen() {
     },
   });
   return screen;
+}
+
+// ── Settings Screen ─────────────────────────────────────────────────
+function makeSettingsScreen() {
+  const sizes = [9, 18, 32, 36, 48];
+  return {
+    title: 'Settings',
+    lines: sizes.map(s => ({
+      text: `Line height: ${s}px` + (s === LH ? '  *' : ''),
+      color: s === LH ? 15 : 10,
+      _size: s,
+    })),
+    cursor: sizes.indexOf(LH),
+    scroll: 0,
+    onPress(idx) {
+      const item = this.lines[idx];
+      if (!item?._size) return;
+      LH = item._size;
+      buildFont(LH);
+      this.lines = sizes.map(s => ({
+        text: `Line height: ${s}px` + (s === LH ? '  *' : ''),
+        color: s === LH ? 15 : 10,
+        _size: s,
+      }));
+      this.cursor = idx;
+      render();
+    },
+    onLongPress: popScreen,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
