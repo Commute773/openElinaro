@@ -243,6 +243,12 @@ export class ClaudeSdkCore implements AgentCore {
     const onLog = options.onLog;
 
     const FIRST_MESSAGE_TIMEOUT_MS = 120_000;
+
+    // Helper to emit progress without blocking the stream
+    const progress = onProgress
+      ? (event: AgentStreamEvent) => { void attemptOrAsync(() => onProgress(event), undefined); }
+      : undefined;
+
     const queryStream = query({ prompt, options: sdkOptions });
     let receivedFirstMessage = false;
 
@@ -254,11 +260,7 @@ export class ClaudeSdkCore implements AgentCore {
       }
     }, FIRST_MESSAGE_TIMEOUT_MS);
 
-    // Helper to emit progress without blocking the stream
-    const progress = onProgress
-      ? (event: AgentStreamEvent) => { void attemptOrAsync(() => onProgress(event), undefined); }
-      : undefined;
-
+    try {
     try {
     for await (const message of queryStream) {
       receivedFirstMessage = true;
@@ -474,6 +476,17 @@ export class ClaudeSdkCore implements AgentCore {
         onLog?.("sdk_prompt_suggestion", { suggestion });
       }
     }
+    } catch (err: unknown) {
+      // If we haven't received any messages yet and this looks like a stale session error,
+      // drop the resume option and retry with a fresh SDK session.
+      if (!receivedFirstMessage && this.config.resumeSessionId && isStaleSessionError(err)) {
+        onLog?.("sdk_stale_session_retry", { resumeSessionId: this.config.resumeSessionId, error: String(err) });
+        progress?.({ type: "status", message: "Session expired, starting fresh" });
+        const freshCore = new ClaudeSdkCore({ ...this.config, resumeSessionId: undefined });
+        return freshCore.run(options);
+      }
+      throw err;
+    }
     } finally {
       clearTimeout(firstMessageTimer);
     }
@@ -604,6 +617,12 @@ function mergeUsage(a: CoreUsage, b: CoreUsage): CoreUsage {
       total: a.cost.total + b.cost.total,
     },
   };
+}
+
+/** Detect errors from the SDK indicating a stale/expired session ID. */
+function isStaleSessionError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /no conversation found|session.*not found|invalid.*session/i.test(msg);
 }
 
 function abortControllerFromSignal(signal: AbortSignal): AbortController {
