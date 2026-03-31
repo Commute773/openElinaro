@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.9
+- Released at: 2026-03-31T01:51:05Z
+- Release id: 20260331T015105Z-b2fa67f
+- Previous version: 2026.03.31.8
+- Trigger: ci/release workflow
+
+- fix: clean up operating model, clarify tool surfaces (#249)
+
 ## 2026.03.31.8
 - Released at: 2026-03-31T01:33:39Z
 - Release id: 20260331T013339Z-8249016
