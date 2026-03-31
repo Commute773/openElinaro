@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import type { AppProgressEvent, AppProgressUpdate } from "../domain/assistant";
+import type { AppProgressEvent, AppResponseAttachment } from "../domain/assistant";
 import { buildToolErrorEnvelope } from "../services/tool-error-service";
 import {
   MissingSecretStoreKeyError,
@@ -239,7 +239,7 @@ export function formatToolUseSummary(name: string, input: unknown): string {
   return `tool: \`${name}\` ${details.join(" ")}${overflow}`;
 }
 
-export function buildOpenBrowserProgressUpdates(result: unknown): AppProgressUpdate[] {
+export function buildOpenBrowserProgressUpdates(result: unknown): AppProgressEvent[] {
   if (!result || typeof result !== "object" || Array.isArray(result)) {
     return [];
   }
@@ -249,7 +249,7 @@ export function buildOpenBrowserProgressUpdates(result: unknown): AppProgressUpd
     return [];
   }
 
-  return stepResults.flatMap((entry) => {
+  return stepResults.flatMap((entry): AppProgressEvent[] => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       return [];
     }
@@ -264,6 +264,7 @@ export function buildOpenBrowserProgressUpdates(result: unknown): AppProgressUpd
     const type = typeof step.type === "string" ? step.type : "step";
     const detail = typeof step.detail === "string" ? truncateToolSummaryText(step.detail, 180) : undefined;
     return [{
+      type: "progress",
       message: [
         `openbrowser state after action ${index} (${type})`,
         detail,
@@ -344,8 +345,12 @@ export async function notifyToolUse(context: ToolContext | undefined, name: stri
     return;
   }
 
+  const args = stripToolControlInput(input);
+  const argsObj = args && typeof args === "object" && !Array.isArray(args)
+    ? args as Record<string, unknown>
+    : undefined;
   await attemptOrAsync(
-    () => context.onToolUse!(formatToolUseSummary(name, stripToolControlInput(input))),
+    () => context.onToolUse!({ type: "tool_start", name, args: argsObj }),
     undefined,
   );
 }
@@ -384,5 +389,5 @@ export async function reportProgress(context: ToolContext | undefined, summary: 
     return;
   }
 
-  await attemptOrAsync(() => context.onToolUse!(summary), undefined);
+  await attemptOrAsync(() => context.onToolUse!({ type: "progress", message: summary }), undefined);
 }

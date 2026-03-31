@@ -20,6 +20,7 @@ const spec = {
     "/api/health": { get: { operationId: "api_health", summary: "Health", tags: ["dashboard"] } },
     "/api/projects": { get: { operationId: "api_projects", summary: "Projects", tags: ["dashboard"] } },
     "/api/finance/summary": { get: { operationId: "finance_summary", summary: "Finance summary", tags: ["finance"] } },
+    "/api/chat/stream": { post: { operationId: "chat_stream", summary: "Streaming chat", tags: ["chat"] } },
   },
 };
 
@@ -74,15 +75,49 @@ const mockData: Record<string, unknown> = {
   },
 };
 
+// Mock agent stream events for agent chat
+const mockChatEvents = [
+  { delay: 100, event: "thinking", data: { type: "thinking", text: "The user wants medication status. I should check the routines system for overdue med-type items..." } },
+  { delay: 200, event: "tool_start", data: { type: "tool_start", name: "routine_check", args: { kind: "med" } } },
+  { delay: 500, event: "tool_progress", data: { type: "tool_progress", name: "routine_check", elapsed: 1.2, message: "querying routines..." } },
+  { delay: 400, event: "tool_end", data: { type: "tool_end", name: "routine_check", isError: false, summary: "2 medications found, both overdue" } },
+  { delay: 100, event: "tool_summary", data: { type: "tool_summary", summary: "Estradiol Valerate (20h overdue), Retatrutide (20h overdue)" } },
+  { delay: 200, event: "text", data: { type: "text", text: "You have two medications that are significantly overdue:" } },
+  { delay: 50, event: "text", data: { type: "text", text: "1. Estradiol Valerate 6mg \u2014 20 hours overdue\n2. Retatrutide 4mg \u2014 20 hours overdue" } },
+  { delay: 50, event: "text", data: { type: "text", text: "I recommend taking both as soon as possible. The Estradiol is particularly important to stay on schedule with." } },
+  { delay: 100, event: "result", data: { type: "result", turns: 2, durationMs: 3200, costUsd: 0.0042 } },
+];
+
+function sseEvent(evt: string, data: unknown): string {
+  return `event: ${evt}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
 const server = Bun.serve({
   port: 0,
-  fetch(req) {
+  async fetch(req) {
     const url = new URL(req.url);
     if (url.pathname === "/g2" || url.pathname === "/") {
       return new Response(Bun.file(htmlPath), { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
     if (url.pathname === "/api/openapi.json") return Response.json(spec);
     if (url.pathname === "/api/events") return new Response("", { headers: { "Content-Type": "text/event-stream" } });
+
+    // Streaming chat endpoint mock
+    if (url.pathname === "/api/chat/stream" && req.method === "POST") {
+      const stream = new ReadableStream<string>({
+        async start(controller) {
+          for (const entry of mockChatEvents) {
+            await new Promise(r => setTimeout(r, entry.delay));
+            controller.enqueue(sseEvent(entry.event, entry.data));
+          }
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      });
+    }
+
     // Handle query params by matching base path
     const basePath = url.pathname.split("?")[0];
     const data = mockData[basePath] ?? mockData[url.pathname];
@@ -106,25 +141,48 @@ async function shot(name: string) {
 await page.goto(`${base}/g2`);
 await shot("home");
 
-// Navigate down to "Routines" and press
-for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowDown");
-// cursor should be on Routines
+// Cursor starts on first menu item (Agent Chat) — just press Enter
+await page.keyboard.press("Enter");
+await page.waitForTimeout(500);
+await shot("agent-chat-empty");
+
+// Send a message via page.evaluate (simulates voice input)
+await page.evaluate(() => {
+  (window as any).sendChatMessage("What medications am I overdue on?");
+});
+
+// Wait for mock stream to complete
+await page.waitForTimeout(3000);
+await shot("agent-chat");
+
+// Scroll up to see the top
+for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowUp");
+await shot("agent-chat-scrolled");
+
+// Go back to home
+await page.keyboard.press("Escape");
+await page.waitForTimeout(300);
+
+// Navigate to Routines (1 down from current cursor on Agent Chat)
+await page.keyboard.press("ArrowDown");
 await page.keyboard.press("Enter");
 await shot("routines");
 
-// Go back
+// Go back — cursor is now on Routines (index 6)
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
 
-// Navigate to Notifications
-for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowDown");
+// Navigate to Notifications (1 more down from Routines)
+await page.keyboard.press("ArrowDown");
 await page.keyboard.press("Enter");
 await shot("notifications");
 
-// Go back, navigate to Agents
+// Go back — cursor is now on Notifications (index 7)
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
-for (let i = 0; i < 7; i++) await page.keyboard.press("ArrowDown");
+
+// Navigate to Agents (1 more down from Notifications)
+await page.keyboard.press("ArrowDown");
 await page.keyboard.press("Enter");
 await shot("agents");
 

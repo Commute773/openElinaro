@@ -313,7 +313,7 @@ export class ChatTurnRunner {
     session.compacting = true;
     try {
       await job.onToolUse?.(
-        `Context usage reached ${effectiveUtilizationPercent}%. Compacting the conversation before continuing.`,
+        { type: "compaction", trigger: `usage_${effectiveUtilizationPercent}%` },
       );
       let compacted;
       try {
@@ -338,7 +338,7 @@ export class ChatTurnRunner {
           outcome: "error",
         });
         await job.onToolUse?.(
-          "Compaction failed. Continuing without compaction for this turn.",
+          { type: "status", message: "Compaction failed. Continuing without compaction for this turn." },
         );
         return;
       }
@@ -366,9 +366,9 @@ export class ChatTurnRunner {
         );
       }
       await job.onToolUse?.(
-        compacted.memoryFilePath
+        { type: "status", message: compacted.memoryFilePath
           ? `Compaction finished. Durable memory saved to ${compacted.memoryFilePath}.`
-          : "Compaction finished. No durable memory was extracted.",
+          : "Compaction finished. No durable memory was extracted." },
       );
     } finally {
       session.compacting = false;

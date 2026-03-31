@@ -13,6 +13,7 @@ import { ModelService } from "../models/model-service";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { attempt, tryCatchAsync } from "../../utils/result";
+import type { AppProgressEvent } from "../../domain/assistant";
 
 const COMPACTION_TAIL_MESSAGES = 4;
 const COMPACTION_MAX_TOKENS = 16_000;
@@ -283,14 +284,14 @@ export class ConversationCompactionService {
     conversationKey: string;
     systemPrompt: string;
     messages: Message[];
-    onProgress?: (message: string) => Promise<void>;
+    onProgress?: (event: AppProgressEvent) => Promise<void>;
     signal?: AbortSignal;
   }) {
     return traceSpan(
       "conversation.compact",
       async () => {
         await params.onProgress?.(
-          `Compacting conversation history for ${params.conversationKey} (${params.messages.length} messages).`,
+          { type: "compaction", trigger: `${params.messages.length}_messages` },
         );
         const resolved = await this.models.resolveModelForPurpose("conversation_compaction");
         const systemPrompt = [
@@ -353,7 +354,7 @@ export class ConversationCompactionService {
           }
         }
         if (memoryMarkdown) {
-          await params.onProgress?.("Merging durable memory into core memory.");
+          await params.onProgress?.({ type: "status", message: "Merging durable memory into core memory." });
         }
         const memoryFilePath = memoryMarkdown
           ? await this.mergeIntoCoreMemory({
@@ -363,7 +364,7 @@ export class ConversationCompactionService {
             })
           : null;
 
-        await params.onProgress?.("Compaction complete.");
+        await params.onProgress?.({ type: "status", message: "Compaction complete." });
 
         return {
           messages: [buildSummaryMessage(summary), ...keepRecentMessages(params.messages)],

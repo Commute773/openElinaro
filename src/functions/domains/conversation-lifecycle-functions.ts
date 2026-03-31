@@ -357,7 +357,10 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
 
       const compacted = await fnCtx.services.transitions.compactForContinuation({
         conversationKey,
-        onProgress: async (message: string) => report(fnCtx.toolContext, message, input),
+        onProgress: async (event) => {
+          const msg = "message" in event ? String((event as any).message) : event.type;
+          return report(fnCtx.toolContext, msg, input);
+        },
       });
 
       return [
@@ -482,7 +485,10 @@ export const buildConversationLifecycleFunctions: FunctionDomainBuilder = (_ctx)
       const freshConversation = await fnCtx.services.transitions.startFreshConversation({
         conversationKey,
         flushMemory,
-        onProgress: async (message: string) => report(context, message, input),
+        onProgress: async (event) => {
+          const msg = "message" in event ? String((event as any).message) : event.type;
+          return report(context, msg, input);
+        },
       });
 
       const resultMessage = [

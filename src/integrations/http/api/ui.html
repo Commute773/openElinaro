@@ -96,6 +96,12 @@ const PAL = Array.from({length:16},(_,i)=>{
 let LH = 16;                 // line height
 let screenStack = [];         // navigation stack
 
+// Agent chat state
+let chatBlocks = [];          // array of block objects
+let chatScroll = 0;           // scroll offset in flattened lines
+let chatAutoScroll = true;    // follow new content
+let chatAbort = null;         // AbortController for active stream
+
 // ═══════════════════════════════════════════════════════════════════════
 //  CRISP CANVAS — offscreen framebuffer + nearest-neighbor blit
 // ═══════════════════════════════════════════════════════════════════════
@@ -189,10 +195,37 @@ function render() {
   fc.font = `${LH}px 'SF Mono','Fira Code',monospace`;
   txt(ts, W - fc.measureText(ts).width - pad, 0, 7);
 
-  // Content area
   const contentStart = LH + 1;
   hline(LH, 3);
   const contentLines = maxLines - 1;
+
+  // ── Agent Chat rendering ──
+  if (screen.isChat) {
+    const flatLines = flattenChatBlocks();
+    // Auto-scroll to bottom
+    if (chatAutoScroll) {
+      chatScroll = Math.max(0, flatLines.length - contentLines);
+    }
+    for (let i = 0; i < contentLines; i++) {
+      const idx = chatScroll + i;
+      if (idx >= flatLines.length) break;
+      const y = contentStart + i * LH;
+      txt(clip(flatLines[idx], W - pad * 2), pad, y, 15);
+    }
+    // Scrollbar
+    if (flatLines.length > contentLines) {
+      const barH = Math.max(8, (contentLines / flatLines.length) * (H - contentStart));
+      const barY = contentStart + (chatScroll / flatLines.length) * (H - contentStart);
+      fc.fillStyle = col(15);
+      fc.fillRect(W - 3, barY, 2, barH);
+    }
+    blit();
+    document.getElementById('info').textContent =
+      `${flatLines.length} lines | ${LH}px | Agent Chat | ${(performance.now()-t0).toFixed(1)}ms`;
+    return;
+  }
+
+  // ── Standard menu rendering ──
   const items = screen.lines || [];
   const cursor = screen.cursor ?? -1;
   const scrollOffset = screen.scroll ?? 0;
@@ -263,6 +296,29 @@ function input(action) {
   const s = currentScreen();
   if (!s) return;
 
+  // Agent chat mode has different navigation
+  if (s.isChat) {
+    const flatLines = flattenChatBlocks();
+    const contentLines = Math.floor(H / LH) - 1;
+    if (action === 'up') {
+      if (chatScroll > 0) { chatScroll--; chatAutoScroll = false; render(); }
+    } else if (action === 'down') {
+      if (chatScroll < Math.max(0, flatLines.length - contentLines)) {
+        chatScroll++;
+        if (chatScroll >= flatLines.length - contentLines) chatAutoScroll = true;
+        render();
+      }
+    } else if (action === 'press') {
+      startVoice();
+    } else if (action === 'longpress') {
+      if (chatAbort) { chatAbort.abort(); chatAbort = null; }
+      popScreen();
+    } else if (action === 'voice') {
+      startVoice();
+    }
+    return;
+  }
+
   if (action === 'up') {
     if (s.cursor > 0) { s.cursor--; scrollToCursor(s); render(); }
   } else if (action === 'down') {
@@ -286,6 +342,9 @@ document.addEventListener('keydown', (e) => {
     case 'Enter': case ' ': e.preventDefault(); input('press'); break;
     case 'Escape': case 'Backspace': e.preventDefault(); input('longpress'); break;
     case 'v': case 'V': e.preventDefault(); input('voice'); break;
+    case 't': case 'T': e.preventDefault();
+      if (!currentScreen()?.isChat) pushScreen(makeAgentChatScreen());
+      break;
   }
 });
 
@@ -329,6 +388,13 @@ function stopVoice() {
 }
 
 async function handleVoiceInput(text) {
+  // Route to agent chat if on that screen
+  const s = currentScreen();
+  if (s?.isChat) {
+    sendChatMessage(text);
+    return;
+  }
+
   showMessage(`"${text}" — asking...`);
   try {
     const res = await fetch('/api/ask', {
@@ -439,6 +505,7 @@ function makeApiScreen(title, path, opts = {}) {
 // ── Home Screen ──────────────────────────────────────────────────────
 function makeHomeScreen() {
   const menuItems = [
+    { text: 'Agent Chat',    screen: () => makeAgentChatScreen() },
     { text: 'Routines',      screen: () => makeRoutinesScreen() },
     { text: 'Notifications', screen: () => makeNotificationsScreen() },
     { text: 'Agents',        screen: () => makeAgentsScreen() },
@@ -558,6 +625,226 @@ function makeTodosScreen() {
     },
   });
   return screen;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  AGENT CHAT
+// ═══════════════════════════════════════════════════════════════════════
+
+function makeAgentChatScreen() {
+  return {
+    title: 'Agent Chat',
+    lines: [],
+    cursor: -1,
+    scroll: 0,
+    isChat: true,
+    init() {
+      chatBlocks = [];
+      chatScroll = 0;
+      chatAutoScroll = true;
+      if (chatAbort) { chatAbort.abort(); chatAbort = null; }
+      chatBlocks.push({ type: 'status', text: 'Press or speak to ask something' });
+      render();
+    },
+    onLongPress() {
+      if (chatAbort) { chatAbort.abort(); chatAbort = null; }
+      popScreen();
+    },
+  };
+}
+
+/** Word-wrap text to fit within maxW pixels */
+function wordWrap(text, maxW) {
+  fc.font = `${LH}px 'SF Mono','Fira Code',monospace`;
+  const results = [];
+  for (const rawLine of text.split('\n')) {
+    if (!rawLine) { results.push(''); continue; }
+    const words = rawLine.split(' ');
+    let current = '';
+    for (const word of words) {
+      const test = current ? current + ' ' + word : word;
+      if (fc.measureText(test).width > maxW && current) {
+        results.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) results.push(current);
+  }
+  return results;
+}
+
+/** Convert chat blocks to flat display lines */
+function flattenChatBlocks() {
+  const pad = 4;
+  const maxW = W - pad * 2;
+  const lines = [];
+  for (const block of chatBlocks) {
+    switch (block.type) {
+      case 'user':
+        for (const l of wordWrap('> ' + block.text, maxW)) lines.push(l);
+        lines.push('');
+        break;
+      case 'thinking': {
+        const preview = block.text.length > 80 ? block.text.slice(0, 80) + '...' : block.text;
+        lines.push('  ' + preview);
+        break;
+      }
+      case 'tool': {
+        const state = block.state === 'running' ? 'running'
+          : block.state === 'failed' ? 'failed'
+          : block.elapsed ? block.elapsed : 'done';
+        lines.push('  \u25B6 ' + block.name + ' (' + state + ')');
+        for (const l of block.lines) {
+          lines.push('    ' + l);
+        }
+        break;
+      }
+      case 'text':
+        for (const l of wordWrap(block.text, maxW - 12)) {
+          lines.push('  ' + l);
+        }
+        break;
+      case 'divider':
+        lines.push('\u2500\u2500 ' + block.text + ' \u2500\u2500');
+        break;
+      case 'status':
+        lines.push('  ' + block.text);
+        break;
+    }
+  }
+  return lines;
+}
+
+/** Find the active (running) tool block, if any */
+function findActiveToolBlock(name) {
+  for (let i = chatBlocks.length - 1; i >= 0; i--) {
+    if (chatBlocks[i].type === 'tool' && chatBlocks[i].name === name && chatBlocks[i].state === 'running') {
+      return chatBlocks[i];
+    }
+  }
+  return null;
+}
+
+/** Handle a single SSE event from the agent stream */
+function handleStreamEvent(event) {
+  switch (event.type) {
+    case 'thinking':
+      chatBlocks.push({ type: 'thinking', text: event.text });
+      break;
+    case 'tool_start':
+      chatBlocks.push({ type: 'tool', name: event.name, state: 'running', elapsed: null, lines: ['starting...'] });
+      break;
+    case 'tool_progress': {
+      const tool = findActiveToolBlock(event.name);
+      if (tool) {
+        tool.elapsed = event.elapsed ? event.elapsed.toFixed(1) + 's' : null;
+        tool.lines = [event.message || ('running... (' + (event.elapsed?.toFixed(0) ?? '?') + 's)')];
+      }
+      break;
+    }
+    case 'tool_end': {
+      const tool = findActiveToolBlock(event.name);
+      if (tool) {
+        tool.state = event.isError ? 'failed' : 'done';
+        tool.lines = [event.isError ? (event.error || 'failed') : (event.summary || 'done')];
+      }
+      break;
+    }
+    case 'tool_summary': {
+      // Update the most recent tool block's summary line
+      for (let i = chatBlocks.length - 1; i >= 0; i--) {
+        if (chatBlocks[i].type === 'tool') {
+          chatBlocks[i].lines = [event.summary];
+          break;
+        }
+      }
+      break;
+    }
+    case 'text':
+      chatBlocks.push({ type: 'text', text: event.text });
+      break;
+    case 'agent_init':
+      chatBlocks.push({ type: 'status', text: 'Agent: ' + (event.model || 'unknown') + ', ' + (event.toolCount || 0) + ' tools' });
+      break;
+    case 'compaction':
+      chatBlocks.push({ type: 'status', text: 'Compacting...' });
+      break;
+    case 'result':
+      chatBlocks.push({ type: 'divider', text: event.turns + ' turns, ' + (event.durationMs / 1000).toFixed(1) + 's, $' + event.costUsd.toFixed(4) });
+      break;
+    case 'error':
+      chatBlocks.push({ type: 'status', text: '[ERR] ' + event.message });
+      break;
+    case 'status':
+      chatBlocks.push({ type: 'status', text: event.message });
+      break;
+    case 'progress':
+      chatBlocks.push({ type: 'status', text: event.message });
+      break;
+  }
+  render();
+}
+
+/** Send a message to the agent via the streaming endpoint */
+async function sendChatMessage(text) {
+  // Add user message block
+  chatBlocks.push({ type: 'user', text });
+  chatAutoScroll = true;
+  render();
+
+  // Abort any previous stream
+  if (chatAbort) { chatAbort.abort(); chatAbort = null; }
+  chatAbort = new AbortController();
+
+  try {
+    const res = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: chatAbort.signal,
+    });
+
+    if (!res.ok) {
+      handleStreamEvent({ type: 'error', message: 'HTTP ' + res.status });
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE events from buffer
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop(); // keep incomplete chunk
+      for (const part of parts) {
+        if (!part.trim()) continue;
+        let eventType = 'message';
+        let data = '';
+        for (const line of part.split('\n')) {
+          if (line.startsWith('event: ')) eventType = line.slice(7);
+          else if (line.startsWith('data: ')) data = line.slice(6);
+        }
+        if (data) {
+          try {
+            handleStreamEvent(JSON.parse(data));
+          } catch {}
+        }
+      }
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      handleStreamEvent({ type: 'error', message: e.message });
+    }
+  } finally {
+    chatAbort = null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════

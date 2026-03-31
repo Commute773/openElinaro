@@ -54,7 +54,7 @@ export {
   deferInteractionReply,
   buildDiscordFiles,
   buildDiscordAttachmentFiles,
-  normalizeDiscordProgressUpdate,
+  formatStreamEventForDiscord,
   replyWithChunks,
   replyWithAppResponse,
   replyToMessageWithChunks,
@@ -77,7 +77,7 @@ import {
 } from "./message-handler";
 import {
   deferInteractionReply,
-  normalizeDiscordProgressUpdate,
+  formatStreamEventForDiscord,
   replyWithChunks,
   replyWithAppResponse,
   replyToMessageWithChunks,
@@ -305,7 +305,7 @@ export function createDiscordEventHandlers(params: {
             await replyToMessageWithAppResponse(message, queuedResponse);
           },
           onToolUse: async (event) => {
-            const update = normalizeDiscordProgressUpdate(event);
+            const update = formatStreamEventForDiscord(event);
             await replyToMessageWithChunks(message, update.message, {
               files: update.files,
             });
@@ -683,7 +683,7 @@ async function handleSlashCommand(params: {
           await replyWithAppResponse(interaction, queuedResponse);
         },
         onToolUse: async (event) => {
-          const update = normalizeDiscordProgressUpdate(event);
+          const update = formatStreamEventForDiscord(event);
           await replyWithChunks(interaction, update.message, {
             files: update.files,
           });
@@ -789,7 +789,7 @@ async function invokeDiscordToolAndReply(
   const response = await app.invokeRoutineTool(toolName, input, {
     conversationKey: getDiscordConversationKey(interaction),
     onToolUse: async (event) => {
-      const update = normalizeDiscordProgressUpdate(event);
+      const update = formatStreamEventForDiscord(event);
       await replyWithChunks(interaction, update.message, {
         files: update.files,
       });
