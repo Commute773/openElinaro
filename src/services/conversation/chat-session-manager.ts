@@ -9,6 +9,7 @@ import type {
 } from "./chat-types";
 import { combineQueuedChatContents } from "./chat-helpers";
 import { telemetry } from "../infrastructure/telemetry";
+import { attempt } from "../../utils/result";
 
 const QUEUED_WHILE_COMPACTING_MESSAGE = "message queued as we are currently compacting";
 const STEERING_ACCEPTED_MESSAGE = "message accepted and will steer the current agent at the next turn";
@@ -256,6 +257,19 @@ export class ChatSessionManager {
 
   canSteerActiveRun(session: ConversationSessionState) {
     return session.processing && !session.compacting && !session.stopRequested && session.activeJobKind === "chat";
+  }
+
+  /**
+   * Try to steer the active SDK session with an immediate-priority message.
+   * Returns true if the steering was delivered to the SDK, false if no live
+   * session is available (caller should fall back to pending steering).
+   */
+  steerActiveSession(session: ConversationSessionState, text: string): boolean {
+    if (!this.canSteerActiveRun(session)) return false;
+    const handle = session.sdkSessionHandle as { steer?: (text: string) => void; isAlive?: boolean } | undefined;
+    if (!handle || handle.isAlive === false || typeof handle.steer !== "function") return false;
+    const steerFn = handle.steer;
+    return attempt(() => { steerFn(text); return true; }).ok ? true : false;
   }
 
   enqueueBackgroundChatJob(

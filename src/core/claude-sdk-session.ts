@@ -58,6 +58,22 @@ export class ClaudeSdkSession {
   }
 
   /**
+   * Inject a steering message into the active session with immediate priority.
+   * The SDK will interrupt the current agent loop to process this message.
+   */
+  steer(text: string): void {
+    if (!this._alive) throw new Error("Session is closed");
+    const msg: SDKUserMessage = {
+      type: "user",
+      message: { role: "user", content: text },
+      parent_tool_use_id: null,
+      timestamp: new Date().toISOString(),
+      priority: "now",
+    };
+    this.channel.push(msg);
+  }
+
+  /**
    * Read the next message from the query stream.
    * Uses the raw iterator protocol so the generator stays alive between turns.
    * Returns `{ done: true }` when the query subprocess exits.

@@ -1,5 +1,6 @@
 import type { ChatPromptContent, AppProgressEvent } from "../../domain/assistant";
 import { coreOwnsFeature, featureIsShared } from "../../core/tool-split";
+import { chatPromptContentToString } from "./chat-helpers";
 
 import type {
   ChatReplyResult,
@@ -139,6 +140,15 @@ export class AgentChatService {
     }
 
     if (this.sessionManager.canSteerActiveRun(session)) {
+      // Try immediate SDK steering via priority message first
+      const steeringText = chatPromptContentToString(params.content);
+      if (steeringText && this.sessionManager.steerActiveSession(session, steeringText)) {
+        return {
+          mode: "accepted",
+          message: STEERING_ACCEPTED_MESSAGE,
+        };
+      }
+      // Fall back to pending steering for next turn
       session.pendingSteeringMessages.push({
         conversationKey: params.conversationKey,
         contextConversationKey: params.contextConversationKey,
