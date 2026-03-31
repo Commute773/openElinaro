@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.21
+- Released at: 2026-03-31T19:46:51Z
+- Release id: 20260331T194651Z-90ff0f2
+- Previous version: 2026.03.31.20
+- Trigger: ci/release workflow
+
+- feat: Bad Apple plays real video with audio in 4 green levels
+
 ## 2026.03.31.20
 - Released at: 2026-03-31T19:36:24Z
 - Release id: 20260331T193624Z-49c4a6b
