@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.29
+- Released at: 2026-03-31T23:49:39Z
+- Release id: 20260331T234939Z-e7a0a06
+- Previous version: 2026.03.31.28
+- Trigger: ci/release workflow
+
+- feat: G2 agent grouping, SDK steering, heartbeat suppression
+
 ## 2026.03.31.28
 - Released at: 2026-03-31T23:25:27Z
 - Release id: 20260331T232527Z-d9d74d0
