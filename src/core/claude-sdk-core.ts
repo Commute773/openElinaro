@@ -176,7 +176,14 @@ export class ClaudeSdkCore implements AgentCore {
       hooks: sdkHooks,
       ...(maxSteps ? { maxTurns: maxSteps } : {}),
       ...(this.config.apiKey
-        ? { env: { ...process.env, ANTHROPIC_API_KEY: this.config.apiKey } }
+        ? {
+            env: {
+              ...process.env,
+              ...(this.config.apiKey.startsWith("sk-ant-oat")
+                ? { CLAUDE_CODE_OAUTH_TOKEN: this.config.apiKey }
+                : { ANTHROPIC_API_KEY: this.config.apiKey }),
+            },
+          }
         : {}),
       ...(signal ? { abortController: abortControllerFromSignal(signal) } : {}),
     };
