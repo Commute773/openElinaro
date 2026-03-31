@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.17
+- Released at: 2026-03-31T19:13:43Z
+- Release id: 20260331T191343Z-ab90819
+- Previous version: 2026.03.31.16
+- Trigger: ci/release workflow
+
+- feat: hierarchical block UI with task nesting and state-based styling
+
 ## 2026.03.31.16
 - Released at: 2026-03-31T18:46:45Z
 - Release id: 20260331T184645Z-d812cba
