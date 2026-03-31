@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.20
+- Released at: 2026-03-31T19:36:24Z
+- Release id: 20260331T193624Z-49c4a6b
+- Previous version: 2026.03.31.19
+- Trigger: ci/release workflow
+
+- fix: auto-retry with fresh session when SDK session expires
+
 ## 2026.03.31.19
 - Released at: 2026-03-31T19:31:41Z
 - Release id: 20260331T193141Z-3114359
