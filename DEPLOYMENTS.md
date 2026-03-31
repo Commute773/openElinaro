@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.5
+- Released at: 2026-03-31T01:17:52Z
+- Release id: 20260331T011752Z-e7e07c5
+- Previous version: 2026.03.31.4
+- Trigger: ci/release workflow
+
+- debug: use telemetry events instead of console.error for SDK diagnostics
+
 ## 2026.03.31.4
 - Released at: 2026-03-31T01:12:00Z
 - Release id: 20260331T011200Z-1367e1e
