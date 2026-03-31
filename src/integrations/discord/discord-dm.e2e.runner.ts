@@ -100,7 +100,7 @@ function resolveTestPath(...segments: string[]) {
 function writeProfileRegistry(providerId: "openai-codex" | "claude") {
   const defaultModelId = providerId === "openai-codex"
     ? "gpt-5.4"
-    : "claude-opus-4-6-20260301";
+    : "claude-sonnet-4-5";
   fs.mkdirSync(resolveTestPath("profiles"), { recursive: true });
   fs.writeFileSync(
     resolveTestPath("profiles", "registry.json"),
@@ -211,12 +211,13 @@ async function main() {
   writeProjectRegistry();
   writeWorkspaceFixture();
 
-  // Detect which provider has valid auth
+  // Detect which provider has valid auth — prefer claude to exercise the
+  // OAuth setup-token → CLAUDE_CODE_OAUTH_TOKEN path that broke in production.
   authStoreModule = await importFresh("src/auth/store.ts");
-  const providerId = authStoreModule.hasProviderAuth("openai-codex", "root")
-    ? "openai-codex"
-    : authStoreModule.hasProviderAuth("claude", "root")
-      ? "claude"
+  const providerId = authStoreModule.hasProviderAuth("claude", "root")
+    ? "claude"
+    : authStoreModule.hasProviderAuth("openai-codex", "root")
+      ? "openai-codex"
       : null;
   if (!providerId) {
     throw new Error(
