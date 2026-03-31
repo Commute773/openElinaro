@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.3
+- Released at: 2026-03-31T00:54:00Z
+- Release id: 20260331T005400Z-f4045c0
+- Previous version: 2026.03.31.2
+- Trigger: ci/release workflow
+
+- fix: normalize model IDs for Agent SDK, add timeout, copy prod settings to e2e (#248)
+
 ## 2026.03.31.2
 - Released at: 2026-03-31T00:42:25Z
 - Release id: 20260331T004225Z-8d3300d
