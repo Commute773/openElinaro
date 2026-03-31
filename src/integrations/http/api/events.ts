@@ -31,17 +31,28 @@ function createEventStream(app: OpenElinaroApp, request: Request): Response {
 
   let pollTimer: ReturnType<typeof setInterval> | undefined;
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+  let unsubscribeBus: (() => void) | undefined;
   let cancelled = false;
 
   const teardown = () => {
     if (cancelled) return;
     cancelled = true;
+    unsubscribeBus?.();
     if (pollTimer) clearInterval(pollTimer);
     if (heartbeatTimer) clearInterval(heartbeatTimer);
   };
 
   const stream = new ReadableStream<string>({
     start(controller) {
+      // Subscribe to the agent event bus for cross-surface broadcasting
+      unsubscribeBus = app.getEventBus().subscribe((busEvent) => {
+        if (cancelled) return;
+        const result = busEvent.kind === "agent_stream"
+          ? attempt(() => controller.enqueue(sseEvent(busEvent.event.type, busEvent.event)))
+          : attempt(() => controller.enqueue(sseEvent("user_input", { text: busEvent.text, source: busEvent.source })));
+        if (!result.ok) teardown();
+      });
+
       pollTimer = setInterval(() => {
         if (cancelled) return;
         try {

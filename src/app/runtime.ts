@@ -1,4 +1,5 @@
 import type { AppProgressEvent, AppRequest, AppResponse } from "../domain/assistant";
+import { AgentEventBus } from "./agent-event-bus";
 import type { ProfileRecord } from "../domain/profiles";
 import { ConversationStore } from "../services/conversation/conversation-store";
 import { FinanceService } from "../services/finance-service";
@@ -78,6 +79,7 @@ export class OpenElinaroApp {
   private readonly activeProfile: ProfileRecord;
   private readonly scopes = new Map<string, RuntimeScope>();
   private readonly startedAt = Date.now();
+  readonly eventBus = new AgentEventBus();
   private instanceServer: InstanceSocketServer | null = null;
   private onCacheMissWarning?: (warning: CacheMissWarning) => Promise<void> | void;
   private onPromptDriftWarning?: (warning: InferencePromptDriftWarning) => Promise<void> | void;
@@ -436,6 +438,10 @@ export class OpenElinaroApp {
 
   stopConversation(conversationKey: string) {
     return this.getScope().chat.stopConversation(conversationKey);
+  }
+
+  getEventBus() {
+    return this.eventBus;
   }
 
   getNotificationTargetUserId() {
