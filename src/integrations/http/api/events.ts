@@ -47,6 +47,10 @@ function createEventStream(app: OpenElinaroApp, request: Request): Response {
       // Subscribe to the agent event bus for cross-surface broadcasting
       unsubscribeBus = app.getEventBus().subscribe((busEvent) => {
         if (cancelled) return;
+        // Suppress agent events from automation conversations (heartbeat, etc.)
+        if (busEvent.kind === "agent_stream" && busEvent.conversationKey && !busEvent.conversationKey.startsWith("main")) {
+          return;
+        }
         const result = busEvent.kind === "agent_stream"
           ? attempt(() => controller.enqueue(sseEvent(busEvent.event.type, busEvent.event)))
           : attempt(() => controller.enqueue(sseEvent("user_input", { text: busEvent.text, source: busEvent.source })));

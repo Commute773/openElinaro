@@ -2,7 +2,7 @@ import type { AgentStreamEvent } from "../domain/assistant";
 import { attempt } from "../utils/result";
 
 export type BusEvent =
-  | { kind: "agent_stream"; event: AgentStreamEvent }
+  | { kind: "agent_stream"; event: AgentStreamEvent; conversationKey?: string }
   | { kind: "user_input"; text: string; source: string };
 
 export type BusListener = (event: BusEvent) => void;

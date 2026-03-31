@@ -44,7 +44,7 @@ body { display:flex; flex-direction:column; }
 .bottombar { flex:0 0 auto; padding:2px 10px; background:var(--panel);
   border-top:1px solid var(--border); font-size:9px; color:var(--dimmer); display:flex; gap:12px; }
 
-.chat-input { position:absolute; bottom:0; left:0; width:100%;
+.chat-input { flex:0 0 auto; width:100%;
   background:rgba(0,10,0,0.95); border:none; border-top:1px solid var(--dimmer);
   color:var(--green); font-family:inherit; font-size:14px;
   padding:6px 8px; outline:none; display:none; }
@@ -67,8 +67,8 @@ body { display:flex; flex-direction:column; }
   <div class="sim-viewport" id="viewport">
     <div class="sim-frame" id="frame">
       <canvas id="display"></canvas>
-      <input type="text" class="chat-input" id="chatInput" placeholder="> type a message..." autocomplete="off">
     </div>
+    <input type="text" class="chat-input" id="chatInput" placeholder="> type a message..." autocomplete="off">
     <div class="sim-controls">
       <button onclick="input('up')" title="Swipe Up (↑)">▲</button>
       <button onclick="input('down')" title="Swipe Down (↓)">▼</button>
@@ -935,9 +935,26 @@ function flattenChatBlocks() {
         const icon = stateIcon(block.state);
         const time = block.elapsed ? ' (' + block.elapsed + ')' : '';
         pushWrapped(lines, icon + ' ' + (block.description || block.taskId) + time, '  ', maxW);
+        // Collect all child lines with | prefix
+        const childLines = [];
         for (const child of block.children) {
-          lines.push(toolLine(child, '    '));
-          if (child.summary) pushWrapped(lines, child.summary, '      ', maxW);
+          const cIcon = stateIcon(child.state);
+          const cTime = child.elapsed ? ' (' + child.elapsed + ')' : '';
+          childLines.push('  | ' + cIcon + ' ' + child.name + cTime);
+          if (child.summary) {
+            for (const l of wordWrap(child.summary, maxW - 6 * font.charWidth)) {
+              childLines.push('  |   ' + l);
+            }
+          }
+        }
+        // Show only the last 6 lines (most recent activity)
+        const MAX_AGENT_LINES = 6;
+        if (childLines.length > MAX_AGENT_LINES) {
+          const hidden = childLines.length - MAX_AGENT_LINES;
+          lines.push('  | ... (+' + hidden + ' hidden)');
+          for (const l of childLines.slice(-MAX_AGENT_LINES)) lines.push(l);
+        } else {
+          for (const l of childLines) lines.push(l);
         }
         break;
       }
