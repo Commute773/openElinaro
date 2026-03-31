@@ -15,6 +15,7 @@ import { buildCurrentLocalTimePrefix } from "../local-time-service";
 import { wrapInjectedMessage } from "../injected-message-service";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
+import { fireAndForget } from "../../utils/result";
 import { splitToolsForCore, coreOwnsFeature, featureIsShared } from "../../core/tool-split";
 import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS } from "../../config/service-constants";
 import type { AgentCore, CoreToolExecutor, CoreToolDefinition } from "../../core/types";
@@ -152,6 +153,12 @@ export class ChatTurnRunner {
           ];
 
         try {
+          agentChatTelemetry.event("agent_chat.pre_core_run", {
+            conversationKey: job.conversationKey,
+            coreId: core.manifest.id,
+            inputMessageCount: inputMessages.length,
+            toolCount: coreToolDefs.length,
+          }, { level: "debug" });
           const result = await this.sessionManager.runAbortableModelCall(session, (signal) =>
             core.run({
               systemPrompt: systemPrompt.text,
@@ -168,16 +175,14 @@ export class ChatTurnRunner {
                     conversationKey: job.conversationKey,
                   });
                   if (this.deps.structuredMemory) {
-                    this.deps.structuredMemory.processTranscript({
-                      transcript: summary,
-                      conversationKey: job.conversationKey,
-                      source: "compaction",
-                    }).catch((error) => {
-                      agentChatTelemetry.event("agent_chat.structured_memory.failed", {
+                    fireAndForget(
+                      () => this.deps.structuredMemory!.processTranscript({
+                        transcript: summary,
                         conversationKey: job.conversationKey,
-                        error: error instanceof Error ? error.message : String(error),
-                      }, { level: "warn", outcome: "error" });
-                    });
+                        source: "compaction",
+                      }),
+                      { operation: "agent_chat.structured_memory", conversationKey: job.conversationKey },
+                    );
                   }
                 },
                 onUsage: (usage) => {
@@ -350,16 +355,14 @@ export class ChatTurnRunner {
       });
       // Fire structured memory management in the background — never block the chat turn
       if (this.deps.structuredMemory) {
-        this.deps.structuredMemory.processTranscript({
-          transcript: compacted.summary,
-          conversationKey: job.conversationKey,
-          source: "compaction",
-        }).catch((error) => {
-          agentChatTelemetry.event("agent_chat.structured_memory.failed", {
+        fireAndForget(
+          () => this.deps.structuredMemory!.processTranscript({
+            transcript: compacted.summary,
             conversationKey: job.conversationKey,
-            error: error instanceof Error ? error.message : String(error),
-          }, { level: "warn", outcome: "error" });
-        });
+            source: "compaction",
+          }),
+          { operation: "agent_chat.structured_memory", conversationKey: job.conversationKey },
+        );
       }
       await job.onToolUse?.(
         compacted.memoryFilePath
