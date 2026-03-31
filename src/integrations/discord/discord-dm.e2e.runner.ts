@@ -97,33 +97,18 @@ function resolveTestPath(...segments: string[]) {
   return path.join(tempRoot, TEST_ROOT_NAME, ...segments);
 }
 
-function writeProfileRegistry(providerId: "openai-codex" | "claude") {
-  const defaultModelId = providerId === "openai-codex"
-    ? "gpt-5.4"
-    : "claude-sonnet-4-5";
-  fs.mkdirSync(resolveTestPath("profiles"), { recursive: true });
-  fs.writeFileSync(
-    resolveTestPath("profiles", "registry.json"),
-    `${JSON.stringify({
-      version: 1,
-      profiles: [
-        {
-          id: "root",
-          name: "Root",
-          roles: ["root"],
-          memoryNamespace: "root",
-          preferredProvider: providerId,
-          defaultModelId,
-          toolSummarizerProvider: providerId,
-          toolSummarizerModelId: defaultModelId,
-          subagentPreferredProvider: providerId,
-          subagentDefaultModelId: defaultModelId,
-          maxSubagentDepth: 0,
-        },
-      ],
-    }, null, 2)}\n`,
-    "utf8",
-  );
+function copyProdProfileAndModelState() {
+  // Copy the REAL profile registry and model-state.json from production so the
+  // test exercises the same provider, model, and settings as the deployed bot.
+  for (const file of ["profiles/registry.json", "model-state.json"]) {
+    const source = findFixtureFile(file);
+    if (!source) {
+      continue;
+    }
+    const destination = path.join(tempRoot, TEST_ROOT_NAME, file);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.copyFileSync(source, destination);
+  }
 }
 
 function writeProjectRegistry() {
@@ -211,21 +196,17 @@ async function main() {
   writeProjectRegistry();
   writeWorkspaceFixture();
 
-  // Detect which provider has valid auth — prefer claude to exercise the
-  // OAuth setup-token → CLAUDE_CODE_OAUTH_TOKEN path that broke in production.
+  // Copy the REAL production profile and model state so the test exercises the
+  // exact same provider + model as the deployed bot.
+  copyProdProfileAndModelState();
+
+  // Verify auth is available
   authStoreModule = await importFresh("src/auth/store.ts");
-  const providerId = authStoreModule.hasProviderAuth("claude", "root")
-    ? "claude"
-    : authStoreModule.hasProviderAuth("openai-codex", "root")
-      ? "openai-codex"
-      : null;
-  if (!providerId) {
+  if (!authStoreModule.hasProviderAuth("claude", "root") && !authStoreModule.hasProviderAuth("openai-codex", "root")) {
     throw new Error(
       "No root provider auth found. Ensure secret-store.json with valid credentials exists in ~/.openelinarotest/ or ~/.openelinaro/.",
     );
   }
-
-  writeProfileRegistry(providerId);
 
   // Fresh-import runtime modules that read OPENELINARO_ROOT_DIR at load time
   runtimeModule = await importFresh("src/app/runtime.ts");
