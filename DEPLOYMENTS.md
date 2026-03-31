@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.28
+- Released at: 2026-03-31T23:25:27Z
+- Release id: 20260331T232527Z-d9d74d0
+- Previous version: 2026.03.31.27
+- Trigger: ci/release workflow
+
+- feat: remove title bar, add Settings screen for font sizes (#265)
+
 ## 2026.03.31.27
 - Released at: 2026-03-31T23:10:47Z
 - Release id: 20260331T231047Z-b0b3c88
