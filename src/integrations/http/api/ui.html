@@ -122,21 +122,66 @@ const CHARS = (() => {
 
 let font = null; // { atlas, charWidth, tileH, charMap }
 
-function buildFont(fontSize) {
-  const family = "'SF Mono','Fira Code','Cascadia Code',monospace";
+const FONT_FAMILY = "'SF Mono','Fira Code','Cascadia Code',monospace";
+
+/** Measure the actual pixel tile height for a given CSS font size */
+function measureTileH(fontSize) {
   const tmp = document.createElement('canvas');
   const tctx = tmp.getContext('2d');
-  tctx.font = `${fontSize}px ${family}`;
+  tctx.font = `${fontSize}px ${FONT_FAMILY}`;
+  const cw = Math.ceil(tctx.measureText('M').width);
+  tmp.width = cw + 2;
+  tmp.height = fontSize * 3;
+  tctx.font = `${fontSize}px ${FONT_FAMILY}`;
+  tctx.textBaseline = 'alphabetic';
+  const bl = fontSize * 2;
+  let minY = tmp.height, maxY = 0;
+  for (const ch of CHARS) {
+    tctx.clearRect(0, 0, tmp.width, tmp.height);
+    tctx.fillStyle = '#fff';
+    tctx.fillText(ch, 0, bl);
+    const d = tctx.getImageData(0, 0, tmp.width, tmp.height).data;
+    for (let y = 0; y < tmp.height; y++) {
+      for (let x = 0; x < tmp.width; x++) {
+        if (d[(y * tmp.width + x) * 4 + 3] > 0) {
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+  }
+  return (minY > maxY) ? fontSize : maxY - minY + 1;
+}
+
+/** Find the CSS font size whose glyph pixels fit exactly in targetH */
+function findFontSize(targetH) {
+  let lo = 1, hi = targetH * 2, best = targetH;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const h = measureTileH(mid);
+    if (h <= targetH) { best = mid; lo = mid + 1; }
+    else { hi = mid - 1; }
+  }
+  return best;
+}
+
+/** Build the atlas for a target tile height */
+function buildFont(targetTileH) {
+  const fontSize = findFontSize(targetTileH);
+  const tileH = targetTileH; // exact requested height
+
+  const tmp = document.createElement('canvas');
+  const tctx = tmp.getContext('2d');
+  tctx.font = `${fontSize}px ${FONT_FAMILY}`;
   const charWidth = Math.ceil(tctx.measureText('M').width);
 
-  // Scan actual pixel bounds across all glyphs
+  // Measure actual glyph bounds for vertical centering in the tile
   tmp.width = charWidth + 2;
   tmp.height = fontSize * 3;
-  tctx.font = `${fontSize}px ${family}`;
+  tctx.font = `${fontSize}px ${FONT_FAMILY}`;
   tctx.textBaseline = 'alphabetic';
   const baseline = fontSize * 2;
   let minY = tmp.height, maxY = 0;
-
   for (const ch of CHARS) {
     tctx.clearRect(0, 0, tmp.width, tmp.height);
     tctx.fillStyle = '#fff';
@@ -151,24 +196,24 @@ function buildFont(fontSize) {
       }
     }
   }
-
-  if (minY > maxY) { minY = 0; maxY = fontSize; }
-  const tileH = maxY - minY + 1;
+  const glyphH = (minY > maxY) ? fontSize : maxY - minY + 1;
   const ascent = baseline - minY;
+  // Center glyphs vertically if they're shorter than the tile
+  const yOffset = Math.floor((tileH - glyphH) / 2);
 
   // Build atlas: 16 palette rows × CHARS.length columns
   const atlas = document.createElement('canvas');
   atlas.width = charWidth * CHARS.length;
   atlas.height = tileH * 16;
   const actx = atlas.getContext('2d');
-  actx.font = `${fontSize}px ${family}`;
+  actx.font = `${fontSize}px ${FONT_FAMILY}`;
   actx.textBaseline = 'alphabetic';
 
   for (let p = 0; p < 16; p++) {
     const [r, g, b] = PAL[p];
     actx.fillStyle = `rgb(${r},${g},${b})`;
     for (let i = 0; i < CHARS.length; i++) {
-      actx.fillText(CHARS[i], i * charWidth, p * tileH + ascent);
+      actx.fillText(CHARS[i], i * charWidth, p * tileH + yOffset + ascent);
     }
   }
 
