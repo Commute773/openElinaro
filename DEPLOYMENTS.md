@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.10
+- Released at: 2026-03-31T01:58:33Z
+- Release id: 20260331T015833Z-d9b5136
+- Previous version: 2026.03.31.9
+- Trigger: ci/release workflow
+
+- fix: stop re-reading system prompt (and core memory) every turn (#250)
+
 ## 2026.03.31.9
 - Released at: 2026-03-31T01:51:05Z
 - Release id: 20260331T015105Z-b2fa67f
