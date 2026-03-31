@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.27
+- Released at: 2026-03-31T23:10:47Z
+- Release id: 20260331T231047Z-b0b3c88
+- Previous version: 2026.03.31.26
+- Trigger: ci/release workflow
+
+- feat: bitmap font rendering, inter-line spacing, fullscreen agent chat (#264)
+
 ## 2026.03.31.26
 - Released at: 2026-03-31T22:45:31Z
 - Release id: 20260331T224531Z-4db88b6
