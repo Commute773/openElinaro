@@ -10,6 +10,7 @@ import { resolveRuntimePath, resolveServicePath, resolveUserDataPath } from "../
 import { SecretStoreService } from "../infrastructure/secret-store-service";
 import { telemetry } from "../infrastructure/telemetry";
 import { DEFAULT_PROFILE_ID } from "../../config/service-constants";
+import { attemptOr } from "../../utils/result";
 
 const SHARED_PROFILE_TMP_ROOT = path.join("/tmp", "openelinaro-profile-tmp");
 const PROFILE_SSH_SECRET_PREFIX = "profile_ssh_keypair";
@@ -162,16 +163,15 @@ export class ProfileService {
 
   private loadStoredProfileSshKeyPair(profileId: string) {
     const secretName = getProfileSshSecretName(profileId);
-    try {
-      return {
+    return attemptOr(
+      () => ({
         privateKey: this.secrets.resolveSecretRef(`${secretName}.privateKey`, profileId),
         publicKey: this.secrets.resolveSecretRef(`${secretName}.publicKey`, profileId),
         migrated: false,
         generated: false,
-      };
-    } catch {
-      return null;
-    }
+      }),
+      null,
+    );
   }
 
   private loadLegacyProfileSshKeyPair(profileId: string) {

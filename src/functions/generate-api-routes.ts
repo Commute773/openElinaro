@@ -18,6 +18,7 @@ import type { FeatureId } from "../services/feature-config-service";
 import { json, error } from "../integrations/http/api/helpers";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 import { telemetry } from "../services/infrastructure/telemetry";
+import { attemptOrAsync, tryCatch, tryCatchAsync } from "../utils/result";
 import { formatResult } from "./formatters";
 
 const apiTelemetry = telemetry.child({ component: "function_api" });
@@ -99,15 +100,13 @@ async function buildInput(
   }
 
   // POST/PUT/PATCH/DELETE: merge path params + request body
-  let body: Record<string, unknown> = {};
-  try {
+  const body = await attemptOrAsync(async () => {
     const contentType = request.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
-      body = (await request.json()) as Record<string, unknown>;
+      return (await request.json()) as Record<string, unknown>;
     }
-  } catch {
-    // Empty body is fine for some endpoints
-  }
+    return {} as Record<string, unknown>;
+  }, {} as Record<string, unknown>);
 
   return { ...body, ...pathParams };
 }
@@ -162,36 +161,41 @@ export function generateApiRoute(
         };
 
         // 4. Execute handler
-        try {
-          const result = await def.handler(parsed.data, ctx);
+        const handlerResult = await tryCatchAsync(
+          async () => {
+            const result = await def.handler(parsed.data, ctx);
 
-          // 5. Apply response transform if present, then auto-wrap strings
-          let responseData: unknown;
-          if (http.responseTransform) {
-            responseData = http.responseTransform(result);
-          } else if (typeof result === "string") {
-            responseData = { text: result };
-          } else {
-            responseData = result;
-          }
-
-          // 6. Attach display string (used by glasses UI and agent output)
-          try {
-            const display = def.format(result);
-            if (Array.isArray(responseData)) {
-              responseData = { items: responseData, display };
-            } else if (responseData && typeof responseData === "object") {
-              (responseData as Record<string, unknown>).display = display;
+            // 5. Apply response transform if present, then auto-wrap strings
+            let responseData: unknown;
+            if (http.responseTransform) {
+              responseData = http.responseTransform(result);
+            } else if (typeof result === "string") {
+              responseData = { text: result };
+            } else {
+              responseData = result;
             }
-          } catch {
-            // formatter failure is non-fatal
-          }
 
-          return json(responseData, http.successStatus ?? 200);
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : "Internal error";
-          return error(message, 500);
+            // 6. Attach display string (used by glasses UI and agent output)
+            const displayResult = tryCatch(
+              () => def.format(result),
+              { operation: "api.formatDisplayResult" },
+            );
+            if (displayResult.ok) {
+              if (Array.isArray(responseData)) {
+                responseData = { items: responseData, display: displayResult.value };
+              } else if (responseData && typeof responseData === "object") {
+                (responseData as Record<string, unknown>).display = displayResult.value;
+              }
+            }
+
+            return json(responseData, http.successStatus ?? 200);
+          },
+          { operation: `api.${def.name}.handler` },
+        );
+        if (!handlerResult.ok) {
+          return error(handlerResult.error.message, 500);
         }
+        return handlerResult.value;
       });
     },
   };

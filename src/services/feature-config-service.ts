@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { parse } from "yaml";
+import { attemptOr } from "../utils/result";
 import {
   getRuntimeConfig,
   getRuntimeConfigValue,
@@ -48,11 +49,7 @@ function hasSecretRef(secrets: SecretStoreService, secretRef: string | undefined
   if (!ref) {
     return false;
   }
-  try {
-    return Boolean(secrets.resolveSecretRef(ref, profileId).trim());
-  } catch {
-    return false;
-  }
+  return attemptOr(() => Boolean(secrets.resolveSecretRef(ref, profileId).trim()), false);
 }
 
 function getSharedPythonReadiness(requiredModules?: string[]) {
@@ -304,11 +301,7 @@ export function parseFeatureValue(raw: string) {
   if (raw === "") {
     return "";
   }
-  try {
-    return parse(raw);
-  } catch {
-    return raw;
-  }
+  return attemptOr(() => parse(raw), raw);
 }
 
 export function getFeatureConfigValue(pathExpression: string) {

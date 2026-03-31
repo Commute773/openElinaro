@@ -353,6 +353,7 @@ export function createDiscordEventHandlers(params: {
           },
         );
       } catch (error) {
+        telemetry.recordError(error, { operation: "discord.commandExecution" });
         const message = error instanceof Error ? error.message : String(error);
         if (interaction.replied) {
           await interaction.followUp({ content: message, flags: MessageFlags.Ephemeral });

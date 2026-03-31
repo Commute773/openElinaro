@@ -13,6 +13,7 @@ import {
 } from "./runtime-user-content";
 import { resolveRuntimePath } from "./runtime-root";
 import { timestamp } from "../utils/timestamp";
+import { attemptOrAsync } from "../utils/result";
 
 const SYSTEM_PROMPT_EXTENSION = ".md";
 export const MAX_SYSTEM_PROMPT_CHARS = 100_000;
@@ -142,30 +143,27 @@ const MEMORY_SKIP_DIRS = new Set(["identity", "compactions"]);
 async function buildMemorySection(): Promise<string | null> {
   const memoryRoot = resolveRuntimePath("memory");
   // Find the first namespace directory (e.g. "root")
-  const namespaces = await readdir(memoryRoot, { withFileTypes: true }).catch(() => []);
+  const namespaces = await attemptOrAsync(() => readdir(memoryRoot, { withFileTypes: true }), []);
   const nsDir = namespaces.find((e) => e.isDirectory() && !e.name.startsWith("."));
   if (!nsDir) return null;
 
   const nsPath = path.join(memoryRoot, nsDir.name);
 
   // Read MEMORY.md (core memory index)
-  let coreMemory = "";
   const coreMemoryPath = path.join(nsPath, "core", "MEMORY.md");
-  try {
-    coreMemory = (await Bun.file(coreMemoryPath).text()).trim();
-  } catch {
+  const coreMemory = await attemptOrAsync(
+    async () => (await Bun.file(coreMemoryPath).text()).trim(),
     // Try root-level MEMORY.md as fallback
-    try {
-      coreMemory = (await Bun.file(path.join(nsPath, "MEMORY.md")).text()).trim();
-    } catch {
-      // no core memory
-    }
-  }
+    await attemptOrAsync(
+      async () => (await Bun.file(path.join(nsPath, "MEMORY.md")).text()).trim(),
+      "",
+    ),
+  );
 
   // Build file tree
   const tree: string[] = [];
   async function walk(dir: string, prefix: string) {
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    const entries = await attemptOrAsync(() => readdir(dir, { withFileTypes: true }), []);
     const sorted = entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of sorted) {
       if (entry.name.startsWith(".") || entry.name === "INDEX.md") continue;

@@ -1,21 +1,18 @@
 /**
  * Audio device/output switching: SwitchAudioSource, blueutil, osascript volume control.
  */
+import { attemptOrAsync } from "../../utils/result";
 import type { MediaSpeaker, RunCommand } from "./types";
 
 export async function ensureSystemVolumeMax(
   runCommand: RunCommand,
   osascriptBin: string,
 ) {
-  try {
-    await runCommand({
-      file: osascriptBin,
-      args: ["-e", "set volume output volume 100"],
-      allowFailure: true,
-    });
-  } catch {
-    // Best effort only.
-  }
+  await attemptOrAsync(() => runCommand({
+    file: osascriptBin,
+    args: ["-e", "set volume output volume 100"],
+    allowFailure: true,
+  }), undefined);
 }
 
 export async function ensureSpeakerReady(

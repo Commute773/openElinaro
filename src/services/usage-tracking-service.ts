@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";
+import { attemptOr } from "../utils/result";
 
 export interface UsageLedgerCost {
   input: number;
@@ -128,13 +129,7 @@ function readRecords(): UsageLedgerRecord[] {
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
-    .flatMap((line) => {
-      try {
-        return [JSON.parse(line) as UsageLedgerRecord];
-      } catch {
-        return [];
-      }
-    });
+    .flatMap((line) => attemptOr(() => [JSON.parse(line) as UsageLedgerRecord], []));
 }
 
 function matchesFilters(record: UsageLedgerRecord, filters?: UsageLedgerFilters) {

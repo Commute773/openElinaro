@@ -3,6 +3,7 @@ import {
   DEFAULT_WEB_SEARCH_UI_LANG,
 } from "./tool-defaults";
 import { telemetry as rootTelemetry, type TelemetryService } from "./infrastructure/telemetry";
+import { attemptOr } from "../utils/result";
 
 const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";
 
@@ -34,11 +35,7 @@ function normalizeUiLanguage(value: string) {
     return trimmed;
   }
 
-  try {
-    return new Intl.Locale(trimmed).toString();
-  } catch {
-    return trimmed;
-  }
+  return attemptOr(() => new Intl.Locale(trimmed).toString(), trimmed);
 }
 
 function normalizeBraveError(status: number, detail: string, params: WebSearchParams) {
@@ -95,11 +92,7 @@ function resolveFreshness(params: WebSearchParams) {
 }
 
 function resolveSiteName(url: string) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "") || undefined;
-  } catch {
-    return undefined;
-  }
+  return attemptOr(() => new URL(url).hostname.replace(/^www\./, "") || undefined, undefined);
 }
 
 export class WebSearchService {

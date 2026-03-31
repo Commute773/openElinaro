@@ -15,6 +15,7 @@ import path from "node:path";
 import { GoogleGenAI, type Session } from "@google/genai";
 import type { LiveCallbacks, LiveServerMessage } from "@google/genai";
 import type { ServerWebSocket } from "bun";
+import { attemptAsync, attemptOr, attemptOrAsync } from "../../utils/result";
 import { normalizeString } from "../../utils/text-utils";
 import { timestamp as nowIso } from "../../utils/timestamp";
 import { readWebhookPayload } from "../../utils/http-helpers";
@@ -426,9 +427,7 @@ export class GeminiLivePhoneService {
     }
     bridge.closed = true;
     this.clearPendingHangup(bridge);
-    try {
-      bridge.geminiSession?.close();
-    } catch {}
+    attemptOr(() => bridge.geminiSession?.close(), undefined);
     this.activeBridges.delete(socket.data.sessionId);
     appendTranscriptLog(socket.data.sessionId, {
       timestamp: nowIso(),
@@ -499,9 +498,7 @@ export class GeminiLivePhoneService {
             message,
           });
           this.failSession(session.id, new Error(message));
-          try {
-            bridge.vonageSocket.close(1011, "Gemini websocket error");
-          } catch {}
+          attemptOr(() => bridge.vonageSocket.close(1011, "Gemini websocket error"), undefined);
         },
         onclose: (event) => {
           appendTranscriptLog(session.id, {
@@ -567,12 +564,10 @@ export class GeminiLivePhoneService {
   // -----------------------------------------------------------------------
 
   private handleVonageControlMessage(bridge: ActiveBridge, rawMessage: string) {
-    let payload: Record<string, unknown> = {};
-    try {
-      payload = JSON.parse(rawMessage) as Record<string, unknown>;
-    } catch {
-      payload = { raw: rawMessage };
-    }
+    const payload: Record<string, unknown> = attemptOr(
+      () => JSON.parse(rawMessage) as Record<string, unknown>,
+      { raw: rawMessage },
+    );
     const event = normalizeString(payload.event) ?? "message";
     appendTranscriptLog(bridge.sessionId, {
       timestamp: nowIso(),
@@ -953,21 +948,24 @@ export class GeminiLivePhoneService {
       reason,
       callId: session.callId,
     });
-    try {
-      await this.vonage.hangupCall(session.callId);
+    const callId = session.callId;
+    const hangupResult = await attemptAsync(async () => {
+      await this.vonage.hangupCall(callId);
+    });
+    if (hangupResult.ok) {
       appendTranscriptLog(bridge.sessionId, {
         timestamp: nowIso(),
         type: "call.auto_hangup.success",
         reason,
         callId: session.callId,
       });
-    } catch (error) {
+    } else {
       bridge.endingCall = false;
       appendTranscriptLog(bridge.sessionId, {
         timestamp: nowIso(),
         type: "call.auto_hangup.error",
         reason,
-        error: error instanceof Error ? error.message : String(error),
+        error: hangupResult.error.message,
       });
     }
   }

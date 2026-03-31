@@ -12,6 +12,7 @@ import {
   type Usage,
 } from "@mariozechner/pi-ai";
 import type { ProfileRecord } from "../../domain/profiles";
+import { attemptOr } from "../../utils/result";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { timestamp } from "../../utils/timestamp";
@@ -66,7 +67,7 @@ function normalizeProviderErrorDetail(errorMessage: string | undefined) {
     return null;
   }
 
-  try {
+  const result = attemptOr(() => {
     const parsed = JSON.parse(detail) as {
       detail?: unknown;
       message?: unknown;
@@ -83,11 +84,10 @@ function normalizeProviderErrorDetail(errorMessage: string | undefined) {
     if (typeof parsed.error?.message === "string" && parsed.error.message.trim()) {
       return parsed.error.message.trim();
     }
-  } catch {
-    // Keep the original message when the provider returned plain text.
-  }
+    return null;
+  }, null);
 
-  return detail;
+  return result ?? detail;
 }
 
 function summarizeProviderResponse(response: AssistantMessage) {

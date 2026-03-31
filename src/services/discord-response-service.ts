@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import type { AppResponse, AppResponseAttachment } from "../domain/assistant";
 import { DISCORD_MAX_ATTACHMENT_BYTES as MAX_DISCORD_ATTACHMENT_BYTES } from "../config/service-constants";
+import { tryCatch } from "../utils/result";
 
 const DISCORD_FILE_DIRECTIVE_PATTERN = /<discord-file\b([^>]*)\/?>/gi;
 const DISCORD_FILE_ATTRIBUTE_PATTERN = /(\w+)=(?:"([^"]*)"|'([^']*)')/g;
@@ -102,36 +103,37 @@ export function resolveDiscordResponse(params: {
 
   for (const match of matches) {
     const attributes = parseDiscordFileDirectiveAttributes(match[1] ?? "");
-    if (!attributes.path?.trim()) {
+    const rawPath = attributes.path?.trim();
+    if (!rawPath) {
       warnings.push(`${ATTACHMENT_FAILED_PREFIX} A Discord file directive was ignored because it did not include a path.`);
       continue;
     }
 
-    try {
-      const resolvedPath = params.assertPathAccess(attributes.path);
+    const attachResult = tryCatch(() => {
+      const resolvedPath = params.assertPathAccess(rawPath);
       if (!fs.existsSync(resolvedPath)) {
         recordAttachmentFailure(`Discord file attachment was skipped because the file was not found: ${resolvedPath}`, resolvedPath);
-        continue;
+        return;
       }
 
       const stat = fs.statSync(resolvedPath);
       if (!stat.isFile()) {
         recordAttachmentFailure(`Discord file attachment was skipped because the path is not a file: ${resolvedPath}`, resolvedPath);
-        continue;
+        return;
       }
 
       if (stat.size > MAX_DISCORD_ATTACHMENT_BYTES) {
         recordAttachmentFailure(`Discord file attachment was skipped because it exceeds the ${MAX_DISCORD_ATTACHMENT_BYTES} byte limit: ${resolvedPath}`, resolvedPath);
-        continue;
+        return;
       }
 
       attachments.push({
         path: resolvedPath,
         name: attributes.name?.trim() || undefined,
       });
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      recordAttachmentFailure(`Discord file attachment was skipped: ${detail}`, attributes.path);
+    }, { operation: "discord.file_attachment", path: rawPath });
+    if (!attachResult.ok) {
+      recordAttachmentFailure(`Discord file attachment was skipped: ${attachResult.error.message}`, rawPath);
     }
   }
 

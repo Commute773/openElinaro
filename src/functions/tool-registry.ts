@@ -16,6 +16,7 @@ import {
   initUntrustedOutputMap,
   formatToolUseSummary,
 } from "./tool-output-pipeline";
+import { tryCatchAsync } from "../utils/result";
 import type { AppProgressEvent } from "../domain/assistant";
 import { ConversationStore } from "../services/conversation/conversation-store";
 import { ConversationStateTransitionService } from "../services/conversation/conversation-state-transition-service";
@@ -59,6 +60,7 @@ import {
 } from "../services/phone-call-backends";
 import { VonageService } from "../services/vonage-service";
 import { TelemetryQueryService } from "../services/telemetry-query-service";
+import { telemetry } from "../services/infrastructure/telemetry";
 import { ToolResultStore } from "../services/tool-result-store";
 import { getToolLibraryDefinitions } from "../services/tool-library-service";
 import type { ToolLibraryDefinition } from "../services/tool-library-service";
@@ -577,27 +579,30 @@ export class ToolRegistry {
     const nextInput = this.injectToolContext(call.name, rawInput, context);
     const strippedInput = stripToolControlInput(nextInput) as Record<string, unknown>;
 
-    try {
-      const rawResult = await entry.handler(strippedInput);
-      if (context?.onToolUse) {
-        await notifyToolResultProgress(context, call.name, rawResult, rawInput);
-      }
-      const formatted = entry.format ? entry.format(rawResult) : rawResult;
-      const content = await finalizeToolResult(formatted, call.name, rawInput, this.toolResults);
-      return toolResultMessage({
-        toolCallId: call.id,
-        toolName: call.name,
-        content: typeof content === "string" ? content : JSON.stringify(content),
-      });
-    } catch (error) {
-      const content = await normalizeToolResult(normalizeToolFailure(call.name, error));
-      return toolResultMessage({
-        toolCallId: call.id,
-        toolName: call.name,
-        content: typeof content === "string" ? content : JSON.stringify(content),
-        isError: true,
-      });
-    }
+    const result = await tryCatchAsync(
+      async () => {
+        const rawResult = await entry.handler(strippedInput);
+        if (context?.onToolUse) {
+          await notifyToolResultProgress(context, call.name, rawResult, rawInput);
+        }
+        const formatted = entry.format ? entry.format(rawResult) : rawResult;
+        const content = await finalizeToolResult(formatted, call.name, rawInput, this.toolResults);
+        return toolResultMessage({
+          toolCallId: call.id,
+          toolName: call.name,
+          content: typeof content === "string" ? content : JSON.stringify(content),
+        });
+      },
+      { operation: "tool.dispatch", toolName: call.name },
+    );
+    if (result.ok) return result.value;
+    const content = await normalizeToolResult(normalizeToolFailure(call.name, result.error));
+    return toolResultMessage({
+      toolCallId: call.id,
+      toolName: call.name,
+      content: typeof content === "string" ? content : JSON.stringify(content),
+      isError: true,
+    });
   }
 
   getToolCatalog(context?: ToolContext): ToolCatalogCard[] {
@@ -691,7 +696,8 @@ export class ToolRegistry {
     }
     try {
       return new WebSearchService(this.secrets.resolveSecretRef(config.braveApiKeySecretRef));
-    } catch {
+    } catch (error) {
+      telemetry.recordError(error, { operation: "toolRegistry.createWebSearchService" });
       return null;
     }
   }
@@ -772,14 +778,17 @@ export class ToolRegistry {
   }
 
   async invoke(name: string, input: Record<string, unknown>, context?: ToolContext) {
-    try {
-      const entry = this.toolsByName.get(name === "model_context_usage" ? "context" : name);
-      const rawResult = await this.invokeRaw(name, input, context);
-      const formatted = entry?.format ? entry.format(rawResult) : rawResult;
-      return await finalizeToolResult(formatted, name, input, this.toolResults);
-    } catch (error) {
-      return await normalizeToolResult(normalizeToolFailure(name, error));
-    }
+    const result = await tryCatchAsync(
+      async () => {
+        const entry = this.toolsByName.get(name === "model_context_usage" ? "context" : name);
+        const rawResult = await this.invokeRaw(name, input, context);
+        const formatted = entry?.format ? entry.format(rawResult) : rawResult;
+        return await finalizeToolResult(formatted, name, input, this.toolResults);
+      },
+      { operation: "tool.invoke", toolName: name },
+    );
+    if (result.ok) return result.value;
+    return await normalizeToolResult(normalizeToolFailure(name, result.error));
   }
 
   async invokeRaw(name: string, input: unknown, context?: ToolContext) {

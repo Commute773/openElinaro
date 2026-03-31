@@ -7,6 +7,7 @@
  */
 
 import fs from "node:fs";
+import { attemptOr } from "../../utils/result";
 import { normalizeString } from "../../utils/text-utils";
 import { timestamp as nowIso } from "../../utils/timestamp";
 import { getVonageWebhookPath } from "../vonage-service";
@@ -45,11 +46,7 @@ export function toWebSocketUrl(baseUrl: string, pathname: string) {
 }
 
 export function decodePathSegment(value: string) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
+  return attemptOr(() => decodeURIComponent(value), value);
 }
 
 export function getSessionWebSocketPath(sessionId: string) {

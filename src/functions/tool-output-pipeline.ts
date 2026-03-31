@@ -13,6 +13,7 @@ import {
 } from "../services/prompt-injection-guard-service";
 import type { ToolResultStore } from "../services/tool-result-store";
 import { telemetry } from "../services/infrastructure/telemetry";
+import { attemptOr, attemptOrAsync } from "../utils/result";
 import type { ToolContext } from "./tool-registry";
 import {
   TOOL_SUMMARY_KEY_LIMIT,
@@ -79,11 +80,7 @@ export function stringifyToolResult(result: unknown) {
     return result;
   }
 
-  try {
-    return JSON.stringify(result, null, 2);
-  } catch {
-    return String(result);
-  }
+  return attemptOr(() => JSON.stringify(result, null, 2), String(result));
 }
 
 export function truncateToolOutput(text: string, limit = TOOL_OUTPUT_CHAR_LIMIT) {
@@ -342,19 +339,10 @@ export async function notifyToolUse(context: ToolContext | undefined, name: stri
     return;
   }
 
-  try {
-    await context.onToolUse(formatToolUseSummary(name, stripToolControlInput(input)));
-  } catch (error) {
-    toolRegistryTelemetry.event(
-      "tool.notify_tool_use.error",
-      {
-        toolName: name,
-        conversationKey: context.conversationKey,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      { level: "debug", outcome: "error" },
-    );
-  }
+  await attemptOrAsync(
+    () => context.onToolUse!(formatToolUseSummary(name, stripToolControlInput(input))),
+    undefined,
+  );
 }
 
 function buildToolProgressUpdates(name: string, result: unknown) {
@@ -379,19 +367,7 @@ export async function notifyToolResultProgress(
 
   const updates = buildToolProgressUpdates(name, result);
   for (const update of updates) {
-    try {
-      await context.onToolUse(update);
-    } catch (error) {
-      toolRegistryTelemetry.event(
-        "tool.notify_tool_result_progress.error",
-        {
-          toolName: name,
-          conversationKey: context.conversationKey,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        { level: "debug", outcome: "error" },
-      );
-    }
+    await attemptOrAsync(() => context.onToolUse!(update), undefined);
   }
 }
 
@@ -403,16 +379,5 @@ export async function reportProgress(context: ToolContext | undefined, summary: 
     return;
   }
 
-  try {
-    await context.onToolUse(summary);
-  } catch (error) {
-    toolRegistryTelemetry.event(
-      "tool.report_progress.error",
-      {
-        conversationKey: context.conversationKey,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      { level: "debug", outcome: "error" },
-    );
-  }
+  await attemptOrAsync(() => context.onToolUse!(summary), undefined);
 }

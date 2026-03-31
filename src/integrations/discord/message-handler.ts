@@ -10,6 +10,7 @@ import {
 import { buildChatPromptContent } from "../../services/message-content-service";
 import { compressImageForApi } from "../../utils/image-compression";
 import { telemetry } from "../../services/infrastructure/telemetry";
+import { attemptAsync } from "../../utils/result";
 
 const MAX_TEXT_ATTACHMENT_CHARS = DISCORD_MAX_TEXT_ATTACHMENT_CHARS;
 const discordTelemetry = telemetry.child({ component: "discord" });
@@ -340,7 +341,7 @@ export async function buildAttachmentBlocks(
     [...attachments].map(async (attachment) => {
       const descriptor = buildAttachmentDescriptor(attachment);
 
-      try {
+      const result = await attemptAsync(async () => {
         if (isImageAttachment(attachment)) {
           if ((attachment.size ?? 0) > MAX_IMAGE_ATTACHMENT_BYTES) {
             return [{
@@ -394,12 +395,15 @@ export async function buildAttachmentBlocks(
           type: "text" as const,
           text: `Attached file: ${descriptor}. Binary content was not inlined.`,
         }];
-      } catch (error) {
+      });
+
+      if (!result.ok) {
         return [{
           type: "text" as const,
-          text: `Attached file: ${descriptor}. It could not be downloaded: ${error instanceof Error ? error.message : String(error)}.`,
+          text: `Attached file: ${descriptor}. It could not be downloaded: ${result.error.message}.`,
         }];
       }
+      return result.value;
     }),
   );
 

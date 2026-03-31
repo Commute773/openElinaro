@@ -5,6 +5,7 @@ import type { ProfileRecord } from "../domain/profiles";
 import { ProfileService } from "./profiles";
 import { ProjectsService } from "./projects-service";
 import { resolveRuntimePath, resolveUserDataPath } from "./runtime-root";
+import { attemptOr } from "../utils/result";
 
 export const THREAD_START_CONTEXT_TOKEN_BUDGET = 5_000;
 const APPROX_CHARS_PER_TOKEN = 4;
@@ -96,12 +97,7 @@ function normalizeExcerpt(content: string, maxChars: number) {
 }
 
 function readExcerpt(absolutePath: string, maxChars: number) {
-  try {
-    const content = fs.readFileSync(absolutePath, "utf8");
-    return normalizeExcerpt(content, maxChars);
-  } catch {
-    return "";
-  }
+  return attemptOr(() => normalizeExcerpt(fs.readFileSync(absolutePath, "utf8"), maxChars), "");
 }
 
 function compareRecent(left: RecentContextCandidate, right: RecentContextCandidate) {

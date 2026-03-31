@@ -12,6 +12,7 @@ import {
   type ExecCommandResult,
   type SpawnCommandResult,
 } from "./shell-backend";
+import { attemptAsync } from "../utils/result";
 
 const execFileAsync = promisify(execFile);
 
@@ -101,7 +102,7 @@ export class SshShellBackend implements ShellBackend {
   }): Promise<ExecCommandResult> {
     const remoteCommand = this.buildRemoteCommand(command, opts.cwd, opts.sudo);
     const effectiveUser = this.resolveEffectiveUserLabel();
-    try {
+    const result = await attemptAsync(async () => {
       const { stdout, stderr } = await execFileAsync("ssh", this.buildSshArgs(remoteCommand), {
         timeout: opts.timeoutMs,
         maxBuffer: 1024 * 1024 * 4,
@@ -112,10 +113,9 @@ export class SshShellBackend implements ShellBackend {
         stdout,
         stderr,
         effectiveUser,
-      };
-    } catch (error) {
-      return buildExecErrorResult(error, effectiveUser);
-    }
+      } satisfies ExecCommandResult;
+    });
+    return result.ok ? result.value : buildExecErrorResult(result.error, effectiveUser);
   }
 
   spawnCommand(command: string, opts: {

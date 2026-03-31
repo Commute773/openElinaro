@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";
 import { openDatabase, withSqliteRetry } from "../utils/sqlite-helpers";
+import { attemptOr } from "../utils/result";
 
 export type TelemetrySeverity = "debug" | "info" | "warn" | "error";
 export type TelemetryOutcome = "ok" | "error" | "cancelled" | "timeout" | "rejected";
@@ -463,7 +464,7 @@ export class TelemetryStore {
 
   private appendErrorLog(line: string) {
     if (this.dbPath === ":memory:") return;
-    try {
+    attemptOr(() => {
       if (!this.logDirReady) {
         fs.mkdirSync(path.dirname(this.logPath), { recursive: true });
         this.logDirReady = true;
@@ -473,19 +474,15 @@ export class TelemetryStore {
       const now = Date.now();
       if (this.writeCount % 100 === 0 || now - this.lastSizeCheckMs > 60_000) {
         this.lastSizeCheckMs = now;
-        try {
+        attemptOr(() => {
           const stat = fs.statSync(this.logPath);
           if (stat.size > 10 * 1024 * 1024) {
             const rotated = path.join(path.dirname(this.logPath), "errors.1.jsonl");
             fs.renameSync(this.logPath, rotated);
           }
-        } catch {
-          // stat/rename failure is non-fatal
-        }
+        }, undefined);
       }
-    } catch {
-      // file I/O failure is non-fatal — don't crash the app
-    }
+    }, undefined);
   }
 
   private formatEventLogLine(record: TelemetryEventRecord): string {

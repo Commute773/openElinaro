@@ -3,6 +3,7 @@ import type { ModelService } from "../models/model-service";
 import { StructuredMemoryManager, MEMORY_CATEGORIES, type MemoryCategory } from "./structured-memory-manager";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
+import { attempt, attemptAsync } from "../../utils/result";
 
 const agentTelemetry = telemetry.child({ component: "memory_management_agent" });
 const traceSpan = createTraceSpan(agentTelemetry);
@@ -94,12 +95,11 @@ function stripCodeFence(text: string) {
 
 function parseExtractionResponse(raw: string): ExtractionResult {
   const cleaned = stripCodeFence(raw);
-  try {
+  const firstAttempt = attempt(() => {
     const parsed = JSON.parse(cleaned) as ExtractionResult;
     if (!Array.isArray(parsed.entities)) {
       return { entities: [] };
     }
-    // Validate categories
     return {
       entities: parsed.entities.filter(
         (e) =>
@@ -112,29 +112,30 @@ function parseExtractionResponse(raw: string): ExtractionResult {
           e.facts.length > 0,
       ),
     };
-  } catch {
-    // Try to find JSON object in the response
-    const firstBrace = cleaned.indexOf("{");
-    const lastBrace = cleaned.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      try {
-        const parsed = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1)) as ExtractionResult;
-        if (Array.isArray(parsed.entities)) {
-          return {
-            entities: parsed.entities.filter(
-              (e) =>
-                MEMORY_CATEGORIES.includes(e.category as MemoryCategory) &&
-                typeof e.title === "string" &&
-                e.title.trim(),
-            ),
-          };
-        }
-      } catch {
-        // fall through
+  });
+  if (firstAttempt.ok) return firstAttempt.value;
+
+  // Try to find JSON object in the response
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const fallback = attempt(() => {
+      const parsed = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1)) as ExtractionResult;
+      if (Array.isArray(parsed.entities)) {
+        return {
+          entities: parsed.entities.filter(
+            (e) =>
+              MEMORY_CATEGORIES.includes(e.category as MemoryCategory) &&
+              typeof e.title === "string" &&
+              e.title.trim(),
+          ),
+        };
       }
-    }
-    return { entities: [] };
+      return null;
+    });
+    if (fallback.ok && fallback.value) return fallback.value;
   }
+  return { entities: [] };
 }
 
 export class MemoryManagementAgent {
@@ -175,7 +176,7 @@ export class MemoryManagementAgent {
         let newEntries = 0;
 
         for (const entity of extraction.entities) {
-          try {
+          const result = await attemptAsync(async () => {
             const existing = await this.structuredMemory.readEntry(
               entity.category,
               entity.slug,
@@ -208,13 +209,14 @@ export class MemoryManagementAgent {
               });
               newEntries += 1;
             }
-          } catch (error) {
+          });
+          if (!result.ok) {
             agentTelemetry.event(
               "memory_management_agent.entity_upsert_failed",
               {
                 category: entity.category,
                 slug: entity.slug,
-                error: error instanceof Error ? error.message : String(error),
+                error: result.error.message,
               },
               { level: "warn", outcome: "error" },
             );

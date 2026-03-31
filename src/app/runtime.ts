@@ -20,6 +20,7 @@ import { getRuntimeConfig } from "../config/runtime-config";
 import type { FeatureId } from "../services/feature-config-service";
 import { InstanceSocketServer } from "../instance/socket-server";
 import { resolveRuntimePath } from "../services/runtime-root";
+import { tryCatchAsync } from "../utils/result";
 
 import { type RuntimeScope, createRuntimeScope } from "./runtime-scope";
 import {
@@ -130,20 +131,23 @@ export class OpenElinaroApp {
       socketPath,
       profileId: this.activeProfile.id,
       onMessage: async (message) => {
-        try {
-          await this.handleRequest({
-            id: `instance:${message.from}:${Date.now()}`,
-            text: message.content,
-            conversationKey: message.conversationKey,
-          });
-          return { accepted: true, conversationKey: message.conversationKey };
-        } catch (error) {
-          return {
-            accepted: false,
-            conversationKey: message.conversationKey,
-            error: error instanceof Error ? error.message : String(error),
-          };
-        }
+        const result = await tryCatchAsync(
+          async () => {
+            await this.handleRequest({
+              id: `instance:${message.from}:${Date.now()}`,
+              text: message.content,
+              conversationKey: message.conversationKey,
+            });
+            return { accepted: true, conversationKey: message.conversationKey } as const;
+          },
+          { operation: "instance_server.onMessage", from: message.from, conversationKey: message.conversationKey },
+        );
+        if (result.ok) return result.value;
+        return {
+          accepted: false,
+          conversationKey: message.conversationKey,
+          error: result.error.message,
+        };
       },
       onStatus: () => ({
         profileId: this.activeProfile.id,

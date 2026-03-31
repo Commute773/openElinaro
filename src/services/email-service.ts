@@ -6,6 +6,7 @@ import { getRuntimeConfig } from "../config/runtime-config";
 import { SecretStoreService } from "./infrastructure/secret-store-service";
 import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
+import { attemptOrAsync } from "../utils/result";
 import { DEFAULT_EMAIL_TIMEOUT_MS, DEFAULT_EMAIL_LIST_LIMIT } from "../config/service-constants";
 
 const DEFAULT_EMAIL_PROVIDER = "IMAP/SMTP";
@@ -648,11 +649,7 @@ class PurelymailEmailBackend implements EmailBackend {
       } finally {
         lock.release();
         if (client.usable) {
-          await client.logout().catch((error) => {
-            emailTelemetry.event("email.imap_logout_failed", {
-              error: error instanceof Error ? error.message : String(error),
-            }, { level: "debug", outcome: "error" });
-          });
+          await attemptOrAsync(() => client.logout(), undefined);
         }
       }
     });

@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { SecretStoreService } from "./infrastructure/secret-store-service";
 import { telemetry } from "./infrastructure/telemetry";
+import { attemptOrAsync } from "../utils/result";
 
 const ticketsTelemetry = telemetry.child({ component: "tickets" });
 
@@ -193,15 +194,10 @@ export class ElinaroTicketsService {
         body: body === undefined ? undefined : JSON.stringify(body),
       });
 
-      const payload = (await response.json().catch((error) => {
-        ticketsTelemetry.event("tickets.response_parse_failed", {
-          method,
-          path,
-          status: response.status,
-          error: error instanceof Error ? error.message : String(error),
-        }, { level: "warn", outcome: "error" });
-        return null;
-      })) as TicketsEnvelope<unknown> | null;
+      const payload = (await attemptOrAsync(
+        () => response.json(),
+        null,
+      )) as TicketsEnvelope<unknown> | null;
       if (!response.ok || !payload || payload.ok === false) {
         const message = payload?.error?.message?.trim() || `Ticket API request failed with ${response.status}.`;
         throw new Error(message);

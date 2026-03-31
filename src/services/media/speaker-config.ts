@@ -1,6 +1,7 @@
 /**
  * Speaker configuration loading, discovery, and resolution.
  */
+import { attemptOrAsync } from "../../utils/result";
 import type { MediaSpeaker, MediaStatus, RunCommand, SpeakerConfigRecord } from "./types";
 import { normalizeTransport, readJsonFile, slugify, uniqueStrings } from "./utils";
 
@@ -80,7 +81,7 @@ export async function getAvailableOutputDeviceNames(
   runCommand: RunCommand,
   switchAudioSourceBin: string,
 ): Promise<Set<string>> {
-  try {
+  return attemptOrAsync(async () => {
     const result = await runCommand({
       file: switchAudioSourceBin,
       args: ["-a", "-t", "output"],
@@ -91,24 +92,20 @@ export async function getAvailableOutputDeviceNames(
         .map((line) => line.trim())
         .filter(Boolean),
     );
-  } catch {
-    return new Set<string>();
-  }
+  }, new Set<string>());
 }
 
 export async function getCurrentOutputDeviceName(
   runCommand: RunCommand,
   switchAudioSourceBin: string,
 ): Promise<string | null> {
-  try {
+  return attemptOrAsync(async () => {
     const result = await runCommand({
       file: switchAudioSourceBin,
       args: ["-c", "-t", "output"],
     });
     return result.stdout.trim() || null;
-  } catch {
-    return null;
-  }
+  }, null);
 }
 
 export async function resolveSpeaker(

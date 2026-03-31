@@ -9,6 +9,7 @@ import { AutonomousTimePromptService } from "./autonomous-time-prompt-service";
 import { AutonomousTimeStateService } from "./autonomous-time-state-service";
 import { nowInTimezone, localDateKey } from "../utils/time-helpers";
 import { getRuntimeConfig } from "../config/runtime-config";
+import { attempt, attemptOrAsync, tryCatchAsync } from "../utils/result";
 import { telemetry } from "./infrastructure/telemetry";
 import { createTraceSpan } from "../utils/telemetry-helpers";
 
@@ -118,17 +119,17 @@ function extractJsonObject(text: string) {
  * Returns null if the response is empty.
  */
 export function parseReflectionText(responseText: string): ReflectionResponse | null {
-  try {
-    return JSON.parse(extractJsonObject(responseText)) as ReflectionResponse;
-  } catch {
-    const heuristicBody = responseText.trim();
-    if (!heuristicBody) {
-      return null;
-    }
-    const lowerText = heuristicBody.toLowerCase();
-    const detectedMood = MOOD_WORDS.find((w) => lowerText.includes(w)) || "uncertain";
-    return { body: heuristicBody, mood: detectedMood };
+  const jsonResult = attempt(() => JSON.parse(extractJsonObject(responseText)) as ReflectionResponse);
+  if (jsonResult.ok) {
+    return jsonResult.value;
   }
+  const heuristicBody = responseText.trim();
+  if (!heuristicBody) {
+    return null;
+  }
+  const lowerText = heuristicBody.toLowerCase();
+  const detectedMood = MOOD_WORDS.find((w) => lowerText.includes(w)) || "uncertain";
+  return { body: heuristicBody, mood: detectedMood };
 }
 
 function compactText(text: string, maxChars: number) {
@@ -447,15 +448,14 @@ export class AutonomousTimeService {
   // ---------------------------------------------------------------------------
 
   private enqueue(job: () => Promise<void>) {
-    this.queuedJob = this.queuedJob
-      .catch(() => undefined)
-      .then(job)
-      .catch((error) => {
-        autonomousTimeTelemetry.recordError(error, {
-          profileId: this.profile.id,
-          operation: "autonomous_time.queue",
-        });
-      });
+    const prev = this.queuedJob;
+    this.queuedJob = tryCatchAsync(
+      async () => {
+        await attemptOrAsync(() => prev, undefined);
+        await job();
+      },
+      { operation: "autonomous_time.queue", profileId: this.profile.id },
+    ).then(() => undefined);
   }
 
   private async runReflection(params: {
@@ -519,9 +519,8 @@ export class AutonomousTimeService {
           return null;
         }
         // Log when heuristic fallback was used (no valid JSON found)
-        try {
-          JSON.parse(extractJsonObject(responseText));
-        } catch {
+        const jsonCheck = attempt(() => JSON.parse(extractJsonObject(responseText)));
+        if (!jsonCheck.ok) {
           autonomousTimeTelemetry.event("autonomous_time.reflection.parse_failed", {
             reason: "non_json_response",
             responseLength: responseText.length,

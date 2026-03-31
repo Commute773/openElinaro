@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { attemptOrAsync } from "../utils/result";
 import type {
   FilesystemBackend,
   ReadFileResult,
@@ -70,7 +71,7 @@ export class LocalFilesystemBackend implements FilesystemBackend {
   }
 
   async stat(targetPath: string): Promise<StatResult | null> {
-    try {
+    return attemptOrAsync(async () => {
       const stat = await fs.stat(targetPath);
       return {
         type: stat.isDirectory() ? "directory" : stat.isFile() ? "file" : "other",
@@ -78,9 +79,7 @@ export class LocalFilesystemBackend implements FilesystemBackend {
         modifiedAt: stat.mtime.toISOString(),
         createdAt: stat.birthtime.toISOString(),
       };
-    } catch {
-      return null;
-    }
+    }, null);
   }
 
   async statOrThrow(targetPath: string): Promise<StatResult> {
@@ -275,7 +274,7 @@ export class LocalFilesystemBackend implements FilesystemBackend {
   async getPathSuggestions(targetPath: string): Promise<string[]> {
     const parent = path.dirname(targetPath);
     const basename = path.basename(targetPath).toLowerCase();
-    try {
+    return attemptOrAsync(async () => {
       const entries = await fs.readdir(parent);
       return entries
         .filter((entry) => {
@@ -284,8 +283,6 @@ export class LocalFilesystemBackend implements FilesystemBackend {
         })
         .slice(0, 5)
         .map((entry) => path.join(parent, entry));
-    } catch {
-      return [];
-    }
+    }, [] as string[]);
   }
 }

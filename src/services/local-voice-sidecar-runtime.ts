@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 import { getRuntimeConfig } from "../config/runtime-config";
+import { attemptOr, attemptOrAsync } from "../utils/result";
 import { assertSharedPythonRuntimeReady, getLocalVoicePythonModules } from "./python-runtime";
 import { resolveRuntimePath, resolveServicePath } from "./runtime-root";
 import { telemetry } from "./infrastructure/telemetry";
@@ -45,12 +46,10 @@ function parseBooleanEnv(value: string | undefined, fallback: boolean) {
 }
 
 function isLocalHttpUrl(value: string) {
-  try {
+  return attemptOr(() => {
     const url = new URL(value);
     return ["127.0.0.1", "localhost", "0.0.0.0"].includes(url.hostname);
-  } catch {
-    return false;
-  }
+  }, false);
 }
 
 function logDir() {
@@ -60,12 +59,10 @@ function logDir() {
 async function waitForHealth(url: string, timeoutMs: number) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) {
-        return true;
-      }
-    } catch {}
+    const response = await attemptOrAsync(() => fetch(url), null);
+    if (response?.ok) {
+      return true;
+    }
     await Bun.sleep(1_000);
   }
   return false;

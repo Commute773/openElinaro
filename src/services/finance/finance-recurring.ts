@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { attempt, attemptOr } from "../../utils/result";
 import type {
   FinanceRecurringCandidateData,
   FinanceRecurringItemData,
@@ -65,14 +66,12 @@ export function ruleMatchesTransaction(rule: Record<string, unknown>, tx: Record
   if (rule.match_kind === "description") {
     return description !== "" && description === value;
   }
-  try {
+  return attemptOr(() => {
     const regex = new RegExp(String(rule.match_value ?? ""), "i");
     return regex.test(String(tx.merchant_name ?? ""))
       || regex.test(String(tx.description_clean ?? ""))
       || regex.test(String(tx.description_raw ?? ""));
-  } catch {
-    return false;
-  }
+  }, false);
 }
 
 export function recurringAmountMatches(rule: Record<string, unknown>, tx: Record<string, unknown>) {
@@ -363,7 +362,7 @@ export function refreshRecurringRules(
       && !existingKeys.has(`${candidate.match_kind}::${candidate.match_value}::${candidate.currency}::${Number(candidate.amount_cad ?? 0).toFixed(2)}`),
     );
     for (const candidate of toSeed.slice(0, seedLimit)) {
-      try {
+      const result = attempt(() =>
         run(
           db,
           `INSERT INTO recurring(
@@ -386,11 +385,10 @@ export function refreshRecurringRules(
           `Auto-seeded (${candidate.occurrences} occurrences; first ${candidate.first_seen})`,
           nowIso(),
           nowIso(),
-        );
-        seeded.push(candidate);
-      } catch {
-        continue;
-      }
+        ),
+      );
+      if (!result.ok) continue;
+      seeded.push(candidate);
     }
   }
 

@@ -18,6 +18,7 @@ import { RoutinesStore } from "./routines-store";
 import { formatLocalTime } from "../local-time-service";
 import { telemetry } from "../infrastructure/telemetry";
 import { nowInTimezone, parseIso, toIso } from "../../utils/time-helpers";
+import { attemptOr } from "../../utils/result";
 import {
   trimHistory,
   defaultReminderPolicy,
@@ -412,11 +413,7 @@ export class RoutinesService {
       return undefined;
     }
 
-    try {
-      return this.profiles.getProfile(normalizedJobId).id;
-    } catch {
-      return undefined;
-    }
+    return attemptOr(() => this.profiles.getProfile(normalizedJobId).id, undefined);
   }
 
   private requireKnownProfileId(profileId: string) {

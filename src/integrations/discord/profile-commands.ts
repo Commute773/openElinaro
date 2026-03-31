@@ -7,6 +7,7 @@ import { MODEL_PROVIDER_IDS, THINKING_LEVELS } from "../../domain/profiles";
 import type { ModelProviderId } from "../../domain/profiles";
 import { getAuthStatus } from "../../auth/store";
 import { ProfileService } from "../../services/profiles";
+import { attemptOr } from "../../utils/result";
 
 export const ROUTINE_KIND_CHOICES: { name: string; value: RoutineItemKind }[] = [
   { name: "todo", value: "todo" },
@@ -49,11 +50,10 @@ const DEFAULT_PROFILE_THINKING_LEVEL = "low";
 export type ProfileCommandAction = "list" | "show" | "set" | "auth";
 
 export function getDiscordOptionalSubcommand(interaction: ChatInputCommandInteraction) {
-  try {
-    return interaction.options.getSubcommand(false) as ProfileCommandAction | null;
-  } catch {
-    return null;
-  }
+  return attemptOr(
+    () => interaction.options.getSubcommand(false) as ProfileCommandAction | null,
+    null,
+  );
 }
 
 export function getProfileCommandAction(interaction: ChatInputCommandInteraction): ProfileCommandAction {

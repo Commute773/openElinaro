@@ -13,6 +13,7 @@
  */
 import { z } from "zod";
 import type { FunctionDefinition, HttpMethod } from "./define-function";
+import { attempt } from "../utils/result";
 import { API_PATH_PREFIX } from "./define-function";
 import { ALL_FUNCTION_BUILDERS } from "./domains/index";
 import { generateOpenApiSpec } from "./generate-openapi";
@@ -287,10 +288,9 @@ async function main() {
 
   const definitions: FunctionDefinition[] = [];
   for (const builder of ALL_FUNCTION_BUILDERS) {
-    try {
-      definitions.push(...builder(stubCtx));
-    } catch {
-      // Some builders may fail with stub context — skip
+    const result = attempt(() => builder(stubCtx));
+    if (result.ok) {
+      definitions.push(...result.value);
     }
   }
 

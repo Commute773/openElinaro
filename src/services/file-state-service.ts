@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import type { ProfileRecord } from "../domain/profiles";
 import { writeJsonFileSecurely } from "../utils/file-utils";
+import { attemptOr } from "../utils/result";
 import { assertTestRuntimeRootIsIsolated } from "./runtime-root";
 
 /**
@@ -23,12 +24,10 @@ export class FileStateService<T> {
       return this.defaultValue();
     }
 
-    try {
-      const raw = JSON.parse(fs.readFileSync(this.filePath, "utf8")) as unknown;
-      return this.normalize(raw);
-    } catch {
-      return this.defaultValue();
-    }
+    return attemptOr(
+      () => this.normalize(JSON.parse(fs.readFileSync(this.filePath, "utf8")) as unknown),
+      this.defaultValue(),
+    );
   }
 
   save(state: T): T {

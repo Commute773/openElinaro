@@ -1,15 +1,14 @@
 import { z } from "zod";
 import { defineFunction, type FunctionDomainBuilder } from "../define-function";
 import { formatOpenBrowserResult, formatResult } from "../formatters";
+import { attemptOr } from "../../utils/result";
 
 function parseOpenBrowserActionsInput(value: unknown) {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
   if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) return value;
-  try {
-    const parsed = JSON.parse(trimmed);
-    return Array.isArray(parsed) ? parsed : value;
-  } catch { return value; }
+  const parsed = attemptOr(() => JSON.parse(trimmed), undefined);
+  return Array.isArray(parsed) ? parsed : value;
 }
 
 const openBrowserViewportSchema = z.object({

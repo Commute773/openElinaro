@@ -10,6 +10,7 @@ import { ProfileService } from "../profiles";
 import { resolveRuntimePath } from "../runtime-root";
 import { DEFAULT_PROFILE_ID as DEFAULT_ROUTINE_PROFILE_ID } from "../../config/service-constants";
 import { writeJsonFileSecurely } from "../../utils/file-utils";
+import { attemptOr } from "../../utils/result";
 
 type LegacyRoutineItem = RoutineItem & {
   notes?: string;
@@ -74,11 +75,10 @@ function normalizeItem(item: LegacyRoutineItem): RoutineItem {
 }
 
 function listKnownProfileIds() {
-  try {
-    return new Set(new ProfileService().loadRegistry().profiles.map((profile) => profile.id));
-  } catch {
-    return new Set([DEFAULT_ROUTINE_PROFILE_ID]);
-  }
+  return attemptOr(
+    () => new Set(new ProfileService().loadRegistry().profiles.map((profile) => profile.id)),
+    new Set([DEFAULT_ROUTINE_PROFILE_ID]),
+  );
 }
 
 function normalizeProfileId(item: Pick<RoutineItem, "profileId" | "jobId">) {

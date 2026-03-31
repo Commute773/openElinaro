@@ -4,6 +4,7 @@ import path from "node:path";
 import { resolveRuntimePath } from "./runtime-root";
 import { telemetry as rootTelemetry, type TelemetryService } from "./infrastructure/telemetry";
 import { timestamp } from "../utils/timestamp";
+import { attemptOr } from "../utils/result";
 
 const WORKSPACE_STORE_VERSION = 1;
 const WORKTREE_ROOT_DIRNAME = ".openelinaro-worktrees";
@@ -75,11 +76,10 @@ export class ProjectWorkspaceService {
   }
 
   resolveGitRepoRoot(cwd: string) {
-    try {
-      return resolveExistingPath(readTrimmedGitOutput(resolveExistingPath(cwd), ["rev-parse", "--show-toplevel"]));
-    } catch {
-      return undefined;
-    }
+    return attemptOr(
+      () => resolveExistingPath(readTrimmedGitOutput(resolveExistingPath(cwd), ["rev-parse", "--show-toplevel"])),
+      undefined,
+    );
   }
 
   ensureIsolatedWorkspace(params: {

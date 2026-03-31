@@ -13,6 +13,7 @@ import { SecretStoreService } from "./infrastructure/secret-store-service";
 import { telemetry } from "./infrastructure/telemetry";
 import { normalizeString } from "../utils/text-utils";
 import { DEFAULT_PROFILE_ID as DEFAULT_SECRET_PROFILE_ID } from "../config/service-constants";
+import { attemptOr, tryCatch } from "../utils/result";
 import { timestamp as nowIso } from "../utils/timestamp";
 import { readWebhookPayload } from "../utils/http-helpers";
 
@@ -695,11 +696,7 @@ export class VonageService {
   }
 
   private hasSecret(secretRef: string, profileId: string) {
-    try {
-      return Boolean(this.secrets.resolveSecretRef(secretRef, profileId));
-    } catch {
-      return false;
-    }
+    return attemptOr(() => Boolean(this.secrets.resolveSecretRef(secretRef, profileId)), false);
   }
 
   private createApplicationJwt() {
@@ -724,12 +721,10 @@ export class VonageService {
 
   private verifyWebhookRequest(request: Request) {
     const signatureSecretRef = getVonageConfig().signatureSecretRef || DEFAULT_SIGNATURE_SECRET_REF;
-    let signatureSecret: string | null = null;
-    try {
-      signatureSecret = this.secrets.resolveSecretRef(signatureSecretRef, this.resolveSecretProfileId());
-    } catch {
-      signatureSecret = null;
-    }
+    const signatureSecret = attemptOr(
+      () => this.secrets.resolveSecretRef(signatureSecretRef, this.resolveSecretProfileId()),
+      null,
+    );
     if (!signatureSecret) {
       return { verified: false, reason: "missing signature secret" as const };
     }
@@ -745,7 +740,7 @@ export class VonageService {
       return { verified: false, reason: "invalid jwt shape" as const };
     }
 
-    try {
+    const result = tryCatch(() => {
       const [encodedHeader, encodedPayload, encodedSignature] = parts;
       if (!encodedSignature) {
         return { verified: false, reason: "missing signature" as const };
@@ -764,10 +759,11 @@ export class VonageService {
         return { verified: false, reason: "expired token" as const };
       }
       return { verified: true as const, reason: "ok" as const };
-    } catch (error) {
-      this.vonageTelemetry.recordError(error, { operation: "webhook.verify" });
+    }, { operation: "webhook.verify" });
+    if (!result.ok) {
       return { verified: false, reason: "verification error" as const };
     }
+    return result.value;
   }
 
   private async fetchVonageJson(url: string, init: RequestInit, operation: string) {
@@ -787,13 +783,7 @@ export class VonageService {
     });
     const text = await response.text();
     const parsed = text.trim()
-      ? (() => {
-          try {
-            return JSON.parse(text) as Record<string, unknown> | unknown[];
-          } catch {
-            return { raw: text };
-          }
-        })()
+      ? attemptOr(() => JSON.parse(text) as Record<string, unknown> | unknown[], { raw: text })
       : {};
 
     if (!response.ok) {

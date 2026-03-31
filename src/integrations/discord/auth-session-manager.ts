@@ -1,6 +1,7 @@
 import { loginOpenAICodex } from "@mariozechner/pi-ai/oauth";
 import { validateClaudeSetupToken } from "../../auth/claude";
 import { saveClaudeSetupToken, saveCodexCredentials, saveZaiApiKey } from "../../auth/store";
+import { telemetry } from "../../services/infrastructure/telemetry";
 
 type SendMessage = (content: string) => Promise<void>;
 
@@ -64,6 +65,7 @@ export class DiscordAuthSessionManager {
       saveClaudeSetupToken(token.trim(), profileId);
       await send(`Claude auth saved locally for profile ${profileId}.`);
     } catch (error) {
+      telemetry.recordError(error, { operation: "auth-session.claudeSetup" });
       await send(error instanceof Error ? error.message : String(error));
     } finally {
       this.activeSessions.delete(userId);
@@ -122,6 +124,7 @@ export class DiscordAuthSessionManager {
       saveCodexCredentials(credentials, profileId);
       await send(`Codex auth saved locally for profile ${profileId}.`);
     } catch (error) {
+      telemetry.recordError(error, { operation: "auth-session.codexOAuth" });
       await send(`Codex auth failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       this.activeSessions.delete(userId);
@@ -159,6 +162,7 @@ export class DiscordAuthSessionManager {
       saveZaiApiKey(trimmed, profileId);
       await send(`Z.ai auth saved locally for profile ${profileId}.`);
     } catch (error) {
+      telemetry.recordError(error, { operation: "auth-session.zaiApiKey" });
       await send(error instanceof Error ? error.message : String(error));
     } finally {
       this.activeSessions.delete(userId);

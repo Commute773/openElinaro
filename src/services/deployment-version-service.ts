@@ -1,4 +1,5 @@
 import path from "node:path";
+import { attemptOr, attemptOrAsync } from "../utils/result";
 import { getServiceRootDir } from "./runtime-root";
 
 type VersionFilePayload = {
@@ -51,15 +52,13 @@ const VERSION_FILE_NAME = "VERSION.json";
 const CHANGELOG_FILE_NAME = "DEPLOYMENTS.md";
 
 async function readJsonFile<T>(filePath: string): Promise<T | null> {
-  try {
+  return attemptOrAsync(async () => {
     const file = Bun.file(filePath);
     if (!await file.exists()) {
       return null;
     }
     return JSON.parse(await file.text()) as T;
-  } catch {
-    return null;
-  }
+  }, null);
 }
 
 function resolveOptionalPath(serviceRoot: string, filePath?: string) {
@@ -122,11 +121,7 @@ function tryParseVersionSegments(version: string | null | undefined) {
     return null;
   }
 
-  try {
-    return parseVersionSegments(version);
-  } catch {
-    return null;
-  }
+  return attemptOr(() => parseVersionSegments(version), null);
 }
 
 function compareVersionSegments(left: number[], right: number[]) {

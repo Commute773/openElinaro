@@ -15,6 +15,7 @@ import {
   type SystemPromptSnapshot,
 } from "../system-prompt-service";
 import { telemetry } from "../infrastructure/telemetry";
+import { tryCatchAsync } from "../../utils/result";
 
 type ProgressReporter = (message: string) => Promise<void>;
 
@@ -158,9 +159,9 @@ export class ConversationStateTransitionService {
     conversationKey: string,
     snapshot: SystemPromptSnapshot,
   ): Promise<AssistantMessage> {
-    try {
+    const result = await tryCatchAsync(async () => {
       const resolved = await this.models.resolveModelForPurpose("conversation_opening");
-      const response = await completeSimple(resolved.runtimeModel, {
+      return completeSimple(resolved.runtimeModel, {
         systemPrompt: composeSystemPrompt(snapshot.text).text,
         messages: [
           userMessage(
@@ -168,16 +169,7 @@ export class ConversationStateTransitionService {
           ),
         ],
       }, { apiKey: resolved.apiKey });
-      return response;
-    } catch (error) {
-      telemetry.event("conversation.transition.opening_generation_failed", {
-        conversationKey,
-        error: error instanceof Error ? error.message : String(error),
-      }, {
-        level: "warn",
-        outcome: "error",
-      });
-      return this.fallbackConversationOpening();
-    }
+    }, { operation: "conversation.transition.opening_generation", conversationKey });
+    return result.ok ? result.value : this.fallbackConversationOpening();
   }
 }

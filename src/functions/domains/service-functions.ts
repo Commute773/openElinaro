@@ -10,6 +10,7 @@ import { formatResult } from "../formatters";
 import { isRunningInsideManagedService } from "../../services/infrastructure/runtime-platform";
 import type { RuntimePlatform } from "../../services/infrastructure/runtime-platform";
 import type { ToolBuildContext } from "../context";
+import { tryCatchAsync } from "../../utils/result";
 
 // ---------------------------------------------------------------------------
 // Shared schemas (same as service-tools.ts)
@@ -175,15 +176,17 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
       timeoutMs: 10_000,
     });
     const latestTagVersion = tagResult.stdout?.trim() ?? "";
-    try {
-      return await services.deploymentVersion.formatAvailableUpdate(latestTagVersion);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
+    const updateResult = await tryCatchAsync(
+      () => services.deploymentVersion.formatAvailableUpdate(latestTagVersion),
+      { operation: "update_preview.formatAvailableUpdate", latestTagVersion },
+    );
+    if (!updateResult.ok) {
       return [
         "Fetched tags, but could not determine available update.",
-        `Reason: ${detail}`,
+        `Reason: ${updateResult.error.message}`,
       ].join("\n");
     }
+    return updateResult.value;
   };
 
   // Shared update runner

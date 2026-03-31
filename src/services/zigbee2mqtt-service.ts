@@ -4,6 +4,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath, resolveServicePath } from "./runtime-root";
 import { telemetry } from "./infrastructure/telemetry";
+import { attemptOr, attemptOrAsync, tryCatchAsync, fireAndForget } from "../utils/result";
 
 const log = telemetry.child({ component: "zigbee" });
 const BRIDGE_PORT = 8085;
@@ -28,11 +29,13 @@ export function detectZigbeeRadio(): string | null {
   for (const pattern of patterns) {
     const dir = path.dirname(pattern);
     const prefix = path.basename(pattern);
-    try {
+    const match = attemptOr(() => {
       for (const entry of fs.readdirSync(dir)) {
         if (entry.startsWith(prefix)) return path.join(dir, entry);
       }
-    } catch {}
+      return null;
+    }, null);
+    if (match) return match;
   }
   return null;
 }
@@ -58,13 +61,15 @@ async function bridgePost(path: string, body: unknown): Promise<any> {
 async function waitForHealth(timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    try {
+    const healthy = await attemptOrAsync(async () => {
       const res = await fetch(`${BRIDGE_URL}/health`);
       if (res.ok) {
         const data = await res.json() as { started?: boolean };
         if (data.started) return true;
       }
-    } catch {}
+      return false;
+    }, false);
+    if (healthy) return true;
     await Bun.sleep(500);
   }
   return false;
@@ -150,9 +155,7 @@ export class Zigbee2MqttService {
       log.event("zigbee.bridge_exit", { code: code ?? null, signal: signal ?? null });
       if (!this.stopping) {
         this.restartTimer = setTimeout(() => {
-          void this.start().catch((err) => {
-            log.recordError(err, { eventName: "zigbee.bridge_restart_failed" });
-          });
+          fireAndForget(() => this.start(), { eventName: "zigbee.bridge_restart_failed" });
         }, RESTART_DELAY_MS);
       }
     });
@@ -252,7 +255,7 @@ export class Zigbee2MqttService {
       return lines.join("\n");
     }
 
-    try {
+    const result = await tryCatchAsync(async () => {
       const data = await bridgeGet("/devices");
       const devices: DeviceInfo[] = data.devices || [];
       const states: Record<string, DeviceState> = data.states || {};
@@ -271,8 +274,9 @@ export class Zigbee2MqttService {
           lines.push(`- ${dev.friendlyName} (${model}, ${dev.type})${stateStr}`);
         }
       }
-    } catch (err) {
-      lines.push(`Error fetching devices: ${err instanceof Error ? err.message : String(err)}`);
+    }, { operation: "zigbee.render_status" });
+    if (!result.ok) {
+      lines.push(`Error fetching devices: ${result.error.message}`);
     }
     return lines.join("\n");
   }
@@ -352,20 +356,12 @@ export async function startZigbeeRuntime(): Promise<ZigbeeRuntime> {
     return { service, stop: async () => {} };
   }
 
-  try {
-    await service.start();
-  } catch (error) {
-    log.recordError(error, { eventName: "zigbee.start_failed" });
-  }
+  await tryCatchAsync(() => service.start(), { eventName: "zigbee.start_failed" });
 
   return {
     service,
     stop: async () => {
-      try {
-        await service.stop();
-      } catch (error) {
-        log.recordError(error, { eventName: "zigbee.stop_failed" });
-      }
+      await tryCatchAsync(() => service.stop(), { eventName: "zigbee.stop_failed" });
     },
   };
 }

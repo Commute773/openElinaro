@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { Database } from "bun:sqlite";
+import { attemptOr } from "../../utils/result";
 import type {
   FinanceNormalizedTransaction,
   FinanceCategoryAggregateData,
@@ -146,13 +147,7 @@ export function applyRule(rules: CategorizationRuleRow[], merchantName: string |
       continue;
     }
     const matched = pattern.startsWith("re:")
-      ? (() => {
-          try {
-            return new RegExp(pattern.slice(3), "i").test(haystack);
-          } catch {
-            return false;
-          }
-        })()
+      ? attemptOr(() => new RegExp(pattern.slice(3), "i").test(haystack), false)
       : haystack.includes(normText(pattern));
     if (matched) {
       return {
@@ -419,11 +414,7 @@ export function parseJson(value: unknown) {
     return null;
   }
   if (typeof value === "string") {
-    try {
-      return JSON.parse(value) as Record<string, unknown>;
-    } catch {
-      return null;
-    }
+    return attemptOr(() => JSON.parse(value) as Record<string, unknown>, null);
   }
   return typeof value === "object" && value !== null ? value as Record<string, unknown> : null;
 }

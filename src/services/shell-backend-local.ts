@@ -9,6 +9,7 @@ import {
   type ExecCommandResult,
   type SpawnCommandResult,
 } from "./shell-backend";
+import { attemptAsync } from "../utils/result";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_CWD = process.cwd();
@@ -111,7 +112,7 @@ export class LocalShellBackend implements ShellBackend {
     timeoutMs: number;
   }): Promise<ExecCommandResult> {
     const invocation = this.buildCommandInvocation(command, opts.sudo);
-    try {
+    const result = await attemptAsync(async () => {
       const { stdout, stderr } = await execFileAsync(invocation.file, invocation.args, {
         cwd: opts.cwd,
         timeout: opts.timeoutMs,
@@ -123,10 +124,9 @@ export class LocalShellBackend implements ShellBackend {
         stdout,
         stderr,
         effectiveUser: invocation.effectiveUser,
-      };
-    } catch (error) {
-      return buildExecErrorResult(error, invocation.effectiveUser);
-    }
+      } satisfies ExecCommandResult;
+    });
+    return result.ok ? result.value : buildExecErrorResult(result.error, invocation.effectiveUser);
   }
 
   spawnCommand(command: string, opts: {

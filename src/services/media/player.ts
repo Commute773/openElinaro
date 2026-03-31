@@ -13,6 +13,7 @@ import type {
   SignalProcess,
   SpawnDetached,
 } from "./types";
+import { attemptOr } from "../../utils/result";
 import { readJsonFile, sleep } from "./utils";
 import { PLAYER_WAIT_POLL_MS } from "./constants";
 
@@ -72,12 +73,10 @@ export async function queryPlayerProperty(
   if (!result.stdout.trim()) {
     return null;
   }
-  try {
+  return attemptOr(() => {
     const parsed = JSON.parse(result.stdout);
     return parsed.data ?? null;
-  } catch {
-    return null;
-  }
+  }, null);
 }
 
 export async function waitForPlayerSocket(
@@ -291,10 +290,6 @@ async function checkEof(
 
 export function emitPlaybackEnd(event: PlaybackEndEvent, callbacks: PlaybackEndCallback[]) {
   for (const callback of callbacks) {
-    try {
-      callback(event);
-    } catch {
-      // Best effort only.
-    }
+    attemptOr(() => callback(event), undefined);
   }
 }

@@ -12,6 +12,7 @@ import type {
   ChatPromptContentBlock,
   ChatTextContentBlock,
 } from "../domain/assistant";
+import { attemptOr } from "../utils/result";
 
 const APPROXIMATE_IMAGE_TOKENS = 1_024;
 const REMOTE_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
@@ -82,15 +83,13 @@ export function resolveRemoteImageUrl(sourceUrl: unknown) {
     return null;
   }
 
-  try {
+  return attemptOr(() => {
     const url = new URL(normalized);
     if (!REMOTE_IMAGE_PROTOCOLS.has(url.protocol)) {
       return null;
     }
     return url.toString();
-  } catch {
-    return null;
-  }
+  }, null);
 }
 
 export function buildChatPromptContent(params: {

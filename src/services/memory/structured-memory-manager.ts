@@ -5,6 +5,7 @@ import { ProfileService } from "../profiles";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../runtime-root";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
+import { attemptOrAsync } from "../../utils/result";
 const structuredMemoryTelemetry = telemetry.child({ component: "structured_memory" });
 const traceSpan = createTraceSpan(structuredMemoryTelemetry);
 
@@ -147,7 +148,7 @@ export class StructuredMemoryManager {
    */
   async readEntry(category: MemoryCategory, slug: string): Promise<{ title: string; body: string; raw: string } | null> {
     const entryPath = this.getEntryPath(category, slug);
-    try {
+    return attemptOrAsync(async () => {
       const raw = await Bun.file(entryPath).text();
       const parsed = parseEntryFrontmatter(raw);
       return {
@@ -155,9 +156,7 @@ export class StructuredMemoryManager {
         body: parsed.body,
         raw,
       };
-    } catch {
-      return null;
-    }
+    }, null);
   }
 
   /**
@@ -165,20 +164,18 @@ export class StructuredMemoryManager {
    */
   async listCategory(category: MemoryCategory): Promise<{ slug: string; title: string }[]> {
     const categoryDir = this.getCategoryDir(category);
-    try {
+    return attemptOrAsync(async () => {
       const files = await readdir(categoryDir);
       const entries: { slug: string; title: string }[] = [];
       for (const file of files) {
         if (!file.endsWith(".md") || file === INDEX_FILENAME) continue;
         const slug = file.replace(/\.md$/, "");
-        const content = await Bun.file(path.join(categoryDir, file)).text().catch(() => null);
+        const content = await attemptOrAsync(() => Bun.file(path.join(categoryDir, file)).text(), null);
         const parsed = content ? parseEntryFrontmatter(content) : { title: undefined, body: "" };
         entries.push({ slug, title: parsed.title ?? slug });
       }
       return entries;
-    } catch {
-      return [];
-    }
+    }, []);
   }
 
   /**
@@ -257,7 +254,7 @@ export class StructuredMemoryManager {
       const enriched = await Promise.all(
         entries.map(async (entry) => {
           const entryPath = this.getEntryPath(category, entry.slug);
-          const fileStat = await stat(entryPath).catch(() => null);
+          const fileStat = await attemptOrAsync(() => stat(entryPath), null);
           return {
             slug: entry.slug,
             title: entry.title,
@@ -283,7 +280,7 @@ export class StructuredMemoryManager {
     const enriched = await Promise.all(
       entries.map(async (entry) => {
         const entryPath = this.getEntryPath(category, entry.slug);
-        const fileStat = await stat(entryPath).catch(() => null);
+        const fileStat = await attemptOrAsync(() => stat(entryPath), null);
         return {
           slug: entry.slug,
           title: entry.title,

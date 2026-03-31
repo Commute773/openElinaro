@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { getRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimePath, resolveServicePath } from "./runtime-root";
+import { attemptOr } from "../utils/result";
 
 const DEFAULT_VENV_PATH = "python/.venv";
 const DEFAULT_REQUIREMENTS_FILE = "python/requirements.txt";
@@ -69,12 +70,8 @@ function findMissingPythonModules(pythonBin: string, requiredModules: string[]) 
     return [...requiredModules];
   }
 
-  try {
-    const parsed = JSON.parse(result.stdout.trim() || "[]");
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [...requiredModules];
-  } catch {
-    return [...requiredModules];
-  }
+  const parsed = attemptOr(() => JSON.parse(result.stdout.trim() || "[]"), undefined);
+  return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [...requiredModules];
 }
 
 function resolveRuntimeRelativePath(configuredPath: string) {

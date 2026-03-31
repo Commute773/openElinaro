@@ -1,3 +1,5 @@
+import { attemptOr } from "./result";
+
 /**
  * Parse the payload from an incoming webhook request.
  *
@@ -24,9 +26,5 @@ export async function readWebhookPayload(
   if (!text.trim()) {
     return {};
   }
-  try {
-    return JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    return { raw: text };
-  }
+  return attemptOr(() => JSON.parse(text) as Record<string, unknown>, { raw: text });
 }

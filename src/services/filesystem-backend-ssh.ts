@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { ProfileRecord } from "../domain/profiles";
+import { attemptOr, attemptOrAsync } from "../utils/result";
 import { ProfileService } from "./profiles";
 import type { ShellService } from "./infrastructure/shell-service";
 import type {
@@ -228,12 +229,10 @@ export class SshFilesystemBackend implements FilesystemBackend {
     const payload = Buffer.from(JSON.stringify(request), "utf8").toString("base64");
     const command = `OPENELINARO_SSH_FS_REQUEST=${shellQuote(payload)} python3 - <<'PY'\n${REMOTE_FILESYSTEM_SCRIPT}\nPY`;
     const result = await this.shell.exec({ command });
-    let parsed: ({ error?: string } & T) | null = null;
-    try {
-      parsed = JSON.parse(result.stdout) as { error?: string } & T;
-    } catch {
-      parsed = null;
-    }
+    const parsed = attemptOr(
+      () => JSON.parse(result.stdout) as ({ error?: string } & T),
+      null,
+    );
     if (result.exitCode !== 0) {
       if (parsed?.error) {
         throw new Error(parsed.error);
@@ -282,7 +281,7 @@ export class SshFilesystemBackend implements FilesystemBackend {
   }
 
   async stat(targetPath: string): Promise<StatResult | null> {
-    try {
+    return attemptOrAsync(async () => {
       const result = await this.runOperation<{
         type: "directory" | "file" | "other";
         sizeBytes: number;
@@ -298,9 +297,7 @@ export class SshFilesystemBackend implements FilesystemBackend {
         modifiedAt: formatTimestamp(result.modifiedAt),
         createdAt: formatTimestamp(result.createdAt),
       };
-    } catch {
-      return null;
-    }
+    }, null);
   }
 
   async statOrThrow(targetPath: string): Promise<StatResult> {

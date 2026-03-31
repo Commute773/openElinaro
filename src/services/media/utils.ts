@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync } from "node:fs";
 import path from "node:path";
+import { attempt, attemptOr, tryCatch } from "../../utils/result";
 import { telemetry } from "../infrastructure/telemetry";
 import type { CommandResult, SpeakerTransport } from "./types";
 
@@ -40,38 +41,24 @@ export function sleep(delayMs: number) {
 }
 
 export function defaultProcessIsAlive(pid: number) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException)?.code === "EPERM";
-  }
+  const result = attempt(() => process.kill(pid, 0));
+  if (result.ok) return true;
+  return (result.error as NodeJS.ErrnoException)?.code === "EPERM";
 }
 
 export function defaultSignalProcess(pid: number, signal: NodeJS.Signals) {
-  try {
-    process.kill(pid, signal);
-  } catch {
-    // Best effort only.
-  }
+  attemptOr(() => process.kill(pid, signal), undefined);
 }
 
 export function readJsonFile<T>(filePath: string): T | null {
   if (!existsSync(filePath)) {
     return null;
   }
-  try {
-    return JSON.parse(readFileSync(filePath, "utf8")) as T;
-  } catch (error) {
-    telemetry.event("media.invalid_json", {
-      filePath,
-      error: error instanceof Error ? error.message : String(error),
-    }, {
-      level: "warn",
-      outcome: "error",
-    });
-    return null;
-  }
+  const result = tryCatch(
+    () => JSON.parse(readFileSync(filePath, "utf8")) as T,
+    { op: "media.readJsonFile", filePath },
+  );
+  return result.ok ? result.value : null;
 }
 
 

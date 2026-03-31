@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
+import { attemptOrAsync, attemptAsync } from "../utils/result";
 
 export type SweBenchDifficultySplit = "verified";
 
@@ -216,11 +217,7 @@ function estimateFailureFrontier(points: Array<{ difficulty: number; solved: boo
 }
 
 async function readOptionalText(filePath: string) {
-  try {
-    return await fs.readFile(filePath, "utf8");
-  } catch {
-    return null;
-  }
+  return attemptOrAsync(() => fs.readFile(filePath, "utf8"), null);
 }
 
 async function loadSubmissionRecords(splitRoot: string, minSubmissionCoverage: number) {
@@ -237,12 +234,11 @@ async function loadSubmissionRecords(splitRoot: string, minSubmissionCoverage: n
     const submissionRoot = path.join(splitRoot, submissionId);
     const resultsPath = path.join(submissionRoot, "results/results.json");
 
-    let results: Record<string, unknown>;
-    try {
-      results = JSON.parse(await fs.readFile(resultsPath, "utf8")) as Record<string, unknown>;
-    } catch {
-      continue;
-    }
+    const parseResult = await attemptAsync(async () =>
+      JSON.parse(await fs.readFile(resultsPath, "utf8")) as Record<string, unknown>,
+    );
+    if (!parseResult.ok) continue;
+    const results = parseResult.value;
 
     submissionsSeen += 1;
     const { attempted, resolved } = collectOutcomeSets(results);

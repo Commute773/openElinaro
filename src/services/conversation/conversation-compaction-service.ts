@@ -12,6 +12,7 @@ import { MemoryService } from "../memory-service";
 import { ModelService } from "../models/model-service";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
+import { attempt, tryCatchAsync } from "../../utils/result";
 
 const COMPACTION_TAIL_MESSAGES = 4;
 const COMPACTION_MAX_TOKENS = 16_000;
@@ -180,43 +181,42 @@ function normalizeMemoryMarkdown(raw: string) {
 function parseCompactionPayload(raw: string): CompactionPayload {
   const cleaned = stripCodeFence(raw);
 
-  try {
-    const parsed = JSON.parse(cleaned) as Partial<CompactionPayload>;
+  const fullParse = attempt(() => JSON.parse(cleaned) as Partial<CompactionPayload>);
+  if (fullParse.ok) {
     return {
-      summary: parsed.summary?.trim() ?? "",
-      memory_markdown: parsed.memory_markdown?.trim() ?? "",
+      summary: fullParse.value.summary?.trim() ?? "",
+      memory_markdown: fullParse.value.memory_markdown?.trim() ?? "",
     };
-  } catch {
-    const firstBrace = cleaned.indexOf("{");
-    const lastBrace = cleaned.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      try {
-        const parsed = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1)) as Partial<CompactionPayload>;
-        return {
-          summary: parsed.summary?.trim() ?? "",
-          memory_markdown: parsed.memory_markdown?.trim() ?? "",
-        };
-      } catch {
-        return {
-          summary: cleaned,
-          memory_markdown: "",
-        };
-      }
-    }
+  }
 
-    const sectioned = parseSectionedCompactionPayload(cleaned);
-    if (sectioned) {
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const braceParse = attempt(() => JSON.parse(cleaned.slice(firstBrace, lastBrace + 1)) as Partial<CompactionPayload>);
+    if (braceParse.ok) {
       return {
-        summary: sectioned.summary.trim(),
-        memory_markdown: normalizeMemoryMarkdown(sectioned.memory_markdown),
+        summary: braceParse.value.summary?.trim() ?? "",
+        memory_markdown: braceParse.value.memory_markdown?.trim() ?? "",
       };
     }
-
     return {
       summary: cleaned,
       memory_markdown: "",
     };
   }
+
+  const sectioned = parseSectionedCompactionPayload(cleaned);
+  if (sectioned) {
+    return {
+      summary: sectioned.summary.trim(),
+      memory_markdown: normalizeMemoryMarkdown(sectioned.memory_markdown),
+    };
+  }
+
+  return {
+    summary: cleaned,
+    memory_markdown: "",
+  };
 }
 
 function buildSummaryMessage(summary: string): UserMessage {
@@ -424,8 +424,7 @@ export class ConversationCompactionService {
     const existingCore = await this.memory.readProfileDocument(CORE_MEMORY_RELATIVE_PATH);
     const bootstrapCore = existingCore?.trim() ? existingCore : "# Core Memory\n";
 
-    let nextCore = "";
-    try {
+    const mergeResult = await tryCatchAsync(async () => {
       const responseText = await this.models.generateMemoryText({
         systemPrompt: [
           "You maintain a markdown core memory file for an assistant.",
@@ -451,28 +450,24 @@ export class ConversationCompactionService {
         usagePurpose: "conversation_compaction_core_memory",
         sessionIdPrefix: "memory-core",
       });
-      nextCore = normalizeCoreMemoryDocument(responseText);
-      if (nextCore.length > CORE_MEMORY_HARD_CAP_CHARS) {
+      const merged = normalizeCoreMemoryDocument(responseText);
+      if (merged.length > CORE_MEMORY_HARD_CAP_CHARS) {
         compactionTelemetry.event("conversation.compact.core_memory_hard_cap_exceeded", {
           conversationKey: params.conversationKey,
-          outputChars: nextCore.length,
+          outputChars: merged.length,
           hardCapChars: CORE_MEMORY_HARD_CAP_CHARS,
         }, {
           level: "warn",
           outcome: "error",
         });
-        nextCore = fallbackMergeCoreMemory(bootstrapCore, params.memoryMarkdown);
+        return fallbackMergeCoreMemory(bootstrapCore, params.memoryMarkdown);
       }
-    } catch (error) {
-      compactionTelemetry.event("conversation.compact.core_memory_merge_failed", {
-        conversationKey: params.conversationKey,
-        error: error instanceof Error ? error.message : String(error),
-      }, {
-        level: "warn",
-        outcome: "error",
-      });
-      nextCore = fallbackMergeCoreMemory(bootstrapCore, params.memoryMarkdown);
-    }
+      return merged;
+    }, { operation: "conversation.compact.core_memory_merge", conversationKey: params.conversationKey });
+
+    const nextCore = mergeResult.ok
+      ? mergeResult.value
+      : fallbackMergeCoreMemory(bootstrapCore, params.memoryMarkdown);
 
     return this.memory.upsertProfileDocument({
       relativePath: CORE_MEMORY_RELATIVE_PATH,

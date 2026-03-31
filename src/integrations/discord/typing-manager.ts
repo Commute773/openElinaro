@@ -1,6 +1,7 @@
 import type { Message } from "discord.js";
 import { DISCORD_TYPING_REFRESH_MS } from "../../config/service-constants";
 import { telemetry } from "../../services/infrastructure/telemetry";
+import { attemptAsync } from "../../utils/result";
 
 const discordTelemetry = telemetry.child({ component: "discord" });
 
@@ -29,14 +30,13 @@ export function createConversationTypingTracker() {
       return;
     }
 
-    try {
-      await state.channel.sendTyping();
-    } catch (error) {
+    const result = await attemptAsync(() => state.channel!.sendTyping());
+    if (!result.ok) {
       discordTelemetry.event(
         "discord.typing_indicator.error",
         {
           conversationKey,
-          error: error instanceof Error ? error.message : String(error),
+          error: result.error.message,
         },
         { level: "debug", outcome: "error" },
       );
@@ -128,17 +128,18 @@ export async function withTypingIndicator<T>(message: Message, run: () => Promis
       return;
     }
 
-    try {
+    const result = await attemptAsync(async () => {
       if ("sendTyping" in message.channel && typeof message.channel.sendTyping === "function") {
         await message.channel.sendTyping();
       }
-    } catch (error) {
+    });
+    if (!result.ok) {
       discordTelemetry.event(
         "discord.typing_indicator.error",
         {
           userId: message.author.id,
           channelId: message.channelId,
-          error: error instanceof Error ? error.message : String(error),
+          error: result.error.message,
         },
         { level: "debug", outcome: "error" },
       );

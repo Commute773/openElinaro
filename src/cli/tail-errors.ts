@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import fs from "node:fs";
 import { resolveRuntimePath } from "../services/runtime-root";
+import { attempt } from "../utils/result";
 
 const logPath = resolveRuntimePath("logs", "errors.jsonl");
 
@@ -65,12 +66,9 @@ function formatEntry(parsed: Record<string, unknown>): string {
 }
 
 function processLine(line: string): void {
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(line);
-  } catch {
-    return;
-  }
+  const result = attempt(() => JSON.parse(line) as Record<string, unknown>);
+  if (!result.ok) return;
+  const parsed = result.value;
   if (!matchesFilter(parsed)) return;
   if (jsonMode) {
     console.log(line);

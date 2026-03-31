@@ -1,5 +1,6 @@
 import type { RouteDefinition } from "./router";
 import { json, error, apiTelemetry } from "./helpers";
+import { attemptOrAsync } from "../../../utils/result";
 
 export const toolRoutes: RouteDefinition[] = [
   {
@@ -30,7 +31,7 @@ export const toolRoutes: RouteDefinition[] = [
     handler: async (request, params, app) => {
       const toolName = params.name!;
       try {
-        const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+        const body = await attemptOrAsync(() => request.json(), {}) as Record<string, unknown>;
         const result = await app.invokeRoutineTool(toolName, body, {
           conversationKey: `api-tool-${Date.now()}`,
         });

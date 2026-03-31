@@ -5,6 +5,7 @@ import { ProjectsService } from "../projects-service";
 import { ProfileService } from "./profile-service";
 import { ProjectWorkspaceService } from "../project-workspace-service";
 import { getRuntimeRootDir, resolveRuntimePath, resolveUserDataPath } from "../runtime-root";
+import { attemptOr } from "../../utils/result";
 
 function getRepoRoot() {
   return getRuntimeRootDir();
@@ -21,17 +22,15 @@ function normalize(targetPath: string, remote = false) {
   const resolved = path.isAbsolute(targetPath)
     ? path.resolve(targetPath)
     : path.resolve(getRuntimeRootDir(), targetPath);
-  try {
-    return realpathSync.native(resolved);
-  } catch {
+  return attemptOr(
+    () => realpathSync.native(resolved),
     // File may not exist yet (e.g. write target). Resolve the parent directory
     // to canonicalize symlinks (macOS /tmp → /private/tmp), then re-append the basename.
-    try {
-      return path.join(realpathSync.native(path.dirname(resolved)), path.basename(resolved));
-    } catch {
-      return resolved;
-    }
-  }
+    attemptOr(
+      () => path.join(realpathSync.native(path.dirname(resolved)), path.basename(resolved)),
+      resolved,
+    ),
+  );
 }
 
 function isWithin(targetPath: string, basePath: string, remote = false) {

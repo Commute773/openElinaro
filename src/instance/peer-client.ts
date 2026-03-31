@@ -5,6 +5,7 @@ import type {
   PeerConfig,
 } from "./types";
 import type { PeerRegistry } from "./peer-registry";
+import { telemetry } from "../services/infrastructure/telemetry";
 
 /**
  * Client for sending messages to peer OpenElinaro instances.
@@ -59,6 +60,7 @@ export class PeerClient {
       } as RequestInit);
       return (await response.json()) as InstanceMessageResponse;
     } catch (error) {
+      telemetry.recordError(error, { operation: "peer-client.sendMessage" });
       return {
         accepted: false,
         conversationKey: message.conversationKey,
@@ -77,6 +79,7 @@ export class PeerClient {
       } as RequestInit);
       return (await response.json()) as InstanceStatus;
     } catch (error) {
+      telemetry.recordError(error, { operation: "peer-client.getStatus" });
       return { error: error instanceof Error ? error.message : String(error) };
     }
   }

@@ -1,6 +1,7 @@
 import type { OpenElinaroApp } from "../../../app/runtime";
 import type { RouteDefinition } from "./router";
 import { CORS_HEADERS, apiTelemetry } from "./helpers";
+import { attempt } from "../../../utils/result";
 
 const SSE_HEADERS: Record<string, string> = {
   "Content-Type": "text/event-stream",
@@ -55,11 +56,8 @@ function createEventStream(app: OpenElinaroApp, request: Request): Response {
 
       heartbeatTimer = setInterval(() => {
         if (cancelled) return;
-        try {
-          controller.enqueue(": heartbeat\n\n");
-        } catch {
-          teardown();
-        }
+        const result = attempt(() => controller.enqueue(": heartbeat\n\n"));
+        if (!result.ok) teardown();
       }, HEARTBEAT_INTERVAL_MS);
     },
     cancel() {

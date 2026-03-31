@@ -2,6 +2,7 @@ import { mkdir, chmod, rm } from "node:fs/promises";
 import path from "node:path";
 import { resolveUserDataPath } from "./runtime-root";
 import { timestamp } from "../utils/timestamp";
+import { attemptOrAsync } from "../utils/result";
 
 export const DEFAULT_SERVICE_RESTART_CONTINUATION_MESSAGE =
   "System restarted. Continue what you were doing. This system restart may be unrelated to your actions.";
@@ -43,7 +44,7 @@ export class ServiceRestartNoticeService {
       return undefined;
     }
 
-    try {
+    const result = await attemptOrAsync(async () => {
       const parsed = JSON.parse(await Bun.file(this.storePath).text()) as Partial<StoredServiceRestartNotice>;
       if (!parsed.message || typeof parsed.message !== "string") {
         await this.clearPendingNotice();
@@ -58,9 +59,11 @@ export class ServiceRestartNoticeService {
       };
       await this.clearPendingNotice();
       return notice;
-    } catch {
+    }, undefined as PendingServiceRestartNotice | undefined);
+
+    if (result === undefined) {
       await this.clearPendingNotice();
-      return undefined;
     }
+    return result;
   }
 }

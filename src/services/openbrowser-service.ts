@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import { getRuntimeConfig } from "../config/runtime-config";
+import { attemptOr } from "../utils/result";
 import { ProfileService } from "./profiles";
 import {
   assertSharedPythonRuntimeReady,
@@ -330,11 +331,7 @@ export class OpenBrowserService {
   }
 
   private getActiveProfileId() {
-    try {
-      return this.profiles.getActiveProfile().id;
-    } catch {
-      return "root";
-    }
+    return attemptOr(() => this.profiles.getActiveProfile().id, "root");
   }
 
   private resolveActionSecrets(action: OpenBrowserAction, profileId: string): OpenBrowserAction {
@@ -530,13 +527,15 @@ export class OpenBrowserService {
       return;
     }
 
-    let message: OpenBrowserRunnerResponse;
-    try {
-      message = JSON.parse(trimmed) as OpenBrowserRunnerResponse;
-    } catch (error) {
+    const parseResult = attemptOr(
+      () => JSON.parse(trimmed) as OpenBrowserRunnerResponse,
+      null,
+    );
+    if (!parseResult) {
       session.stdoutNoise = `${session.stdoutNoise}${trimmed}\n`.slice(-MAX_SESSION_STDERR_CHARS);
       return;
     }
+    const message = parseResult;
 
     const pending = session.pending.get(message.commandId);
     if (!pending) {

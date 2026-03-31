@@ -7,6 +7,7 @@ import {
   sendDiscordDirectMessage,
 } from "../services/service-transition-notifier";
 import { getUserDataRootDir } from "../services/runtime-root";
+import { attemptOrAsync } from "../utils/result";
 
 const execFileAsync = promisify(execFile);
 
@@ -32,7 +33,7 @@ async function writeStatus(
 }
 
 async function readCurrentVersion(rootDir: string) {
-  try {
+  return attemptOrAsync(async () => {
     const userDataDir = getUserDataRootDir();
     const deploymentsDir = path.join(userDataDir, "deployments");
     const pointerPath = path.join(deploymentsDir, "current-release.txt");
@@ -44,9 +45,7 @@ async function readCurrentVersion(rootDir: string) {
     const raw = await fs.readFile(versionPath, "utf8");
     const parsed = JSON.parse(raw) as { version?: unknown };
     return typeof parsed.version === "string" ? parsed.version : "";
-  } catch {
-    return "";
-  }
+  }, "");
 }
 
 async function notifyTransitionStatus(rootDir: string, action: "update" | "rollback", status: "completed" | "failed") {

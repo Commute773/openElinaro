@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { InstanceMessage, InstanceMessageResponse, InstanceStatus } from "./types";
+import { attemptAsync } from "../utils/result";
 
 export interface InstanceSocketServerOptions {
   socketPath: string;
@@ -41,7 +42,7 @@ export class InstanceSocketServer {
         }
 
         if (req.method === "POST" && url.pathname === "/message") {
-          try {
+          const parsed = await attemptAsync(async () => {
             const message = (await req.json()) as InstanceMessage;
             if (!message.from || !message.content || !message.conversationKey) {
               return Response.json(
@@ -51,12 +52,14 @@ export class InstanceSocketServer {
             }
             const result = await self.options.onMessage(message);
             return Response.json(result, { status: result.accepted ? 200 : 400 });
-          } catch {
+          });
+          if (!parsed.ok) {
             return Response.json(
               { accepted: false, conversationKey: "", error: "Invalid request body" },
               { status: 400 },
             );
           }
+          return parsed.value;
         }
 
         return Response.json({ error: "Not found" }, { status: 404 });

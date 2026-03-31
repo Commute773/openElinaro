@@ -1,6 +1,7 @@
 import { mkdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import type { ProfileRecord } from "../domain/profiles";
+import { attemptOrAsync } from "../utils/result";
 import { ProfileService } from "./profiles";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "./runtime-root";
 
@@ -58,7 +59,7 @@ export class MemoryService {
       relativePath,
     );
     const targetPath = path.join(getMemoryDocumentRoot(), namespacedPath);
-    return Bun.file(targetPath).text().catch(() => null);
+    return attemptOrAsync(() => Bun.file(targetPath).text(), null);
   }
 
   async deleteProfileDocument(relativePath: string) {
