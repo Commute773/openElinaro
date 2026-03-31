@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.24
+- Released at: 2026-03-31T20:15:06Z
+- Release id: 20260331T201506Z-6c649b4
+- Previous version: 2026.03.31.23
+- Trigger: ci/release workflow
+
+- fix: catch stale session error from SDK result messages
+
 ## 2026.03.31.23
 - Released at: 2026-03-31T19:57:40Z
 - Release id: 20260331T195740Z-e93a7b8
