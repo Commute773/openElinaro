@@ -357,7 +357,7 @@ export class ClaudeSdkCore implements AgentCore {
           elapsed,
           taskId: msg.task_id,
         });
-        progress?.({ type: "tool_progress", name: toolName, elapsed });
+        progress?.({ type: "tool_progress", name: toolName, elapsed, taskId: msg.task_id });
       }
 
       if (message.type === "result") {
@@ -428,15 +428,15 @@ export class ClaudeSdkCore implements AgentCore {
             progress?.({ type: "status", message: `Hook ${msg.outcome ?? "completed"}: ${msg.hook_name ?? "unknown"}${msg.exit_code != null ? ` (exit ${msg.exit_code})` : ""}` });
             break;
           case "task_started":
-            progress?.({ type: "status", message: `Task started: ${msg.description ?? msg.task_id ?? "unknown"}${msg.task_type ? ` (${msg.task_type})` : ""}` });
+            progress?.({ type: "task_started", taskId: msg.task_id ?? "", description: msg.description, taskType: msg.task_type });
             break;
           case "task_progress": {
             const usage = msg.usage ?? {};
-            progress?.({ type: "status", message: `Task progress: ${msg.description ?? msg.task_id ?? "unknown"} (${usage.total_tokens ?? 0} tokens, ${usage.tool_uses ?? 0} tool calls, ${((usage.duration_ms ?? 0) / 1000).toFixed(1)}s)` });
+            progress?.({ type: "task_progress", taskId: msg.task_id ?? "", tokens: usage.total_tokens, toolUses: usage.tool_uses, durationMs: usage.duration_ms });
             break;
           }
           case "task_notification":
-            progress?.({ type: "status", message: `Task ${msg.status ?? "completed"}: ${msg.summary ?? msg.task_id ?? "unknown"}` });
+            progress?.({ type: "task_completed", taskId: msg.task_id ?? "", status: msg.status, summary: msg.summary });
             break;
           case "files_persisted": {
             const files = msg.files ?? [];

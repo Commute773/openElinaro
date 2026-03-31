@@ -75,17 +75,25 @@ const mockData: Record<string, unknown> = {
   },
 };
 
-// Mock agent stream events for agent chat
+// Mock agent stream events for agent chat — includes task nesting
 const mockChatEvents = [
-  { delay: 100, event: "thinking", data: { type: "thinking", text: "The user wants medication status. I should check the routines system for overdue med-type items..." } },
+  { delay: 100, event: "thinking", data: { type: "thinking", text: "Checking medication schedule and researching any interactions..." } },
+  // Direct tool call (no task parent)
   { delay: 200, event: "tool_start", data: { type: "tool_start", name: "routine_check", args: { kind: "med" } } },
-  { delay: 500, event: "tool_progress", data: { type: "tool_progress", name: "routine_check", elapsed: 1.2, message: "querying routines..." } },
-  { delay: 400, event: "tool_end", data: { type: "tool_end", name: "routine_check", isError: false, summary: "2 medications found, both overdue" } },
-  { delay: 100, event: "tool_summary", data: { type: "tool_summary", summary: "Estradiol Valerate (20h overdue), Retatrutide (20h overdue)" } },
-  { delay: 200, event: "text", data: { type: "text", text: "You have two medications that are significantly overdue:" } },
-  { delay: 50, event: "text", data: { type: "text", text: "1. Estradiol Valerate 6mg \u2014 20 hours overdue\n2. Retatrutide 4mg \u2014 20 hours overdue" } },
-  { delay: 50, event: "text", data: { type: "text", text: "I recommend taking both as soon as possible. The Estradiol is particularly important to stay on schedule with." } },
-  { delay: 100, event: "result", data: { type: "result", turns: 2, durationMs: 3200, costUsd: 0.0042 } },
+  { delay: 500, event: "tool_progress", data: { type: "tool_progress", name: "routine_check", elapsed: 1.2 } },
+  { delay: 400, event: "tool_end", data: { type: "tool_end", name: "routine_check", isError: false, summary: "2 medications found" } },
+  // Subagent task with nested tool calls
+  { delay: 200, event: "task_started", data: { type: "task_started", taskId: "task-abc", description: "Research interactions" } },
+  { delay: 100, event: "tool_start", data: { type: "tool_start", name: "Read", taskId: "task-abc" } },
+  { delay: 300, event: "tool_end", data: { type: "tool_end", name: "Read", isError: false, summary: "pharmacology.md" } },
+  { delay: 100, event: "tool_start", data: { type: "tool_start", name: "Grep", taskId: "task-abc" } },
+  { delay: 400, event: "tool_end", data: { type: "tool_end", name: "Grep", isError: false, summary: "no interactions" } },
+  { delay: 100, event: "task_completed", data: { type: "task_completed", taskId: "task-abc", status: "completed", summary: "No drug interactions found" } },
+  // Response text
+  { delay: 200, event: "text", data: { type: "text", text: "You have two medications overdue:" } },
+  { delay: 50, event: "text", data: { type: "text", text: "1. Estradiol Valerate 6mg \u2014 20h overdue\n2. Retatrutide 4mg \u2014 20h overdue" } },
+  { delay: 50, event: "text", data: { type: "text", text: "No drug interactions found. Safe to take both now." } },
+  { delay: 100, event: "result", data: { type: "result", turns: 3, durationMs: 4100, costUsd: 0.0058 } },
 ];
 
 function sseEvent(evt: string, data: unknown): string {

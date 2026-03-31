@@ -26,10 +26,13 @@ export interface AppResponseAttachment {
 
 export type AgentStreamEvent =
   | { type: "thinking"; text: string }
-  | { type: "tool_start"; name: string; args?: Record<string, unknown> }
-  | { type: "tool_progress"; name: string; elapsed?: number; message?: string }
+  | { type: "tool_start"; name: string; args?: Record<string, unknown>; taskId?: string }
+  | { type: "tool_progress"; name: string; elapsed?: number; message?: string; taskId?: string }
   | { type: "tool_end"; name: string; isError: boolean; summary?: string; error?: string }
   | { type: "tool_summary"; summary: string }
+  | { type: "task_started"; taskId: string; description?: string; taskType?: string }
+  | { type: "task_progress"; taskId: string; tokens?: number; toolUses?: number; durationMs?: number }
+  | { type: "task_completed"; taskId: string; status?: string; summary?: string }
   | { type: "text"; text: string }
   | { type: "agent_init"; model?: string; toolCount?: number; mcpServerCount?: number }
   | { type: "compaction"; trigger?: string; preTokens?: number }
