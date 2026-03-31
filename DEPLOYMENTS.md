@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.2
+- Released at: 2026-03-31T00:42:25Z
+- Release id: 20260331T004225Z-8d3300d
+- Previous version: 2026.03.31
+- Trigger: ci/release workflow
+
+- test: add unit test for OAuth token env routing + fix e2e to exercise Claude path (#247)
+
 ## 2026.03.31
 - Released at: 2026-03-31T00:28:56Z
 - Release id: 20260331T002856Z-d7b8b28
