@@ -1,5 +1,16 @@
 # Deployments
 
+## 2026.03.31.11
+- Released at: 2026-03-31T17:05:26Z
+- Release id: 20260331T170526Z-8b9ee2e
+- Previous version: 2026.03.31.10
+- Trigger: ci/release workflow
+
+- fix: use attemptOrAsync for progress callback error handling
+- fix: enable SDK session persistence for cross-turn continuity and fix circular dependency test failures
+- suppress load_tool_library for Claude Agent SDK core
+- emit all Claude Agent SDK events to user-facing surfaces
+
 ## 2026.03.31.10
 - Released at: 2026-03-31T01:58:33Z
 - Release id: 20260331T015833Z-d9b5136
