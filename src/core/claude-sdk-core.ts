@@ -384,6 +384,15 @@ export class ClaudeSdkCore implements AgentCore {
           const errors = (message as any).errors ?? [];
           const errorText = errors.length > 0 ? errors.join("; ") : "unknown";
           onLog?.("sdk_result_error", { error: errorText, subtype: message.subtype });
+
+          // If this is a stale session error, retry with a fresh session instead of failing
+          if (this.config.resumeSessionId && isStaleSessionError(new Error(errorText))) {
+            onLog?.("sdk_stale_session_retry", { resumeSessionId: this.config.resumeSessionId, error: errorText });
+            progress?.({ type: "status", message: "Session expired, starting fresh" });
+            const freshCore = new ClaudeSdkCore({ ...this.config, resumeSessionId: undefined });
+            return freshCore.run(options);
+          }
+
           progress?.({ type: "error", message: errorText });
           throw new Error(`Claude Code returned an error result: ${errorText}`);
         }
@@ -622,7 +631,7 @@ function mergeUsage(a: CoreUsage, b: CoreUsage): CoreUsage {
 /** Detect errors from the SDK indicating a stale/expired session ID. */
 function isStaleSessionError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return /no conversation found|session.*not found|invalid.*session/i.test(msg);
+  return /no conversation found|session.*not found|invalid.*session|session.*expired/i.test(msg);
 }
 
 function abortControllerFromSignal(signal: AbortSignal): AbortController {
