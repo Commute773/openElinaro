@@ -55,17 +55,23 @@ async function listSystemPromptSources(root: string, displayPath: (fileName: str
 }
 
 /**
- * Assemble system prompt sources from two layers:
+ * Assemble system prompt sources from three layers:
  *
  * 1. **Universal** (`system_prompt/universal/`): Platform prompts that ship
  *    with the app. Sorted by filename, always included first.
  *
- * 2. **Custom** (`~/.openelinaro/system_prompt/`): Operator-managed prompts.
+ * 2. **Core** (`system_prompt/cores/{coreId}.md`): Core-specific prompt,
+ *    included when a coreId is provided. Contains tool guidance that varies
+ *    between agent cores (e.g., PiCore has filesystem/shell tool names,
+ *    tool library guidance, browser interaction patterns; ClaudeSdkCore
+ *    doesn't need these since the SDK provides its own).
+ *
+ * 3. **Custom** (`~/.openelinaro/system_prompt/`): Operator-managed prompts.
  *    Sorted by filename, appended after universal. Optional and additive.
  *
  * No merge logic, no override filtering, no in-code defaults.
  */
-async function getSystemPromptSources() {
+async function getSystemPromptSources(coreId?: string) {
   const customPromptRoot = getUserSystemPromptRoot();
   await mkdir(customPromptRoot, { recursive: true });
 
@@ -74,12 +80,25 @@ async function getSystemPromptSources() {
     (fileName) => path.posix.join("system_prompt", "universal", fileName),
   )).sort((a, b) => a.fileName.localeCompare(b.fileName));
 
+  // Core-specific prompt: a single file matching the core ID.
+  const coreSources: SystemPromptSource[] = [];
+  if (coreId) {
+    const corePromptPath = path.join(getUniversalSystemPromptRoot(), "..", "cores", `${coreId}.md`);
+    if (existsSync(corePromptPath)) {
+      coreSources.push({
+        absolutePath: corePromptPath,
+        fileName: `${coreId}.md`,
+        displayPath: path.posix.join("system_prompt", "cores", `${coreId}.md`),
+      });
+    }
+  }
+
   const customSources = (await listSystemPromptSources(
     customPromptRoot,
     (fileName) => formatUserDataRelativePath("system_prompt", fileName),
   )).sort((a, b) => a.fileName.localeCompare(b.fileName));
 
-  return [...universalSources, ...customSources];
+  return [...universalSources, ...coreSources, ...customSources];
 }
 
 function sha256(value: string) {
@@ -137,7 +156,7 @@ function buildEnvironmentSection() {
   return lines.join("\n");
 }
 
-function buildRuntimeOverviewPrompt() {
+function buildRuntimeOverviewPrompt(coreId?: string) {
   const config = getRuntimeConfig();
   const featureConfig = new FeatureConfigService();
   const statuses = featureConfig.listStatuses();
@@ -149,14 +168,19 @@ function buildRuntimeOverviewPrompt() {
     `docs indexer ${config.core.app.docsIndexerEnabled ? "on" : "off"}`,
   ].join("; ");
 
+  // Tool library names are useful context for all cores, but the
+  // load_tool_library instruction is only relevant for cores that use it
+  // (i.e., not claude-sdk which has its own tool loading).
+  const includeToolLibraryGuidance = coreId !== "claude-sdk";
+
   const featureLines = statuses.map((s) => {
     const status = s.active ? "active" : s.enabled ? "enabled but not configured" : "off";
     const library = FEATURE_TOOL_LIBRARY[s.featureId];
-    const libraryNote = library ? ` (library: ${library})` : "";
+    const libraryNote = includeToolLibraryGuidance && library ? ` (library: ${library})` : "";
     return `  ${s.featureId}: ${status}${libraryNote}`;
   });
 
-  return [
+  const lines = [
     buildEnvironmentSection(),
     "",
     "## Runtime",
@@ -166,9 +190,16 @@ function buildRuntimeOverviewPrompt() {
     ...featureLines,
     "Tools for non-active features are completely hidden. Do not attempt to use tools from disabled features.",
     `To inspect or enable features, use \`feature_manage\` (\`action=status\` then \`action=apply\`) or update ${configPath} and ${secretStorePath}. Run \`bun run setup:python\` for Python-backed features.`,
-    "Tool libraries load latent tool groups into the active run. Use `load_tool_library` with one library id when the tool you need is not already visible.",
-    `Available tool libraries: ${toolLibraries.map((library) => `${library.id} (${library.description})`).join("; ")}.`,
-  ].join("\n");
+  ];
+
+  if (includeToolLibraryGuidance) {
+    lines.push(
+      "Tool libraries load latent tool groups into the active run. Use `load_tool_library` with one library id when the tool you need is not already visible.",
+      `Available tool libraries: ${toolLibraries.map((library) => `${library.id} (${library.description})`).join("; ")}.`,
+    );
+  }
+
+  return lines.join("\n");
 }
 
 const MEMORY_SKIP_DIRS = new Set(["identity", "compactions"]);
@@ -228,7 +259,7 @@ async function buildMemorySection(): Promise<string | null> {
   if (tree.length > 0) {
     sections.push(
       "### Memory Files",
-      `Use \`read_file\` on any file below (under ${memoryDir}/) when its topic is relevant to the conversation.`,
+      `Read any file below (under ${memoryDir}/) when its topic is relevant to the conversation.`,
       tree.join("\n"),
     );
   }
@@ -236,8 +267,8 @@ async function buildMemorySection(): Promise<string | null> {
   return sections.join("\n\n");
 }
 
-async function compileFiles(files: SystemPromptSource[]) {
-  const runtimeOverview = buildRuntimeOverviewPrompt();
+async function compileFiles(files: SystemPromptSource[], coreId?: string) {
+  const runtimeOverview = buildRuntimeOverviewPrompt(coreId);
   const identityContext = buildAssistantIdentityPromptContext();
   const memorySection = await buildMemorySection();
 
@@ -292,10 +323,10 @@ export function formatSystemPromptWarning(prompt: ComposedSystemPrompt) {
 }
 
 export class SystemPromptService {
-  async load(): Promise<SystemPromptSnapshot> {
-    const sources = await getSystemPromptSources();
+  async load(coreId?: string): Promise<SystemPromptSnapshot> {
+    const sources = await getSystemPromptSources(coreId);
     const files = sources.map((source) => source.displayPath);
-    const text = await compileFiles(sources);
+    const text = await compileFiles(sources, coreId);
 
     return {
       text,
