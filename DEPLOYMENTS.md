@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.26
+- Released at: 2026-03-31T22:45:31Z
+- Release id: 20260331T224531Z-4db88b6
+- Previous version: 2026.03.31.25
+- Trigger: ci/release workflow
+
+- feat: pixel-perfect bitmap font atlas for G2 simulator (#263)
+
 ## 2026.03.31.25
 - Released at: 2026-03-31T21:52:31Z
 - Release id: 20260331T215231Z-44e19d0
