@@ -162,6 +162,17 @@ The docs graph starts here:
 - [docs/assistant/README.md](docs/assistant/README.md)
 - [docs/research/README.md](docs/research/README.md)
 
+## Tool Surface (Claude Code Context)
+
+When working on this repo via Claude Code, two tool surfaces coexist:
+
+- **Native Claude Code tools** — `Read`, `Write`, `Edit`, `Bash`, `Glob`, `Grep`, `Agent`. Use these for all filesystem, shell, and search operations.
+- **OpenElinaro MCP tools** — domain tools for routines, finance, lights, media, projects, memory, email, agents, and browser. Access via `ToolSearch` to discover and fetch, then call directly.
+
+Do not use MCP tools for file reads/writes or shell commands — native tools are faster and produce better output. Do not use native tools for OpenElinaro domain operations — the MCP tools have the correct runtime context.
+
+The `system_prompt/universal/` files use runtime tool names (`read_file`, `exec_command`, `load_tool_library`, etc.) because they ship as the runtime's system prompt. Those names are correct for the runtime; they do not map to Claude Code native tools.
+
 ## Research And Historical Notes
 
 Research notes are intentionally separate from current operating guidance.
