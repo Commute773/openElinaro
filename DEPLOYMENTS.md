@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.18
+- Released at: 2026-03-31T19:29:49Z
+- Release id: 20260331T192949Z-25144dd
+- Previous version: 2026.03.31.17
+- Trigger: ci/release workflow
+
+- fix: duplicate text and word wrapping in agent chat
+
 ## 2026.03.31.17
 - Released at: 2026-03-31T19:13:43Z
 - Release id: 20260331T191343Z-ab90819
