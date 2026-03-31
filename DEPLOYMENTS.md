@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.4
+- Released at: 2026-03-31T01:12:00Z
+- Release id: 20260331T011200Z-1367e1e
+- Previous version: 2026.03.31.3
+- Trigger: ci/release workflow
+
+- debug: add stderr logging to ClaudeSdkCore.run() to diagnose production hang
+
 ## 2026.03.31.3
 - Released at: 2026-03-31T00:54:00Z
 - Release id: 20260331T005400Z-f4045c0
