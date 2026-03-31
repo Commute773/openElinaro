@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.16
+- Released at: 2026-03-31T18:46:45Z
+- Release id: 20260331T184645Z-d812cba
+- Previous version: 2026.03.31.15
+- Trigger: ci/release workflow
+
+- feat: unified "main" session, text input, cross-surface event bus
+
 ## 2026.03.31.15
 - Released at: 2026-03-31T18:07:50Z
 - Release id: 20260331T180750Z-5ed7ae1
