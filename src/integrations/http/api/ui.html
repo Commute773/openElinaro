@@ -714,6 +714,13 @@ function toolLine(tool, indent) {
   return indent + icon + ' ' + tool.name + time;
 }
 
+/** Helper: wrap text with a given indent prefix, pushing to lines array */
+function pushWrapped(lines, text, indent, maxW) {
+  fc.font = `${LH}px 'SF Mono','Fira Code',monospace`;
+  const indentW = fc.measureText(indent).width;
+  for (const l of wordWrap(text, maxW - indentW)) lines.push(indent + l);
+}
+
 /** Convert chat blocks to flat display lines */
 function flattenChatBlocks() {
   const pad = 4;
@@ -722,34 +729,36 @@ function flattenChatBlocks() {
   for (const block of chatBlocks) {
     switch (block.type) {
       case 'user':
-        for (const l of wordWrap('> ' + block.text, maxW)) lines.push(l);
+        pushWrapped(lines, '> ' + block.text, '', maxW);
         lines.push('');
         break;
-      case 'thinking':
-        lines.push('  ' + (block.text.length > 60 ? block.text.slice(0, 60) + '...' : block.text));
+      case 'thinking': {
+        const preview = block.text.length > 60 ? block.text.slice(0, 60) + '...' : block.text;
+        pushWrapped(lines, preview, '  ', maxW);
         break;
+      }
       case 'tool':
         lines.push(toolLine(block, '  '));
-        if (block.summary) lines.push('    ' + block.summary);
+        if (block.summary) pushWrapped(lines, block.summary, '    ', maxW);
         break;
       case 'task': {
         const icon = stateIcon(block.state);
         const time = block.elapsed ? ' (' + block.elapsed + ')' : '';
-        lines.push('  ' + icon + ' ' + (block.description || block.taskId) + time);
+        pushWrapped(lines, icon + ' ' + (block.description || block.taskId) + time, '  ', maxW);
         for (const child of block.children) {
           lines.push(toolLine(child, '    '));
-          if (child.summary) lines.push('      ' + child.summary);
+          if (child.summary) pushWrapped(lines, child.summary, '      ', maxW);
         }
         break;
       }
       case 'text':
-        for (const l of wordWrap(block.text, maxW - 12)) lines.push('  ' + l);
+        pushWrapped(lines, block.text, '  ', maxW);
         break;
       case 'result':
         lines.push('  ' + block.turns + ' turns  ' + block.duration + '  ' + block.cost);
         break;
       case 'status':
-        lines.push('  ' + block.text);
+        pushWrapped(lines, block.text, '  ', maxW);
         break;
     }
   }

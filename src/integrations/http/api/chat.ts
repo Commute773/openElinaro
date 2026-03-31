@@ -76,16 +76,12 @@ export const chatRoutes: RouteDefinition[] = [
               },
             ).then((response) => {
               if (!streamClosed) {
-                const textEvent: AgentStreamEvent = { type: "text", text: response.message };
-                enqueue(textEvent);
-                bus.publish({ kind: "agent_stream", event: textEvent });
+                enqueue({ type: "text", text: response.message });
                 controller.close();
               }
             }).catch((err) => {
               if (!streamClosed) {
-                const errEvent: AgentStreamEvent = { type: "error", message: err.message ?? "Request failed" };
-                enqueue(errEvent);
-                bus.publish({ kind: "agent_stream", event: errEvent });
+                enqueue({ type: "error", message: err.message ?? "Request failed" });
                 attempt(() => controller.close());
               }
               getApiTelemetry().recordError(err, { operation: "api.chat.stream" });
