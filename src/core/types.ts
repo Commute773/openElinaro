@@ -214,6 +214,8 @@ export interface CoreRunResult {
   steps: number;
   /** Aggregated usage across all model calls in this run. */
   totalUsage?: CoreUsage;
+  /** SDK-managed session ID for cross-turn continuity (returned by cores that persist sessions). */
+  sdkSessionId?: string;
 }
 
 // ---------------------------------------------------------------------------

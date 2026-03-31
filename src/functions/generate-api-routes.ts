@@ -21,8 +21,13 @@ import { telemetry } from "../services/infrastructure/telemetry";
 import { attemptOrAsync, tryCatch, tryCatchAsync } from "../utils/result";
 import { formatResult } from "./formatters";
 
-const apiTelemetry = telemetry.child({ component: "function_api" });
-const traceSpan = createTraceSpan(apiTelemetry);
+let _apiTelemetry: typeof telemetry | undefined;
+let _traceSpan: ReturnType<typeof createTraceSpan> | undefined;
+function getTraceSpan() {
+  _apiTelemetry ??= telemetry.child({ component: "function_api" });
+  _traceSpan ??= createTraceSpan(_apiTelemetry);
+  return _traceSpan;
+}
 
 /**
  * Resolved HTTP configuration for a route, combining explicit annotation
@@ -143,7 +148,7 @@ export function generateApiRoute(
     method: http.method,
     pattern: fullPath,
     handler: async (request, params, _app) => {
-      return traceSpan(`api.${def.name}`, async () => {
+      return getTraceSpan()(`api.${def.name}`, async () => {
         // 1. Build input from request
         const rawInput = await buildInput(def, request, params, http);
 

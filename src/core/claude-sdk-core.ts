@@ -81,6 +81,8 @@ export interface ClaudeSdkCoreConfig {
   model: string;
   apiKey?: string;
   cwd?: string;
+  /** SDK session ID to resume from a prior turn (enables cross-turn continuity). */
+  resumeSessionId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +202,7 @@ export class ClaudeSdkCore implements AgentCore {
             .join("\n\n")
       : "";
 
-    // Build SDK options
+    // Build SDK options — enable session persistence for cross-turn continuity
     const sdkOptions: Options = {
       model: normalizeSdkModelId(this.config.model),
       systemPrompt,
@@ -217,7 +219,7 @@ export class ClaudeSdkCore implements AgentCore {
       tools: { type: "preset", preset: "claude_code" },
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,
-      persistSession: false,
+      persistSession: true,
       thinking: { type: "adaptive" },
       hooks: sdkHooks,
       ...(maxSteps ? { maxTurns: maxSteps } : {}),
@@ -225,6 +227,9 @@ export class ClaudeSdkCore implements AgentCore {
         ? { env: { ...process.env, ...buildAuthEnv(this.config.apiKey) } }
         : {}),
       ...(signal ? { abortController: abortControllerFromSignal(signal) } : {}),
+      ...(this.config.resumeSessionId
+        ? { resume: this.config.resumeSessionId }
+        : {}),
     };
 
     // Run the query
@@ -232,6 +237,7 @@ export class ClaudeSdkCore implements AgentCore {
     let finalText = "";
     let totalUsage: CoreUsage = emptyUsage();
     let steps = 0;
+    let capturedSessionId: string | undefined;
     const onLog = options.onLog;
 
     const FIRST_MESSAGE_TIMEOUT_MS = 120_000;
@@ -387,6 +393,7 @@ export class ClaudeSdkCore implements AgentCore {
 
         switch (subtype) {
           case "init":
+            capturedSessionId = msg.session_id ?? undefined;
             progress?.(`Agent initialized: model=${msg.model ?? "unknown"}, ${(msg.tools ?? []).length} tools, ${(msg.mcp_servers ?? []).length} MCP servers`);
             break;
           case "api_retry":
@@ -490,6 +497,7 @@ export class ClaudeSdkCore implements AgentCore {
       finalMessage,
       steps,
       totalUsage,
+      sdkSessionId: capturedSessionId,
     };
   }
 }

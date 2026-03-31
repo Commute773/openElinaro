@@ -22,10 +22,15 @@ import {
   TOOL_OUTPUT_CHAR_LIMIT,
 } from "../config/service-constants";
 
-const toolRegistryTelemetry = telemetry.child({ component: "tool" });
 export const TOOL_CALL_BEHAVIOR_SCHEMA = z.object({
   silent: z.boolean().optional(),
 });
+
+let _toolRegistryTelemetry: typeof telemetry | undefined;
+function getToolRegistryTelemetry() {
+  _toolRegistryTelemetry ??= telemetry.child({ component: "tool" });
+  return _toolRegistryTelemetry;
+}
 
 /**
  * Untrusted output descriptors for dynamic/legacy tools not in the function layer.

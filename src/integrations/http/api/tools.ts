@@ -1,5 +1,5 @@
 import type { RouteDefinition } from "./router";
-import { json, error, apiTelemetry } from "./helpers";
+import { json, error, getApiTelemetry } from "./helpers";
 import { attemptOrAsync } from "../../../utils/result";
 
 export const toolRoutes: RouteDefinition[] = [
@@ -20,7 +20,7 @@ export const toolRoutes: RouteDefinition[] = [
           })),
         );
       } catch (err: any) {
-        apiTelemetry.recordError(err, { operation: "api.tools_list" });
+        getApiTelemetry().recordError(err, { operation: "api.tools_list" });
         return error(err.message ?? "Failed to list tools", 500);
       }
     },
@@ -37,7 +37,7 @@ export const toolRoutes: RouteDefinition[] = [
         });
         return json({ tool: toolName, result });
       } catch (err: any) {
-        apiTelemetry.recordError(err, { operation: "api.tool_exec", toolName });
+        getApiTelemetry().recordError(err, { operation: "api.tool_exec", toolName });
         const msg = err.message ?? "Tool execution failed";
         const status = msg.includes("Unknown tool") ? 404
           : msg.includes("not allowed") ? 403

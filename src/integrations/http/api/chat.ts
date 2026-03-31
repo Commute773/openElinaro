@@ -1,5 +1,5 @@
 import type { RouteDefinition } from "./router";
-import { json, error, apiTelemetry } from "./helpers";
+import { json, error, getApiTelemetry } from "./helpers";
 
 export const chatRoutes: RouteDefinition[] = [
   {
@@ -18,7 +18,7 @@ export const chatRoutes: RouteDefinition[] = [
 
         return json({ response: response.message });
       } catch (err: any) {
-        apiTelemetry.recordError(err, { operation: "api.ask" });
+        getApiTelemetry().recordError(err, { operation: "api.ask" });
         return error(err.message ?? "Failed to process query", 500);
       }
     },

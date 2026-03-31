@@ -259,6 +259,7 @@ export function createRuntimeScope(ctx: {
         return new ClaudeSdkCore({
           model: modelConfig.modelId,
           apiKey: modelConfig.apiKey,
+          resumeSessionId: modelConfig.providerOptions?.sdkSessionId as string | undefined,
         });
       }
       return new PiCore({

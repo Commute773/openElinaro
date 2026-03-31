@@ -1,4 +1,9 @@
-import { telemetry } from "../services/infrastructure/telemetry";
+// Breaks the circular dependency: result → telemetry → TelemetryStore → result.
+// By the time any function here is *called*, all modules have finished loading,
+// so the deferred require() always succeeds.
+function getTelemetry(): { event: Function; recordError: Function } {
+  return require("../services/infrastructure/telemetry").telemetry;
+}
 
 /**
  * Discriminated union for fallible operations.
@@ -18,7 +23,7 @@ function wrapError(error: unknown): Error {
 }
 
 function logExpectedFailure(error: Error) {
-  telemetry.event("result.expected_failure", {
+  getTelemetry().event("result.expected_failure", {
     error: { name: error.name, message: error.message },
   }, { level: "debug", outcome: "error" });
 }
@@ -27,7 +32,7 @@ function logExpectedFailure(error: Error) {
  * Construct an explicit failure. Always logs at error level.
  */
 export function fail(error: unknown, context: Record<string, unknown>): Result<never> {
-  telemetry.recordError(error, context);
+  getTelemetry().recordError(error, context);
   return { ok: false, error: wrapError(error) };
 }
 
@@ -116,7 +121,7 @@ export function fireAndForget(
   context: Record<string, unknown>,
 ): void {
   void fn().catch((error) => {
-    telemetry.recordError(error, context);
+    getTelemetry().recordError(error, context);
   });
 }
 

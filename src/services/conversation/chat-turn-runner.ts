@@ -103,6 +103,7 @@ export class ChatTurnRunner {
         const coreNeedsHistory = core.manifest.requires.messageHistory;
         const coreHandlesPersistence = coreOwnsFeature(core.manifest, "session_persistence")
           || featureIsShared(core.manifest, "session_persistence");
+        const sdkSessionId = conversation.sdkSessionId;
 
         // Build the core tool executor that delegates to ToolRegistry
         const coreToolExecutor: CoreToolExecutor = async (toolCall, signal) => {
@@ -229,6 +230,14 @@ export class ChatTurnRunner {
             await this.deps.conversations.appendMessages(
               job.conversationKey,
               messagesToPersist,
+            );
+          }
+
+          // Store the SDK session ID for cross-turn continuity
+          if (result.sdkSessionId && job.execution.persistConversation) {
+            await this.deps.conversations.updateSdkSessionId(
+              job.conversationKey,
+              result.sdkSessionId,
             );
           }
 

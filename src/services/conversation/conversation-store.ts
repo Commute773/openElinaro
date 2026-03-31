@@ -11,6 +11,8 @@ export interface ConversationState {
   messages: Message[];
   updatedAt: string;
   systemPrompt?: SystemPromptSnapshot;
+  /** SDK-managed session ID for cross-turn continuity (Claude Agent SDK). */
+  sdkSessionId?: string;
 }
 
 type StoredConversationState = {
@@ -18,6 +20,7 @@ type StoredConversationState = {
   messages: Message[];
   updatedAt: string;
   systemPrompt?: SystemPromptSnapshot;
+  sdkSessionId?: string;
 };
 
 type ConversationStoreShape = {
@@ -91,6 +94,7 @@ export class ConversationStore {
         messages: entry.messages ?? [],
         updatedAt: entry.updatedAt,
         systemPrompt: entry.systemPrompt,
+        sdkSessionId: entry.sdkSessionId,
       }))
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
@@ -116,6 +120,7 @@ export class ConversationStore {
       messages: existing.messages ?? [],
       updatedAt: existing.updatedAt,
       systemPrompt: existing.systemPrompt,
+      sdkSessionId: existing.sdkSessionId,
     };
   }
 
@@ -141,6 +146,7 @@ export class ConversationStore {
       messages: state.messages,
       updatedAt: timestamp(),
       systemPrompt: state.systemPrompt ?? existing?.systemPrompt,
+      sdkSessionId: state.sdkSessionId ?? existing?.sdkSessionId,
     };
     store.conversations[state.key] = nextState;
     await writeStore(store);
@@ -150,6 +156,7 @@ export class ConversationStore {
       messages: state.messages,
       updatedAt: nextState.updatedAt,
       systemPrompt: nextState.systemPrompt,
+      sdkSessionId: nextState.sdkSessionId,
     };
   }
 
@@ -223,6 +230,14 @@ export class ConversationStore {
     return this.save({
       ...conversation,
       systemPrompt: snapshot,
+    });
+  }
+
+  async updateSdkSessionId(key: string, sdkSessionId: string): Promise<ConversationState> {
+    const conversation = await this.get(key);
+    return this.save({
+      ...conversation,
+      sdkSessionId,
     });
   }
 }
