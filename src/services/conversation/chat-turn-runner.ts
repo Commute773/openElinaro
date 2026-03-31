@@ -60,7 +60,13 @@ export class ChatTurnRunner {
           ? this.deps.routineTools.consumePendingBackgroundExecNotifications(job.conversationKey)
           : [];
         // conversation.systemPrompt is guaranteed set by loadConversationForJob
-        const systemPrompt = composeSystemPrompt(conversation.systemPrompt!.text);
+        // Strip tool library prompt lines when the core suppresses load_tool_library
+        const suppressToolLibrary = core.manifest.suppressedTools?.includes("load_tool_library");
+        const basePromptText = conversation.systemPrompt!.text;
+        const filteredPromptText = suppressToolLibrary
+          ? stripToolLibraryPromptLines(basePromptText)
+          : basePromptText;
+        const systemPrompt = composeSystemPrompt(filteredPromptText);
         const promptWarning = formatSystemPromptWarning(systemPrompt);
         const backgroundExecMessages = this.buildBackgroundExecMessages(backgroundExecNotifications);
         const steeringMessages = this.sessionManager.consumePendingSteeringMessages(session);
@@ -195,6 +201,9 @@ export class ChatTurnRunner {
                   ...data,
                 }, { level: "debug" });
               },
+              onProgress: job.onToolUse
+                ? async (msg) => { await job.onToolUse!(msg); }
+                : undefined,
             })
           );
 
@@ -460,4 +469,18 @@ export class ChatTurnRunner {
       ),
     ];
   }
+}
+
+/**
+ * Remove the tool-library prompt lines from the system prompt text.
+ * These lines instruct the model to use `load_tool_library`, which is
+ * not available when the core suppresses it (e.g., Claude Agent SDK).
+ */
+function stripToolLibraryPromptLines(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) =>
+      !line.includes("load_tool_library") &&
+      !line.startsWith("Available tool libraries:"))
+    .join("\n");
 }

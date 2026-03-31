@@ -13,11 +13,12 @@ export function splitToolsForCore(
   harnessTools: CoreToolDefinition[],
   manifest: CoreManifest,
 ): CoreToolDefinition[] {
-  if (manifest.nativeTools.length === 0) {
-    return harnessTools; // Fast path for cores with no native tools (e.g., Pi)
-  }
   const nativeNames = new Set(manifest.nativeTools.map((t) => t.harnessToolName));
-  return harnessTools.filter((t) => !nativeNames.has(t.name));
+  const suppressedNames = new Set(manifest.suppressedTools ?? []);
+  if (nativeNames.size === 0 && suppressedNames.size === 0) {
+    return harnessTools; // Fast path for cores with no filtering
+  }
+  return harnessTools.filter((t) => !nativeNames.has(t.name) && !suppressedNames.has(t.name));
 }
 
 /**
