@@ -124,6 +124,7 @@ export class ClaudeSdkCore implements AgentCore {
       signal,
       onAssistantMessage,
       hooks: harnessHooks,
+      onProgress,
     } = options;
 
     // Build MCP tools from harness tool definitions
@@ -167,6 +168,22 @@ export class ClaudeSdkCore implements AgentCore {
         };
       };
       sdkHooks.PreToolUse = [{ hooks: [preToolUseHook] }];
+    }
+
+    if (onProgress) {
+      const postToolUseHook: HookCallback = async (input) => {
+        const postInput = input as { tool_name?: string; tool_use_id?: string };
+        await onProgress(`Tool completed: ${postInput.tool_name ?? "unknown"}`);
+        return {};
+      };
+      sdkHooks.PostToolUse = [{ hooks: [postToolUseHook] }];
+
+      const postToolUseFailureHook: HookCallback = async (input) => {
+        const postInput = input as { tool_name?: string; error?: string };
+        await onProgress(`Tool failed: ${postInput.tool_name ?? "unknown"} — ${postInput.error ?? "unknown error"}`);
+        return {};
+      };
+      sdkHooks.PostToolUseFailure = [{ hooks: [postToolUseFailureHook] }];
     }
 
     // Extract the user prompt from the last user message
@@ -226,6 +243,11 @@ export class ClaudeSdkCore implements AgentCore {
       }
     }, FIRST_MESSAGE_TIMEOUT_MS);
 
+    // Helper to emit progress without blocking the stream
+    const progress = onProgress
+      ? (msg: string) => { onProgress(msg).catch(() => {}); }
+      : undefined;
+
     try {
     for await (const message of queryStream) {
       receivedFirstMessage = true;
@@ -274,6 +296,27 @@ export class ClaudeSdkCore implements AgentCore {
         onAssistantMessage?.(coreMsg);
         harnessHooks?.onUsage?.(usage);
 
+        // Emit thinking blocks to surface
+        if (progress && thinkingBlocks.length > 0) {
+          for (const block of thinkingBlocks) {
+            const thinking = (block as any).thinking ?? "";
+            if (thinking) {
+              const preview = thinking.length > 300 ? thinking.slice(0, 300) + "..." : thinking;
+              progress(`Thinking: ${preview}`);
+            }
+          }
+        }
+
+        // Emit tool calls to surface
+        if (progress && toolUseBlocks.length > 0) {
+          for (const block of toolUseBlocks) {
+            const name = (block as any).name ?? "unknown";
+            const input = (block as any).input ?? {};
+            const inputSummary = summarizeToolInput(name, input);
+            progress(`Using tool: ${name}${inputSummary ? ` — ${inputSummary}` : ""}`);
+          }
+        }
+
         onLog?.("sdk_assistant_message", {
           responseId: betaMsg?.id,
           step: steps,
@@ -291,33 +334,133 @@ export class ClaudeSdkCore implements AgentCore {
         const summary = (message as any).summary as string;
         const toolUseIds = (message as any).preceding_tool_use_ids as string[];
         onLog?.("sdk_tool_use_summary", { summary, toolUseIds });
+        progress?.(`Tool summary: ${summary}`);
+      }
+
+      if (message.type === "tool_progress") {
+        const msg = message as any;
+        const toolName: string = msg.tool_name ?? "unknown";
+        const elapsed: number = msg.elapsed_time_seconds ?? 0;
+        onLog?.("sdk_tool_progress", {
+          toolUseId: msg.tool_use_id,
+          toolName,
+          elapsed,
+          taskId: msg.task_id,
+        });
+        progress?.(`Running ${toolName}... (${elapsed.toFixed(0)}s)`);
       }
 
       if (message.type === "result") {
         if (message.subtype === "success") {
           finalText = message.result;
           totalUsage = extractResultUsage(message);
+          const numTurns = (message as any).num_turns ?? 0;
+          const durationMs = (message as any).duration_ms ?? 0;
+          const totalCostUsd = (message as any).total_cost_usd ?? 0;
           onLog?.("sdk_result_success", {
-            numTurns: (message as any).num_turns,
-            durationMs: (message as any).duration_ms,
+            numTurns,
+            durationMs,
             durationApiMs: (message as any).duration_api_ms,
-            totalCostUsd: (message as any).total_cost_usd,
+            totalCostUsd,
             inputTokens: totalUsage.input,
             outputTokens: totalUsage.output,
             cacheReadTokens: totalUsage.cacheRead,
             resultChars: finalText.length,
           });
+          progress?.(`Completed in ${numTurns} turns, ${(durationMs / 1000).toFixed(1)}s, $${totalCostUsd.toFixed(4)}`);
         } else {
-          const errorText = (message as any).error ?? "unknown";
-          onLog?.("sdk_result_error", { error: errorText });
+          const errors = (message as any).errors ?? [];
+          const errorText = errors.length > 0 ? errors.join("; ") : "unknown";
+          onLog?.("sdk_result_error", { error: errorText, subtype: message.subtype });
+          progress?.(`Error: ${errorText}`);
           throw new Error(`Claude Code returned an error result: ${errorText}`);
         }
       }
 
       if (message.type === "system") {
-        onLog?.("sdk_system", {
-          message: (message as any).message ?? (message as any).text ?? "",
-        });
+        const msg = message as any;
+        const subtype: string = msg.subtype ?? "";
+        onLog?.("sdk_system", { subtype, message: msg.message ?? msg.text ?? "" });
+
+        switch (subtype) {
+          case "init":
+            progress?.(`Agent initialized: model=${msg.model ?? "unknown"}, ${(msg.tools ?? []).length} tools, ${(msg.mcp_servers ?? []).length} MCP servers`);
+            break;
+          case "api_retry":
+            progress?.(`API retry: attempt ${msg.attempt ?? "?"}/${msg.max_retries ?? "?"}, waiting ${msg.retry_delay_ms ?? 0}ms${msg.error_status ? ` (HTTP ${msg.error_status})` : ""}`);
+            break;
+          case "compact_boundary": {
+            const meta = msg.compact_metadata ?? {};
+            progress?.(`Conversation compacted (trigger: ${meta.trigger ?? "unknown"}, pre-tokens: ${meta.pre_tokens ?? "?"})`);
+            break;
+          }
+          case "status":
+            if (msg.status) {
+              progress?.(`Status: ${msg.status}`);
+            }
+            break;
+          case "local_command_output":
+            if (msg.content) {
+              const preview = msg.content.length > 500 ? msg.content.slice(0, 500) + "..." : msg.content;
+              progress?.(`Command output: ${preview}`);
+            }
+            break;
+          case "hook_started":
+            progress?.(`Hook started: ${msg.hook_name ?? "unknown"} (${msg.hook_event ?? "unknown"})`);
+            break;
+          case "hook_progress":
+            if (msg.output) {
+              progress?.(`Hook progress [${msg.hook_name ?? "unknown"}]: ${msg.output}`);
+            }
+            break;
+          case "hook_response":
+            progress?.(`Hook ${msg.outcome ?? "completed"}: ${msg.hook_name ?? "unknown"}${msg.exit_code != null ? ` (exit ${msg.exit_code})` : ""}`);
+            break;
+          case "task_started":
+            progress?.(`Task started: ${msg.description ?? msg.task_id ?? "unknown"}${msg.task_type ? ` (${msg.task_type})` : ""}`);
+            break;
+          case "task_progress": {
+            const usage = msg.usage ?? {};
+            progress?.(`Task progress: ${msg.description ?? msg.task_id ?? "unknown"} (${usage.total_tokens ?? 0} tokens, ${usage.tool_uses ?? 0} tool calls, ${((usage.duration_ms ?? 0) / 1000).toFixed(1)}s)`);
+            break;
+          }
+          case "task_notification":
+            progress?.(`Task ${msg.status ?? "completed"}: ${msg.summary ?? msg.task_id ?? "unknown"}`);
+            break;
+          case "files_persisted": {
+            const files = msg.files ?? [];
+            const failed = msg.failed ?? [];
+            progress?.(`Files persisted: ${files.length} saved${failed.length > 0 ? `, ${failed.length} failed` : ""}`);
+            break;
+          }
+          case "session_state_changed":
+            progress?.(`Session state: ${msg.state ?? "unknown"}`);
+            break;
+          case "elicitation_complete":
+            progress?.(`Elicitation complete: ${msg.mcp_server_name ?? "unknown"}`);
+            break;
+        }
+      }
+
+      if (message.type === "rate_limit_event") {
+        const info = (message as any).rate_limit_info ?? {};
+        onLog?.("sdk_rate_limit", info);
+        progress?.(`Rate limited — ${JSON.stringify(info)}`);
+      }
+
+      if (message.type === "auth_status") {
+        const msg = message as any;
+        onLog?.("sdk_auth_status", { isAuthenticating: msg.isAuthenticating, error: msg.error });
+        if (msg.isAuthenticating) {
+          progress?.("Authenticating...");
+        } else if (msg.error) {
+          progress?.(`Auth error: ${msg.error}`);
+        }
+      }
+
+      if (message.type === "prompt_suggestion") {
+        const suggestion = (message as any).suggestion ?? "";
+        onLog?.("sdk_prompt_suggestion", { suggestion });
       }
     }
     } finally {
@@ -449,6 +592,41 @@ function mergeUsage(a: CoreUsage, b: CoreUsage): CoreUsage {
       total: a.cost.total + b.cost.total,
     },
   };
+}
+
+/** Produce a short human-readable summary of a tool's input for progress display. */
+function summarizeToolInput(toolName: string, input: Record<string, unknown>): string {
+  switch (toolName) {
+    case "Read":
+      return input.file_path ? String(input.file_path) : "";
+    case "Write":
+      return input.file_path ? String(input.file_path) : "";
+    case "Edit":
+      return input.file_path ? String(input.file_path) : "";
+    case "Glob":
+      return input.pattern ? String(input.pattern) : "";
+    case "Grep":
+      return input.pattern ? `/${input.pattern}/` : "";
+    case "Bash": {
+      const cmd = String(input.command ?? "");
+      return cmd.length > 120 ? cmd.slice(0, 120) + "..." : cmd;
+    }
+    case "WebSearch":
+      return input.query ? String(input.query) : "";
+    case "WebFetch":
+      return input.url ? String(input.url) : "";
+    case "Agent":
+      return input.description ? String(input.description) : "";
+    default: {
+      // For MCP tools, show the first string-valued arg
+      for (const [key, val] of Object.entries(input)) {
+        if (typeof val === "string" && val.length > 0 && val.length < 200) {
+          return `${key}: ${val}`;
+        }
+      }
+      return "";
+    }
+  }
 }
 
 function abortControllerFromSignal(signal: AbortSignal): AbortController {

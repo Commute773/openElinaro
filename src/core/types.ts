@@ -199,6 +199,8 @@ export interface CoreRunOptions {
   hooks?: CoreHarnessHooks;
   /** Structured log callback for core-internal events (SDK tool calls, system messages, etc.). */
   onLog?: (event: string, data: Record<string, unknown>) => void;
+  /** Called when the core has a progress update worth showing on the user-facing surface (Discord, API, etc.). */
+  onProgress?: (message: string) => Promise<void>;
 }
 
 export interface CoreRunResult {

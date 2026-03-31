@@ -195,6 +195,9 @@ export class ChatTurnRunner {
                   ...data,
                 }, { level: "debug" });
               },
+              onProgress: job.onToolUse
+                ? async (msg) => { await job.onToolUse!(msg); }
+                : undefined,
             })
           );
 
