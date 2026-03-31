@@ -53,18 +53,14 @@ body { display:flex; flex-direction:column; }
 </head>
 <body>
 
-<div class="topbar">
-  <span style="font-weight:700;color:var(--green)">G2</span>
+<div class="topbar" style="display:none">
   <span class="dim" id="dims">576x288</span>
-  <label style="color:var(--dim)">Line:
-    <select id="lineHeight">
-      <option value="8">8</option><option value="16" selected>16</option>
-      <option value="24">24</option><option value="32">32</option>
-      <option value="48">48</option>
-    </select>
-  </label>
-  <div class="spacer"></div>
-  <span class="status" id="status">…</span>
+  <select id="lineHeight">
+    <option value="9">9</option><option value="18" selected>18</option>
+    <option value="32">32</option><option value="36">36</option>
+    <option value="48">48</option>
+  </select>
+  <span class="status" id="status"></span>
 </div>
 
 <div class="main">
@@ -92,19 +88,14 @@ body { display:flex; flex-direction:column; }
 //  CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════
 const W = 576, H = 288;
-const PAL4 = [
-  [0,0,0],           // 0: black
-  [5,85,13],          // 1: dark green
-  [10,170,27],        // 2: mid green
-  [20,255,40],        // 3: bright green
-];
-// Map 0-15 range to 4 levels so existing color references still work
-const PAL = Array.from({length:16},(_,i)=> PAL4[Math.min(3, Math.round(i/15*3))]);
+const PAL = Array.from({length:16},(_,i)=>{
+  const t=i/15; return [Math.round(t*20),Math.round(t*255),Math.round(t*40)];
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════════════════════════
-let LH = 16;                 // line height
+let LH = 18;                 // line height
 let screenStack = [];         // navigation stack
 
 // Agent chat state
@@ -250,8 +241,14 @@ const EXTRA_VALUES = EXTRA_KEYS.map(k => EXTRA_GLYPHS[k]);
 
 let font = null; // { atlas, charWidth, tileH, charMap }
 
+// Line height → scale lookup. Each entry: 8*scale + gap = tileH, tileH divides 288.
+const SCALE_FOR = { 9:1, 18:2, 32:3, 36:4, 48:5 };
+
 function buildFont(tileH) {
-  const scale = tileH / 8;
+  const scale = SCALE_FOR[tileH] || Math.floor(tileH / 8) || 1;
+  const fontH = 8 * scale;
+  const gap = tileH - fontH;
+  const yPad = Math.floor(gap / 2); // center font in tile
   const charWidth = 8 * scale;
 
   // Glyph count: 128 ASCII + extras
@@ -271,7 +268,7 @@ function buildFont(tileH) {
         const byte = glyph[row];
         for (let col = 0; col < 8; col++) {
           if (byte & (1 << col)) {
-            actx.fillRect(gi * charWidth + col * scale, p * tileH + row * scale, scale, scale);
+            actx.fillRect(gi * charWidth + col * scale, p * tileH + yPad + row * scale, scale, scale);
           }
         }
       }
@@ -378,7 +375,25 @@ function render() {
   const maxLines = Math.floor(H / TH);
   const pad = 4;
 
-  // Title bar
+  // ── Agent Chat rendering (full screen, no title bar) ──
+  if (screen.isChat) {
+    const chatLines = maxLines;
+    const flatLines = flattenChatBlocks();
+    if (chatAutoScroll) {
+      chatScroll = Math.max(0, flatLines.length - chatLines);
+    }
+    for (let i = 0; i < chatLines; i++) {
+      const idx = chatScroll + i;
+      if (idx >= flatLines.length) break;
+      txt(clip(flatLines[idx], W - pad * 2), pad, i * TH, 15);
+    }
+    blit();
+    document.getElementById('info').textContent =
+      `${flatLines.length} lines | ${TH}px | Agent Chat | ${(performance.now()-t0).toFixed(1)}ms`;
+    return;
+  }
+
+  // Title bar (menu screens only)
   rect(0, 0, W, TH, 4);
   txt(screen.title, pad, 0, 15);
   const ts = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
@@ -387,32 +402,6 @@ function render() {
   const contentStart = TH + 1;
   hline(TH, 3);
   const contentLines = maxLines - 1;
-
-  // ── Agent Chat rendering ──
-  if (screen.isChat) {
-    const flatLines = flattenChatBlocks();
-    // Auto-scroll to bottom
-    if (chatAutoScroll) {
-      chatScroll = Math.max(0, flatLines.length - contentLines);
-    }
-    for (let i = 0; i < contentLines; i++) {
-      const idx = chatScroll + i;
-      if (idx >= flatLines.length) break;
-      const y = contentStart + i * TH;
-      txt(clip(flatLines[idx], W - pad * 2), pad, y, 15);
-    }
-    // Scrollbar
-    if (flatLines.length > contentLines) {
-      const barH = Math.max(8, (contentLines / flatLines.length) * (H - contentStart));
-      const barY = contentStart + (chatScroll / flatLines.length) * (H - contentStart);
-      fc.fillStyle = col(15);
-      fc.fillRect(W - 3, barY, 2, barH);
-    }
-    blit();
-    document.getElementById('info').textContent =
-      `${flatLines.length} lines | ${TH}px | Agent Chat | ${(performance.now()-t0).toFixed(1)}ms`;
-    return;
-  }
 
   // ── Standard menu rendering ──
   const items = screen.lines || [];
@@ -488,7 +477,7 @@ function input(action) {
   // Agent chat mode has different navigation
   if (s.isChat) {
     const flatLines = flattenChatBlocks();
-    const contentLines = Math.floor(H / font.tileH) - 1;
+    const contentLines = Math.floor(H / font.tileH);
     if (action === 'up') {
       if (chatScroll > 0) { chatScroll--; chatAutoScroll = false; render(); }
     } else if (action === 'down') {
@@ -716,8 +705,6 @@ function makeHomeScreen() {
     { text: 'Finance',       screen: () => makeApiScreen('Finance', '/api/finance/summary') },
     { text: 'Projects',      screen: () => makeApiScreen('Projects', '/api/projects') },
     { text: 'Todos',         screen: () => makeTodosScreen() },
-    { text: 'Bad Apple',     screen: () => makeVideoScreen('Bad Apple!!', 'bad-apple.mp4') },
-    { text: 'Nyan Cat',      screen: () => makeVideoScreen('Nyan Cat', 'nyancat.mp4') },
   ];
 
   return {
@@ -829,141 +816,6 @@ function makeTodosScreen() {
     },
   });
   return screen;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  VIDEO PLAYER — Floyd-Steinberg dithered to 4 green brightness levels
-// ═══════════════════════════════════════════════════════════════════════
-
-// Shared video element cache: { filename: { el, ready } }
-const videoCache = {};
-
-// 4 luminance thresholds for quantization (0-255 mapped to levels 0-3)
-const LUM_LEVELS = [0, 85, 170, 255];
-const G = [[0,0,0],[5,85,13],[10,170,27],[20,255,40]];
-
-function nearestLevel(lum) {
-  // Clamp to 0-255
-  lum = Math.max(0, Math.min(255, lum));
-  if (lum < 43) return 0;
-  if (lum < 128) return 1;
-  if (lum < 213) return 2;
-  return 3;
-}
-
-function makeVideoScreen(title, filename) {
-  let raf = null;
-  const samp = document.createElement('canvas');
-  samp.width = W; samp.height = H;
-  const sc = samp.getContext('2d', { willReadFrequently: true });
-
-  function ensureVideo() {
-    if (videoCache[filename]) return videoCache[filename].el;
-    const v = document.createElement('video');
-    v.crossOrigin = 'anonymous';
-    v.playsInline = true;
-    v.loop = true;
-    v.style.display = 'none';
-    document.body.appendChild(v);
-    videoCache[filename] = { el: v, ready: false };
-    return v;
-  }
-
-  function renderVideoFrame() {
-    const entry = videoCache[filename];
-    const v = entry?.el;
-    if (!v || v.paused) return;
-
-    // Draw video frame to scratch canvas
-    sc.drawImage(v, 0, 0, W, H);
-    const img = sc.getImageData(0, 0, W, H);
-    const px = img.data;
-
-    // Build luminance buffer for Floyd-Steinberg dithering
-    const lum = new Float32Array(W * H);
-    for (let i = 0; i < W * H; i++) {
-      const j = i * 4;
-      lum[i] = px[j] * 0.299 + px[j+1] * 0.587 + px[j+2] * 0.114;
-    }
-
-    // Floyd-Steinberg dithering
-    const out = fc.createImageData(W, H);
-    const od = out.data;
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const idx = y * W + x;
-        const old = lum[idx];
-        const lvl = nearestLevel(old);
-        const newVal = LUM_LEVELS[lvl];
-        const err = old - newVal;
-
-        // Distribute error to neighbors
-        if (x + 1 < W)               lum[idx + 1]     += err * 7/16;
-        if (y + 1 < H) {
-          if (x > 0)                  lum[idx + W - 1] += err * 3/16;
-                                      lum[idx + W]     += err * 5/16;
-          if (x + 1 < W)             lum[idx + W + 1] += err * 1/16;
-        }
-
-        const c = G[lvl];
-        const j = idx * 4;
-        od[j]   = c[0];
-        od[j+1] = c[1];
-        od[j+2] = c[2];
-        od[j+3] = 255;
-      }
-    }
-
-    fc.putImageData(out, 0, 0);
-    blit();
-
-    const t = v.currentTime;
-    const d = v.duration || 0;
-    const fmt = (s) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-    document.getElementById('info').textContent =
-      `${title} | ${fmt(t)} / ${fmt(d)}`;
-
-    raf = requestAnimationFrame(renderVideoFrame);
-  }
-
-  function stop() {
-    if (raf) { cancelAnimationFrame(raf); raf = null; }
-    const v = videoCache[filename]?.el;
-    if (v) v.pause();
-  }
-
-  return {
-    title,
-    lines: [],
-    cursor: -1,
-    scroll: 0,
-    async init() {
-      const v = ensureVideo();
-      const entry = videoCache[filename];
-
-      if (!entry.ready) {
-        clr();
-        txt('Loading ' + title + '...', 20, H/2 - LH, 3);
-        blit();
-
-        v.src = '/g2/media/' + filename;
-        entry.ready = true;
-
-        await new Promise((res, rej) => {
-          v.oncanplay = res;
-          v.onerror = () => { entry.ready = false; rej(new Error('Failed to load')); };
-        });
-      }
-
-      v.currentTime = 0;
-      v.play();
-      raf = requestAnimationFrame(renderVideoFrame);
-    },
-    onLongPress() {
-      stop();
-      popScreen();
-    },
-  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -146,7 +146,7 @@ async function shot(name: string) {
   console.log(`\u2192 /tmp/g2-${name}.png`);
 }
 
-await page.goto(`${base}/g2`);
+await page.goto(`${base}/g2`, { waitUntil: 'networkidle' });
 await shot("home");
 
 // Long press to enter Agent Chat
@@ -194,9 +194,9 @@ await shot("agents");
 // Go back to home, test line heights
 await page.keyboard.press("Escape");
 await page.waitForTimeout(500);
-await page.locator("#lineHeight").selectOption("8");
-await shot("home-lh8");
-await page.locator("#lineHeight").selectOption("48");
+await page.evaluate(() => { (window as any).LH = 9; (window as any).buildFont(9); (window as any).render(); });
+await shot("home-lh9");
+await page.evaluate(() => { (window as any).LH = 48; (window as any).buildFont(48); (window as any).render(); });
 await shot("home-lh48");
 
 await browser.close();
