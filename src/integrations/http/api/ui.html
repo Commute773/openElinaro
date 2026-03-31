@@ -43,6 +43,12 @@ body { display:flex; flex-direction:column; }
 
 .bottombar { flex:0 0 auto; padding:2px 10px; background:var(--panel);
   border-top:1px solid var(--border); font-size:9px; color:var(--dimmer); display:flex; gap:12px; }
+
+.chat-input { position:absolute; bottom:0; left:0; width:100%;
+  background:rgba(0,10,0,0.95); border:none; border-top:1px solid var(--dimmer);
+  color:var(--green); font-family:inherit; font-size:14px;
+  padding:6px 8px; outline:none; display:none; }
+.chat-input::placeholder { color:var(--dimmer); }
 </style>
 </head>
 <body>
@@ -66,6 +72,7 @@ body { display:flex; flex-direction:column; }
   <div class="sim-viewport" id="viewport">
     <div class="sim-frame" id="frame">
       <canvas id="display"></canvas>
+      <input type="text" class="chat-input" id="chatInput" placeholder="> type a message..." autocomplete="off">
     </div>
     <div class="sim-controls">
       <button onclick="input('up')" title="Swipe Up (↑)">▲</button>
@@ -101,6 +108,7 @@ let chatBlocks = [];          // array of block objects
 let chatScroll = 0;           // scroll offset in flattened lines
 let chatAutoScroll = true;    // follow new content
 let chatAbort = null;         // AbortController for active stream
+let chatStreamActive = false; // true while receiving events from own /api/chat/stream
 
 // ═══════════════════════════════════════════════════════════════════════
 //  CRISP CANVAS — offscreen framebuffer + nearest-neighbor blit
@@ -184,6 +192,8 @@ function render() {
   clr();
   const screen = screenStack[screenStack.length - 1];
   if (!screen) { txt('Loading...', 4, LH*2, 6); blit(); return; }
+
+  document.getElementById('chatInput').style.display = screen.isChat ? 'block' : 'none';
 
   const maxLines = Math.floor(H / LH);
   const pad = 4;
@@ -309,7 +319,7 @@ function input(action) {
         render();
       }
     } else if (action === 'press') {
-      startVoice();
+      document.getElementById('chatInput').focus();
     } else if (action === 'longpress') {
       if (chatAbort) { chatAbort.abort(); chatAbort = null; }
       popScreen();
@@ -345,6 +355,21 @@ document.addEventListener('keydown', (e) => {
     case 't': case 'T': e.preventDefault();
       if (!currentScreen()?.isChat) pushScreen(makeAgentChatScreen());
       break;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CHAT TEXT INPUT
+// ═══════════════════════════════════════════════════════════════════════
+document.getElementById('chatInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const el = e.target;
+    const text = el.value.trim();
+    if (text) { sendChatMessage(text); el.value = ''; }
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    e.target.blur();
   }
 });
 
@@ -790,6 +815,7 @@ async function sendChatMessage(text) {
   // Add user message block
   chatBlocks.push({ type: 'user', text });
   chatAutoScroll = true;
+  chatStreamActive = true;
   render();
 
   // Abort any previous stream
@@ -842,6 +868,7 @@ async function sendChatMessage(text) {
     }
   } finally {
     chatAbort = null;
+    chatStreamActive = false;
   }
 }
 
@@ -865,12 +892,34 @@ async function loadSpec() {
 function connectSSE() {
   try {
     const es = new EventSource('/api/events');
+    // Dashboard refresh events
     for (const evt of ['agent_started','agent_completed','routine_reminder','alarm_triggered']) {
       es.addEventListener(evt, () => {
         const s = currentScreen();
         if (s?.init) s.init();
       });
     }
+    // Cross-surface agent stream events (from Discord or other surfaces)
+    const agentEvents = ['thinking','tool_start','tool_progress','tool_end',
+      'tool_summary','text','agent_init','compaction','result','error','status','progress'];
+    for (const evt of agentEvents) {
+      es.addEventListener(evt, (e) => {
+        if (chatStreamActive) return; // already receiving from own stream
+        if (!currentScreen()?.isChat) return;
+        try { handleStreamEvent(JSON.parse(e.data)); } catch {}
+      });
+    }
+    // Cross-surface user input (show messages from other surfaces)
+    es.addEventListener('user_input', (e) => {
+      if (!currentScreen()?.isChat) return;
+      try {
+        const data = JSON.parse(e.data);
+        if (data.source === 'g2') return; // don't echo own input
+        chatBlocks.push({ type: 'user', text: '[' + data.source + '] ' + data.text });
+        chatAutoScroll = true;
+        render();
+      } catch {}
+    });
   } catch(e) {}
 }
 

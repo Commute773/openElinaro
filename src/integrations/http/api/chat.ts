@@ -23,11 +23,15 @@ export const chatRoutes: RouteDefinition[] = [
         const body = (await request.json()) as { text?: string };
         if (!body.text) return error("text is required");
 
+        app.getEventBus().publish({ kind: "user_input", text: body.text, source: "api" });
+
         const response = await app.handleRequest({
           id: `api-ask-${Date.now()}`,
           text: body.text,
-          conversationKey: "api-simulator",
+          conversationKey: "main",
         });
+
+        app.getEventBus().publish({ kind: "agent_stream", event: { type: "text", text: response.message } });
 
         return json({ response: response.message });
       } catch (err: any) {
@@ -46,6 +50,9 @@ export const chatRoutes: RouteDefinition[] = [
 
         const text = body.text;
         let streamClosed = false;
+        const bus = app.getEventBus();
+
+        bus.publish({ kind: "user_input", text, source: "g2" });
 
         const stream = new ReadableStream<string>({
           start(controller) {
@@ -59,21 +66,26 @@ export const chatRoutes: RouteDefinition[] = [
               {
                 id: `api-chat-${Date.now()}`,
                 text,
-                conversationKey: "api-agent-chat",
+                conversationKey: "main",
               },
               {
                 onToolUse: async (event) => {
                   enqueue(event);
+                  bus.publish({ kind: "agent_stream", event });
                 },
               },
             ).then((response) => {
               if (!streamClosed) {
-                enqueue({ type: "text", text: response.message });
+                const textEvent: AgentStreamEvent = { type: "text", text: response.message };
+                enqueue(textEvent);
+                bus.publish({ kind: "agent_stream", event: textEvent });
                 controller.close();
               }
             }).catch((err) => {
               if (!streamClosed) {
-                enqueue({ type: "error", message: err.message ?? "Request failed" });
+                const errEvent: AgentStreamEvent = { type: "error", message: err.message ?? "Request failed" };
+                enqueue(errEvent);
+                bus.publish({ kind: "agent_stream", event: errEvent });
                 attempt(() => controller.close());
               }
               getApiTelemetry().recordError(err, { operation: "api.chat.stream" });

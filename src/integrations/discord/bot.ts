@@ -114,6 +114,8 @@ export interface DiscordAppRuntime {
   ): Promise<string>;
   getActiveModel(): Promise<{ providerId: ModelProviderId }> | { providerId: ModelProviderId };
   getActiveProfile(): { id: string };
+  getEventBus?(): import("../../app/agent-event-bus").AgentEventBus;
+  getNotificationTargetUserId?(): string | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -132,8 +134,10 @@ export async function startDiscordBot(options?: { app?: OpenElinaroApp }) {
   const app = options?.app ?? new OpenElinaroApp();
   const healthchecks = new AgentHealthcheckService();
   const typingTracker = createConversationTypingTracker();
-  app.setBackgroundConversationNotifier(async ({ conversationKey, response }) => {
-    const user = await client.users.fetch(conversationKey);
+  app.setBackgroundConversationNotifier(async ({ response }) => {
+    const userId = app.getNotificationTargetUserId();
+    if (!userId) return;
+    const user = await client.users.fetch(userId);
     const dm = await user.createDM();
     await sendAppResponseToChannel(dm, response);
   });
@@ -274,11 +278,13 @@ export function createDiscordEventHandlers(params: {
     attachments,
     reason,
   }: DiscordBatchedDirectMessage) => {
-    params.typingTracker?.noteChannel(message.author.id, message);
-    const request = await buildMessageRequest(message.author.id, content, attachments.values());
+    params.typingTracker?.noteChannel("main", message);
+    const request = await buildMessageRequest("main", content, attachments.values());
+    const eventBus = params.app.getEventBus?.();
+    eventBus?.publish({ kind: "user_input", text: content, source: "discord" });
     const response = await discordTelemetry.run({
       component: "discord",
-      conversationKey: message.author.id,
+      conversationKey: "main",
       attributes: {
         userId: message.author.id,
         channelId: message.channelId,
@@ -305,6 +311,7 @@ export function createDiscordEventHandlers(params: {
             await replyToMessageWithAppResponse(message, queuedResponse);
           },
           onToolUse: async (event) => {
+            eventBus?.publish({ kind: "agent_stream", event });
             const update = formatStreamEventForDiscord(event);
             await replyToMessageWithChunks(message, update.message, {
               files: update.files,
@@ -390,7 +397,7 @@ export function createDiscordEventHandlers(params: {
 
       if (isDirectMessage(message) && content && isStopCommandContent(content)) {
         dmMessageBatcher.clear(message);
-        const stopped = params.app.stopConversation(message.author.id);
+        const stopped = params.app.stopConversation("main");
         await replyToMessageWithChunks(message, stopped.message);
         return;
       }
@@ -798,8 +805,8 @@ async function invokeDiscordToolAndReply(
   await replyWithChunks(interaction, response);
 }
 
-function getDiscordConversationKey(interaction: ChatInputCommandInteraction) {
-  return interaction.user.id;
+function getDiscordConversationKey(_interaction: ChatInputCommandInteraction) {
+  return "main";
 }
 
 function parseJsonObject(value: string) {
