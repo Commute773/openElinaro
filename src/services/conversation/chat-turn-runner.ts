@@ -207,6 +207,11 @@ export class ChatTurnRunner {
             job.conversationKey,
           );
           if (pendingResetMessage) {
+            // Close the persistent SDK session so the fresh conversation
+            // doesn't inherit stale context from the old one.
+            const handle = session.sdkSessionHandle as { close?: () => void } | undefined;
+            if (typeof handle?.close === "function") handle.close();
+            session.sdkSessionHandle = undefined;
             return {
               mode: "immediate" as const,
               message: pendingResetMessage,
@@ -233,6 +238,11 @@ export class ChatTurnRunner {
               job.conversationKey,
               result.sdkSessionId,
             );
+          }
+
+          // Store the persistent session handle for reuse on next turn
+          if (result.sessionHandle) {
+            session.sdkSessionHandle = result.sessionHandle;
           }
 
           // Check stop AFTER persistence
