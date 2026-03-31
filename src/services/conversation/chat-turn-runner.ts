@@ -59,10 +59,8 @@ export class ChatTurnRunner {
         const backgroundExecNotifications = job.execution.includeBackgroundExecNotifications
           ? this.deps.routineTools.consumePendingBackgroundExecNotifications(job.conversationKey)
           : [];
-        const promptSnapshot = await this.deps.systemPrompts.load();
-        const systemPrompt = composeSystemPrompt(
-          conversation.systemPrompt?.text ?? promptSnapshot.text,
-        );
+        // conversation.systemPrompt is guaranteed set by loadConversationForJob
+        const systemPrompt = composeSystemPrompt(conversation.systemPrompt!.text);
         const promptWarning = formatSystemPromptWarning(systemPrompt);
         const backgroundExecMessages = this.buildBackgroundExecMessages(backgroundExecNotifications);
         const steeringMessages = this.sessionManager.consumePendingSteeringMessages(session);
@@ -268,18 +266,15 @@ export class ChatTurnRunner {
     }
 
     this.sessionManager.throwIfStopRequested(session);
-    const systemPromptSnapshot = await this.deps.systemPrompts.load();
-    const conversation = await this.deps.conversations.ensureSystemPrompt(
-      job.conversationKey,
-      systemPromptSnapshot,
-    );
+    const conversation = await this.deps.conversations.get(job.conversationKey);
     if (conversation.messages.length === 0) {
       return;
     }
+    if (!conversation.systemPrompt) {
+      return; // No system prompt set yet — nothing to compact against
+    }
 
-    const systemPrompt = composeSystemPrompt(
-      conversation.systemPrompt?.text ?? systemPromptSnapshot.text,
-    );
+    const systemPrompt = composeSystemPrompt(conversation.systemPrompt.text);
 
     const usage = await this.deps.models.inspectContextWindowUsage({
       conversationKey: job.conversationKey,
