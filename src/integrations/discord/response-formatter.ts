@@ -70,6 +70,12 @@ export function formatStreamEventForDiscord(event: AppProgressEvent): { message:
       return { message: `Running \`${event.name}\`... (${event.elapsed?.toFixed(0) ?? "?"}s)` };
     case "tool_summary":
       return { message: event.summary };
+    case "task_started":
+      return { message: `Task started: ${event.description ?? event.taskId}` };
+    case "task_progress":
+      return { message: `Task progress: ${event.taskId} (${event.toolUses ?? 0} tools, ${((event.durationMs ?? 0) / 1000).toFixed(1)}s)` };
+    case "task_completed":
+      return { message: `Task ${event.status ?? "completed"}: ${event.summary ?? event.taskId}` };
     case "text":
       return { message: event.text };
     case "agent_init":

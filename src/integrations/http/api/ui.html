@@ -698,6 +698,22 @@ function wordWrap(text, maxW) {
   return results;
 }
 
+// ── State icons ──
+const IC_RUN = '\u25D0';  // ◐
+const IC_OK  = '\u2713';  // ✓
+const IC_ERR = '\u2717';  // ✗
+
+function stateIcon(state) {
+  return state === 'running' ? IC_RUN : state === 'failed' ? IC_ERR : IC_OK;
+}
+
+/** Render a tool line: icon name (elapsed) */
+function toolLine(tool, indent) {
+  const icon = stateIcon(tool.state);
+  const time = tool.elapsed ? ' (' + tool.elapsed + ')' : '';
+  return indent + icon + ' ' + tool.name + time;
+}
+
 /** Convert chat blocks to flat display lines */
 function flattenChatBlocks() {
   const pad = 4;
@@ -709,28 +725,28 @@ function flattenChatBlocks() {
         for (const l of wordWrap('> ' + block.text, maxW)) lines.push(l);
         lines.push('');
         break;
-      case 'thinking': {
-        const preview = block.text.length > 80 ? block.text.slice(0, 80) + '...' : block.text;
-        lines.push('  ' + preview);
+      case 'thinking':
+        lines.push('  ' + (block.text.length > 60 ? block.text.slice(0, 60) + '...' : block.text));
         break;
-      }
-      case 'tool': {
-        const state = block.state === 'running' ? 'running'
-          : block.state === 'failed' ? 'failed'
-          : block.elapsed ? block.elapsed : 'done';
-        lines.push('  \u25B6 ' + block.name + ' (' + state + ')');
-        for (const l of block.lines) {
-          lines.push('    ' + l);
+      case 'tool':
+        lines.push(toolLine(block, '  '));
+        if (block.summary) lines.push('    ' + block.summary);
+        break;
+      case 'task': {
+        const icon = stateIcon(block.state);
+        const time = block.elapsed ? ' (' + block.elapsed + ')' : '';
+        lines.push('  ' + icon + ' ' + (block.description || block.taskId) + time);
+        for (const child of block.children) {
+          lines.push(toolLine(child, '    '));
+          if (child.summary) lines.push('      ' + child.summary);
         }
         break;
       }
       case 'text':
-        for (const l of wordWrap(block.text, maxW - 12)) {
-          lines.push('  ' + l);
-        }
+        for (const l of wordWrap(block.text, maxW - 12)) lines.push('  ' + l);
         break;
-      case 'divider':
-        lines.push('\u2500\u2500 ' + block.text + ' \u2500\u2500');
+      case 'result':
+        lines.push('  ' + block.turns + ' turns  ' + block.duration + '  ' + block.cost);
         break;
       case 'status':
         lines.push('  ' + block.text);
@@ -740,8 +756,26 @@ function flattenChatBlocks() {
   return lines;
 }
 
-/** Find the active (running) tool block, if any */
-function findActiveToolBlock(name) {
+/** Find a task block by ID */
+function findTaskBlock(taskId) {
+  if (!taskId) return null;
+  for (let i = chatBlocks.length - 1; i >= 0; i--) {
+    if (chatBlocks[i].type === 'task' && chatBlocks[i].taskId === taskId) return chatBlocks[i];
+  }
+  return null;
+}
+
+/** Find a running tool block — inside a task if taskId given, else top-level */
+function findRunningTool(name, taskId) {
+  if (taskId) {
+    const task = findTaskBlock(taskId);
+    if (task) {
+      for (let i = task.children.length - 1; i >= 0; i--) {
+        if (task.children[i].name === name && task.children[i].state === 'running') return task.children[i];
+      }
+    }
+  }
+  // Search top-level
   for (let i = chatBlocks.length - 1; i >= 0; i--) {
     if (chatBlocks[i].type === 'tool' && chatBlocks[i].name === name && chatBlocks[i].state === 'running') {
       return chatBlocks[i];
@@ -750,38 +784,74 @@ function findActiveToolBlock(name) {
   return null;
 }
 
+/** Find the most recent tool block (any state) in tasks or top-level */
+function findRecentTool() {
+  for (let i = chatBlocks.length - 1; i >= 0; i--) {
+    if (chatBlocks[i].type === 'tool') return chatBlocks[i];
+    if (chatBlocks[i].type === 'task') {
+      const ch = chatBlocks[i].children;
+      if (ch.length > 0) return ch[ch.length - 1];
+    }
+  }
+  return null;
+}
+
 /** Handle a single SSE event from the agent stream */
 function handleStreamEvent(event) {
   switch (event.type) {
-    case 'thinking':
-      chatBlocks.push({ type: 'thinking', text: event.text });
+    case 'thinking': {
+      // Replace previous thinking block instead of accumulating
+      const last = chatBlocks[chatBlocks.length - 1];
+      if (last?.type === 'thinking') { last.text = event.text; }
+      else chatBlocks.push({ type: 'thinking', text: event.text });
       break;
-    case 'tool_start':
-      chatBlocks.push({ type: 'tool', name: event.name, state: 'running', elapsed: null, lines: ['starting...'] });
+    }
+    case 'tool_start': {
+      const toolBlock = { type: 'tool', name: event.name, state: 'running', elapsed: null, summary: null };
+      if (event.taskId) {
+        const task = findTaskBlock(event.taskId);
+        if (task) { task.children.push(toolBlock); break; }
+      }
+      chatBlocks.push(toolBlock);
       break;
+    }
     case 'tool_progress': {
-      const tool = findActiveToolBlock(event.name);
+      const tool = findRunningTool(event.name, event.taskId);
       if (tool) {
-        tool.elapsed = event.elapsed ? event.elapsed.toFixed(1) + 's' : null;
-        tool.lines = [event.message || ('running... (' + (event.elapsed?.toFixed(0) ?? '?') + 's)')];
+        tool.elapsed = event.elapsed ? event.elapsed.toFixed(1) + 's' : tool.elapsed;
+        if (event.message) tool.summary = event.message;
       }
       break;
     }
     case 'tool_end': {
-      const tool = findActiveToolBlock(event.name);
+      const tool = findRunningTool(event.name, null);
       if (tool) {
         tool.state = event.isError ? 'failed' : 'done';
-        tool.lines = [event.isError ? (event.error || 'failed') : (event.summary || 'done')];
+        if (event.summary) tool.summary = event.summary;
+        if (event.error) tool.summary = event.error;
       }
       break;
     }
     case 'tool_summary': {
-      // Update the most recent tool block's summary line
-      for (let i = chatBlocks.length - 1; i >= 0; i--) {
-        if (chatBlocks[i].type === 'tool') {
-          chatBlocks[i].lines = [event.summary];
-          break;
-        }
+      const tool = findRecentTool();
+      if (tool) tool.summary = event.summary;
+      break;
+    }
+    case 'task_started':
+      chatBlocks.push({ type: 'task', taskId: event.taskId, description: event.description || event.taskId, state: 'running', elapsed: null, children: [] });
+      break;
+    case 'task_progress': {
+      const task = findTaskBlock(event.taskId);
+      if (task && event.durationMs) {
+        task.elapsed = (event.durationMs / 1000).toFixed(1) + 's';
+      }
+      break;
+    }
+    case 'task_completed': {
+      const task = findTaskBlock(event.taskId);
+      if (task) {
+        task.state = (event.status === 'error' || event.status === 'failed') ? 'failed' : 'done';
+        if (event.summary && !task.elapsed) task.elapsed = event.summary;
       }
       break;
     }
@@ -789,20 +859,18 @@ function handleStreamEvent(event) {
       chatBlocks.push({ type: 'text', text: event.text });
       break;
     case 'agent_init':
-      chatBlocks.push({ type: 'status', text: 'Agent: ' + (event.model || 'unknown') + ', ' + (event.toolCount || 0) + ' tools' });
+      // Suppress verbose init
       break;
     case 'compaction':
       chatBlocks.push({ type: 'status', text: 'Compacting...' });
       break;
     case 'result':
-      chatBlocks.push({ type: 'divider', text: event.turns + ' turns, ' + (event.durationMs / 1000).toFixed(1) + 's, $' + event.costUsd.toFixed(4) });
+      chatBlocks.push({ type: 'result', turns: event.turns, duration: (event.durationMs / 1000).toFixed(1) + 's', cost: '$' + event.costUsd.toFixed(4) });
       break;
     case 'error':
-      chatBlocks.push({ type: 'status', text: '[ERR] ' + event.message });
+      chatBlocks.push({ type: 'status', text: IC_ERR + ' ' + event.message });
       break;
     case 'status':
-      chatBlocks.push({ type: 'status', text: event.message });
-      break;
     case 'progress':
       chatBlocks.push({ type: 'status', text: event.message });
       break;
@@ -901,7 +969,8 @@ function connectSSE() {
     }
     // Cross-surface agent stream events (from Discord or other surfaces)
     const agentEvents = ['thinking','tool_start','tool_progress','tool_end',
-      'tool_summary','text','agent_init','compaction','result','error','status','progress'];
+      'tool_summary','task_started','task_progress','task_completed',
+      'text','agent_init','compaction','result','error','status','progress'];
     for (const evt of agentEvents) {
       es.addEventListener(evt, (e) => {
         if (chatStreamActive) return; // already receiving from own stream
