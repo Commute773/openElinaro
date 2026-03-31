@@ -542,7 +542,8 @@ function makeHomeScreen() {
     { text: 'Finance',       screen: () => makeApiScreen('Finance', '/api/finance/summary') },
     { text: 'Projects',      screen: () => makeApiScreen('Projects', '/api/projects') },
     { text: 'Todos',         screen: () => makeTodosScreen() },
-    { text: 'Bad Apple',     screen: () => makeBadAppleScreen() },
+    { text: 'Bad Apple',     screen: () => makeVideoScreen('Bad Apple!!', 'bad-apple.mp4') },
+    { text: 'Nyan Cat',      screen: () => makeVideoScreen('Nyan Cat', 'nyancat.mp4') },
   ];
 
   return {
@@ -657,92 +658,126 @@ function makeTodosScreen() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  BAD APPLE — renders video at 576x288 in 4 green brightness levels
+//  VIDEO PLAYER — Floyd-Steinberg dithered to 4 green brightness levels
 // ═══════════════════════════════════════════════════════════════════════
 
-let badAppleVideo = null;   // reuse across screen opens
-let badAppleReady = false;
+// Shared video element cache: { filename: { el, ready } }
+const videoCache = {};
 
-function makeBadAppleScreen() {
+// 4 luminance thresholds for quantization (0-255 mapped to levels 0-3)
+const LUM_LEVELS = [0, 85, 170, 255];
+const G = [[0,0,0],[5,85,13],[10,170,27],[20,255,40]];
+
+function nearestLevel(lum) {
+  // Clamp to 0-255
+  lum = Math.max(0, Math.min(255, lum));
+  if (lum < 43) return 0;
+  if (lum < 128) return 1;
+  if (lum < 213) return 2;
+  return 3;
+}
+
+function makeVideoScreen(title, filename) {
   let raf = null;
-  // Scratch canvas to sample video frames
   const samp = document.createElement('canvas');
   samp.width = W; samp.height = H;
   const sc = samp.getContext('2d', { willReadFrequently: true });
 
-  // 4-level green palette (matches PAL4)
-  const G = [[0,0,0],[5,85,13],[10,170,27],[20,255,40]];
-
   function ensureVideo() {
-    if (badAppleVideo) return badAppleVideo;
+    if (videoCache[filename]) return videoCache[filename].el;
     const v = document.createElement('video');
     v.crossOrigin = 'anonymous';
     v.playsInline = true;
+    v.loop = true;
     v.style.display = 'none';
     document.body.appendChild(v);
-    badAppleVideo = v;
+    videoCache[filename] = { el: v, ready: false };
     return v;
   }
 
   function renderVideoFrame() {
-    const v = badAppleVideo;
-    if (!v || v.paused || v.ended) { if (v?.ended) stop(); return; }
+    const entry = videoCache[filename];
+    const v = entry?.el;
+    if (!v || v.paused) return;
 
-    // Draw video frame to scratch canvas, filling 576x288
+    // Draw video frame to scratch canvas
     sc.drawImage(v, 0, 0, W, H);
     const img = sc.getImageData(0, 0, W, H);
     const px = img.data;
 
-    // Write directly to framebuffer — quantize luminance to 4 levels
+    // Build luminance buffer for Floyd-Steinberg dithering
+    const lum = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) {
+      const j = i * 4;
+      lum[i] = px[j] * 0.299 + px[j+1] * 0.587 + px[j+2] * 0.114;
+    }
+
+    // Floyd-Steinberg dithering
     const out = fc.createImageData(W, H);
     const od = out.data;
-    for (let i = 0; i < px.length; i += 4) {
-      // Perceived luminance
-      const lum = px[i] * 0.299 + px[i+1] * 0.587 + px[i+2] * 0.114;
-      // Quantize to 0-3
-      const lvl = lum < 40 ? 0 : lum < 110 ? 1 : lum < 190 ? 2 : 3;
-      const c = G[lvl];
-      od[i]   = c[0];
-      od[i+1] = c[1];
-      od[i+2] = c[2];
-      od[i+3] = 255;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const idx = y * W + x;
+        const old = lum[idx];
+        const lvl = nearestLevel(old);
+        const newVal = LUM_LEVELS[lvl];
+        const err = old - newVal;
+
+        // Distribute error to neighbors
+        if (x + 1 < W)               lum[idx + 1]     += err * 7/16;
+        if (y + 1 < H) {
+          if (x > 0)                  lum[idx + W - 1] += err * 3/16;
+                                      lum[idx + W]     += err * 5/16;
+          if (x + 1 < W)             lum[idx + W + 1] += err * 1/16;
+        }
+
+        const c = G[lvl];
+        const j = idx * 4;
+        od[j]   = c[0];
+        od[j+1] = c[1];
+        od[j+2] = c[2];
+        od[j+3] = 255;
+      }
     }
+
     fc.putImageData(out, 0, 0);
     blit();
 
     const t = v.currentTime;
-    const m = Math.floor(t / 60);
-    const s = Math.floor(t % 60);
+    const d = v.duration || 0;
+    const fmt = (s) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
     document.getElementById('info').textContent =
-      `Bad Apple!! | ${m}:${String(s).padStart(2,'0')} / 3:39`;
+      `${title} | ${fmt(t)} / ${fmt(d)}`;
 
     raf = requestAnimationFrame(renderVideoFrame);
   }
 
   function stop() {
     if (raf) { cancelAnimationFrame(raf); raf = null; }
-    if (badAppleVideo) { badAppleVideo.pause(); }
+    const v = videoCache[filename]?.el;
+    if (v) v.pause();
   }
 
-  const screen = {
-    title: 'Bad Apple!!',
+  return {
+    title,
     lines: [],
     cursor: -1,
     scroll: 0,
     async init() {
       const v = ensureVideo();
+      const entry = videoCache[filename];
 
-      if (!badAppleReady) {
+      if (!entry.ready) {
         clr();
-        txt('Loading Bad Apple...', 20, H/2 - LH, 3);
+        txt('Loading ' + title + '...', 20, H/2 - LH, 3);
         blit();
 
-        v.src = '/g2/bad-apple.mp4';
-        badAppleReady = true;
+        v.src = '/g2/media/' + filename;
+        entry.ready = true;
 
         await new Promise((res, rej) => {
           v.oncanplay = res;
-          v.onerror = () => rej(new Error('Failed to load video'));
+          v.onerror = () => { entry.ready = false; rej(new Error('Failed to load')); };
         });
       }
 
@@ -755,8 +790,6 @@ function makeBadAppleScreen() {
       popScreen();
     },
   };
-
-  return screen;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

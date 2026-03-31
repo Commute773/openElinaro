@@ -47,14 +47,17 @@ export function createHttpRequestHandler(
       });
     }
 
-    // Bad Apple video
-    if (pathname === "/g2/bad-apple.mp4") {
-      const vidPath = `${getUserDataRootDir()}/bad-apple.mp4`;
-      const file = Bun.file(vidPath);
-      if (await file.exists()) {
-        return new Response(file, {
-          headers: { "Content-Type": "video/mp4", ...CORS_HEADERS },
-        });
+    // Serve video files from user data root
+    if (pathname.startsWith("/g2/media/") && pathname.endsWith(".mp4")) {
+      const filename = pathname.slice("/g2/media/".length);
+      if (/^[a-z0-9_-]+\.mp4$/.test(filename)) {
+        const vidPath = `${getUserDataRootDir()}/${filename}`;
+        const file = Bun.file(vidPath);
+        if (await file.exists()) {
+          return new Response(file, {
+            headers: { "Content-Type": "video/mp4", ...CORS_HEADERS },
+          });
+        }
       }
     }
 
