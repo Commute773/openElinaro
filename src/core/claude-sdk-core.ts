@@ -1,19 +1,21 @@
 /**
  * Claude Agent SDK core implementation.
  *
- * Uses the Claude Agent SDK's query() API to run the agent loop.
+ * Uses persistent SDK sessions (via ClaudeSdkSession) to keep a single
+ * subprocess alive across conversational turns. The first turn creates
+ * the session; subsequent turns reuse it for warm cache and lower latency.
  * Harness domain tools are registered via an in-process MCP server.
  * The SDK handles its own agent loop, compaction, context management,
  * streaming, file checkpointing, and thinking.
  */
 import {
-  query,
   tool,
   createSdkMcpServer,
   type Options,
   type SDKMessage,
   type HookCallback,
 } from "@anthropic-ai/claude-agent-sdk";
+import { ClaudeSdkSession } from "./claude-sdk-session";
 import { z } from "zod";
 import { attemptOrAsync } from "../utils/result";
 import type { AgentStreamEvent } from "../domain/assistant";
@@ -83,8 +85,8 @@ export interface ClaudeSdkCoreConfig {
   model: string;
   apiKey?: string;
   cwd?: string;
-  /** SDK session ID to resume from a prior turn (enables cross-turn continuity). */
-  resumeSessionId?: string;
+  /** Existing persistent session to reuse across turns. */
+  session?: ClaudeSdkSession;
 }
 
 // ---------------------------------------------------------------------------
@@ -229,9 +231,6 @@ export class ClaudeSdkCore implements AgentCore {
         ? { env: { ...process.env, ...buildAuthEnv(this.config.apiKey) } }
         : {}),
       ...(signal ? { abortController: abortControllerFromSignal(signal) } : {}),
-      ...(this.config.resumeSessionId
-        ? { resume: this.config.resumeSessionId }
-        : {}),
     };
 
     // Run the query
@@ -249,7 +248,14 @@ export class ClaudeSdkCore implements AgentCore {
       ? (event: AgentStreamEvent) => { void attemptOrAsync(() => onProgress(event), undefined); }
       : undefined;
 
-    const queryStream = query({ prompt, options: sdkOptions });
+    // Create or reuse the persistent session
+    const session = this.config.session?.isAlive
+      ? this.config.session
+      : ClaudeSdkSession.create(sdkOptions);
+
+    // Push the user message to start this turn
+    session.sendMessage(prompt);
+
     let receivedFirstMessage = false;
 
     const firstMessageTimer = setTimeout(() => {
@@ -262,7 +268,9 @@ export class ClaudeSdkCore implements AgentCore {
 
     try {
     try {
-    for await (const message of queryStream) {
+    while (true) {
+      const { value: message, done } = await session.nextMessage();
+      if (done) break;
       receivedFirstMessage = true;
       if (signal?.aborted) break;
 
@@ -380,16 +388,17 @@ export class ClaudeSdkCore implements AgentCore {
             resultChars: finalText.length,
           });
           progress?.({ type: "result", turns: numTurns, durationMs, costUsd: totalCostUsd });
+          break; // Turn complete — session stays alive for next turn
         } else {
           const errors = (message as any).errors ?? [];
           const errorText = errors.length > 0 ? errors.join("; ") : "unknown";
           onLog?.("sdk_result_error", { error: errorText, subtype: message.subtype });
 
-          // If this is a stale session error, retry with a fresh session instead of failing
-          if (this.config.resumeSessionId && isStaleSessionError(new Error(errorText))) {
-            onLog?.("sdk_stale_session_retry", { resumeSessionId: this.config.resumeSessionId, error: errorText });
-            progress?.({ type: "status", message: "Session expired, starting fresh" });
-            const freshCore = new ClaudeSdkCore({ ...this.config, resumeSessionId: undefined });
+          // If the session died, close it and retry with a fresh one
+          if (this.config.session && isStaleSessionError(new Error(errorText))) {
+            onLog?.("sdk_session_died_retry", { error: errorText });
+            session.close();
+            const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined });
             return freshCore.run(options);
           }
 
@@ -406,7 +415,8 @@ export class ClaudeSdkCore implements AgentCore {
         switch (subtype) {
           case "init":
             capturedSessionId = msg.session_id ?? undefined;
-            progress?.({ type: "agent_init", model: msg.model ?? "unknown", toolCount: (msg.tools ?? []).length, mcpServerCount: (msg.mcp_servers ?? []).length });
+            if (capturedSessionId) session.setSessionId(capturedSessionId);
+            // agent_init is logged but not surfaced to users — it fires every turn
             break;
           case "api_retry":
             progress?.({ type: "status", message: `API retry: attempt ${msg.attempt ?? "?"}/${msg.max_retries ?? "?"}, waiting ${msg.retry_delay_ms ?? 0}ms${msg.error_status ? ` (HTTP ${msg.error_status})` : ""}` });
@@ -467,7 +477,7 @@ export class ClaudeSdkCore implements AgentCore {
       if (message.type === "rate_limit_event") {
         const info = (message as any).rate_limit_info ?? {};
         onLog?.("sdk_rate_limit", info);
-        progress?.({ type: "status", message: `Rate limited — ${JSON.stringify(info)}` });
+        // Rate limit info is logged but not surfaced to users — it's noise
       }
 
       if (message.type === "auth_status") {
@@ -486,12 +496,13 @@ export class ClaudeSdkCore implements AgentCore {
       }
     }
     } catch (err: unknown) {
-      // If we haven't received any messages yet and this looks like a stale session error,
-      // drop the resume option and retry with a fresh SDK session.
-      if (!receivedFirstMessage && this.config.resumeSessionId && isStaleSessionError(err)) {
-        onLog?.("sdk_stale_session_retry", { resumeSessionId: this.config.resumeSessionId, error: String(err) });
+      // If we haven't received any messages yet and the session died,
+      // close it and retry with a fresh session.
+      if (!receivedFirstMessage && this.config.session && isStaleSessionError(err)) {
+        onLog?.("sdk_session_died_retry", { error: String(err) });
         progress?.({ type: "status", message: "Session expired, starting fresh" });
-        const freshCore = new ClaudeSdkCore({ ...this.config, resumeSessionId: undefined });
+        session.close();
+        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined });
         return freshCore.run(options);
       }
       throw err;
@@ -521,6 +532,7 @@ export class ClaudeSdkCore implements AgentCore {
       steps,
       totalUsage,
       sdkSessionId: capturedSessionId,
+      sessionHandle: session,
     };
   }
 }

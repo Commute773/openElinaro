@@ -72,6 +72,8 @@ export type ConversationSessionState = {
   activeAbortController: AbortController | null;
   stopRequested: boolean;
   typingIndicatorActive: boolean;
+  /** Opaque handle to a persistent SDK session for reuse across turns. */
+  sdkSessionHandle?: unknown;
 };
 
 export type ChatDependencies = {

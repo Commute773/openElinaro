@@ -1,0 +1,105 @@
+/**
+ * Persistent wrapper around the Claude Agent SDK's v1 Query object.
+ *
+ * Uses streaming input mode (`prompt: AsyncIterable<SDKUserMessage>`)
+ * to keep a single Query (and its underlying subprocess) alive across
+ * multiple conversational turns. Each `sendMessage()` pushes a new user
+ * message into the channel; the caller reads responses via `nextMessage()`
+ * using the raw iterator protocol (avoids for-await which would close
+ * the generator on break).
+ */
+import {
+  query as sdkQuery,
+  type Options,
+  type SDKMessage,
+  type SDKUserMessage,
+  type Query,
+} from "@anthropic-ai/claude-agent-sdk";
+import { AsyncChannel } from "./async-channel";
+
+export class ClaudeSdkSession {
+  private readonly channel: AsyncChannel<SDKUserMessage>;
+  private readonly queryInstance: Query;
+  private readonly iterator: AsyncIterator<SDKMessage>;
+  private _sessionId: string | undefined;
+  private _alive = true;
+
+  private constructor(channel: AsyncChannel<SDKUserMessage>, queryInstance: Query) {
+    this.channel = channel;
+    this.queryInstance = queryInstance;
+    this.iterator = queryInstance[Symbol.asyncIterator]();
+  }
+
+  /**
+   * Create a new persistent session with the given SDK options.
+   * The session starts idle — call `sendMessage()` to trigger the first turn.
+   */
+  static create(options: Options): ClaudeSdkSession {
+    const channel = new AsyncChannel<SDKUserMessage>();
+
+    // Omit `prompt` from options — we provide the channel as the streaming input
+    const { ...rest } = options;
+    const queryInstance = sdkQuery({ prompt: channel, options: rest });
+
+    return new ClaudeSdkSession(channel, queryInstance);
+  }
+
+  /** Push a user message to start or continue a turn. */
+  sendMessage(text: string, priority?: SDKUserMessage["priority"]): void {
+    if (!this._alive) throw new Error("Session is closed");
+    const msg: SDKUserMessage = {
+      type: "user",
+      message: { role: "user", content: text },
+      parent_tool_use_id: null,
+      timestamp: new Date().toISOString(),
+      ...(priority ? { priority } : {}),
+    };
+    this.channel.push(msg);
+  }
+
+  /**
+   * Read the next message from the query stream.
+   * Uses the raw iterator protocol so the generator stays alive between turns.
+   * Returns `{ done: true }` when the query subprocess exits.
+   */
+  async nextMessage(): Promise<IteratorResult<SDKMessage>> {
+    if (!this._alive) return { value: undefined as any, done: true };
+    const result = await this.iterator.next();
+    if (result.done) {
+      this._alive = false;
+    }
+    return result;
+  }
+
+  /** Close the session and its underlying subprocess. */
+  close(): void {
+    if (!this._alive) return;
+    this._alive = false;
+    this.channel.close();
+    this.queryInstance.close();
+  }
+
+  /** Interrupt the current agent execution without closing the session. */
+  async interrupt(): Promise<void> {
+    if (!this._alive) return;
+    await this.queryInstance.interrupt();
+  }
+
+  get sessionId(): string | undefined {
+    return this._sessionId;
+  }
+
+  /** Called by the core when a system init message provides the session ID. */
+  setSessionId(id: string): void {
+    this._sessionId = id;
+  }
+
+  get isAlive(): boolean {
+    return this._alive;
+  }
+
+  /** Access the underlying Query for advanced control (setMcpServers, etc.). */
+  get query(): Query {
+    return this.queryInstance;
+  }
+}

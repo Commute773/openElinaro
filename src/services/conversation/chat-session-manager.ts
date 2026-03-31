@@ -79,6 +79,8 @@ export class ChatSessionManager {
   }
 
   deleteSession(conversationKey: string) {
+    const session = this.sessions.get(conversationKey);
+    this.closeSdkSessionHandle(session);
     this.sessions.delete(conversationKey);
   }
 
@@ -106,7 +108,7 @@ export class ChatSessionManager {
           this.kickSession(conversationKey);
           return;
         }
-        if (!session.compacting && session.pendingSteeringMessages.length === 0) {
+        if (!session.compacting && session.pendingSteeringMessages.length === 0 && !session.sdkSessionHandle) {
           this.sessions.delete(conversationKey);
         }
       });
@@ -326,6 +328,22 @@ export class ChatSessionManager {
     if (session.stopRequested) {
       throw new AgentRunStoppedError();
     }
+  }
+
+  /** Close all active SDK session handles (for process shutdown). */
+  closeAll() {
+    for (const session of this.sessions.values()) {
+      this.closeSdkSessionHandle(session);
+    }
+  }
+
+  private closeSdkSessionHandle(session: ConversationSessionState | undefined) {
+    if (!session?.sdkSessionHandle) return;
+    const handle = session.sdkSessionHandle as { close?: () => void };
+    if (typeof handle.close === "function") {
+      handle.close();
+    }
+    session.sdkSessionHandle = undefined;
   }
 }
 

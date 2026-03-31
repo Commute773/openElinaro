@@ -235,6 +235,11 @@ export class ChatTurnRunner {
             );
           }
 
+          // Store the persistent session handle for reuse on next turn
+          if (result.sessionHandle) {
+            session.sdkSessionHandle = result.sessionHandle;
+          }
+
           // Check stop AFTER persistence
           this.sessionManager.throwIfStopRequested(session);
 

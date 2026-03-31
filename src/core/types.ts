@@ -218,6 +218,8 @@ export interface CoreRunResult {
   totalUsage?: CoreUsage;
   /** SDK-managed session ID for cross-turn continuity (returned by cores that persist sessions). */
   sdkSessionId?: string;
+  /** Opaque handle to a persistent SDK session for reuse across turns. */
+  sessionHandle?: unknown;
 }
 
 // ---------------------------------------------------------------------------

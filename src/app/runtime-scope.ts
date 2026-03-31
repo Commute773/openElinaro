@@ -1,3 +1,4 @@
+import { getUserDataRootDir } from "../services/runtime-root";
 import type { CacheMissWarning } from "../services/cache-miss-monitor";
 import type { ProfileRecord } from "../domain/profiles";
 import { AccessControlService } from "../services/profiles";
@@ -26,7 +27,7 @@ import { ToolResolutionService } from "../services/tool-resolution-service";
 import { ToolRegistry } from "../functions/tool-registry";
 import { telemetry } from "../services/infrastructure/telemetry";
 import { getRuntimeConfig } from "../config/runtime-config";
-import { PiCore, ClaudeSdkCore } from "../core";
+import { PiCore, ClaudeSdkCore, ClaudeSdkSession } from "../core";
 import type { CoreFactory } from "../core";
 import { PeerClient } from "../instance/peer-client";
 import { PeerRegistry } from "../instance/peer-registry";
@@ -259,7 +260,8 @@ export function createRuntimeScope(ctx: {
         return new ClaudeSdkCore({
           model: modelConfig.modelId,
           apiKey: modelConfig.apiKey,
-          resumeSessionId: modelConfig.providerOptions?.sdkSessionId as string | undefined,
+          cwd: getUserDataRootDir(),
+          session: modelConfig.providerOptions?.sdkSessionHandle as ClaudeSdkSession | undefined,
         });
       }
       return new PiCore({
