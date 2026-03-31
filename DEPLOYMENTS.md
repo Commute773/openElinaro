@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.13
+- Released at: 2026-03-31T17:32:32Z
+- Release id: 20260331T173232Z-4ad7501
+- Previous version: 2026.03.31.12
+- Trigger: ci/release workflow
+
+- docs: add deploy step to workflow in CLAUDE.md
+
 ## 2026.03.31.12
 - Released at: 2026-03-31T17:29:30Z
 - Release id: 20260331T172930Z-099b32a
