@@ -55,18 +55,12 @@ export class ChatTurnRunner {
       async () => {
         const session = this.sessionManager.getSession(job.conversationKey);
         session.stopRequested = false;
-        const conversation = await this.loadConversationForJob(job);
+        const conversation = await this.loadConversationForJob(job, core.manifest.id);
         const backgroundExecNotifications = job.execution.includeBackgroundExecNotifications
           ? this.deps.routineTools.consumePendingBackgroundExecNotifications(job.conversationKey)
           : [];
         // conversation.systemPrompt is guaranteed set by loadConversationForJob
-        // Strip tool library prompt lines when the core suppresses load_tool_library
-        const suppressToolLibrary = core.manifest.suppressedTools?.includes("load_tool_library");
-        const basePromptText = conversation.systemPrompt!.text;
-        const filteredPromptText = suppressToolLibrary
-          ? stripToolLibraryPromptLines(basePromptText)
-          : basePromptText;
-        const systemPrompt = composeSystemPrompt(filteredPromptText);
+        const systemPrompt = composeSystemPrompt(conversation.systemPrompt!.text);
         const promptWarning = formatSystemPromptWarning(systemPrompt);
         const backgroundExecMessages = this.buildBackgroundExecMessages(backgroundExecNotifications);
         const steeringMessages = this.sessionManager.consumePendingSteeringMessages(session);
@@ -381,8 +375,8 @@ export class ChatTurnRunner {
     }
   }
 
-  async loadConversationForJob(job: QueuedChatJob) {
-    const systemPromptSnapshot = await this.deps.systemPrompts.load();
+  async loadConversationForJob(job: QueuedChatJob, coreId?: string) {
+    const systemPromptSnapshot = await this.deps.systemPrompts.load(coreId);
     if (job.execution.persistConversation) {
       return this.deps.conversations.ensureSystemPrompt(
         job.conversationKey,
@@ -478,18 +472,4 @@ export class ChatTurnRunner {
       ),
     ];
   }
-}
-
-/**
- * Remove the tool-library prompt lines from the system prompt text.
- * These lines instruct the model to use `load_tool_library`, which is
- * not available when the core suppresses it (e.g., Claude Agent SDK).
- */
-function stripToolLibraryPromptLines(text: string): string {
-  return text
-    .split("\n")
-    .filter((line) =>
-      !line.includes("load_tool_library") &&
-      !line.startsWith("Available tool libraries:"))
-    .join("\n");
 }
