@@ -194,8 +194,8 @@ await shot("agents");
 // Go back to home, test line heights
 await page.keyboard.press("Escape");
 await page.waitForTimeout(500);
-await page.locator("#lineHeight").selectOption("9");
-await shot("home-lh9");
+await page.locator("#lineHeight").selectOption("8");
+await shot("home-lh8");
 await page.locator("#lineHeight").selectOption("48");
 await shot("home-lh48");
 
