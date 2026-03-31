@@ -16,6 +16,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { attemptOrAsync } from "../utils/result";
+import type { AgentStreamEvent } from "../domain/assistant";
 import type {
   AgentCore,
   CoreManifest,
@@ -179,14 +180,14 @@ export class ClaudeSdkCore implements AgentCore {
     if (onProgress) {
       const postToolUseHook: HookCallback = async (input) => {
         const postInput = input as { tool_name?: string; tool_use_id?: string };
-        await onProgress(`Tool completed: ${postInput.tool_name ?? "unknown"}`);
+        await onProgress({ type: "tool_end", name: postInput.tool_name ?? "unknown", isError: false });
         return {};
       };
       sdkHooks.PostToolUse = [{ hooks: [postToolUseHook] }];
 
       const postToolUseFailureHook: HookCallback = async (input) => {
         const postInput = input as { tool_name?: string; error?: string };
-        await onProgress(`Tool failed: ${postInput.tool_name ?? "unknown"} — ${postInput.error ?? "unknown error"}`);
+        await onProgress({ type: "tool_end", name: postInput.tool_name ?? "unknown", isError: true, error: postInput.error ?? "unknown error" });
         return {};
       };
       sdkHooks.PostToolUseFailure = [{ hooks: [postToolUseFailureHook] }];
@@ -255,7 +256,7 @@ export class ClaudeSdkCore implements AgentCore {
 
     // Helper to emit progress without blocking the stream
     const progress = onProgress
-      ? (msg: string) => { void attemptOrAsync(() => onProgress(msg), undefined); }
+      ? (event: AgentStreamEvent) => { void attemptOrAsync(() => onProgress(event), undefined); }
       : undefined;
 
     try {
@@ -312,7 +313,7 @@ export class ClaudeSdkCore implements AgentCore {
             const thinking = (block as any).thinking ?? "";
             if (thinking) {
               const preview = thinking.length > 300 ? thinking.slice(0, 300) + "..." : thinking;
-              progress(`Thinking: ${preview}`);
+              progress({ type: "thinking", text: preview });
             }
           }
         }
@@ -322,8 +323,7 @@ export class ClaudeSdkCore implements AgentCore {
           for (const block of toolUseBlocks) {
             const name = (block as any).name ?? "unknown";
             const input = (block as any).input ?? {};
-            const inputSummary = summarizeToolInput(name, input);
-            progress(`Using tool: ${name}${inputSummary ? ` — ${inputSummary}` : ""}`);
+            progress({ type: "tool_start", name, args: input });
           }
         }
 
@@ -344,7 +344,7 @@ export class ClaudeSdkCore implements AgentCore {
         const summary = (message as any).summary as string;
         const toolUseIds = (message as any).preceding_tool_use_ids as string[];
         onLog?.("sdk_tool_use_summary", { summary, toolUseIds });
-        progress?.(`Tool summary: ${summary}`);
+        progress?.({ type: "tool_summary", summary });
       }
 
       if (message.type === "tool_progress") {
@@ -357,7 +357,7 @@ export class ClaudeSdkCore implements AgentCore {
           elapsed,
           taskId: msg.task_id,
         });
-        progress?.(`Running ${toolName}... (${elapsed.toFixed(0)}s)`);
+        progress?.({ type: "tool_progress", name: toolName, elapsed });
       }
 
       if (message.type === "result") {
@@ -377,12 +377,12 @@ export class ClaudeSdkCore implements AgentCore {
             cacheReadTokens: totalUsage.cacheRead,
             resultChars: finalText.length,
           });
-          progress?.(`Completed in ${numTurns} turns, ${(durationMs / 1000).toFixed(1)}s, $${totalCostUsd.toFixed(4)}`);
+          progress?.({ type: "result", turns: numTurns, durationMs, costUsd: totalCostUsd });
         } else {
           const errors = (message as any).errors ?? [];
           const errorText = errors.length > 0 ? errors.join("; ") : "unknown";
           onLog?.("sdk_result_error", { error: errorText, subtype: message.subtype });
-          progress?.(`Error: ${errorText}`);
+          progress?.({ type: "error", message: errorText });
           throw new Error(`Claude Code returned an error result: ${errorText}`);
         }
       }
@@ -395,60 +395,60 @@ export class ClaudeSdkCore implements AgentCore {
         switch (subtype) {
           case "init":
             capturedSessionId = msg.session_id ?? undefined;
-            progress?.(`Agent initialized: model=${msg.model ?? "unknown"}, ${(msg.tools ?? []).length} tools, ${(msg.mcp_servers ?? []).length} MCP servers`);
+            progress?.({ type: "agent_init", model: msg.model ?? "unknown", toolCount: (msg.tools ?? []).length, mcpServerCount: (msg.mcp_servers ?? []).length });
             break;
           case "api_retry":
-            progress?.(`API retry: attempt ${msg.attempt ?? "?"}/${msg.max_retries ?? "?"}, waiting ${msg.retry_delay_ms ?? 0}ms${msg.error_status ? ` (HTTP ${msg.error_status})` : ""}`);
+            progress?.({ type: "status", message: `API retry: attempt ${msg.attempt ?? "?"}/${msg.max_retries ?? "?"}, waiting ${msg.retry_delay_ms ?? 0}ms${msg.error_status ? ` (HTTP ${msg.error_status})` : ""}` });
             break;
           case "compact_boundary": {
             const meta = msg.compact_metadata ?? {};
-            progress?.(`Conversation compacted (trigger: ${meta.trigger ?? "unknown"}, pre-tokens: ${meta.pre_tokens ?? "?"})`);
+            progress?.({ type: "compaction", trigger: meta.trigger ?? "unknown", preTokens: meta.pre_tokens });
             break;
           }
           case "status":
             if (msg.status) {
-              progress?.(`Status: ${msg.status}`);
+              progress?.({ type: "status", message: msg.status });
             }
             break;
           case "local_command_output":
             if (msg.content) {
               const preview = msg.content.length > 500 ? msg.content.slice(0, 500) + "..." : msg.content;
-              progress?.(`Command output: ${preview}`);
+              progress?.({ type: "status", message: `Command output: ${preview}` });
             }
             break;
           case "hook_started":
-            progress?.(`Hook started: ${msg.hook_name ?? "unknown"} (${msg.hook_event ?? "unknown"})`);
+            progress?.({ type: "status", message: `Hook started: ${msg.hook_name ?? "unknown"} (${msg.hook_event ?? "unknown"})` });
             break;
           case "hook_progress":
             if (msg.output) {
-              progress?.(`Hook progress [${msg.hook_name ?? "unknown"}]: ${msg.output}`);
+              progress?.({ type: "status", message: `Hook progress [${msg.hook_name ?? "unknown"}]: ${msg.output}` });
             }
             break;
           case "hook_response":
-            progress?.(`Hook ${msg.outcome ?? "completed"}: ${msg.hook_name ?? "unknown"}${msg.exit_code != null ? ` (exit ${msg.exit_code})` : ""}`);
+            progress?.({ type: "status", message: `Hook ${msg.outcome ?? "completed"}: ${msg.hook_name ?? "unknown"}${msg.exit_code != null ? ` (exit ${msg.exit_code})` : ""}` });
             break;
           case "task_started":
-            progress?.(`Task started: ${msg.description ?? msg.task_id ?? "unknown"}${msg.task_type ? ` (${msg.task_type})` : ""}`);
+            progress?.({ type: "status", message: `Task started: ${msg.description ?? msg.task_id ?? "unknown"}${msg.task_type ? ` (${msg.task_type})` : ""}` });
             break;
           case "task_progress": {
             const usage = msg.usage ?? {};
-            progress?.(`Task progress: ${msg.description ?? msg.task_id ?? "unknown"} (${usage.total_tokens ?? 0} tokens, ${usage.tool_uses ?? 0} tool calls, ${((usage.duration_ms ?? 0) / 1000).toFixed(1)}s)`);
+            progress?.({ type: "status", message: `Task progress: ${msg.description ?? msg.task_id ?? "unknown"} (${usage.total_tokens ?? 0} tokens, ${usage.tool_uses ?? 0} tool calls, ${((usage.duration_ms ?? 0) / 1000).toFixed(1)}s)` });
             break;
           }
           case "task_notification":
-            progress?.(`Task ${msg.status ?? "completed"}: ${msg.summary ?? msg.task_id ?? "unknown"}`);
+            progress?.({ type: "status", message: `Task ${msg.status ?? "completed"}: ${msg.summary ?? msg.task_id ?? "unknown"}` });
             break;
           case "files_persisted": {
             const files = msg.files ?? [];
             const failed = msg.failed ?? [];
-            progress?.(`Files persisted: ${files.length} saved${failed.length > 0 ? `, ${failed.length} failed` : ""}`);
+            progress?.({ type: "status", message: `Files persisted: ${files.length} saved${failed.length > 0 ? `, ${failed.length} failed` : ""}` });
             break;
           }
           case "session_state_changed":
-            progress?.(`Session state: ${msg.state ?? "unknown"}`);
+            progress?.({ type: "status", message: `Session state: ${msg.state ?? "unknown"}` });
             break;
           case "elicitation_complete":
-            progress?.(`Elicitation complete: ${msg.mcp_server_name ?? "unknown"}`);
+            progress?.({ type: "status", message: `Elicitation complete: ${msg.mcp_server_name ?? "unknown"}` });
             break;
         }
       }
@@ -456,16 +456,16 @@ export class ClaudeSdkCore implements AgentCore {
       if (message.type === "rate_limit_event") {
         const info = (message as any).rate_limit_info ?? {};
         onLog?.("sdk_rate_limit", info);
-        progress?.(`Rate limited — ${JSON.stringify(info)}`);
+        progress?.({ type: "status", message: `Rate limited — ${JSON.stringify(info)}` });
       }
 
       if (message.type === "auth_status") {
         const msg = message as any;
         onLog?.("sdk_auth_status", { isAuthenticating: msg.isAuthenticating, error: msg.error });
         if (msg.isAuthenticating) {
-          progress?.("Authenticating...");
+          progress?.({ type: "status", message: "Authenticating..." });
         } else if (msg.error) {
-          progress?.(`Auth error: ${msg.error}`);
+          progress?.({ type: "error", message: `Auth error: ${msg.error}` });
         }
       }
 
@@ -604,41 +604,6 @@ function mergeUsage(a: CoreUsage, b: CoreUsage): CoreUsage {
       total: a.cost.total + b.cost.total,
     },
   };
-}
-
-/** Produce a short human-readable summary of a tool's input for progress display. */
-function summarizeToolInput(toolName: string, input: Record<string, unknown>): string {
-  switch (toolName) {
-    case "Read":
-      return input.file_path ? String(input.file_path) : "";
-    case "Write":
-      return input.file_path ? String(input.file_path) : "";
-    case "Edit":
-      return input.file_path ? String(input.file_path) : "";
-    case "Glob":
-      return input.pattern ? String(input.pattern) : "";
-    case "Grep":
-      return input.pattern ? `/${input.pattern}/` : "";
-    case "Bash": {
-      const cmd = String(input.command ?? "");
-      return cmd.length > 120 ? cmd.slice(0, 120) + "..." : cmd;
-    }
-    case "WebSearch":
-      return input.query ? String(input.query) : "";
-    case "WebFetch":
-      return input.url ? String(input.url) : "";
-    case "Agent":
-      return input.description ? String(input.description) : "";
-    default: {
-      // For MCP tools, show the first string-valued arg
-      for (const [key, val] of Object.entries(input)) {
-        if (typeof val === "string" && val.length > 0 && val.length < 200) {
-          return `${key}: ${val}`;
-        }
-      }
-      return "";
-    }
-  }
 }
 
 function abortControllerFromSignal(signal: AbortSignal): AbortController {

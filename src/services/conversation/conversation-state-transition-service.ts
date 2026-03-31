@@ -16,8 +16,9 @@ import {
 } from "../system-prompt-service";
 import { telemetry } from "../infrastructure/telemetry";
 import { tryCatchAsync } from "../../utils/result";
+import type { AppProgressEvent } from "../../domain/assistant";
 
-type ProgressReporter = (message: string) => Promise<void>;
+type ProgressReporter = (event: AppProgressEvent) => Promise<void>;
 
 export interface ConversationContinuationResult {
   conversation: ConversationState;
@@ -105,11 +106,11 @@ export class ConversationStateTransitionService {
       memoryFilePath = compacted.memoryFilePath ?? null;
     } else if (!flushMemory && conversation.messages.length > 0) {
       await params.onProgress?.(
-        "Skipping durable memory flush and starting a brand new conversation.",
+        { type: "status", message: "Skipping durable memory flush and starting a brand new conversation." },
       );
     } else {
       await params.onProgress?.(
-        "No prior conversation messages were found, so there was nothing to compact.",
+        { type: "status", message: "No prior conversation messages were found, so there was nothing to compact." },
       );
     }
 

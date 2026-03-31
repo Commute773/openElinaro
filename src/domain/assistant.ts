@@ -20,12 +20,25 @@ export interface AppResponseAttachment {
   name?: string;
 }
 
-export interface AppProgressUpdate {
-  message: string;
-  attachments?: AppResponseAttachment[];
-}
+// ---------------------------------------------------------------------------
+// Structured agent stream events — emitted by cores, formatted by clients
+// ---------------------------------------------------------------------------
 
-export type AppProgressEvent = string | AppProgressUpdate;
+export type AgentStreamEvent =
+  | { type: "thinking"; text: string }
+  | { type: "tool_start"; name: string; args?: Record<string, unknown> }
+  | { type: "tool_progress"; name: string; elapsed?: number; message?: string }
+  | { type: "tool_end"; name: string; isError: boolean; summary?: string; error?: string }
+  | { type: "tool_summary"; summary: string }
+  | { type: "text"; text: string }
+  | { type: "agent_init"; model?: string; toolCount?: number; mcpServerCount?: number }
+  | { type: "compaction"; trigger?: string; preTokens?: number }
+  | { type: "result"; turns: number; durationMs: number; costUsd: number }
+  | { type: "error"; message: string }
+  | { type: "status"; message: string }
+  | { type: "progress"; message: string; attachments?: AppResponseAttachment[] };
+
+export type AppProgressEvent = AgentStreamEvent;
 
 export interface AppRequest {
   id: string;

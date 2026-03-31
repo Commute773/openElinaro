@@ -58,18 +58,35 @@ export function buildDiscordAttachmentFiles(attachments: AppResponseAttachment[]
   );
 }
 
-export function normalizeDiscordProgressUpdate(event: AppProgressEvent) {
-  if (typeof event === "string") {
-    return {
-      message: event,
-      files: undefined,
-    };
+export function formatStreamEventForDiscord(event: AppProgressEvent): { message: string; files?: AttachmentBuilder[] } {
+  switch (event.type) {
+    case "thinking":
+      return { message: `*${event.text.length > 200 ? event.text.slice(0, 200) + "..." : event.text}*` };
+    case "tool_start":
+      return { message: `Using tool: \`${event.name}\`` };
+    case "tool_end":
+      return { message: event.isError ? `Tool failed: \`${event.name}\`${event.error ? ` — ${event.error}` : ""}` : `Tool completed: \`${event.name}\`${event.summary ? ` — ${event.summary}` : ""}` };
+    case "tool_progress":
+      return { message: `Running \`${event.name}\`... (${event.elapsed?.toFixed(0) ?? "?"}s)` };
+    case "tool_summary":
+      return { message: event.summary };
+    case "text":
+      return { message: event.text };
+    case "agent_init":
+      return { message: `Agent initialized: model=${event.model ?? "unknown"}, ${event.toolCount ?? 0} tools` };
+    case "compaction":
+      return { message: `Compacting conversation (trigger: ${event.trigger ?? "unknown"})` };
+    case "result":
+      return { message: `Completed in ${event.turns} turns, ${(event.durationMs / 1000).toFixed(1)}s, $${event.costUsd.toFixed(4)}` };
+    case "error":
+      return { message: `Error: ${event.message}` };
+    case "status":
+      return { message: event.message };
+    case "progress":
+      return { message: event.message, files: buildDiscordAttachmentFiles(event.attachments) };
+    default:
+      return { message: JSON.stringify(event) };
   }
-
-  return {
-    message: event.message,
-    files: buildDiscordAttachmentFiles(event.attachments),
-  };
 }
 
 export async function replyWithChunks(
