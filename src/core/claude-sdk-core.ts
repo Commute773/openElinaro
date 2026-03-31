@@ -89,11 +89,25 @@ export interface ClaudeSdkCoreConfig {
  * OAuth setup tokens (sk-ant-oat*) → CLAUDE_CODE_OAUTH_TOKEN
  * Standard API keys → ANTHROPIC_API_KEY
  */
+/**
+ * Choose the correct env var for the given API key/token.
+ * OAuth setup tokens (sk-ant-oat*) → CLAUDE_CODE_OAUTH_TOKEN
+ * Standard API keys → ANTHROPIC_API_KEY
+ */
 export function buildAuthEnv(apiKey: string): Record<string, string> {
   if (apiKey.startsWith("sk-ant-oat")) {
     return { CLAUDE_CODE_OAUTH_TOKEN: apiKey };
   }
   return { ANTHROPIC_API_KEY: apiKey };
+}
+
+/**
+ * Normalize a dated Claude model ID (e.g. "claude-opus-4-6-20260301") to the
+ * alias form the Agent SDK expects (e.g. "claude-opus-4-6").
+ * Non-Claude or already-alias IDs pass through unchanged.
+ */
+export function normalizeSdkModelId(modelId: string): string {
+  return modelId.replace(/-(\d{8})$/, "");
 }
 
 export class ClaudeSdkCore implements AgentCore {
@@ -168,7 +182,7 @@ export class ClaudeSdkCore implements AgentCore {
 
     // Build SDK options
     const sdkOptions: Options = {
-      model: this.config.model,
+      model: normalizeSdkModelId(this.config.model),
       systemPrompt,
       cwd: this.config.cwd ?? process.cwd(),
       mcpServers: { openelinaro: mcpServer },
@@ -200,9 +214,21 @@ export class ClaudeSdkCore implements AgentCore {
     let steps = 0;
     const onLog = options.onLog;
 
+    const FIRST_MESSAGE_TIMEOUT_MS = 120_000;
     const queryStream = query({ prompt, options: sdkOptions });
+    let receivedFirstMessage = false;
 
+    const firstMessageTimer = setTimeout(() => {
+      if (!receivedFirstMessage && !signal?.aborted) {
+        // The SDK is hanging — likely an auth or model error it didn't surface.
+        // Abort so the error propagates instead of hanging forever.
+        signal?.dispatchEvent?.(new Event("abort"));
+      }
+    }, FIRST_MESSAGE_TIMEOUT_MS);
+
+    try {
     for await (const message of queryStream) {
+      receivedFirstMessage = true;
       if (signal?.aborted) break;
 
       if (message.type === "assistant") {
@@ -282,9 +308,9 @@ export class ClaudeSdkCore implements AgentCore {
             resultChars: finalText.length,
           });
         } else {
-          onLog?.("sdk_result_error", {
-            error: (message as any).error ?? "unknown",
-          });
+          const errorText = (message as any).error ?? "unknown";
+          onLog?.("sdk_result_error", { error: errorText });
+          throw new Error(`Claude Code returned an error result: ${errorText}`);
         }
       }
 
@@ -293,6 +319,13 @@ export class ClaudeSdkCore implements AgentCore {
           message: (message as any).message ?? (message as any).text ?? "",
         });
       }
+    }
+    } finally {
+      clearTimeout(firstMessageTimer);
+    }
+
+    if (!receivedFirstMessage && !signal?.aborted) {
+      throw new Error("Claude Agent SDK timed out waiting for the first response. This usually means an auth or model configuration error.");
     }
 
     // Build the final assistant message
