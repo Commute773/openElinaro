@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.15
+- Released at: 2026-03-31T18:07:50Z
+- Release id: 20260331T180750Z-5ed7ae1
+- Previous version: 2026.03.31.14
+- Trigger: ci/release workflow
+
+- fix: agent chat via long press, remove from menu
+
 ## 2026.03.31.14
 - Released at: 2026-03-31T17:58:23Z
 - Release id: 20260331T175823Z-6e22fdd
