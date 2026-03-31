@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.03.31.25
+- Released at: 2026-03-31T21:52:31Z
+- Release id: 20260331T215231Z-44e19d0
+- Previous version: 2026.03.31.24
+- Trigger: ci/release workflow
+
+- feat: persistent SDK sessions via v1 streaming input (#262)
+
 ## 2026.03.31.24
 - Released at: 2026-03-31T20:15:06Z
 - Release id: 20260331T201506Z-6c649b4
