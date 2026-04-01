@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.14
+- Released at: 2026-04-01T18:30:20Z
+- Release id: 20260401T183020Z-032427b
+- Previous version: 2026.04.01.13
+- Trigger: ci/release workflow
+
+- fix: watchdog abort leaks subprocess exit text instead of timeout message
+
 ## 2026.04.01.13
 - Released at: 2026-04-01T17:39:36Z
 - Release id: 20260401T173936Z-c03ccb9
