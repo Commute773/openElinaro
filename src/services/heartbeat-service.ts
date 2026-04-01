@@ -124,25 +124,8 @@ export class HeartbeatService {
     if (EMPTY_ASSISTANT_RESPONSES.includes(normalized)) {
       return undefined;
     }
-    const nonEmptyLines = normalized
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-    // Strip markdown formatting (bold, italic, code) before matching
-    const stripMarkdown = (text: string) =>
-      text.replace(/^[`*_~>#\-\s]+|[`*_~<\s]+$/g, "").trim();
-    // Check for HEARTBEAT_OK / heartbeat_ok with any casing and optional trailing punctuation
-    const heartbeatPattern = /^heartbeat[_\s]*ok[.!]?$/i;
-    const isHeartbeatLine = (line: string) =>
-      line === HEARTBEAT_NOOP_RESPONSE
-      || heartbeatPattern.test(line)
-      || heartbeatPattern.test(stripMarkdown(line));
-    if (nonEmptyLines.some(isHeartbeatLine)) {
-      return undefined;
-    }
-    // Filter if the entire message is just heartbeat noop variants (possibly with filler)
-    const stripped = nonEmptyLines.filter((line) => !isHeartbeatLine(line)).join(" ").trim();
-    if (!stripped) {
+    // If HEARTBEAT_OK appears anywhere in the message, suppress it
+    if (/heartbeat[_\s]*ok/i.test(normalized)) {
       return undefined;
     }
     return normalized;

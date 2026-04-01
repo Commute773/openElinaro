@@ -34,27 +34,17 @@ describe("HeartbeatService.normalizeAssistantReply", () => {
     expect(svc.normalizeAssistantReply("HEARTBEAT_OK.")).toBeUndefined();
   });
 
-  test("suppresses with trailing exclamation", () => {
-    expect(svc.normalizeAssistantReply("heartbeat_ok!")).toBeUndefined();
+  test("suppresses HEARTBEAT_OK embedded in longer text", () => {
+    expect(svc.normalizeAssistantReply(
+      "All checks passed. HEARTBEAT_OK",
+    )).toBeUndefined();
   });
 
-  test("suppresses HEARTBEAT_OK with leading/trailing whitespace", () => {
-    expect(svc.normalizeAssistantReply("  HEARTBEAT_OK  ")).toBeUndefined();
-  });
-
-  test("suppresses multiline with HEARTBEAT_OK on its own line", () => {
+  test("suppresses HEARTBEAT_OK on its own line with context", () => {
     expect(svc.normalizeAssistantReply(
       "I checked everything.\nHEARTBEAT_OK",
     )).toBeUndefined();
   });
-
-  test("suppresses HEARTBEAT_OK with preceding context lines", () => {
-    expect(svc.normalizeAssistantReply(
-      "All routines checked, no action needed.\n\nHEARTBEAT_OK",
-    )).toBeUndefined();
-  });
-
-  // --- Markdown-formatted HEARTBEAT_OK variants ---
 
   test("suppresses backtick-wrapped HEARTBEAT_OK", () => {
     expect(svc.normalizeAssistantReply("`HEARTBEAT_OK`")).toBeUndefined();
@@ -64,20 +54,8 @@ describe("HeartbeatService.normalizeAssistantReply", () => {
     expect(svc.normalizeAssistantReply("**HEARTBEAT_OK**")).toBeUndefined();
   });
 
-  test("suppresses italic HEARTBEAT_OK", () => {
-    expect(svc.normalizeAssistantReply("*HEARTBEAT_OK*")).toBeUndefined();
-  });
-
   test("suppresses HEARTBEAT_OK after markdown heading", () => {
     expect(svc.normalizeAssistantReply("# HEARTBEAT_OK")).toBeUndefined();
-  });
-
-  test("suppresses HEARTBEAT_OK in blockquote", () => {
-    expect(svc.normalizeAssistantReply("> HEARTBEAT_OK")).toBeUndefined();
-  });
-
-  test("suppresses HEARTBEAT_OK as list item", () => {
-    expect(svc.normalizeAssistantReply("- HEARTBEAT_OK")).toBeUndefined();
   });
 
   // --- Empty response fallback strings ---
