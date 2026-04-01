@@ -1,18 +1,13 @@
-import fs from "node:fs";
-import path from "node:path";
 import type { HeartbeatReminderSnapshot } from "../domain/routines";
 import { formatLocalTime } from "./local-time-service";
 import { wrapInjectedMessage } from "./injected-message-service";
-import { getAssistantContextRoot } from "./runtime-user-content";
-import { timestamp } from "../utils/timestamp";
 
-const HEARTBEAT_FILE_NAME = "heartbeat.md";
 const HEARTBEAT_NOOP_RESPONSE = "HEARTBEAT_OK";
 const EMPTY_ASSISTANT_RESPONSES = [
   "The assistant responded without text output.",
   "The assistant did not return a reply.",
 ];
-const FALLBACK_HEARTBEAT = [
+const HEARTBEAT_PROMPT = [
   "# Heartbeat",
   "",
   "- This is an automated internal check-in, not a user-authored message.",
@@ -21,36 +16,10 @@ const FALLBACK_HEARTBEAT = [
   "- Heartbeat processing must also check mail on every run with the `email` tool. Start with `count`, and if unread mail exists inspect it with `list_unread`.",
   "- Use `silent: true` on heartbeat housekeeping tool calls so intermediate tool echoes stay out of Discord.",
   "- If nothing needs user attention, reply with exactly `HEARTBEAT_OK`.",
+  "- Do NOT greet the user, make small talk, or offer to surface optional items. The default is silence (`HEARTBEAT_OK`), not conversation.",
 ].join("\n");
 
-function getHeartbeatFilePath() {
-  return path.join(getAssistantContextRoot(), HEARTBEAT_FILE_NAME);
-}
-
-export interface HeartbeatSnapshot {
-  text: string;
-  path: string;
-  loadedAt: string;
-  charCount: number;
-}
-
 export class HeartbeatService {
-  load(): HeartbeatSnapshot {
-    const heartbeatContextRoot = getAssistantContextRoot();
-    const heartbeatFilePath = getHeartbeatFilePath();
-    fs.mkdirSync(heartbeatContextRoot, { recursive: true });
-    const text = fs.existsSync(heartbeatFilePath)
-      ? fs.readFileSync(heartbeatFilePath, "utf8").trim()
-      : FALLBACK_HEARTBEAT;
-
-    return {
-      text,
-      path: heartbeatFilePath,
-      loadedAt: timestamp(),
-      charCount: text.length,
-    };
-  }
-
   buildInjectedMessage(
     reference: Date = new Date(),
     options?: {
@@ -62,13 +31,11 @@ export class HeartbeatService {
       deliveryRequirement?: string;
     },
   ) {
-    const snapshot = this.load();
     const sections = [
       "Automated heartbeat trigger. This is an internal check-in, not a user-authored Discord message.",
       `Triggered at: ${reference.toISOString()}`,
       `Current local time: ${options?.localTime?.trim() || formatLocalTime(reference, options?.timezone)}`,
-      `Heartbeat instructions from ${snapshot.path}:`,
-      snapshot.text,
+      HEARTBEAT_PROMPT,
     ];
     const reminderSnapshot = options?.reminderSnapshot;
     if (reminderSnapshot) {
@@ -132,4 +99,4 @@ export class HeartbeatService {
   }
 }
 
-export { HEARTBEAT_NOOP_RESPONSE, getAssistantContextRoot as HEARTBEAT_CONTEXT_ROOT, getHeartbeatFilePath as HEARTBEAT_FILE_PATH };
+export { HEARTBEAT_NOOP_RESPONSE };
