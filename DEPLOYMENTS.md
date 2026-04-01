@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.17
+- Released at: 2026-04-01T21:23:31Z
+- Release id: 20260401T212331Z-ecbe4c1
+- Previous version: 2026.04.01.16
+- Trigger: ci/release workflow
+
+- fix: inline heartbeat prompt, remove file-based override
+
 ## 2026.04.01.16
 - Released at: 2026-04-01T20:27:45Z
 - Release id: 20260401T202745Z-3579e0a
