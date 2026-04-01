@@ -24,6 +24,7 @@ const benchmarkSchema = z.object({
 const serviceActionSchema = z.object({
   timeoutMs: z.number().int().min(1_000).max(300_000).optional(),
   conversationKey: z.string().min(1).optional(),
+  notifyDiscordUserId: z.string().min(1).optional(),
 });
 
 const serviceChangelogSinceVersionSchema = z.object({
@@ -74,7 +75,7 @@ function renderShellExecResult(result: Awaited<ReturnType<ToolBuildContext["shel
 function buildServiceCommand(
   action: "update" | "rollback" | "healthcheck",
   timeoutMs: number,
-  options?: { conversationKey?: string },
+  options?: { notifyDiscordUserId?: string },
 ) {
   const rootDir = process.env.OPENELINARO_ROOT_DIR?.trim() || process.cwd();
   if (action === "healthcheck") {
@@ -107,9 +108,9 @@ function buildServiceCommand(
       envParts.push(`${envName}=${shellQuote(envValue)}`);
     }
   }
-  if (options?.conversationKey?.trim()) {
+  if (options?.notifyDiscordUserId?.trim()) {
     envParts.push(
-      `OPENELINARO_NOTIFY_DISCORD_USER_ID=${shellQuote(options.conversationKey.trim())}`,
+      `OPENELINARO_NOTIFY_DISCORD_USER_ID=${shellQuote(options.notifyDiscordUserId.trim())}`,
     );
   }
 
@@ -209,7 +210,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
     }
     const result = await services.shell.exec({
       command: buildServiceCommand("update", timeoutMs, {
-        conversationKey: input.conversationKey,
+        notifyDiscordUserId: input.notifyDiscordUserId,
       }),
       timeoutMs: timeoutMs + 180_000,
       sudo: requiresPrivilegedServiceControl(services.runtimePlatform, "update"),
@@ -391,7 +392,7 @@ export const buildServiceFunctions: FunctionDomainBuilder = (ctx) => {
         const timeoutMs = input.timeoutMs ?? 60_000;
         const result = await fnCtx.services.shell.exec({
           command: buildServiceCommand("rollback", timeoutMs, {
-            conversationKey: input.conversationKey,
+            notifyDiscordUserId: input.notifyDiscordUserId,
           }),
           timeoutMs: timeoutMs + 180_000,
           sudo: requiresPrivilegedServiceControl(fnCtx.services.runtimePlatform, "rollback"),

@@ -356,6 +356,7 @@ export function getRuntimeAgentDefaultVisibleToolNames(
 
 export type ToolContext = {
   conversationKey?: string;
+  notifyDiscordUserId?: string;
   onToolUse?: (event: AppProgressEvent) => Promise<void>;
   invocationSource?: "chat" | "direct";
   activateToolNames?: (toolNames: string[]) => void;
@@ -826,10 +827,14 @@ export class ToolRegistry {
       }
       return { ...(input as Record<string, unknown>), sessionKey: context.conversationKey };
     }
-    if ("conversationKey" in input && typeof (input as { conversationKey?: string }).conversationKey === "string") {
-      return input;
+    const merged = { ...(input as Record<string, unknown>) };
+    if (!("conversationKey" in merged) || typeof merged.conversationKey !== "string") {
+      merged.conversationKey = context.conversationKey;
     }
-    return { ...(input as Record<string, unknown>), conversationKey: context.conversationKey };
+    if (context.notifyDiscordUserId && !("notifyDiscordUserId" in merged)) {
+      merged.notifyDiscordUserId = context.notifyDiscordUserId;
+    }
+    return merged;
   }
 
   private async requestManagedServiceRestart(source: "config_edit" | "feature_manage" | "manual") {

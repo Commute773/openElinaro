@@ -410,6 +410,7 @@ export class OpenElinaroApp {
     input: Record<string, unknown>,
     options?: {
       conversationKey?: string;
+      notifyDiscordUserId?: string;
       onToolUse?: (event: AppProgressEvent) => Promise<void>;
     },
   ) {
