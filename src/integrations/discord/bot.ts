@@ -60,6 +60,7 @@ export {
   replyToMessageWithChunks,
   replyToMessageWithAppResponse,
   sendAppResponseToChannel,
+  DiscordTurnSession,
 } from "./response-formatter";
 export {
   createConversationTypingTracker,
@@ -83,6 +84,7 @@ import {
   replyToMessageWithChunks,
   replyToMessageWithAppResponse,
   sendAppResponseToChannel,
+  DiscordTurnSession,
 } from "./response-formatter";
 import { createConversationTypingTracker } from "./typing-manager";
 
@@ -282,6 +284,7 @@ export function createDiscordEventHandlers(params: {
     const request = await buildMessageRequest("main", content, attachments.values());
     const eventBus = params.app.getEventBus?.();
     eventBus?.publish({ kind: "user_input", text: content, source: "discord" });
+    const turnSession = new DiscordTurnSession(message);
     const response = await discordTelemetry.run({
       component: "discord",
       conversationKey: "main",
@@ -312,10 +315,7 @@ export function createDiscordEventHandlers(params: {
           },
           onToolUse: async (event) => {
             eventBus?.publish({ kind: "agent_stream", event });
-            const update = formatStreamEventForDiscord(event);
-            await replyToMessageWithChunks(message, update.message, {
-              files: update.files,
-            });
+            await turnSession.push(event);
           },
         }),
         {
@@ -327,7 +327,7 @@ export function createDiscordEventHandlers(params: {
         },
       );
     });
-    await replyToMessageWithAppResponse(message, response);
+    await turnSession.finish(response);
   };
 
   const dmMessageBatcher = createDiscordDmMessageBatcher({
@@ -679,6 +679,7 @@ async function handleSlashCommand(params: {
   if (interaction.commandName === "chat") {
     await deferInteractionReply(interaction);
     const text = interaction.options.getString("text", true);
+    const turnSession = new DiscordTurnSession(interaction);
     const response = await app.handleRequest(
       {
         id: nextRequestId("chat"),
@@ -690,14 +691,11 @@ async function handleSlashCommand(params: {
           await replyWithAppResponse(interaction, queuedResponse);
         },
         onToolUse: async (event) => {
-          const update = formatStreamEventForDiscord(event);
-          await replyWithChunks(interaction, update.message, {
-            files: update.files,
-          });
+          await turnSession.push(event);
         },
       },
     );
-    await replyWithAppResponse(interaction, response);
+    await turnSession.finish(response);
   }
 }
 
@@ -793,16 +791,14 @@ async function invokeDiscordToolAndReply(
   input: unknown,
 ) {
   await deferInteractionReply(interaction);
+  const turnSession = new DiscordTurnSession(interaction);
   const response = await app.invokeRoutineTool(toolName, input, {
     conversationKey: getDiscordConversationKey(interaction),
     onToolUse: async (event) => {
-      const update = formatStreamEventForDiscord(event);
-      await replyWithChunks(interaction, update.message, {
-        files: update.files,
-      });
+      await turnSession.push(event);
     },
   });
-  await replyWithChunks(interaction, response);
+  await turnSession.finish({ requestId: "", mode: "immediate", message: response });
 }
 
 function getDiscordConversationKey(_interaction: ChatInputCommandInteraction) {

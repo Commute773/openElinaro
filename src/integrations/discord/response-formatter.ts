@@ -12,6 +12,7 @@ import type {
 } from "../../domain/assistant";
 import { DISCORD_MESSAGE_LIMIT } from "../../config/service-constants";
 import { sanitizeDiscordText } from "../../services/discord-response-service";
+import { TurnRenderer } from "../../services/turn-renderer";
 
 export function splitIntoChunks(text: string) {
   if (text.length <= DISCORD_MESSAGE_LIMIT) {
@@ -185,5 +186,135 @@ export async function sendAppResponseToChannel(
     for (const chunk of splitIntoChunks(warning)) {
       await channel.send(chunk);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DiscordTurnSession — single-message editing with TurnRenderer
+// ---------------------------------------------------------------------------
+
+/** Minimum interval between Discord message edits (ms). */
+const EDIT_THROTTLE_MS = 1_200;
+
+/**
+ * Manages a single Discord message that gets edited as the agent turn
+ * progresses. Uses TurnRenderer to accumulate stream events and produce
+ * a text snapshot. Throttles edits to respect Discord rate limits.
+ */
+export class DiscordTurnSession {
+  private renderer = new TurnRenderer();
+  private sentMessage: Message | null = null;
+  private lastEditTime = 0;
+  private pendingEdit: ReturnType<typeof setTimeout> | null = null;
+  private channel: { send: (payload: string | { content: string }) => Promise<Message> };
+
+  constructor(
+    private target: Message | ChatInputCommandInteraction,
+  ) {
+    if ("channel" in target && target.channel?.isSendable()) {
+      this.channel = target.channel as { send: (payload: string | { content: string }) => Promise<Message> };
+    } else {
+      // Interaction — we'll use editReply/followUp instead
+      this.channel = null as any;
+    }
+  }
+
+  /** Feed a stream event; triggers message create or edit. */
+  async push(event: AppProgressEvent): Promise<void> {
+    this.renderer.push(event);
+    await this.flush(false);
+  }
+
+  /** Finalize with the agent's response text and do a final edit/send. */
+  async finish(response: AppResponse): Promise<void> {
+    // Add final text to renderer if it has content
+    if (response.message) {
+      this.renderer.push({ type: "text", text: response.message });
+    }
+    // Cancel any pending throttled edit — we'll do a final one now
+    if (this.pendingEdit) {
+      clearTimeout(this.pendingEdit);
+      this.pendingEdit = null;
+    }
+    await this.flush(true);
+
+    // Send warnings as separate messages
+    for (const warning of response.warnings ?? []) {
+      await this.sendNew(warning);
+    }
+  }
+
+  // ── Private ──────────────────────────────────────────────────────────
+
+  private async flush(force: boolean): Promise<void> {
+    if (this.renderer.empty) return;
+    const text = sanitizeDiscordText(this.renderer.snapshot(DISCORD_MESSAGE_LIMIT));
+    if (!text) return;
+
+    if (!this.sentMessage) {
+      // First event — create the message
+      await this.createMessage(text);
+      this.lastEditTime = Date.now();
+      return;
+    }
+
+    if (force) {
+      await this.editMessage(text);
+      return;
+    }
+
+    // Throttle: schedule an edit if we're within the cooldown
+    const elapsed = Date.now() - this.lastEditTime;
+    if (elapsed >= EDIT_THROTTLE_MS) {
+      await this.editMessage(text);
+      this.lastEditTime = Date.now();
+    } else if (!this.pendingEdit) {
+      const delay = EDIT_THROTTLE_MS - elapsed;
+      this.pendingEdit = setTimeout(async () => {
+        this.pendingEdit = null;
+        const snapshot = sanitizeDiscordText(this.renderer.snapshot(DISCORD_MESSAGE_LIMIT));
+        if (snapshot && this.sentMessage) {
+          await this.editMessage(snapshot);
+          this.lastEditTime = Date.now();
+        }
+      }, delay);
+    }
+  }
+
+  private async createMessage(text: string): Promise<void> {
+    if (this.isInteraction(this.target)) {
+      // Interaction: edit the deferred reply
+      const msg = await this.target.editReply({ content: text });
+      this.sentMessage = msg as Message;
+    } else {
+      // DM: send a new message
+      this.sentMessage = await this.channel.send({ content: text });
+    }
+  }
+
+  private async editMessage(text: string): Promise<void> {
+    if (!this.sentMessage) return;
+    if (this.isInteraction(this.target)) {
+      await this.target.editReply({ content: text });
+    } else {
+      await this.sentMessage.edit({ content: text });
+    }
+  }
+
+  private async sendNew(text: string): Promise<void> {
+    const chunks = splitIntoChunks(sanitizeDiscordText(text));
+    if (this.isInteraction(this.target)) {
+      for (const chunk of chunks) {
+        await this.target.followUp({ content: chunk });
+      }
+    } else {
+      for (const chunk of chunks) {
+        await this.channel.send(chunk);
+      }
+    }
+  }
+
+  private isInteraction(target: Message | ChatInputCommandInteraction): target is ChatInputCommandInteraction {
+    return "editReply" in target && typeof target.editReply === "function";
   }
 }
