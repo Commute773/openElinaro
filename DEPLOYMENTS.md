@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.12
+- Released at: 2026-04-01T16:01:42Z
+- Release id: 20260401T160142Z-4b278a3
+- Previous version: 2026.04.01.11
+- Trigger: ci/release workflow
+
+- fix: inactivity watchdog only fires after first activity, distinct timeout message
+
 ## 2026.04.01.11
 - Released at: 2026-04-01T15:23:45Z
 - Release id: 20260401T152345Z-12c172d

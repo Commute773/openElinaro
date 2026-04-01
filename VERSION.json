@@ -1,8 +1,8 @@
 {
-  "version": "2026.04.01.11",
-  "releasedAt": "2026-04-01T15:23:45Z",
-  "sequence": 11,
-  "previousVersion": "2026.04.01.10",
-  "releaseId": "20260401T152345Z-12c172d",
+  "version": "2026.04.01.12",
+  "releasedAt": "2026-04-01T16:01:42Z",
+  "sequence": 12,
+  "previousVersion": "2026.04.01.11",
+  "releaseId": "20260401T160142Z-4b278a3",
   "changelogPath": "DEPLOYMENTS.md"
 }
