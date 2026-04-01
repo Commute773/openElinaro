@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01
+- Released at: 2026-04-01T14:07:41Z
+- Release id: 20260401T140741Z-1273a42
+- Previous version: 2026.03.31.29
+- Trigger: ci/release workflow
+
+- feat: hide webSearch/webFetch from Claude SDK core system prompt
+
 ## 2026.03.31.29
 - Released at: 2026-03-31T23:49:39Z
 - Release id: 20260331T234939Z-e7a0a06
