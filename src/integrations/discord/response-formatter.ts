@@ -173,7 +173,7 @@ export async function sendAppResponseToChannel(
   channel: { send: (payload: string | { content: string; files?: AttachmentBuilder[] }) => Promise<unknown> },
   response: AppResponse,
 ) {
-  const chunks = splitIntoChunks(response.message);
+  const chunks = splitIntoChunks(sanitizeDiscordText(response.message));
   const [firstChunk, ...rest] = chunks;
   await channel.send({
     content: firstChunk ?? "(no content)",
@@ -183,7 +183,7 @@ export async function sendAppResponseToChannel(
     await channel.send(chunk);
   }
   for (const warning of response.warnings ?? []) {
-    for (const chunk of splitIntoChunks(warning)) {
+    for (const chunk of splitIntoChunks(sanitizeDiscordText(warning))) {
       await channel.send(chunk);
     }
   }
@@ -206,13 +206,13 @@ export class DiscordTurnSession {
   private sentMessage: Message | null = null;
   private lastEditTime = 0;
   private pendingEdit: ReturnType<typeof setTimeout> | null = null;
-  private channel: { send: (payload: string | { content: string }) => Promise<Message> };
+  private channel: { send: (payload: string | { content: string; files?: AttachmentBuilder[] }) => Promise<Message> };
 
   constructor(
     private target: Message | ChatInputCommandInteraction,
   ) {
     if ("channel" in target && target.channel?.isSendable()) {
-      this.channel = target.channel as { send: (payload: string | { content: string }) => Promise<Message> };
+      this.channel = target.channel as { send: (payload: string | { content: string; files?: AttachmentBuilder[] }) => Promise<Message> };
     } else {
       // Interaction — we'll use editReply/followUp instead
       this.channel = null as any;
@@ -227,16 +227,22 @@ export class DiscordTurnSession {
 
   /** Finalize with the agent's response text and do a final edit/send. */
   async finish(response: AppResponse): Promise<void> {
-    // Add final text to renderer if it has content
-    if (response.message) {
-      this.renderer.push({ type: "text", text: response.message });
-    }
-    // Cancel any pending throttled edit — we'll do a final one now
+    // Cancel any pending throttled edit
     if (this.pendingEdit) {
       clearTimeout(this.pendingEdit);
       this.pendingEdit = null;
     }
-    await this.flush(true);
+
+    // Final edit of the progress message (without the response text)
+    if (this.sentMessage && !this.renderer.empty) {
+      await this.flush(true);
+    }
+
+    // Send the response text as separate message(s) so long content isn't truncated
+    if (response.message) {
+      const files = buildDiscordFiles(response);
+      await this.sendNewWithFiles(response.message, files.length > 0 ? files : undefined);
+    }
 
     // Send warnings as separate messages
     for (const warning of response.warnings ?? []) {
@@ -302,14 +308,19 @@ export class DiscordTurnSession {
   }
 
   private async sendNew(text: string): Promise<void> {
+    await this.sendNewWithFiles(text);
+  }
+
+  private async sendNewWithFiles(text: string, files?: AttachmentBuilder[]): Promise<void> {
     const chunks = splitIntoChunks(sanitizeDiscordText(text));
     if (this.isInteraction(this.target)) {
-      for (const chunk of chunks) {
-        await this.target.followUp({ content: chunk });
+      for (let i = 0; i < chunks.length; i++) {
+        await this.target.followUp({ content: chunks[i], files: i === 0 ? files : undefined });
       }
     } else {
-      for (const chunk of chunks) {
-        await this.channel.send(chunk);
+      for (let i = 0; i < chunks.length; i++) {
+        const payload = i === 0 && files ? { content: chunks[i]!, files } : chunks[i]!;
+        await this.channel.send(payload);
       }
     }
   }

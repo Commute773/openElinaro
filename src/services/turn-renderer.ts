@@ -9,9 +9,7 @@ interface ToolBlock { type: "tool"; name: string; state: "running" | "done" | "f
 interface TaskBlock { type: "task"; taskId: string; description: string; state: "running" | "done" | "failed"; elapsed: string | null; children: ToolBlock[] }
 interface TextBlock { type: "text"; text: string }
 interface StatusBlock { type: "status"; text: string }
-interface ResultBlock { type: "result"; turns: number; duration: string; cost: string }
-
-type Block = ThinkingBlock | ToolBlock | TaskBlock | TextBlock | StatusBlock | ResultBlock;
+type Block = ThinkingBlock | ToolBlock | TaskBlock | TextBlock | StatusBlock;
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -100,7 +98,7 @@ export class TurnRenderer {
         this.blocks.push({ type: "status", text: "Compacting..." });
         break;
       case "result":
-        this.blocks.push({ type: "result", turns: event.turns, duration: (event.durationMs / 1000).toFixed(1) + "s", cost: "$" + event.costUsd.toFixed(4) });
+        // Suppress result line — the response text is sent separately
         break;
       case "error":
         this.blocks.push({ type: "status", text: IC_ERR + " " + event.message });
@@ -206,9 +204,6 @@ export class TurnRenderer {
         }
         case "text":
           lines.push(block.text);
-          break;
-        case "result":
-          lines.push(block.turns + " turns  " + block.duration + "  " + block.cost);
           break;
         case "status":
           lines.push(block.text);
