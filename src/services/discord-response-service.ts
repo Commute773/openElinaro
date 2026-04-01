@@ -4,7 +4,7 @@ import { DISCORD_MAX_ATTACHMENT_BYTES as MAX_DISCORD_ATTACHMENT_BYTES } from "..
 import { tryCatch } from "../utils/result";
 
 const DISCORD_FILE_DIRECTIVE_PATTERN = /<discord-file\b([^>]*)\/?>/gi;
-const DISCORD_FILE_ATTRIBUTE_PATTERN = /(\w+)=(?:"([^"]*)"|'([^']*)')/g;
+const DISCORD_FILE_ATTRIBUTE_PATTERN = /(\w+)=(?:"([^"]*)"|'([^']*)'|(\S+))/g;
 export const ATTACHMENT_FAILED_PREFIX = "[ATTACHMENT FAILED]";
 const UNTRUSTED_CONTENT_WARNING_LINE = "UNTRUSTED CONTENT WARNING";
 const UNTRUSTED_DATA_BEGIN_LINE = "BEGIN_UNTRUSTED_DATA";
@@ -19,7 +19,7 @@ function parseDiscordFileDirectiveAttributes(rawAttributes: string): DiscordFile
   const parsed: DiscordFileDirective = {};
   for (const match of rawAttributes.matchAll(DISCORD_FILE_ATTRIBUTE_PATTERN)) {
     const key = match[1]?.trim().toLowerCase();
-    const value = match[2] ?? match[3] ?? "";
+    const value = match[2] ?? match[3] ?? match[4] ?? "";
     if (!key) {
       continue;
     }
