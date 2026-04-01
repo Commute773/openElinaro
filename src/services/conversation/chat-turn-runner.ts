@@ -160,14 +160,41 @@ export class ChatTurnRunner {
           // Once output starts flowing, any gap longer than the timeout is
           // treated as a stuck process.
           let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
+          const turnStartedAt = Date.now();
+          let firstActivityAt: number | undefined;
+          let lastActivityAt: number | undefined;
+          let lastActivityType: string | undefined;
+          let activityCount = 0;
 
-          const resetInactivityTimer = (controller: AbortController) => {
+          const resetInactivityTimer = (controller: AbortController, activityType: string) => {
+            const now = Date.now();
+            if (!firstActivityAt) {
+              firstActivityAt = now;
+              agentChatTelemetry.event("agent_chat.watchdog_armed", {
+                conversationKey: job.conversationKey,
+                coreId: core.manifest.id,
+                timeoutMs: CORE_INACTIVITY_TIMEOUT_MS,
+                firstActivityType: activityType,
+                elapsedSinceTurnStartMs: now - turnStartedAt,
+              }, { level: "debug" });
+            }
+            lastActivityAt = now;
+            lastActivityType = activityType;
+            activityCount++;
+
             if (inactivityTimer) clearTimeout(inactivityTimer);
             inactivityTimer = setTimeout(() => {
+              const elapsedSinceLastActivity = Date.now() - (lastActivityAt ?? turnStartedAt);
+              const elapsedSinceTurnStart = Date.now() - turnStartedAt;
               agentChatTelemetry.event("agent_chat.inactivity_timeout", {
                 conversationKey: job.conversationKey,
                 coreId: core.manifest.id,
                 timeoutMs: CORE_INACTIVITY_TIMEOUT_MS,
+                lastActivityType,
+                lastActivityAgoMs: elapsedSinceLastActivity,
+                turnElapsedMs: elapsedSinceTurnStart,
+                totalActivityCount: activityCount,
+                sessionAlive: !!(session.sdkSessionHandle as { isAlive?: boolean } | undefined)?.isAlive,
               }, { level: "warn", outcome: "error" });
               // Interrupt the SDK session so the subprocess actually stops
               const handle = session.sdkSessionHandle as { interrupt?: () => Promise<void> } | undefined;
@@ -184,9 +211,9 @@ export class ChatTurnRunner {
 
             // Wrap executeTool to reset the timer on every tool call
             const watchedExecuteTool: typeof coreToolExecutor = async (toolCall, sig) => {
-              resetInactivityTimer(controller);
+              resetInactivityTimer(controller, `tool_start:${toolCall.name}`);
               const result = await coreToolExecutor(toolCall, sig);
-              resetInactivityTimer(controller);
+              resetInactivityTimer(controller, `tool_end:${toolCall.name}`);
               return result;
             };
 
@@ -199,7 +226,7 @@ export class ChatTurnRunner {
               signal,
               hooks: {
                 onPreCompact: async (summary) => {
-                  resetInactivityTimer(controller);
+                  resetInactivityTimer(controller, "pre_compact");
                   // When the core handles compaction, persist memory via hook
                   this.deps.autonomousTime?.queueCompactionReflection({
                     summary,
@@ -217,7 +244,7 @@ export class ChatTurnRunner {
                   }
                 },
                 onUsage: (usage) => {
-                  resetInactivityTimer(controller);
+                  resetInactivityTimer(controller, "usage");
                   agentChatTelemetry.event("agent_chat.core_usage", {
                     conversationKey: job.conversationKey,
                     coreId: core.manifest.id,
@@ -229,7 +256,7 @@ export class ChatTurnRunner {
                 },
               },
               onLog: (event, data) => {
-                resetInactivityTimer(controller);
+                resetInactivityTimer(controller, `log:${event}`);
                 agentChatTelemetry.event(`agent_chat.core.${event}`, {
                   conversationKey: job.conversationKey,
                   coreId: core.manifest.id,
@@ -237,11 +264,11 @@ export class ChatTurnRunner {
                 }, { level: "debug" });
               },
               onProgress: async (msg) => {
-                resetInactivityTimer(controller);
+                resetInactivityTimer(controller, `progress:${msg.type}`);
                 await job.onToolUse?.(msg);
               },
               onAssistantMessage: (msg) => {
-                resetInactivityTimer(controller);
+                resetInactivityTimer(controller, "assistant_message");
               },
             });
           }).finally(() => {

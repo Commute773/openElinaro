@@ -162,6 +162,12 @@ export class ChatSessionManager {
         if (job.kind === "chat" && error instanceof AgentRunStoppedError) {
           // The subprocess was interrupted — close the session handle so the
           // next message gets a fresh subprocess instead of a dead one.
+          agentChatTelemetry.event("agent_chat.session_closed", {
+            conversationKey,
+            reason: "user_stop",
+            hadHandle: !!session.sdkSessionHandle,
+            handleAlive: !!(session.sdkSessionHandle as { isAlive?: boolean } | undefined)?.isAlive,
+          }, { level: "info" });
           this.closeSdkSessionHandle(session);
           job.resolve({
             mode: "immediate",
@@ -173,6 +179,12 @@ export class ChatSessionManager {
         if (job.kind === "chat" && error instanceof CoreInactivityTimeoutError) {
           // The watchdog killed the stuck process — close the dead session
           // handle so the next message gets a fresh subprocess.
+          agentChatTelemetry.event("agent_chat.session_closed", {
+            conversationKey,
+            reason: "inactivity_timeout",
+            hadHandle: !!session.sdkSessionHandle,
+            handleAlive: !!(session.sdkSessionHandle as { isAlive?: boolean } | undefined)?.isAlive,
+          }, { level: "info" });
           this.closeSdkSessionHandle(session);
           job.resolve({
             mode: "immediate",
