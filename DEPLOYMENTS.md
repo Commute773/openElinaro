@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.5
+- Released at: 2026-04-01T14:18:35Z
+- Release id: 20260401T141835Z-bac1a78
+- Previous version: 2026.04.01.4
+- Trigger: ci/release workflow
+
+- feat: core inactivity timeout + fix stop command for SDK sessions
+
 ## 2026.04.01.4
 - Released at: 2026-04-01T14:17:57Z
 - Release id: 20260401T141757Z-862eda5
