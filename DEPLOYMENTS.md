@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.10
+- Released at: 2026-04-01T15:08:46Z
+- Release id: 20260401T150846Z-c4cc4b7
+- Previous version: 2026.04.01.9
+- Trigger: ci/release workflow
+
+- fix: G2 simulator media catalog format mismatch
+
 ## 2026.04.01.9
 - Released at: 2026-04-01T15:05:31Z
 - Release id: 20260401T150531Z-7c94b36
