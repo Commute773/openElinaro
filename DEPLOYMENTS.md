@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.04.01.2
+- Released at: 2026-04-01T14:14:23Z
+- Release id: 20260401T141423Z-1ae5831
+- Previous version: 2026.04.01
+- Trigger: ci/release workflow
+
+- feat: unified turn renderer, Discord edits single message instead of spamming
+- feat: catalogue-driven Media menu with video and audio players
+
 ## 2026.04.01
 - Released at: 2026-04-01T14:07:41Z
 - Release id: 20260401T140741Z-1273a42
