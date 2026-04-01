@@ -111,6 +111,7 @@ export interface DiscordAppRuntime {
     input: unknown,
     options?: {
       conversationKey?: string;
+      notifyDiscordUserId?: string;
       onToolUse?: (event: AppProgressEvent) => Promise<void>;
     },
   ): Promise<string>;
@@ -611,6 +612,7 @@ async function handleSlashCommand(params: {
     await deferInteractionReply(interaction);
     const updateResult = await app.invokeRoutineTool("update", {}, {
       conversationKey: getDiscordConversationKey(interaction),
+      notifyDiscordUserId: interaction.user.id,
     });
     const resultText = typeof updateResult === "string" ? updateResult : String(updateResult ?? "");
     if (resultText.includes("Update skipped") || resultText.includes("Nothing to deploy") || resultText.includes("already at version")) {
