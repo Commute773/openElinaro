@@ -17,7 +17,7 @@ import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { fireAndForget } from "../../utils/result";
 import { splitToolsForCore, coreOwnsFeature, featureIsShared } from "../../core/tool-split";
-import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS } from "../../config/service-constants";
+import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS, CORE_INACTIVITY_TIMEOUT_MS } from "../../config/service-constants";
 import type { AgentCore, CoreToolExecutor, CoreToolDefinition } from "../../core/types";
 
 import type {
@@ -152,16 +152,49 @@ export class ChatTurnRunner {
           ];
 
         try {
-          const result = await this.sessionManager.runAbortableModelCall(session, (signal) =>
-            core.run({
+          // Inactivity watchdog: abort if the core goes silent for too long.
+          let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
+
+          const resetInactivityTimer = (controller: AbortController) => {
+            if (inactivityTimer) clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+              agentChatTelemetry.event("agent_chat.inactivity_timeout", {
+                conversationKey: job.conversationKey,
+                coreId: core.manifest.id,
+                timeoutMs: CORE_INACTIVITY_TIMEOUT_MS,
+              }, { level: "warn", outcome: "error" });
+              // Interrupt the SDK session so the subprocess actually stops
+              const handle = session.sdkSessionHandle as { interrupt?: () => Promise<void> } | undefined;
+              if (typeof handle?.interrupt === "function") {
+                void handle.interrupt();
+              }
+              controller.abort(new Error("Core inactivity timeout"));
+            }, CORE_INACTIVITY_TIMEOUT_MS);
+          };
+
+          const result = await this.sessionManager.runAbortableModelCall(session, (signal) => {
+            // Grab the abort controller from the session so the timer can abort it
+            const controller = session.activeAbortController!;
+            resetInactivityTimer(controller);
+
+            // Wrap executeTool to reset the timer on every tool call
+            const watchedExecuteTool: typeof coreToolExecutor = async (toolCall, sig) => {
+              resetInactivityTimer(controller);
+              const result = await coreToolExecutor(toolCall, sig);
+              resetInactivityTimer(controller);
+              return result;
+            };
+
+            return core.run({
               systemPrompt: systemPrompt.text,
               messages: inputMessages,
               tools: coreToolDefs,
-              executeTool: coreToolExecutor,
+              executeTool: watchedExecuteTool,
               maxSteps: CHAT_MAX_STEPS,
               signal,
               hooks: {
                 onPreCompact: async (summary) => {
+                  resetInactivityTimer(controller);
                   // When the core handles compaction, persist memory via hook
                   this.deps.autonomousTime?.queueCompactionReflection({
                     summary,
@@ -179,6 +212,7 @@ export class ChatTurnRunner {
                   }
                 },
                 onUsage: (usage) => {
+                  resetInactivityTimer(controller);
                   agentChatTelemetry.event("agent_chat.core_usage", {
                     conversationKey: job.conversationKey,
                     coreId: core.manifest.id,
@@ -190,17 +224,24 @@ export class ChatTurnRunner {
                 },
               },
               onLog: (event, data) => {
+                resetInactivityTimer(controller);
                 agentChatTelemetry.event(`agent_chat.core.${event}`, {
                   conversationKey: job.conversationKey,
                   coreId: core.manifest.id,
                   ...data,
                 }, { level: "debug" });
               },
-              onProgress: job.onToolUse
-                ? async (msg) => { await job.onToolUse!(msg); }
-                : undefined,
-            })
-          );
+              onProgress: async (msg) => {
+                resetInactivityTimer(controller);
+                await job.onToolUse?.(msg);
+              },
+              onAssistantMessage: (msg) => {
+                resetInactivityTimer(controller);
+              },
+            });
+          }).finally(() => {
+            if (inactivityTimer) clearTimeout(inactivityTimer);
+          });
 
           // Check pending conversation reset before persistence
           const pendingResetMessage = this.deps.routineTools.consumePendingConversationReset(
