@@ -850,9 +850,16 @@ let mediaCatalogue = null;
 
 async function fetchCatalogue() {
   if (mediaCatalogue) return mediaCatalogue;
-  const res = await fetch('/g2/media/catalogue.json');
+  const res = await fetch('/g2/media/catalog.json');
   if (!res.ok) throw new Error('No catalogue');
-  mediaCatalogue = await res.json();
+  const data = await res.json();
+  // Transform { tracks: [{title, file, category, ...}] } into { category: [{title, file}] }
+  const grouped = {};
+  for (const track of data.tracks ?? []) {
+    const cat = track.category ?? 'other';
+    (grouped[cat] ??= []).push({ title: track.title, file: track.file });
+  }
+  mediaCatalogue = grouped;
   return mediaCatalogue;
 }
 
@@ -898,9 +905,9 @@ function makeMediaScreen() {
       const item = line._item;
       const cat = line._category;
 
-      if (cat === 'videos') {
+      if (cat === 'video' || cat === 'videos') {
         pushScreen(makeVideoScreen(item.title, item.file));
-      } else if (cat === 'songs' || cat === 'ambience') {
+      } else {
         pushScreen(makeAudioScreen(item.title, item.file));
       }
     },
