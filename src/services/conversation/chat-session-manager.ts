@@ -160,6 +160,9 @@ export class ChatSessionManager {
           continue;
         }
         if (job.kind === "chat" && error instanceof AgentRunStoppedError) {
+          // The subprocess was interrupted — close the session handle so the
+          // next message gets a fresh subprocess instead of a dead one.
+          this.closeSdkSessionHandle(session);
           job.resolve({
             mode: "immediate",
             message: STOPPED_MESSAGE,
@@ -337,11 +340,25 @@ export class ChatSessionManager {
     const controller = new AbortController();
     session.activeAbortController = controller;
     try {
-      return await run(controller.signal);
+      const result = await run(controller.signal);
+      // The subprocess can return a "success" result even when the signal was
+      // aborted (e.g. watchdog interrupt → subprocess sends its exit message as
+      // a normal result with text like "Claude Code process aborted by user").
+      // Check the signal on the success path so the abort reason propagates
+      // instead of leaking the subprocess exit text to the user.
+      if (session.stopRequested) {
+        throw new AgentRunStoppedError();
+      }
+      if (controller.signal.aborted) {
+        const reason = controller.signal.reason;
+        if (reason instanceof Error) throw reason;
+        throw new AgentRunStoppedError();
+      }
+      return result;
     } catch (error) {
-      // Only treat as a user-initiated stop if the user actually requested it.
-      // If the signal was aborted by the inactivity watchdog, surface a real
-      // error instead of silently resolving as "stopped".
+      if (error instanceof AgentRunStoppedError || error instanceof CoreInactivityTimeoutError) {
+        throw error;
+      }
       if (session.stopRequested) {
         throw new AgentRunStoppedError();
       }
