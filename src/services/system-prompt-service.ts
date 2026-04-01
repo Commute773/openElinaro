@@ -171,14 +171,20 @@ function buildRuntimeOverviewPrompt(coreId?: string) {
   // Tool library names are useful context for all cores, but the
   // load_tool_library instruction is only relevant for cores that use it
   // (i.e., not claude-sdk which has its own tool loading).
-  const includeToolLibraryGuidance = coreId !== "claude-sdk";
+  const isClaudeSdk = coreId === "claude-sdk";
+  const includeToolLibraryGuidance = !isClaudeSdk;
 
-  const featureLines = statuses.map((s) => {
-    const status = s.active ? "active" : s.enabled ? "enabled but not configured" : "off";
-    const library = FEATURE_TOOL_LIBRARY[s.featureId];
-    const libraryNote = includeToolLibraryGuidance && library ? ` (library: ${library})` : "";
-    return `  ${s.featureId}: ${status}${libraryNote}`;
-  });
+  // Features the Claude SDK provides natively — skip them from the prompt.
+  const CLAUDE_SDK_NATIVE_FEATURES: Set<FeatureId> = new Set(["webSearch", "webFetch"]);
+
+  const featureLines = statuses
+    .filter((s) => !(isClaudeSdk && CLAUDE_SDK_NATIVE_FEATURES.has(s.featureId)))
+    .map((s) => {
+      const status = s.active ? "active" : s.enabled ? "enabled but not configured" : "off";
+      const library = FEATURE_TOOL_LIBRARY[s.featureId];
+      const libraryNote = includeToolLibraryGuidance && library ? ` (library: ${library})` : "";
+      return `  ${s.featureId}: ${status}${libraryNote}`;
+    });
 
   const lines = [
     buildEnvironmentSection(),
