@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.7
+- Released at: 2026-04-01T14:24:12Z
+- Release id: 20260401T142412Z-8dca8f4
+- Previous version: 2026.04.01.6
+- Trigger: ci/release workflow
+
+- fix: clamp RGB brightness to Zigbee max of 254
+
 ## 2026.04.01.6
 - Released at: 2026-04-01T14:21:23Z
 - Release id: 20260401T142123Z-6630ea5
