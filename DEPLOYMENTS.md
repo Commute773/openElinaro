@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.4
+- Released at: 2026-04-01T14:17:57Z
+- Release id: 20260401T141757Z-862eda5
+- Previous version: 2026.04.01.3
+- Trigger: ci/release workflow
+
+- fix: rewrite production catalog.json to flat tracks schema, add e2e tests
+
 ## 2026.04.01.3
 - Released at: 2026-04-01T14:15:16Z
 - Release id: 20260401T141516Z-b79a168
