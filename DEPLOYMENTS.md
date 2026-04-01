@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.9
+- Released at: 2026-04-01T15:05:31Z
+- Release id: 20260401T150531Z-7c94b36
+- Previous version: 2026.04.01.8
+- Trigger: ci/release workflow
+
+- fix: simplify heartbeat suppression — match HEARTBEAT_OK anywhere in response
+
 ## 2026.04.01.8
 - Released at: 2026-04-01T14:26:52Z
 - Release id: 20260401T142652Z-7763b6f
