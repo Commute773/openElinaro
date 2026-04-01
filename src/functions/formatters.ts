@@ -32,10 +32,10 @@ export interface RoutineItemForFormat {
  * Format a routine item as a single display line.
  *
  * Examples:
- *   [med] Progesterone 100mg 23:00
- *   [med!] Estradiol Valerate 6mg — 20h overdue
- *   [todo] Buy combien.ca domain
- *   [med] Dextroamphetamine 10mg 09:00 ✓
+ *   [med] med_progesterone — Progesterone 100mg 23:00
+ *   [med!] med_estradiol — Estradiol Valerate 6mg — 20h overdue
+ *   [todo] todo_buy_domain — Buy combien.ca domain
+ *   [med] med_dextroamphetamine_morning — Dextroamphetamine 10mg 09:00 ✓
  */
 export function formatRoutineItem(
   item: RoutineItemForFormat,
@@ -44,7 +44,7 @@ export function formatRoutineItem(
   const overdue = (item.overdueMinutes ?? 0) > 0;
   const tag = `[${item.kind}${overdue ? "!" : ""}]`;
 
-  let line = `${tag} ${item.title}`;
+  let line = `${tag} ${item.id} — ${item.title}`;
 
   if (item.dose) line += ` ${item.dose}`;
 
@@ -84,13 +84,13 @@ export interface CheckItemForFormat {
  * Format a routine_check item for display.
  *
  * Examples:
- *   [med!] Estradiol Valerate — 20h overdue
- *   [todo] Fix CORS headers
+ *   [med!] med_estradiol — Estradiol Valerate — 20h overdue
+ *   [todo] todo_fix_cors — Fix CORS headers
  */
 export function formatCheckItem(item: CheckItemForFormat): string {
   const overdue = item.overdueMinutes > 0;
   const tag = `[${item.kind}${overdue ? "!" : ""}]`;
-  let line = `${tag} ${item.title}`;
+  let line = `${tag} ${item.id} — ${item.title}`;
   if (overdue) {
     line += ` \u2014 ${formatDuration(item.overdueMinutes)} overdue`;
   }
