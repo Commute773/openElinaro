@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.6
+- Released at: 2026-04-01T14:21:23Z
+- Release id: 20260401T142123Z-6630ea5
+- Previous version: 2026.04.01.5
+- Trigger: ci/release workflow
+
+- fix: prevent g2 simulator canvas from overflowing above viewport
+
 ## 2026.04.01.5
 - Released at: 2026-04-01T14:18:35Z
 - Release id: 20260401T141835Z-bac1a78
