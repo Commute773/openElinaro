@@ -107,7 +107,7 @@ export const buildZigbee2MqttFunctions: FunctionDomainBuilder = (ctx) => [
         if (r === 0 && g === 0 && b === 0) {
           state = { state: "OFF" };
         } else {
-          state = { color: { r, g, b }, brightness: Math.max(1, Math.max(r, g, b)) };
+          state = { color: { r, g, b }, brightness: Math.max(1, Math.min(254, Math.max(r, g, b))) };
         }
       } else {
         const w = input.ch1, c = input.ch2;
