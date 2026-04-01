@@ -698,6 +698,7 @@ function makeHomeScreen() {
     { text: 'Finance',       screen: () => makeApiScreen('Finance', '/api/finance/summary') },
     { text: 'Projects',      screen: () => makeApiScreen('Projects', '/api/projects') },
     { text: 'Todos',         screen: () => makeTodosScreen() },
+    { text: 'Media',         screen: () => makeMediaScreen() },
     { text: 'Settings',      screen: () => makeSettingsScreen() },
   ];
 
@@ -838,6 +839,296 @@ function makeSettingsScreen() {
       render();
     },
     onLongPress: popScreen,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  MEDIA — catalogue-driven menu for videos, songs, ambience
+// ═══════════════════════════════════════════════════════════════════════
+
+let mediaCatalogue = null;
+
+async function fetchCatalogue() {
+  if (mediaCatalogue) return mediaCatalogue;
+  const res = await fetch('/g2/media/catalogue.json');
+  if (!res.ok) throw new Error('No catalogue');
+  mediaCatalogue = await res.json();
+  return mediaCatalogue;
+}
+
+function makeMediaScreen() {
+  const screen = {
+    title: 'Media',
+    lines: [{ text: 'Loading...', color: 5 }],
+    cursor: 0,
+    scroll: 0,
+    _sections: [],
+    async init() {
+      try {
+        const cat = await fetchCatalogue();
+        const lines = [];
+        const sections = [];
+
+        for (const [category, items] of Object.entries(cat)) {
+          if (!Array.isArray(items) || items.length === 0) continue;
+          lines.push({ text: '\u2500\u2500 ' + category.toUpperCase() + ' \u2500\u2500', color: 5, _cat: true });
+          for (const item of items) {
+            lines.push({
+              text: '  ' + item.title,
+              color: 10,
+              _item: item,
+              _category: category,
+            });
+          }
+        }
+
+        if (!lines.length) lines.push({ text: '(empty)', color: 5 });
+        this.lines = lines;
+        this.cursor = lines.findIndex(l => !l._cat);
+        if (this.cursor < 0) this.cursor = 0;
+        render();
+      } catch (e) {
+        this.lines = [{ text: 'Error: ' + e.message, color: 4 }];
+        render();
+      }
+    },
+    onPress(idx) {
+      const line = this.lines[idx];
+      if (!line?._item) return;
+      const item = line._item;
+      const cat = line._category;
+
+      if (cat === 'videos') {
+        pushScreen(makeVideoScreen(item.title, item.file));
+      } else if (cat === 'songs' || cat === 'ambience') {
+        pushScreen(makeAudioScreen(item.title, item.file));
+      }
+    },
+    onLongPress: popScreen,
+  };
+  return screen;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VIDEO PLAYER — Floyd-Steinberg dithered to 4 green brightness levels
+// ═══════════════════════════════════════════════════════════════════════
+
+const videoCache = {};
+const LUM_LEVELS = [0, 85, 170, 255];
+const G = [[0,0,0],[5,85,13],[10,170,27],[20,255,40]];
+
+function nearestLevel(lum) {
+  lum = Math.max(0, Math.min(255, lum));
+  if (lum < 43) return 0;
+  if (lum < 128) return 1;
+  if (lum < 213) return 2;
+  return 3;
+}
+
+function makeVideoScreen(title, file) {
+  let raf = null;
+  const samp = document.createElement('canvas');
+  samp.width = W; samp.height = H;
+  const sc = samp.getContext('2d', { willReadFrequently: true });
+
+  function ensureVideo() {
+    if (videoCache[file]) return videoCache[file].el;
+    const v = document.createElement('video');
+    v.crossOrigin = 'anonymous';
+    v.playsInline = true;
+    v.loop = true;
+    v.style.display = 'none';
+    document.body.appendChild(v);
+    videoCache[file] = { el: v, ready: false };
+    return v;
+  }
+
+  function renderVideoFrame() {
+    const entry = videoCache[file];
+    const v = entry?.el;
+    if (!v || v.paused) return;
+
+    sc.drawImage(v, 0, 0, W, H);
+    const img = sc.getImageData(0, 0, W, H);
+    const px = img.data;
+
+    const lum = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) {
+      const j = i * 4;
+      lum[i] = px[j] * 0.299 + px[j+1] * 0.587 + px[j+2] * 0.114;
+    }
+
+    // Floyd-Steinberg dithering
+    const out = fc.createImageData(W, H);
+    const od = out.data;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const idx = y * W + x;
+        const old = lum[idx];
+        const lvl = nearestLevel(old);
+        const newVal = LUM_LEVELS[lvl];
+        const err = old - newVal;
+
+        if (x + 1 < W)               lum[idx + 1]     += err * 7/16;
+        if (y + 1 < H) {
+          if (x > 0)                  lum[idx + W - 1] += err * 3/16;
+                                      lum[idx + W]     += err * 5/16;
+          if (x + 1 < W)             lum[idx + W + 1] += err * 1/16;
+        }
+
+        const c = G[lvl];
+        const j = idx * 4;
+        od[j]   = c[0];
+        od[j+1] = c[1];
+        od[j+2] = c[2];
+        od[j+3] = 255;
+      }
+    }
+
+    fc.putImageData(out, 0, 0);
+    blit();
+
+    const t = v.currentTime;
+    const d = v.duration || 0;
+    const fmt = (s) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+    document.getElementById('info').textContent =
+      `${title} | ${fmt(t)} / ${fmt(d)}`;
+
+    raf = requestAnimationFrame(renderVideoFrame);
+  }
+
+  function stop() {
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    const v = videoCache[file]?.el;
+    if (v) v.pause();
+  }
+
+  return {
+    title,
+    lines: [],
+    cursor: -1,
+    scroll: 0,
+    async init() {
+      const v = ensureVideo();
+      const entry = videoCache[file];
+
+      if (!entry.ready) {
+        clr();
+        txt('Loading ' + title + '...', 20, H/2 - LH, 3);
+        blit();
+
+        v.src = '/g2/media/' + file;
+        entry.ready = true;
+
+        await new Promise((res, rej) => {
+          v.oncanplay = res;
+          v.onerror = () => { entry.ready = false; rej(new Error('Failed to load')); };
+        });
+      }
+
+      v.currentTime = 0;
+      v.play();
+      raf = requestAnimationFrame(renderVideoFrame);
+    },
+    onLongPress() {
+      stop();
+      popScreen();
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  AUDIO PLAYER — visualizer rendered to framebuffer
+// ═══════════════════════════════════════════════════════════════════════
+
+let audioEl = null;
+
+function makeAudioScreen(title, file) {
+  let raf = null;
+  let analyser = null;
+  let dataArray = null;
+
+  function stop() {
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    if (audioEl) { audioEl.pause(); }
+  }
+
+  function renderAudioFrame() {
+    if (!audioEl || audioEl.paused) return;
+
+    clr();
+
+    // Waveform visualizer
+    if (analyser && dataArray) {
+      analyser.getByteFrequencyData(dataArray);
+      const barCount = Math.min(dataArray.length, W);
+      const barW = Math.max(1, Math.floor(W / barCount));
+      for (let i = 0; i < barCount; i++) {
+        const val = dataArray[i] / 255;
+        const barH = Math.floor(val * H);
+        const lvl = val < 0.25 ? 1 : val < 0.6 ? 2 : 3;
+        fc.fillStyle = col(lvl * 5);
+        fc.fillRect(i * barW, H - barH, barW - 1, barH);
+      }
+    }
+
+    // Title overlay
+    txt(title, 4, 4, 3);
+    const t = audioEl.currentTime;
+    const d = audioEl.duration || 0;
+    const fmt = (s) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+    const ts = `${fmt(t)} / ${fmt(d)}`;
+    fc.font = `${LH}px 'SF Mono','Fira Code',monospace`;
+    txt(ts, W - fc.measureText(ts).width - 4, 4, 1);
+
+    blit();
+    document.getElementById('info').textContent = `${title} | ${fmt(t)} / ${fmt(d)}`;
+    raf = requestAnimationFrame(renderAudioFrame);
+  }
+
+  return {
+    title,
+    lines: [],
+    cursor: -1,
+    scroll: 0,
+    async init() {
+      if (!audioEl) {
+        audioEl = new Audio();
+        audioEl.crossOrigin = 'anonymous';
+      }
+
+      clr();
+      txt('Loading ' + title + '...', 20, H/2 - LH, 3);
+      blit();
+
+      audioEl.src = '/g2/media/' + file;
+      audioEl.loop = true;
+
+      await new Promise((res, rej) => {
+        audioEl.oncanplay = res;
+        audioEl.onerror = () => rej(new Error('Failed to load'));
+      });
+
+      // Set up Web Audio analyser
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const src = ctx.createMediaElementSource(audioEl);
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        src.connect(analyser);
+        analyser.connect(ctx.destination);
+      } catch (e) {
+        // Analyser failed, still play audio
+      }
+
+      audioEl.play();
+      raf = requestAnimationFrame(renderAudioFrame);
+    },
+    onLongPress() {
+      stop();
+      popScreen();
+    },
   };
 }
 

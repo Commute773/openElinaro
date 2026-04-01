@@ -47,15 +47,22 @@ export function createHttpRequestHandler(
       });
     }
 
-    // Serve video files from user data root
-    if (pathname.startsWith("/g2/media/") && pathname.endsWith(".mp4")) {
-      const filename = pathname.slice("/g2/media/".length);
-      if (/^[a-z0-9_-]+\.mp4$/.test(filename)) {
-        const vidPath = `${getUserDataRootDir()}/${filename}`;
-        const file = Bun.file(vidPath);
+    // Serve media files from user data root
+    if (pathname.startsWith("/g2/media/")) {
+      const relPath = decodeURIComponent(pathname.slice("/g2/media/".length));
+      // Block path traversal
+      if (!relPath.includes("..")) {
+        const mediaPath = `${getUserDataRootDir()}/media/${relPath}`;
+        const file = Bun.file(mediaPath);
         if (await file.exists()) {
+          const ext = relPath.split(".").pop()?.toLowerCase();
+          const mimeMap: Record<string, string> = {
+            mp4: "video/mp4", webm: "video/webm",
+            mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg",
+            json: "application/json",
+          };
           return new Response(file, {
-            headers: { "Content-Type": "video/mp4", ...CORS_HEADERS },
+            headers: { "Content-Type": mimeMap[ext ?? ""] || "application/octet-stream", ...CORS_HEADERS },
           });
         }
       }
