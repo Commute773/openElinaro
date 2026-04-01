@@ -18,6 +18,7 @@ import {
 import { ClaudeSdkSession } from "./claude-sdk-session";
 import { z } from "zod";
 import { attemptOrAsync } from "../utils/result";
+import { telemetry } from "../services/infrastructure/telemetry";
 import type { AgentStreamEvent } from "../domain/assistant";
 import type {
   AgentCore,
@@ -119,6 +120,8 @@ export function buildAuthEnv(apiKey: string): Record<string, string> {
 export function normalizeSdkModelId(modelId: string): string {
   return modelId.replace(/-(\d{8})$/, "");
 }
+
+const sdkCoreTelemetry = telemetry.child({ component: "claude_sdk_core" });
 
 export class ClaudeSdkCore implements AgentCore {
   readonly manifest = CLAUDE_SDK_MANIFEST;
@@ -250,9 +253,19 @@ export class ClaudeSdkCore implements AgentCore {
       : undefined;
 
     // Create or reuse the persistent session
-    const session = this.config.session?.isAlive
-      ? this.config.session
+    const sessionReused = !!this.config.session?.isAlive;
+    const session = sessionReused
+      ? this.config.session!
       : ClaudeSdkSession.create(sdkOptions);
+    const runStartedAt = Date.now();
+
+    sdkCoreTelemetry.event("claude_sdk_core.session_lifecycle", {
+      action: sessionReused ? "reuse" : "create",
+      sessionId: session.sessionId,
+      model: this.config.model,
+      promptLength: prompt.length,
+      toolCount: harnessTools.length,
+    }, { level: "debug" });
 
     // Push the user message to start this turn
     session.sendMessage(prompt);
@@ -261,6 +274,12 @@ export class ClaudeSdkCore implements AgentCore {
 
     const firstMessageTimer = setTimeout(() => {
       if (!receivedFirstMessage && !signal?.aborted) {
+        sdkCoreTelemetry.event("claude_sdk_core.first_message_timeout", {
+          sessionReused,
+          sessionId: session.sessionId,
+          sessionAlive: session.isAlive,
+          elapsedMs: Date.now() - runStartedAt,
+        }, { level: "warn", outcome: "error" });
         // The SDK is hanging — likely an auth or model error it didn't surface.
         // Abort so the error propagates instead of hanging forever.
         signal?.dispatchEvent?.(new Event("abort"));
@@ -271,8 +290,25 @@ export class ClaudeSdkCore implements AgentCore {
     try {
     while (true) {
       const { value: message, done } = await session.nextMessage();
-      if (done) break;
-      receivedFirstMessage = true;
+      if (done) {
+        sdkCoreTelemetry.event("claude_sdk_core.stream_ended", {
+          sessionReused,
+          sessionId: session.sessionId,
+          receivedFirstMessage,
+          steps,
+          elapsedMs: Date.now() - runStartedAt,
+        }, { level: "debug" });
+        break;
+      }
+      if (!receivedFirstMessage) {
+        receivedFirstMessage = true;
+        sdkCoreTelemetry.event("claude_sdk_core.first_message", {
+          sessionReused,
+          sessionId: session.sessionId,
+          messageType: message.type,
+          elapsedMs: Date.now() - runStartedAt,
+        }, { level: "debug" });
+      }
       if (signal?.aborted) break;
 
       if (message.type === "assistant") {
@@ -497,6 +533,20 @@ export class ClaudeSdkCore implements AgentCore {
       }
     }
     } catch (err: unknown) {
+      const elapsedMs = Date.now() - runStartedAt;
+      sdkCoreTelemetry.event("claude_sdk_core.run_error", {
+        sessionReused,
+        sessionId: session.sessionId,
+        sessionAlive: session.isAlive,
+        receivedFirstMessage,
+        steps,
+        elapsedMs,
+        error: err instanceof Error ? err.message : String(err),
+        errorName: err instanceof Error ? err.name : "unknown",
+        isAborted: signal?.aborted ?? false,
+        abortReason: signal?.aborted ? String(signal.reason) : undefined,
+      }, { level: "warn", outcome: "error" });
+
       // If we haven't received any messages yet and the session died,
       // close it and retry with a fresh session.
       if (!receivedFirstMessage && this.config.session && isStaleSessionError(err)) {
