@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.13
+- Released at: 2026-04-01T17:39:36Z
+- Release id: 20260401T173936Z-c03ccb9
+- Previous version: 2026.04.01.12
+- Trigger: ci/release workflow
+
+- fix: Discord long message truncation, file directive parsing, result line removal
+
 ## 2026.04.01.12
 - Released at: 2026-04-01T16:01:42Z
 - Release id: 20260401T160142Z-4b278a3
