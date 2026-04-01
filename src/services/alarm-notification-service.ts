@@ -7,7 +7,10 @@ import { getAssistantContextRoot } from "./runtime-user-content";
 import { timestamp } from "../utils/timestamp";
 
 const ALARM_FILE_NAME = "alarm.md";
-const EMPTY_ASSISTANT_RESPONSE = "The assistant responded without text output.";
+const EMPTY_ASSISTANT_RESPONSES = [
+  "The assistant responded without text output.",
+  "The assistant did not return a reply.",
+];
 const FALLBACK_ALARM_CONTEXT = [
   "# Alarm Notification",
   "",
@@ -68,7 +71,7 @@ export class AlarmNotificationService {
 
   normalizeAssistantReply(message: string | undefined) {
     const normalized = message?.trim();
-    if (!normalized || normalized === EMPTY_ASSISTANT_RESPONSE) {
+    if (!normalized || EMPTY_ASSISTANT_RESPONSES.includes(normalized)) {
       return undefined;
     }
     return normalized;

@@ -8,7 +8,10 @@ import { timestamp } from "../utils/timestamp";
 
 const HEARTBEAT_FILE_NAME = "heartbeat.md";
 const HEARTBEAT_NOOP_RESPONSE = "HEARTBEAT_OK";
-const EMPTY_ASSISTANT_RESPONSE = "The assistant responded without text output.";
+const EMPTY_ASSISTANT_RESPONSES = [
+  "The assistant responded without text output.",
+  "The assistant did not return a reply.",
+];
 const FALLBACK_HEARTBEAT = [
   "# Heartbeat",
   "",
@@ -118,21 +121,28 @@ export class HeartbeatService {
     if (!normalized) {
       return undefined;
     }
+    if (EMPTY_ASSISTANT_RESPONSES.includes(normalized)) {
+      return undefined;
+    }
     const nonEmptyLines = normalized
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
+    // Strip markdown formatting (bold, italic, code) before matching
+    const stripMarkdown = (text: string) =>
+      text.replace(/^[`*_~>#\-\s]+|[`*_~<\s]+$/g, "").trim();
     // Check for HEARTBEAT_OK / heartbeat_ok with any casing and optional trailing punctuation
     const heartbeatPattern = /^heartbeat[_\s]*ok[.!]?$/i;
-    if (nonEmptyLines.some((line) => line === HEARTBEAT_NOOP_RESPONSE || heartbeatPattern.test(line))) {
+    const isHeartbeatLine = (line: string) =>
+      line === HEARTBEAT_NOOP_RESPONSE
+      || heartbeatPattern.test(line)
+      || heartbeatPattern.test(stripMarkdown(line));
+    if (nonEmptyLines.some(isHeartbeatLine)) {
       return undefined;
     }
-    // Filter if the entire message is just a heartbeat noop variant (possibly with filler)
-    const stripped = nonEmptyLines.filter((line) => !heartbeatPattern.test(line)).join(" ").trim();
+    // Filter if the entire message is just heartbeat noop variants (possibly with filler)
+    const stripped = nonEmptyLines.filter((line) => !isHeartbeatLine(line)).join(" ").trim();
     if (!stripped) {
-      return undefined;
-    }
-    if (normalized === EMPTY_ASSISTANT_RESPONSE) {
       return undefined;
     }
     return normalized;
