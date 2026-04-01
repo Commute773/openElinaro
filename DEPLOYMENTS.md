@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.15
+- Released at: 2026-04-01T19:29:22Z
+- Release id: 20260401T192922Z-8ca918e
+- Previous version: 2026.04.01.14
+- Trigger: ci/release workflow
+
+- fix: include item IDs in routine_list and routine_check output
+
 ## 2026.04.01.14
 - Released at: 2026-04-01T18:30:20Z
 - Release id: 20260401T183020Z-032427b
