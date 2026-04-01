@@ -3,6 +3,7 @@
  * Re-exports services that manage chat, compaction, and state transitions.
  */
 export { AgentChatService } from "./agent-chat-service";
+export { CoreInactivityTimeoutError } from "./chat-types";
 export type { ChatDependencies } from "./chat-types";
 export type {
   ChatReplyResult,

@@ -8,6 +8,7 @@ import type {
   PendingSteeringMessage,
 } from "./chat-types";
 import { combineQueuedChatContents } from "./chat-helpers";
+import { CoreInactivityTimeoutError } from "./chat-types";
 import { telemetry } from "../infrastructure/telemetry";
 import { attempt } from "../../utils/result";
 
@@ -162,6 +163,17 @@ export class ChatSessionManager {
           job.resolve({
             mode: "immediate",
             message: STOPPED_MESSAGE,
+            warnings: [],
+          });
+          continue;
+        }
+        if (job.kind === "chat" && error instanceof CoreInactivityTimeoutError) {
+          // The watchdog killed the stuck process — close the dead session
+          // handle so the next message gets a fresh subprocess.
+          this.closeSdkSessionHandle(session);
+          job.resolve({
+            mode: "immediate",
+            message: error.message,
             warnings: [],
           });
           continue;

@@ -9,6 +9,15 @@ import type { AutonomousTimeService } from "../autonomous-time-service";
 import type { MemoryManagementAgent } from "../memory/memory-management-agent";
 import type { CoreFactory } from "../../core/types";
 
+const INACTIVITY_TIMEOUT_MESSAGE = "I got stuck and had to restart. Please try again.";
+
+export class CoreInactivityTimeoutError extends Error {
+  constructor() {
+    super(INACTIVITY_TIMEOUT_MESSAGE);
+    this.name = "CoreInactivityTimeoutError";
+  }
+}
+
 export type ChatReplyResult = {
   mode: "immediate" | "accepted";
   message: string;

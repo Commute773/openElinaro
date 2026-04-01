@@ -20,10 +20,11 @@ import { splitToolsForCore, coreOwnsFeature, featureIsShared } from "../../core/
 import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS, CORE_INACTIVITY_TIMEOUT_MS } from "../../config/service-constants";
 import type { AgentCore, CoreToolExecutor, CoreToolDefinition } from "../../core/types";
 
-import type {
-  QueuedChatJob,
-  ConversationSessionState,
-  ChatDependencies,
+import {
+  CoreInactivityTimeoutError,
+  type QueuedChatJob,
+  type ConversationSessionState,
+  type ChatDependencies,
 } from "./chat-types";
 import { buildCombinedTurnContent, chatPromptContentToString } from "./chat-helpers";
 import type { ChatSessionManager } from "./chat-session-manager";
@@ -31,6 +32,7 @@ import { AgentRunStoppedError } from "./chat-session-manager";
 
 const agentChatTelemetry = telemetry.child({ component: "agent_chat" });
 const traceSpan = createTraceSpan(agentChatTelemetry);
+
 
 export class ChatTurnRunner {
   private sessionManager!: ChatSessionManager;
@@ -153,6 +155,10 @@ export class ChatTurnRunner {
 
         try {
           // Inactivity watchdog: abort if the core goes silent for too long.
+          // The timer is only armed after the first activity event — the model
+          // is allowed to think for as long as it needs before producing output.
+          // Once output starts flowing, any gap longer than the timeout is
+          // treated as a stuck process.
           let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
 
           const resetInactivityTimer = (controller: AbortController) => {
@@ -168,14 +174,13 @@ export class ChatTurnRunner {
               if (typeof handle?.interrupt === "function") {
                 void handle.interrupt();
               }
-              controller.abort(new Error("Core inactivity timeout"));
+              controller.abort(new CoreInactivityTimeoutError());
             }, CORE_INACTIVITY_TIMEOUT_MS);
           };
 
           const result = await this.sessionManager.runAbortableModelCall(session, (signal) => {
             // Grab the abort controller from the session so the timer can abort it
             const controller = session.activeAbortController!;
-            resetInactivityTimer(controller);
 
             // Wrap executeTool to reset the timer on every tool call
             const watchedExecuteTool: typeof coreToolExecutor = async (toolCall, sig) => {
