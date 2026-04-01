@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.3
+- Released at: 2026-04-01T14:15:16Z
+- Release id: 20260401T141516Z-b79a168
+- Previous version: 2026.04.01.2
+- Trigger: ci/release workflow
+
+- feat: wire DiscordTurnSession into DM and interaction handlers (#268)
+
 ## 2026.04.01.2
 - Released at: 2026-04-01T14:14:23Z
 - Release id: 20260401T141423Z-1ae5831
