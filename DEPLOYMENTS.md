@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.04.01.16
+- Released at: 2026-04-01T20:27:45Z
+- Release id: 20260401T202745Z-3579e0a
+- Previous version: 2026.04.01.15
+- Trigger: ci/release workflow
+
+- feat: enhance telemetry for Claude Code subprocess lifecycle
+- update: 2026.04.01.15 [skip ci]
+
 ## 2026.04.01.15
 - Released at: 2026-04-01T19:29:22Z
 - Release id: 20260401T192922Z-8ca918e
