@@ -327,7 +327,15 @@ export class ChatSessionManager {
     try {
       return await run(controller.signal);
     } catch (error) {
-      if (controller.signal.aborted || session.stopRequested) {
+      // Only treat as a user-initiated stop if the user actually requested it.
+      // If the signal was aborted by the inactivity watchdog, surface a real
+      // error instead of silently resolving as "stopped".
+      if (session.stopRequested) {
+        throw new AgentRunStoppedError();
+      }
+      if (controller.signal.aborted) {
+        const reason = controller.signal.reason;
+        if (reason instanceof Error) throw reason;
         throw new AgentRunStoppedError();
       }
       throw error;

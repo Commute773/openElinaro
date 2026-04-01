@@ -212,6 +212,11 @@ export class AgentChatService {
     session.stopRequested = true;
     session.pendingSteeringMessages = [];
     session.activeAbortController?.abort();
+    // Interrupt the SDK session so the subprocess actually stops working
+    const handle = session.sdkSessionHandle as { interrupt?: () => Promise<void> } | undefined;
+    if (typeof handle?.interrupt === "function") {
+      void handle.interrupt();
+    }
     this.sessionManager.cancelQueuedChatJobs(session, QUEUED_STOPPED_MESSAGE);
     this.sessionManager.refreshConversationActivity(conversationKey, session);
     if (!session.processing && !session.compacting && session.queue.length === 0) {

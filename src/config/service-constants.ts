@@ -32,6 +32,8 @@ export const DISCORD_CONTINUED_SUFFIX = "/continued";
 // ---------------------------------------------------------------------------
 export const COMPACTION_THRESHOLD_PERCENT = 80;
 export const CHAT_MAX_STEPS = 24;
+/** Kill the core if no progress event arrives within this window. */
+export const CORE_INACTIVITY_TIMEOUT_MS = 2 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Tools
