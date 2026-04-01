@@ -19,6 +19,19 @@ The runtime builds its media library from:
 
 If `media/catalog.json` exists, its track ids/tags are used. If it does not exist, the runtime synthesizes media entries from file paths and filenames.
 
+The catalog file must use the flat `tracks` schema. Do not use a grouped schema with top-level `songs`/`ambience`/`videos` keys — the runtime ignores those.
+
+```json
+{
+  "tracks": [
+    { "title": "Song Title", "file": "songs/file.mp3", "category": "song", "tags": ["tag1"] },
+    { "title": "Ambience", "file": "ambience/rain.mp3", "category": "ambience", "tags": ["rain"] }
+  ]
+}
+```
+
+The filename must be `catalog.json` (American spelling), not `catalogue.json`.
+
 Current intent:
 
 - `song` means music tracks
