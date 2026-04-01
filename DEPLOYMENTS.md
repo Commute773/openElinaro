@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.01.11
+- Released at: 2026-04-01T15:23:45Z
+- Release id: 20260401T152345Z-12c172d
+- Previous version: 2026.04.01.10
+- Trigger: ci/release workflow
+
+- fix: pass Discord user ID (not conversation key) to update notification
+
 ## 2026.04.01.10
 - Released at: 2026-04-01T15:08:46Z
 - Release id: 20260401T150846Z-c4cc4b7
