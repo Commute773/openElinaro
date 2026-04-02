@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.02.2
+- Released at: 2026-04-02T12:30:34Z
+- Release id: 20260402T123034Z-56ad988
+- Previous version: 2026.04.02
+- Trigger: ci/release workflow
+
+- fix: VERSION.json sequence leading-zero and invalid JSON in CI workflow
+
 ## 2026.04.02
 - Released at: 2026-04-02T12:27:04Z
 - Release id: 20260402T122704Z-721a1f4
