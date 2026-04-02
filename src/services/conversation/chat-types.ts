@@ -7,7 +7,8 @@ import type { ToolRegistry } from "../../functions/tool-registry";
 import type { ToolResolutionService } from "../tool-resolution-service";
 import type { AutonomousTimeService } from "../autonomous-time-service";
 import type { MemoryManagementAgent } from "../memory/memory-management-agent";
-import type { CoreFactory } from "../../core/types";
+import type { ClaudeSdkCore } from "../../core/claude-sdk-core";
+import type { CoreModelConfig } from "../../core/types";
 
 const INACTIVITY_TIMEOUT_MESSAGE = "I got stuck and had to restart. Please try again.";
 
@@ -96,5 +97,5 @@ export type ChatDependencies = {
   models: ModelService;
   autonomousTime?: Pick<AutonomousTimeService, "queueCompactionReflection">;
   structuredMemory?: Pick<MemoryManagementAgent, "processTranscript">;
-  coreFactory: CoreFactory;
+  createCore: (modelConfig: CoreModelConfig) => ClaudeSdkCore;
 };

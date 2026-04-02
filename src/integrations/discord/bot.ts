@@ -458,15 +458,9 @@ async function handleSlashCommand(params: {
     }
 
     if (provider === "codex") {
-      await replyWithChunks(interaction, `Check your DMs to continue Codex auth for profile ${targetProfile.id}.`, {
+      await replyWithChunks(interaction, "Codex auth has been removed. Only Claude auth is supported.", {
         ephemeral: true,
       });
-      await beginDirectMessageAuth(interaction, () =>
-        authManager.startCodexOAuthFlowForProfile(targetProfile.id, interaction.user.id, async (text) => {
-          const dm = await interaction.user.createDM();
-          await dm.send(text);
-        }),
-      );
       return;
     }
 
@@ -552,15 +546,9 @@ async function handleSlashCommand(params: {
     }
 
     if (provider === "codex") {
-      await replyWithChunks(interaction, `Check your DMs to continue Codex auth for profile ${targetProfile.id}.`, {
+      await replyWithChunks(interaction, "Codex auth has been removed. Only Claude auth is supported.", {
         ephemeral: true,
       });
-      await beginDirectMessageAuth(interaction, () =>
-        authManager.startCodexOAuthFlowForProfile(targetProfile.id, interaction.user.id, async (text) => {
-          const dm = await interaction.user.createDM();
-          await dm.send(text);
-        }),
-      );
       return;
     }
 

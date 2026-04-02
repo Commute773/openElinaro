@@ -1,4 +1,3 @@
-import { completeSimple } from "@mariozechner/pi-ai";
 import type { Message, UserMessage, AssistantMessage, TextContent } from "../../messages/types";
 import {
   userMessage,
@@ -312,19 +311,10 @@ export class ConversationCompactionService {
           formatTranscript(params.messages),
         ].join("\n");
 
-        const response = await completeSimple(resolved.runtimeModel, {
-          systemPrompt,
-          messages: [{ role: "user", content: transcriptContent, timestamp: Date.now() }],
-        }, {
-          apiKey: resolved.apiKey,
-          signal: params.signal,
-          maxTokens: COMPACTION_MAX_TOKENS,
-        });
-
-        const responseText = response.content
-          .filter((c) => c.type === "text")
-          .map((c) => (c as TextContent).text)
-          .join("");
+        // TODO: Rebuild compaction using a short-lived Claude Agent SDK instance.
+        // For now, the SDK handles compaction natively via the PreCompact hook.
+        // This code path is only reached from startFreshConversation (explicit reset).
+        const responseText = "";
 
         const payload = parseCompactionPayload(responseText);
         if (
@@ -396,25 +386,8 @@ export class ConversationCompactionService {
       "If nothing is durable enough to save, return an empty string.",
     ].join(" ");
 
-    const response = await completeSimple(resolved.runtimeModel, {
-      systemPrompt,
-      messages: [{
-        role: "user",
-        content: ["Compaction summary:", "", params.summary].join("\n"),
-        timestamp: Date.now(),
-      }],
-    }, {
-      apiKey: resolved.apiKey,
-      signal: params.signal,
-      maxTokens: MEMORY_EXTRACTION_MAX_TOKENS,
-    });
-
-    const responseText = response.content
-      .filter((c) => c.type === "text")
-      .map((c) => (c as TextContent).text)
-      .join("");
-
-    return normalizeMemoryMarkdown(responseText);
+    // TODO: Rebuild memory extraction using a short-lived Claude Agent SDK instance.
+    return "";
   }
 
   private async mergeIntoCoreMemory(params: {
@@ -425,50 +398,9 @@ export class ConversationCompactionService {
     const existingCore = await this.memory.readProfileDocument(CORE_MEMORY_RELATIVE_PATH);
     const bootstrapCore = existingCore?.trim() ? existingCore : "# Core Memory\n";
 
-    const mergeResult = await tryCatchAsync(async () => {
-      const responseText = await this.models.generateMemoryText({
-        systemPrompt: [
-          "You maintain a markdown core memory file for an assistant.",
-          "Merge the incoming durable memory into the existing core memory by editing the file.",
-          "Preserve only durable facts, stable preferences, standing instructions, and long-lived project context.",
-          "Deduplicate overlapping bullets, merge repeated facts, and replace stale details when the new memory is more current.",
-          "Drop transient items: account balances, streak counts, in-progress task lists, and anything that changes frequently.",
-          "Keep the file compact and well organized with markdown headings.",
-          `The output MUST stay under ${CORE_MEMORY_SOFT_CAP_CHARS} characters. Aggressively prune to stay within budget.`,
-          "Return markdown only for the full updated MEMORY.md file.",
-          "Do not include code fences.",
-        ].join(" "),
-        userPrompt: [
-          "Existing core memory:",
-          bootstrapCore,
-          "",
-          "Conversation summary:",
-          params.summary,
-          "",
-          "New durable memory to merge:",
-          params.memoryMarkdown,
-        ].join("\n"),
-        usagePurpose: "conversation_compaction_core_memory",
-        sessionIdPrefix: "memory-core",
-      });
-      const merged = normalizeCoreMemoryDocument(responseText);
-      if (merged.length > CORE_MEMORY_HARD_CAP_CHARS) {
-        compactionTelemetry.event("conversation.compact.core_memory_hard_cap_exceeded", {
-          conversationKey: params.conversationKey,
-          outputChars: merged.length,
-          hardCapChars: CORE_MEMORY_HARD_CAP_CHARS,
-        }, {
-          level: "warn",
-          outcome: "error",
-        });
-        return fallbackMergeCoreMemory(bootstrapCore, params.memoryMarkdown);
-      }
-      return merged;
-    }, { operation: "conversation.compact.core_memory_merge", conversationKey: params.conversationKey });
-
-    const nextCore = mergeResult.ok
-      ? mergeResult.value
-      : fallbackMergeCoreMemory(bootstrapCore, params.memoryMarkdown);
+    // TODO: Rebuild core memory merge using a short-lived Claude Agent SDK instance.
+    // For now, use the fallback append strategy.
+    const nextCore = fallbackMergeCoreMemory(bootstrapCore, params.memoryMarkdown);
 
     return this.memory.upsertProfileDocument({
       relativePath: CORE_MEMORY_RELATIVE_PATH,

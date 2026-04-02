@@ -1,40 +1,20 @@
 /**
- * Filters harness tools based on a core's manifest.
- *
- * Tools that the core handles natively are excluded so the harness
- * doesn't send duplicate definitions to the model.
+ * Filters harness tools to exclude those the Claude SDK handles natively.
  */
-import type { CoreManifest, CoreToolDefinition } from "./types";
+import type { CoreToolDefinition } from "./types";
 
 /**
- * Return only the harness tools that the core does NOT handle natively.
+ * Return only the harness tools that the Claude SDK does NOT handle natively.
  */
-export function splitToolsForCore(
+export function filterNativeTools(
   harnessTools: CoreToolDefinition[],
-  manifest: CoreManifest,
+  nativeToolNames: Set<string>,
+  suppressedToolNames?: Set<string>,
 ): CoreToolDefinition[] {
-  const nativeNames = new Set(manifest.nativeTools.map((t) => t.harnessToolName));
-  const suppressedNames = new Set(manifest.suppressedTools ?? []);
-  if (nativeNames.size === 0 && suppressedNames.size === 0) {
-    return harnessTools; // Fast path for cores with no filtering
+  if (nativeToolNames.size === 0 && (!suppressedToolNames || suppressedToolNames.size === 0)) {
+    return harnessTools;
   }
-  return harnessTools.filter((t) => !nativeNames.has(t.name) && !suppressedNames.has(t.name));
-}
-
-/**
- * Check whether a given feature is owned by the core (harness should skip).
- */
-export function coreOwnsFeature(manifest: CoreManifest, feature: string): boolean {
-  return manifest.nativeFeatures.some(
-    (f) => f.feature === feature && f.mode === "core_owns",
-  );
-}
-
-/**
- * Check whether a given feature is shared between core and harness.
- */
-export function featureIsShared(manifest: CoreManifest, feature: string): boolean {
-  return manifest.nativeFeatures.some(
-    (f) => f.feature === feature && f.mode === "shared",
+  return harnessTools.filter(
+    (t) => !nativeToolNames.has(t.name) && (!suppressedToolNames || !suppressedToolNames.has(t.name)),
   );
 }

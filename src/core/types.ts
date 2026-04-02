@@ -1,71 +1,15 @@
 /**
- * Swappable Agent Core — type definitions.
+ * Core type definitions for the Claude Agent SDK integration.
  *
- * These types define the abstraction boundary between the harness
- * (Discord, profiles, domain tools, conversation storage) and the
- * core (agent loop, model interaction, native tools).
- *
- * Core message types are structurally compatible with pi-ai's plain
- * JSON message types so the Pi adapter is near zero-cost.
+ * These types define the message and tool shapes used between
+ * the harness (Discord, profiles, domain tools, conversation storage)
+ * and the Claude SDK core.
  */
 
 import type { AgentStreamEvent } from "../domain/assistant";
 
 // ---------------------------------------------------------------------------
-// Core Manifest — declares what a core handles natively
-// ---------------------------------------------------------------------------
-
-export interface CoreManifest {
-  /** Unique identifier for this core implementation. */
-  id: string;
-  /** Tool names this core handles natively. Harness won't send these as tool definitions. */
-  nativeTools: NativeToolMapping[];
-  /** Harness tool names that should not be provided to this core at all. */
-  suppressedTools?: string[];
-  /** Features this core handles internally. Harness disables its own implementation for "core_owns". */
-  nativeFeatures: CoreFeatureDeclaration[];
-  /** What this core needs from the harness. */
-  requires: CoreRequirements;
-}
-
-export interface NativeToolMapping {
-  /** The harness tool name (e.g., "read_file") */
-  harnessToolName: string;
-  /** The core's internal tool name (e.g., "Read" for Claude SDK) */
-  coreToolName: string;
-  /** Whether the harness should still receive results/notifications from this tool */
-  reportResultsToHarness: boolean;
-}
-
-export type CoreFeatureId =
-  | "agent_loop"
-  | "compaction"
-  | "context_management"
-  | "session_persistence"
-  | "cost_tracking"
-  | "streaming"
-  | "permission_control"
-  | "file_checkpointing"
-  | "thinking"
-  | "tool_result_summarization";
-
-export interface CoreFeatureDeclaration {
-  feature: CoreFeatureId;
-  /** How the harness should interact with this feature. */
-  mode: "core_owns" | "harness_owns" | "shared";
-  /** If shared, what hook/callback the core exposes for harness integration. */
-  integrationPoint?: string;
-}
-
-export interface CoreRequirements {
-  systemPrompt: boolean;
-  messageHistory: boolean;
-  toolExecution: boolean;
-  toolDefinitions: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Core Message Types — harness-owned, structurally compatible with pi-ai
+// Core Message Types
 // ---------------------------------------------------------------------------
 
 export interface CoreTextContent {
@@ -156,7 +100,7 @@ export interface CoreToolDefinition {
   description: string;
   /** JSON Schema object for the tool parameters. */
   parameters: Record<string, unknown>;
-  /** Original Zod schema, when available. Cores that accept Zod input (e.g., Claude Agent SDK) use this for proper schema passthrough. */
+  /** Original Zod schema, when available. The Claude Agent SDK uses this for proper schema passthrough. */
   zodSchema?: unknown;
 }
 
@@ -222,34 +166,12 @@ export interface CoreRunResult {
   sessionHandle?: unknown;
 }
 
-// ---------------------------------------------------------------------------
-// The Core Interface
-// ---------------------------------------------------------------------------
-
-export interface AgentCore {
-  readonly manifest: CoreManifest;
-  /** Run the agent loop: call model, execute tools, repeat until done. */
-  run(options: CoreRunOptions): Promise<CoreRunResult>;
-}
-
-// ---------------------------------------------------------------------------
-// Core Factory — harness uses this to create a core per turn
-// ---------------------------------------------------------------------------
-
-export type CoreFactory = (params: {
-  /** Resolved model information from the harness's model service. */
-  modelConfig: CoreModelConfig;
-}) => AgentCore;
-
 /** Thinking/reasoning level for model inference. */
 export type CoreThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhigh";
 
 export interface CoreModelConfig {
-  providerId: string;
   modelId: string;
   apiKey?: string;
   reasoning?: CoreThinkingLevel;
   providerOptions?: Record<string, unknown>;
-  /** Opaque runtime model object for adapter-specific cores (e.g., pi-ai Model). */
-  runtimeModel?: unknown;
 }

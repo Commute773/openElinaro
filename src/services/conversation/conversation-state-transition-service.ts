@@ -1,4 +1,3 @@
-import { completeSimple } from "@mariozechner/pi-ai";
 import type { AssistantMessage } from "../../messages/types";
 import {
   assistantTextMessage,
@@ -157,20 +156,10 @@ export class ConversationStateTransitionService {
   }
 
   private async buildConversationOpening(
-    conversationKey: string,
-    snapshot: SystemPromptSnapshot,
+    _conversationKey: string,
+    _snapshot: SystemPromptSnapshot,
   ): Promise<AssistantMessage> {
-    const result = await tryCatchAsync(async () => {
-      const resolved = await this.models.resolveModelForPurpose("conversation_opening");
-      return completeSimple(resolved.runtimeModel, {
-        systemPrompt: composeSystemPrompt(snapshot.text).text,
-        messages: [
-          userMessage(
-            "A fresh conversation was just created. Reply with exactly one short opening line. Invite the user to continue. Do not mention resets, memory, compaction, system prompts, or tools.",
-          ),
-        ],
-      }, { apiKey: resolved.apiKey });
-    }, { operation: "conversation.transition.opening_generation", conversationKey });
-    return result.ok ? result.value : this.fallbackConversationOpening();
+    // TODO: Rebuild conversation opening generation using a short-lived Claude Agent SDK instance.
+    return this.fallbackConversationOpening();
   }
 }

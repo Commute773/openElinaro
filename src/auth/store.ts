@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
-import type { OAuthCredentials } from "@mariozechner/pi-ai/oauth";
+/** OAuth credentials shape (previously from pi-ai/oauth). */
+type OAuthCredentials = { access: string; refresh?: string; expires_at?: number };
 import { getDefaultProfileId } from "../services/profiles";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../services/runtime-root";
 import { type ProviderAuthSecret, SecretStoreService } from "../services/infrastructure/secret-store-service";

@@ -27,11 +27,9 @@ import { ToolResolutionService } from "../services/tool-resolution-service";
 import { ToolRegistry } from "../functions/tool-registry";
 import { telemetry } from "../services/infrastructure/telemetry";
 import { getRuntimeConfig } from "../config/runtime-config";
-import { PiCore, ClaudeSdkCore, ClaudeSdkSession } from "../core";
-import type { CoreFactory } from "../core";
+import { ClaudeSdkCore, ClaudeSdkSession } from "../core";
 import { PeerClient } from "../instance/peer-client";
 import { PeerRegistry } from "../instance/peer-registry";
-import type { Model, Api, ThinkingLevel } from "@mariozechner/pi-ai";
 
 type ShellRuntime = Pick<
   ShellService,
@@ -253,25 +251,15 @@ export function createRuntimeScope(ctx: {
     const automaticConversationMemoryDisabled = isAutomaticConversationMemoryDisabled();
     const profile = c.resolve<ProfileRecord>(K.profile);
 
-    // Core factory: creates an AgentCore instance per turn based on the resolved model.
-    // Routes to ClaudeSdkCore for the claude provider, PiCore for all others.
-    const coreFactory: CoreFactory = ({ modelConfig }) => {
-      if (modelConfig.providerId === "claude") {
-        return new ClaudeSdkCore({
-          model: modelConfig.modelId,
-          apiKey: modelConfig.apiKey,
-          cwd: getUserDataRootDir(),
-          session: modelConfig.providerOptions?.sdkSessionHandle as ClaudeSdkSession | undefined,
-          resumeSessionId: modelConfig.providerOptions?.resumeSessionId as string | undefined,
-        });
-      }
-      return new PiCore({
-        model: modelConfig.runtimeModel as Model<Api>,
+    // Core factory: creates a ClaudeSdkCore instance per turn.
+    const createCore = (modelConfig: { modelId: string; apiKey?: string; providerOptions?: Record<string, unknown> }) =>
+      new ClaudeSdkCore({
+        model: modelConfig.modelId,
         apiKey: modelConfig.apiKey,
-        reasoning: modelConfig.reasoning as ThinkingLevel | undefined,
-        providerOptions: modelConfig.providerOptions,
+        cwd: getUserDataRootDir(),
+        session: modelConfig.providerOptions?.sdkSessionHandle as ClaudeSdkSession | undefined,
+        resumeSessionId: modelConfig.providerOptions?.resumeSessionId as string | undefined,
       });
-    };
 
     const chat = new AgentChatService(
       {
@@ -285,7 +273,7 @@ export function createRuntimeScope(ctx: {
         structuredMemory: automaticConversationMemoryDisabled
           ? undefined
           : c.resolve<MemoryManagementAgent>(K.memoryManagementAgent),
-        coreFactory,
+        createCore,
       },
       true,
       ctx.onConversationActivityChange
