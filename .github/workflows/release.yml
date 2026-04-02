@@ -48,8 +48,11 @@ jobs:
             NEXT_VERSION="${TODAY}"
           fi
 
+          # Extract sequence: only present when version has 4+ dot-segments
+          # (e.g. 2026.04.02.3 → 3). Base versions like 2026.04.02 have sequence 1.
           SEQUENCE="1"
-          if [[ "${NEXT_VERSION}" =~ \.[0-9]+$ ]]; then
+          SEGMENT_COUNT="$(echo "${NEXT_VERSION}" | tr '.' '\n' | wc -l | tr -d ' ')"
+          if [[ "${SEGMENT_COUNT}" -gt 3 ]]; then
             SEQUENCE="${NEXT_VERSION##*.}"
           fi
 
@@ -85,19 +88,21 @@ jobs:
             PREV_VERSION_JSON="\"${PREV_VERSION}\""
           fi
 
-          cat > VERSION.json <<EOF
-          {
-            "version": "${VERSION}",
-            "releasedAt": "${RELEASED_AT}",
-            "sequence": ${SEQUENCE},
-            "previousVersion": ${PREV_VERSION_JSON},
-            "releaseId": "${RELEASE_ID}",
-            "changelogPath": "DEPLOYMENTS.md"
-          }
-          EOF
-
-          # Remove leading whitespace from heredoc
-          sed -i 's/^          //' VERSION.json
+          # Write VERSION.json via jq to guarantee valid JSON
+          jq -n \
+            --arg version "${VERSION}" \
+            --arg releasedAt "${RELEASED_AT}" \
+            --argjson sequence "${SEQUENCE}" \
+            --argjson previousVersion "${PREV_VERSION_JSON}" \
+            --arg releaseId "${RELEASE_ID}" \
+            '{
+              version: $version,
+              releasedAt: $releasedAt,
+              sequence: $sequence,
+              previousVersion: $previousVersion,
+              releaseId: $releaseId,
+              changelogPath: "DEPLOYMENTS.md"
+            }' > VERSION.json
 
           # Prepend new entry to DEPLOYMENTS.md
           PREV_LABEL="${PREV_VERSION:-none}"
