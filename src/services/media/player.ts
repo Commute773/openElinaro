@@ -214,7 +214,7 @@ export async function stopAllPlayers(
 
 export async function getActiveStatuses(
   metadataRoot: string,
-  getStatus: (speakerQuery: string) => Promise<MediaStatus>,
+  getStatus: (speakerQuery: string) => Promise<MediaStatus | null>,
 ): Promise<MediaStatus[]> {
   const statuses: MediaStatus[] = [];
   for (const entry of readdirSync(metadataRoot, { withFileTypes: true })) {
@@ -223,7 +223,7 @@ export async function getActiveStatuses(
     }
     const speakerId = entry.name.replace(/\.json$/, "");
     const status = await getStatus(speakerId);
-    if (status.state !== "stopped") {
+    if (status && status.state !== "stopped") {
       statuses.push(status);
     }
   }

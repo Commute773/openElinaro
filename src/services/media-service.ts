@@ -415,7 +415,70 @@ export class MediaService {
   // Internal helpers
   // ---------------------------------------------------------------------------
 
+  /**
+   * Read-only status check — never kills processes or deletes metadata.
+   * Used by getActiveStatusesInternal() to avoid destructive side effects
+   * when scanning for which speakers are currently active.
+   */
+  private async getStatusPassive(speakerId: string): Promise<MediaStatus | null> {
+    const metadata = readPlayerMetadata(this.metadataRoot, speakerId);
+    if (!metadata) return null;
+
+    const socketPath = getSocketPath(this.socketsRoot, speakerId);
+    if (!existsSync(socketPath)) return null;
+
+    // Check if the process is still alive without killing it
+    if (metadata.pid && !this.processIsAliveImpl(metadata.pid)) return null;
+
+    // Attempt to query state — if the socket is unresponsive, just report null
+    // instead of cleaning up.
+    const pid = await queryPlayerProperty(socketPath, "pid", this.runCommandImpl, this.ncBin);
+    if (typeof pid !== "number") return null;
+
+    const pause = await queryPlayerProperty(socketPath, "pause", this.runCommandImpl, this.ncBin);
+    const vol = await queryPlayerProperty(socketPath, "volume", this.runCommandImpl, this.ncBin);
+    const mediaPath = await queryPlayerProperty(socketPath, "path", this.runCommandImpl, this.ncBin);
+    const normalizedMediaPath = normalizeString(mediaPath) ?? metadata.mediaPath;
+    const media = resolveMediaForPath(normalizedMediaPath, this.mediaRoots, this.catalogPath);
+
+    const speakers = getConfiguredSpeakers(this.speakerConfigPath);
+    const speakerRecord = speakers.find((s) =>
+      slugify(s.id?.trim() || s.name?.trim() || s.device_name?.trim() || "speaker") === speakerId,
+    );
+    const speaker: MediaSpeaker = speakerRecord
+      ? {
+          id: slugify(speakerRecord.id?.trim() || speakerRecord.name?.trim() || speakerRecord.device_name?.trim() || "speaker"),
+          name: speakerRecord.name?.trim() || speakerRecord.device_name?.trim() || speakerRecord.id?.trim() || "Unknown",
+          aliases: speakerRecord.aliases ?? [],
+          deviceName: speakerRecord.device_name?.trim() || "",
+          transport: (speakerRecord.transport as MediaSpeaker["transport"]) ?? "builtin",
+          btAddress: speakerRecord.bt_address,
+          configured: true,
+          available: true,
+          isCurrentOutput: false,
+        }
+      : {
+          id: speakerId,
+          name: metadata.speakerName ?? speakerId,
+          aliases: [],
+          deviceName: metadata.deviceName ?? "",
+          transport: "built-in",
+          configured: false,
+          available: true,
+          isCurrentOutput: false,
+        };
+
+    return {
+      speaker,
+      state: pause ? "paused" : "playing",
+      volume: typeof vol === "number" ? Math.round(vol) : metadata.volume ?? null,
+      media,
+      path: normalizedMediaPath ?? null,
+      startedAt: metadata.startedAt,
+    };
+  }
+
   private async getActiveStatusesInternal(): Promise<MediaStatus[]> {
-    return getActiveStatuses(this.metadataRoot, (speakerQuery) => this.getStatus(speakerQuery));
+    return getActiveStatuses(this.metadataRoot, (speakerId) => this.getStatusPassive(speakerId));
   }
 }
