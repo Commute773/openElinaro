@@ -187,6 +187,9 @@ async function main() {
   previousRootDirEnv = process.env.OPENELINARO_ROOT_DIR;
   tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openelinaro-discord-dm-e2e-"));
   process.env.OPENELINARO_ROOT_DIR = tempRoot;
+  // Clear USER_DATA_DIR so it doesn't leak the production path from the parent
+  // shell — getUserDataRootDir() checks it before OPENELINARO_ROOT_DIR.
+  delete process.env.OPENELINARO_USER_DATA_DIR;
 
   // Copy system prompts and auth fixtures
   copyDirectory("system_prompt");

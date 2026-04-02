@@ -282,9 +282,12 @@ export class ChatTurnRunner {
           if (pendingResetMessage) {
             // Close the persistent SDK session so the fresh conversation
             // doesn't inherit stale context from the old one.
+            // Intentionally do NOT preserve lastSdkSessionId here — the
+            // conversation is being reset, so resuming old context is wrong.
             const handle = session.sdkSessionHandle as { close?: () => void } | undefined;
             if (typeof handle?.close === "function") handle.close();
             session.sdkSessionHandle = undefined;
+            session.lastSdkSessionId = undefined;
             return {
               mode: "immediate" as const,
               message: pendingResetMessage,
@@ -313,9 +316,11 @@ export class ChatTurnRunner {
             );
           }
 
-          // Store the persistent session handle for reuse on next turn
+          // Store the persistent session handle for reuse on next turn.
+          // Clear lastSdkSessionId — the live handle now owns continuity.
           if (result.sessionHandle) {
             session.sdkSessionHandle = result.sessionHandle;
+            session.lastSdkSessionId = undefined;
           }
 
           // Check stop AFTER persistence

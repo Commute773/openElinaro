@@ -262,6 +262,7 @@ export function createRuntimeScope(ctx: {
           apiKey: modelConfig.apiKey,
           cwd: getUserDataRootDir(),
           session: modelConfig.providerOptions?.sdkSessionHandle as ClaudeSdkSession | undefined,
+          resumeSessionId: modelConfig.providerOptions?.resumeSessionId as string | undefined,
         });
       }
       return new PiCore({

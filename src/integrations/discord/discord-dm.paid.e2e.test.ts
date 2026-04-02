@@ -55,7 +55,7 @@ describe("discord dm e2e", () => {
     const runnerPath = path.join(repoRoot, "src/integrations/discord/discord-dm.e2e.runner.ts");
     const stdout = execFileSync("bun", ["run", runnerPath], {
       cwd: repoRoot,
-      env: process.env,
+      env: { ...process.env, NODE_ENV: "test" },
       encoding: "utf8",
       timeout: 240_000,
     });

@@ -193,6 +193,19 @@ export class ChatSessionManager {
           });
           continue;
         }
+        // Any unhandled error (e.g. "Claude Code process aborted by user")
+        // means the subprocess is likely dead. Close the session handle so
+        // the next message gets a fresh subprocess instead of cascading.
+        if (session.sdkSessionHandle) {
+          agentChatTelemetry.event("agent_chat.session_closed", {
+            conversationKey,
+            reason: "unhandled_error",
+            errorMessage: error instanceof Error ? error.message : String(error),
+            hadHandle: true,
+            handleAlive: !!(session.sdkSessionHandle as { isAlive?: boolean } | undefined)?.isAlive,
+          }, { level: "warn" });
+          this.closeSdkSessionHandle(session);
+        }
         job.reject(error);
       } finally {
         session.activeJobKind = null;
@@ -402,7 +415,11 @@ export class ChatSessionManager {
 
   private closeSdkSessionHandle(session: ConversationSessionState | undefined) {
     if (!session?.sdkSessionHandle) return;
-    const handle = session.sdkSessionHandle as { close?: () => void };
+    const handle = session.sdkSessionHandle as { close?: () => void; sessionId?: string };
+    // Preserve the session ID so we can resume from disk after subprocess death
+    if (handle.sessionId) {
+      session.lastSdkSessionId = handle.sessionId;
+    }
     if (typeof handle.close === "function") {
       handle.close();
     }

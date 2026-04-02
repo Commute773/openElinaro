@@ -83,6 +83,8 @@ export type ConversationSessionState = {
   typingIndicatorActive: boolean;
   /** Opaque handle to a persistent SDK session for reuse across turns. */
   sdkSessionHandle?: unknown;
+  /** SDK session ID from the last closed session — used to resume context after subprocess death. */
+  lastSdkSessionId?: string;
 };
 
 export type ChatDependencies = {

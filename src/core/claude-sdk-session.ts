@@ -16,6 +16,16 @@ import {
   type Query,
 } from "@anthropic-ai/claude-agent-sdk";
 import { AsyncChannel } from "./async-channel";
+import { attempt } from "../utils/result";
+
+/**
+ * Shape of the SDK's internal ProcessTransport, accessed via (query as any).transport.
+ * We only read from it — never write — so breakage would just disable the proactive check.
+ */
+interface ProcessTransportLike {
+  isReady?: () => boolean;
+  onExit?: (callback: (error?: Error) => void) => () => void;
+}
 
 export class ClaudeSdkSession {
   private readonly channel: AsyncChannel<SDKUserMessage>;
@@ -23,11 +33,16 @@ export class ClaudeSdkSession {
   private readonly iterator: AsyncIterator<SDKMessage>;
   private _sessionId: string | undefined;
   private _alive = true;
+  private _removeExitListener?: () => void;
 
   private constructor(channel: AsyncChannel<SDKUserMessage>, queryInstance: Query) {
     this.channel = channel;
     this.queryInstance = queryInstance;
     this.iterator = queryInstance[Symbol.asyncIterator]();
+
+    // Proactively detect subprocess death so isAlive reflects reality
+    // even before the next nextMessage() call.
+    this.attachExitListener();
   }
 
   /**
@@ -91,6 +106,8 @@ export class ClaudeSdkSession {
   close(): void {
     if (!this._alive) return;
     this._alive = false;
+    this._removeExitListener?.();
+    this._removeExitListener = undefined;
     this.channel.close();
     this.queryInstance.close();
   }
@@ -117,5 +134,28 @@ export class ClaudeSdkSession {
   /** Access the underlying Query for advanced control (setMcpServers, etc.). */
   get query(): Query {
     return this.queryInstance;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Proactive subprocess death detection
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Hook into the SDK's internal ProcessTransport.onExit() so we learn about
+   * subprocess death immediately — not just on the next nextMessage() call.
+   * This is best-effort: if the SDK internals change shape, the attach silently
+   * fails and we fall back to the reactive detection in nextMessage().
+   */
+  private attachExitListener(): void {
+    const result = attempt(() => {
+      const transport = (this.queryInstance as any)?.transport as ProcessTransportLike | undefined;
+      if (typeof transport?.onExit === "function") {
+        this._removeExitListener = transport.onExit(() => {
+          this._alive = false;
+        });
+      }
+    });
+    // SDK internals changed — no-op, reactive detection is the fallback.
+    void result;
   }
 }

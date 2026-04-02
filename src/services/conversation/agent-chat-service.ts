@@ -35,6 +35,18 @@ export class AgentChatService {
         // Resolve the core early so we can check feature ownership
         const resolved = await this.deps.models.resolveModelForPurpose(job.execution.usagePurpose);
         const sessionState = this.sessionManager.getSession(job.conversationKey);
+
+        // Determine resume session ID: prefer in-memory (from a recently closed
+        // handle) then fall back to the persisted value from the conversation store
+        // (survives process restarts).
+        let resumeSessionId = sessionState.lastSdkSessionId;
+        if (!resumeSessionId && !sessionState.sdkSessionHandle) {
+          const conv = await this.deps.conversations.get(job.conversationKey);
+          if (conv.sdkSessionId) {
+            resumeSessionId = conv.sdkSessionId;
+          }
+        }
+
         const core = this.deps.coreFactory({
           modelConfig: {
             providerId: resolved.selection.providerId,
@@ -44,6 +56,7 @@ export class AgentChatService {
             providerOptions: {
               sessionId: job.execution.providerSessionId ?? job.conversationKey,
               sdkSessionHandle: sessionState.sdkSessionHandle,
+              resumeSessionId,
             },
             runtimeModel: resolved.runtimeModel,
           },

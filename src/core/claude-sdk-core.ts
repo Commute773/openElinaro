@@ -89,6 +89,8 @@ export interface ClaudeSdkCoreConfig {
   cwd?: string;
   /** Existing persistent session to reuse across turns. */
   session?: ClaudeSdkSession;
+  /** SDK session ID to resume from disk when no live session handle is available. */
+  resumeSessionId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,16 +254,24 @@ export class ClaudeSdkCore implements AgentCore {
       ? (event: AgentStreamEvent) => { void attemptOrAsync(() => onProgress(event), undefined); }
       : undefined;
 
-    // Create or reuse the persistent session
+    // Create or reuse the persistent session.
+    // When resuming a dead session, pass the resume ID so the SDK restores
+    // conversation context from its persisted JSONL transcript on disk.
     const sessionReused = !!this.config.session?.isAlive;
+    const resumingFromDisk = !sessionReused && !!this.config.resumeSessionId;
     const session = sessionReused
       ? this.config.session!
-      : ClaudeSdkSession.create(sdkOptions);
+      : ClaudeSdkSession.create(
+          resumingFromDisk
+            ? { ...sdkOptions, resume: this.config.resumeSessionId }
+            : sdkOptions,
+        );
     const runStartedAt = Date.now();
 
     sdkCoreTelemetry.event("claude_sdk_core.session_lifecycle", {
-      action: sessionReused ? "reuse" : "create",
+      action: sessionReused ? "reuse" : resumingFromDisk ? "resume" : "create",
       sessionId: session.sessionId,
+      resumeSessionId: resumingFromDisk ? this.config.resumeSessionId : undefined,
       model: this.config.model,
       promptLength: prompt.length,
       toolCount: harnessTools.length,
@@ -427,15 +437,35 @@ export class ClaudeSdkCore implements AgentCore {
           progress?.({ type: "result", turns: numTurns, durationMs, costUsd: totalCostUsd });
           break; // Turn complete — session stays alive for next turn
         } else {
-          const errors = (message as any).errors ?? [];
+          const rawMessage = message as any;
+          const errors = rawMessage.errors ?? [];
           const errorText = errors.length > 0 ? errors.join("; ") : "unknown";
-          onLog?.("sdk_result_error", { error: errorText, subtype: message.subtype });
+          onLog?.("sdk_result_error", {
+            error: errorText,
+            subtype: rawMessage.subtype,
+            // Log extra fields that might explain "unknown" errors
+            rawErrorCount: errors.length,
+            hasResult: !!rawMessage.result,
+            resultPreview: rawMessage.result ? String(rawMessage.result).slice(0, 200) : undefined,
+            messageKeys: Object.keys(rawMessage).join(","),
+          });
 
-          // If the session died, close it and retry with a fresh one
-          if (this.config.session && isStaleSessionError(new Error(errorText))) {
+          // If the session died or we got an opaque "unknown" error, close and
+          // retry with a fresh session. "unknown" usually means the subprocess
+          // died without surfacing a meaningful error.
+          const isRecoverable = isStaleSessionError(new Error(errorText)) || errorText === "unknown";
+          if (isRecoverable && (this.config.session || resumingFromDisk)) {
+            sdkCoreTelemetry.event("claude_sdk_core.error_result_retry", {
+              sessionReused,
+              resumingFromDisk,
+              sessionId: session.sessionId,
+              errorText,
+              elapsedMs: Date.now() - runStartedAt,
+            }, { level: "warn" });
             onLog?.("sdk_session_died_retry", { error: errorText });
+            progress?.({ type: "status", message: "Session error, retrying with fresh session" });
             session.close();
-            const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined });
+            const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined, resumeSessionId: undefined });
             return freshCore.run(options);
           }
 
@@ -553,7 +583,20 @@ export class ClaudeSdkCore implements AgentCore {
         onLog?.("sdk_session_died_retry", { error: String(err) });
         progress?.({ type: "status", message: "Session expired, starting fresh" });
         session.close();
-        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined });
+        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined, resumeSessionId: undefined });
+        return freshCore.run(options);
+      }
+      // If resume from disk failed, fall back to a completely fresh session.
+      if (!receivedFirstMessage && resumingFromDisk) {
+        sdkCoreTelemetry.event("claude_sdk_core.resume_failed_fallback", {
+          resumeSessionId: this.config.resumeSessionId,
+          error: err instanceof Error ? err.message : String(err),
+          elapsedMs: Date.now() - runStartedAt,
+        }, { level: "warn" });
+        onLog?.("sdk_resume_failed_fallback", { error: String(err) });
+        progress?.({ type: "status", message: "Session resume failed, starting fresh" });
+        session.close();
+        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined, resumeSessionId: undefined });
         return freshCore.run(options);
       }
       throw err;
@@ -563,6 +606,18 @@ export class ClaudeSdkCore implements AgentCore {
     }
 
     if (!receivedFirstMessage && !signal?.aborted) {
+      // If we reused a session that silently died (subprocess gone, no messages),
+      // retry once with a fresh session instead of surfacing the error.
+      if (sessionReused && this.config.session) {
+        sdkCoreTelemetry.event("claude_sdk_core.dead_session_retry", {
+          sessionId: session.sessionId,
+          sessionAlive: session.isAlive,
+          elapsedMs: Date.now() - runStartedAt,
+        }, { level: "warn" });
+        session.close();
+        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined });
+        return freshCore.run(options);
+      }
       throw new Error("Claude Agent SDK timed out waiting for the first response. This usually means an auth or model configuration error.");
     }
 
@@ -691,10 +746,10 @@ function mergeUsage(a: CoreUsage, b: CoreUsage): CoreUsage {
   };
 }
 
-/** Detect errors from the SDK indicating a stale/expired session ID. */
+/** Detect errors from the SDK indicating a stale/expired session or dead subprocess. */
 function isStaleSessionError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return /no conversation found|session.*not found|invalid.*session|session.*expired/i.test(msg);
+  return /no conversation found|session.*not found|invalid.*session|session.*expired|process aborted|aborted by user/i.test(msg);
 }
 
 function abortControllerFromSignal(signal: AbortSignal): AbortController {
