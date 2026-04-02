@@ -1,5 +1,14 @@
 # Deployments
 
+## 2026.04.02.4
+- Released at: 2026-04-02T23:16:34Z
+- Release id: 20260402T231634Z-1c63350
+- Previous version: 2026.04.02.3
+- Trigger: ci/release workflow
+
+- cleanup: remove codex/zai provider references
+- rearchitect: remove Pi core, AgentCore abstraction, and secondary model dispatch
+
 ## 2026.04.02.3
 - Released at: 2026-04-02T13:03:50Z
 - Release id: 20260402T130350Z-48a80d7
