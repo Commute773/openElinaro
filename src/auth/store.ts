@@ -216,12 +216,6 @@ export function getZaiApiKey(profileId = getDefaultProfileId()): string | null {
 }
 
 export function hasProviderAuth(provider: ProviderId, profileId = getDefaultProfileId()): boolean {
-  if (provider === "openai-codex") {
-    return hasUsableCodexCredentials(getStoredCodexCredential(profileId));
-  }
-  if (provider === "zai") {
-    return hasUsableZaiToken(getStoredZaiCredential(profileId));
-  }
   return hasUsableClaudeToken(getStoredClaudeCredential(profileId));
 }
 

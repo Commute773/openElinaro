@@ -165,9 +165,7 @@ export function buildSlashCommands() {
           .setRequired(true)
           .addChoices(
             { name: "status", value: "status" },
-            { name: "codex", value: "codex" },
             { name: "claude", value: "claude" },
-            { name: "zai", value: "zai" },
           ),
       )
       .addStringOption((option) =>

@@ -29,7 +29,7 @@ import {
   type RecordedUsageInspection,
   type RecordedUsageDailyInspection,
 } from "./model-usage-service";
-import { getClaudeSetupToken, getZaiApiKey } from "../../auth/store";
+import { getClaudeSetupToken } from "../../auth/store";
 import type { ProfileRecord, ModelProviderId } from "../../domain/profiles";
 import { getRuntimeConfig } from "../../config/runtime-config";
 import { resolveRuntimePath } from "../runtime-root";
@@ -206,9 +206,7 @@ const DEFAULT_ACTIVE_MODEL: ActiveModelSelection = {
 };
 
 const PROVIDER_LABELS: Record<ModelProviderId, string> = {
-  "openai-codex": "OpenAI Codex",
   claude: "Claude",
-  zai: "Z.ai",
 };
 
 async function ensureStoreDir() {
@@ -646,14 +644,6 @@ export function resolveClaudeToken(profileId: string) {
     throw new ConfigurationError("Claude auth is not configured yet. Use `/auth provider:claude` first.");
   }
   return token;
-}
-
-export function resolveZaiApiKey(profileId: string) {
-  const key = getZaiApiKey(profileId);
-  if (!key) {
-    throw new ConfigurationError("Z.ai auth is not configured yet. Use `/auth provider:zai` first.");
-  }
-  return key;
 }
 
 export class ModelService {

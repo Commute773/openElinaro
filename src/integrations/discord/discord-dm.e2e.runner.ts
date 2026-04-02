@@ -205,7 +205,7 @@ async function main() {
 
   // Verify auth is available
   authStoreModule = await importFresh("src/auth/store.ts");
-  if (!authStoreModule.hasProviderAuth("claude", "root") && !authStoreModule.hasProviderAuth("openai-codex", "root")) {
+  if (!authStoreModule.hasProviderAuth("claude", "root")) {
     throw new Error(
       "No root provider auth found. Ensure secret-store.json with valid credentials exists in ~/.openelinarotest/ or ~/.openelinaro/.",
     );

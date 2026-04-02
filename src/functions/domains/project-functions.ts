@@ -29,8 +29,8 @@ import type { ThinkingLevel } from "../../messages/types";
 // ---------------------------------------------------------------------------
 
 const responseFormatSchema = z.enum(["text", "json"]);
-const modelProviderSchema = z.enum(["openai-codex", "claude", "zai"]);
-const modelProviderIds: ModelProviderId[] = ["openai-codex", "claude", "zai"];
+const modelProviderSchema = z.enum(["claude"]);
+const modelProviderIds: ModelProviderId[] = ["claude"];
 const thinkingLevelSchema = z.enum(["minimal", "low", "medium", "high", "xhigh"]);
 const jobStatusSchema = z.enum(["active", "paused", "archived"]);
 const projectStatusSchema = z.enum(["active", "paused", "idea", "archived"]);

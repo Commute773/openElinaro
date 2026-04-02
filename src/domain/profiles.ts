@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const MODEL_PROVIDER_IDS = ["openai-codex", "claude", "zai"] as const;
+export const MODEL_PROVIDER_IDS = ["claude"] as const;
 export type ModelProviderId = (typeof MODEL_PROVIDER_IDS)[number];
 const ModelProviderSchema = z.enum(MODEL_PROVIDER_IDS);
 
