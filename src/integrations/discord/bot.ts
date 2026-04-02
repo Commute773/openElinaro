@@ -457,31 +457,6 @@ async function handleSlashCommand(params: {
       return;
     }
 
-    if (provider === "codex") {
-      await replyWithChunks(interaction, `Check your DMs to continue Codex auth for profile ${targetProfile.id}.`, {
-        ephemeral: true,
-      });
-      await beginDirectMessageAuth(interaction, () =>
-        authManager.startCodexOAuthFlowForProfile(targetProfile.id, interaction.user.id, async (text) => {
-          const dm = await interaction.user.createDM();
-          await dm.send(text);
-        }),
-      );
-      return;
-    }
-
-    if (provider === "zai") {
-      await replyWithChunks(interaction, `Check your DMs to continue Z.ai auth for profile ${targetProfile.id}.`, {
-        ephemeral: true,
-      });
-      await beginDirectMessageAuth(interaction, () =>
-        authManager.startZaiApiKeyFlowForProfile(targetProfile.id, interaction.user.id, async (text) => {
-          const dm = await interaction.user.createDM();
-          await dm.send(text);
-        }),
-      );
-      return;
-    }
 
     await replyWithChunks(interaction, `Check your DMs to continue Claude auth for profile ${targetProfile.id}.`, {
       ephemeral: true,
@@ -551,31 +526,6 @@ async function handleSlashCommand(params: {
       return;
     }
 
-    if (provider === "codex") {
-      await replyWithChunks(interaction, `Check your DMs to continue Codex auth for profile ${targetProfile.id}.`, {
-        ephemeral: true,
-      });
-      await beginDirectMessageAuth(interaction, () =>
-        authManager.startCodexOAuthFlowForProfile(targetProfile.id, interaction.user.id, async (text) => {
-          const dm = await interaction.user.createDM();
-          await dm.send(text);
-        }),
-      );
-      return;
-    }
-
-    if (provider === "zai") {
-      await replyWithChunks(interaction, `Check your DMs to continue Z.ai auth for profile ${targetProfile.id}.`, {
-        ephemeral: true,
-      });
-      await beginDirectMessageAuth(interaction, () =>
-        authManager.startZaiApiKeyFlowForProfile(targetProfile.id, interaction.user.id, async (text) => {
-          const dm = await interaction.user.createDM();
-          await dm.send(text);
-        }),
-      );
-      return;
-    }
 
     await replyWithChunks(interaction, `Check your DMs to continue Claude auth for profile ${targetProfile.id}.`, {
       ephemeral: true,
@@ -670,7 +620,7 @@ async function handleSlashCommand(params: {
   if (!hasProviderAuth(activeModel.providerId, profileId)) {
     await replyWithChunks(
       interaction,
-      `${activeModel.providerId} chat auth is not set up yet. Use \`/auth provider:${activeModel.providerId === "openai-codex" ? "codex" : "claude"}\`.`,
+      `Claude auth is not set up yet. Use \`/auth provider:claude\`.`,
       {
         ephemeral: true,
       },

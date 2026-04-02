@@ -21,63 +21,41 @@ import { attemptOrAsync } from "../utils/result";
 import { telemetry } from "../services/infrastructure/telemetry";
 import type { AgentStreamEvent } from "../domain/assistant";
 import type {
-  AgentCore,
-  CoreManifest,
   CoreRunOptions,
   CoreRunResult,
   CoreAssistantMessage,
   CoreToolDefinition,
   CoreUsage,
-  CoreModelConfig,
 } from "./types";
 
 // ---------------------------------------------------------------------------
-// Manifest
+// Native tool and suppression lists
 // ---------------------------------------------------------------------------
 
 /**
- * Claude Agent SDK native tools — these overlap with harness tools.
+ * Harness tool names that the Claude SDK handles natively.
  * The harness should NOT send these as tool definitions since the SDK
- * provides them natively.
+ * provides them internally.
  */
-export const CLAUDE_SDK_MANIFEST: CoreManifest = {
-  id: "claude-sdk",
+export const CLAUDE_SDK_NATIVE_TOOLS = new Set([
+  "read_file",
+  "write_file",
+  "edit_file",
+  "glob",
+  "grep",
+  "exec_command",
+  "web_search",
+  "web_fetch",
+]);
 
-  nativeTools: [
-    { harnessToolName: "read_file",    coreToolName: "Read",      reportResultsToHarness: false },
-    { harnessToolName: "write_file",   coreToolName: "Write",     reportResultsToHarness: false },
-    { harnessToolName: "edit_file",    coreToolName: "Edit",      reportResultsToHarness: false },
-    { harnessToolName: "glob",         coreToolName: "Glob",      reportResultsToHarness: false },
-    { harnessToolName: "grep",         coreToolName: "Grep",      reportResultsToHarness: false },
-    { harnessToolName: "exec_command", coreToolName: "Bash",      reportResultsToHarness: true },
-    { harnessToolName: "web_search",   coreToolName: "WebSearch", reportResultsToHarness: false },
-    { harnessToolName: "web_fetch",    coreToolName: "WebFetch",  reportResultsToHarness: false },
-  ],
-
-  // The SDK manages its own tool loading and compaction; harness equivalents are not applicable.
-  // Compaction is handled natively by the SDK; durable memory is flushed via the PreCompact hook.
-  suppressedTools: ["load_tool_library", "compact"],
-
-  nativeFeatures: [
-    { feature: "agent_loop",               mode: "core_owns" },
-    { feature: "compaction",               mode: "shared", integrationPoint: "PreCompact hook" },
-    { feature: "context_management",       mode: "core_owns" },
-    { feature: "session_persistence",      mode: "shared", integrationPoint: "PostToolUse hook + message stream" },
-    { feature: "cost_tracking",            mode: "shared", integrationPoint: "usage from message stream" },
-    { feature: "streaming",                mode: "core_owns" },
-    { feature: "permission_control",       mode: "shared", integrationPoint: "canUseTool callback" },
-    { feature: "file_checkpointing",       mode: "core_owns" },
-    { feature: "thinking",                 mode: "core_owns" },
-    { feature: "tool_result_summarization", mode: "core_owns" },
-  ],
-
-  requires: {
-    systemPrompt: true,
-    messageHistory: false, // SDK manages its own session history
-    toolExecution: true,   // Harness domain tools executed via MCP
-    toolDefinitions: true, // Harness provides domain tool schemas
-  },
-};
+/**
+ * Harness tool names that should not be provided to the SDK at all.
+ * The SDK manages its own tool loading and compaction.
+ */
+export const CLAUDE_SDK_SUPPRESSED_TOOLS = new Set([
+  "load_tool_library",
+  "compact",
+]);
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -125,9 +103,7 @@ export function normalizeSdkModelId(modelId: string): string {
 
 const sdkCoreTelemetry = telemetry.child({ component: "claude_sdk_core" });
 
-export class ClaudeSdkCore implements AgentCore {
-  readonly manifest = CLAUDE_SDK_MANIFEST;
-
+export class ClaudeSdkCore {
   constructor(private readonly config: ClaudeSdkCoreConfig) {}
 
   async run(options: CoreRunOptions): Promise<CoreRunResult> {

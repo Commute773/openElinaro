@@ -1,187 +1,44 @@
 import { test, expect, describe } from "bun:test";
-import { splitToolsForCore, coreOwnsFeature, featureIsShared } from "./tool-split.ts";
-import type { CoreManifest, CoreToolDefinition } from "./types.ts";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeManifest(overrides?: Partial<CoreManifest>): CoreManifest {
-  return {
-    id: "test-core",
-    nativeTools: [],
-    nativeFeatures: [],
-    requires: {
-      systemPrompt: true,
-      messageHistory: true,
-      toolExecution: true,
-      toolDefinitions: true,
-    },
-    ...overrides,
-  };
-}
+import { filterNativeTools } from "./tool-split.ts";
+import type { CoreToolDefinition } from "./types.ts";
 
 function makeTool(name: string): CoreToolDefinition {
   return { name, description: `${name} description`, parameters: {} };
 }
 
-// ---------------------------------------------------------------------------
-// splitToolsForCore
-// ---------------------------------------------------------------------------
-
-describe("splitToolsForCore", () => {
-  test("returns all harness tools when manifest has no native tools", () => {
+describe("filterNativeTools", () => {
+  test("returns all harness tools when no native tools", () => {
     const tools = [makeTool("read_file"), makeTool("write_file")];
-    const manifest = makeManifest({ nativeTools: [] });
-
-    const result = splitToolsForCore(tools, manifest);
+    const result = filterNativeTools(tools, new Set());
     expect(result).toEqual(tools);
   });
 
-  test("filters out tools matching native tool mappings", () => {
+  test("filters out native tools", () => {
     const tools = [makeTool("read_file"), makeTool("write_file"), makeTool("search")];
-    const manifest = makeManifest({
-      nativeTools: [
-        {
-          harnessToolName: "read_file",
-          coreToolName: "Read",
-          reportResultsToHarness: false,
-        },
-        {
-          harnessToolName: "write_file",
-          coreToolName: "Write",
-          reportResultsToHarness: false,
-        },
-      ],
-    });
-
-    const result = splitToolsForCore(tools, manifest);
+    const native = new Set(["read_file", "write_file"]);
+    const result = filterNativeTools(tools, native);
     expect(result).toHaveLength(1);
     expect(result[0]!.name).toBe("search");
   });
 
-  test("returns all tools when none match native mappings", () => {
-    const tools = [makeTool("search"), makeTool("list_files")];
-    const manifest = makeManifest({
-      nativeTools: [
-        {
-          harnessToolName: "read_file",
-          coreToolName: "Read",
-          reportResultsToHarness: false,
-        },
-      ],
-    });
-
-    const result = splitToolsForCore(tools, manifest);
-    expect(result).toHaveLength(2);
+  test("filters out suppressed tools", () => {
+    const tools = [makeTool("compact"), makeTool("search")];
+    const native = new Set<string>();
+    const suppressed = new Set(["compact"]);
+    const result = filterNativeTools(tools, native, suppressed);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("search");
   });
 
-  test("handles empty harness tools list", () => {
-    const manifest = makeManifest({
-      nativeTools: [
-        {
-          harnessToolName: "read_file",
-          coreToolName: "Read",
-          reportResultsToHarness: false,
-        },
-      ],
-    });
-
-    const result = splitToolsForCore([], manifest);
+  test("handles empty tools list", () => {
+    const result = filterNativeTools([], new Set(["read_file"]));
     expect(result).toEqual([]);
   });
 
-  test("does not mutate the original harness tools array", () => {
+  test("does not mutate original array", () => {
     const tools = [makeTool("read_file"), makeTool("search")];
     const original = [...tools];
-    const manifest = makeManifest({
-      nativeTools: [
-        {
-          harnessToolName: "read_file",
-          coreToolName: "Read",
-          reportResultsToHarness: false,
-        },
-      ],
-    });
-
-    splitToolsForCore(tools, manifest);
+    filterNativeTools(tools, new Set(["read_file"]));
     expect(tools).toEqual(original);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// coreOwnsFeature
-// ---------------------------------------------------------------------------
-
-describe("coreOwnsFeature", () => {
-  test("returns true when feature mode is core_owns", () => {
-    const manifest = makeManifest({
-      nativeFeatures: [{ feature: "compaction", mode: "core_owns" }],
-    });
-    expect(coreOwnsFeature(manifest, "compaction")).toBe(true);
-  });
-
-  test("returns false when feature mode is harness_owns", () => {
-    const manifest = makeManifest({
-      nativeFeatures: [{ feature: "compaction", mode: "harness_owns" }],
-    });
-    expect(coreOwnsFeature(manifest, "compaction")).toBe(false);
-  });
-
-  test("returns false when feature mode is shared", () => {
-    const manifest = makeManifest({
-      nativeFeatures: [{ feature: "compaction", mode: "shared" }],
-    });
-    expect(coreOwnsFeature(manifest, "compaction")).toBe(false);
-  });
-
-  test("returns false when feature not in manifest", () => {
-    const manifest = makeManifest({ nativeFeatures: [] });
-    expect(coreOwnsFeature(manifest, "compaction")).toBe(false);
-  });
-
-  test("matches by feature name, not position", () => {
-    const manifest = makeManifest({
-      nativeFeatures: [
-        { feature: "streaming", mode: "harness_owns" },
-        { feature: "compaction", mode: "core_owns" },
-        { feature: "thinking", mode: "shared" },
-      ],
-    });
-    expect(coreOwnsFeature(manifest, "compaction")).toBe(true);
-    expect(coreOwnsFeature(manifest, "streaming")).toBe(false);
-    expect(coreOwnsFeature(manifest, "thinking")).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// featureIsShared
-// ---------------------------------------------------------------------------
-
-describe("featureIsShared", () => {
-  test("returns true when feature mode is shared", () => {
-    const manifest = makeManifest({
-      nativeFeatures: [{ feature: "context_management", mode: "shared" }],
-    });
-    expect(featureIsShared(manifest, "context_management")).toBe(true);
-  });
-
-  test("returns false when feature mode is core_owns", () => {
-    const manifest = makeManifest({
-      nativeFeatures: [{ feature: "context_management", mode: "core_owns" }],
-    });
-    expect(featureIsShared(manifest, "context_management")).toBe(false);
-  });
-
-  test("returns false when feature mode is harness_owns", () => {
-    const manifest = makeManifest({
-      nativeFeatures: [{ feature: "context_management", mode: "harness_owns" }],
-    });
-    expect(featureIsShared(manifest, "context_management")).toBe(false);
-  });
-
-  test("returns false when feature not in manifest", () => {
-    const manifest = makeManifest({ nativeFeatures: [] });
-    expect(featureIsShared(manifest, "context_management")).toBe(false);
   });
 });

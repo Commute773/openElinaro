@@ -1,18 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { ConfigurationError, NotFoundError, ValidationError } from "../../domain/errors";
-import {
-  getModels,
-  streamSimple,
-  type Api,
-  type Context as PiContext,
-  type KnownProvider,
-  type Message as PiMessage,
-  type Model,
-  type ThinkingLevel as PiThinkingLevel,
-  type Tool as PiTool,
-  type Usage as PiUsage,
-} from "@mariozechner/pi-ai";
 import type {
   Message,
   AssistantMessage,
@@ -24,7 +12,6 @@ import type {
   Usage,
   ThinkingLevel,
 } from "../../messages/types";
-import { getOAuthApiKey, type OAuthCredentials } from "@mariozechner/pi-ai/oauth";
 import { approximateTextTokens } from "../../utils/text-utils";
 import {
   approximateContentTokens,
@@ -42,17 +29,46 @@ import {
   type RecordedUsageInspection,
   type RecordedUsageDailyInspection,
 } from "./model-usage-service";
-import { getClaudeSetupToken, getCodexCredentials, getZaiApiKey, saveCodexCredentials } from "../../auth/store";
+import { getClaudeSetupToken } from "../../auth/store";
 import type { ProfileRecord, ModelProviderId } from "../../domain/profiles";
 import { getRuntimeConfig } from "../../config/runtime-config";
 import { resolveRuntimePath } from "../runtime-root";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { timestamp } from "../../utils/timestamp";
-import { SecondaryModelDispatch, type ResolvedRuntimeModel } from "./secondary-model-dispatch";
 
 export type { RecordedUsageInspection, RecordedUsageDailyInspection } from "./model-usage-service";
 export { ModelUsageService } from "./model-usage-service";
+
+// ---------------------------------------------------------------------------
+// Resolved model type (replaces pi-ai Model<Api> dependency)
+// ---------------------------------------------------------------------------
+
+export interface ResolvedRuntimeModel {
+  selection: ActiveModelSelection;
+  apiKey: string;
+  contextWindow?: number;
+  maxOutputTokens?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Inline Claude model catalog (replaces pi-ai getModels)
+// ---------------------------------------------------------------------------
+
+interface ClaudeModelEntry {
+  id: string;
+  name: string;
+  contextWindow: number;
+  maxTokens: number;
+  reasoning: boolean;
+}
+
+const CLAUDE_MODEL_CATALOG: ClaudeModelEntry[] = [
+  { id: "claude-opus-4-6", name: "Claude Opus 4.6", contextWindow: 200_000, maxTokens: 32_000, reasoning: true },
+  { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextWindow: 200_000, maxTokens: 16_000, reasoning: true },
+  { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", contextWindow: 200_000, maxTokens: 16_000, reasoning: true },
+  { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", contextWindow: 200_000, maxTokens: 8_192, reasoning: true },
+];
 
 export type { ModelProviderId } from "../../domain/profiles";
 const modelTelemetry = telemetry.child({ component: "model" });
@@ -176,7 +192,7 @@ interface ActiveModelStoreShape {
   activeModels?: Record<string, ActiveModelSelection>;
 }
 
-type RuntimeModelStub = Pick<Model<Api>, "id" | "name">;
+type RuntimeModelStub = { id: string; name: string };
 
 function getStorePath() {
   return resolveRuntimePath("model-state.json");
@@ -189,16 +205,8 @@ const DEFAULT_ACTIVE_MODEL: ActiveModelSelection = {
   updatedAt: new Date(0).toISOString(),
 };
 
-export const PROVIDER_RUNTIME_MAP: Record<ModelProviderId, KnownProvider> = {
-  "openai-codex": "openai-codex",
-  claude: "anthropic",
-  zai: "zai",
-};
-
 const PROVIDER_LABELS: Record<ModelProviderId, string> = {
-  "openai-codex": "OpenAI Codex",
   claude: "Claude",
-  zai: "Z.ai",
 };
 
 async function ensureStoreDir() {
@@ -462,10 +470,6 @@ export function resolveListedModelIdentifier(
 }
 
 
-function hrtimeMs(startedAt: bigint, endedAt: bigint) {
-  return Number(endedAt - startedAt) / 1_000_000;
-}
-
 function approximateConversationTokens(params: {
   systemPrompt: string;
   messages: Message[];
@@ -630,30 +634,8 @@ function toAnthropicMessages(messages: Message[]) {
   return normalized;
 }
 
-function getRuntimeCatalog(providerId: ModelProviderId) {
-  return new Map(
-    getModels(PROVIDER_RUNTIME_MAP[providerId]).map((model) => [model.id, model]),
-  );
-}
-
-export async function resolveCodexApiKey(profileId: string): Promise<OAuthCredentials & { apiKey: string }> {
-  const credentials = getCodexCredentials(profileId);
-  if (!credentials) {
-    throw new ConfigurationError("Codex auth is not configured yet. Use `/auth provider:codex` first.");
-  }
-
-  const result = await getOAuthApiKey("openai-codex", {
-    "openai-codex": credentials,
-  });
-  if (!result) {
-    throw new ConfigurationError("Codex auth could not be resolved.");
-  }
-
-  saveCodexCredentials(result.newCredentials, profileId);
-  return {
-    ...result.newCredentials,
-    apiKey: result.apiKey,
-  };
+function getClaudeModelCatalog() {
+  return new Map(CLAUDE_MODEL_CATALOG.map((model) => [model.id, model]));
 }
 
 export function resolveClaudeToken(profileId: string) {
@@ -664,19 +646,10 @@ export function resolveClaudeToken(profileId: string) {
   return token;
 }
 
-export function resolveZaiApiKey(profileId: string) {
-  const key = getZaiApiKey(profileId);
-  if (!key) {
-    throw new ConfigurationError("Z.ai auth is not configured yet. Use `/auth provider:zai` first.");
-  }
-  return key;
-}
-
 export class ModelService {
   private readonly usageService: ModelUsageService;
   private readonly selectionStoreKey: string;
   private readonly defaultSelectionOverride?: Partial<Pick<ActiveModelSelection, "providerId" | "modelId" | "thinkingLevel">>;
-  readonly secondaryDispatch: SecondaryModelDispatch;
 
   constructor(
     private readonly profile: ProfileRecord,
@@ -689,44 +662,51 @@ export class ModelService {
     });
     this.selectionStoreKey = options?.selectionStoreKey?.trim() || profile.id;
     this.defaultSelectionOverride = options?.defaultSelectionOverride;
-    this.secondaryDispatch = new SecondaryModelDispatch(profile, this);
   }
 
   getSupportedProviders(): ModelProviderId[] {
-    return ["openai-codex", "claude", "zai"];
+    return ["claude"];
   }
 
   getProviderLabel(providerId: ModelProviderId) {
     return PROVIDER_LABELS[providerId];
   }
 
-  getToolSummarizerSelection(): ToolSummarizerSelection {
-    return this.secondaryDispatch.getToolSummarizerSelection();
+  // TODO: Secondary model selections (tool summarizer, memory, heartbeat, reflection)
+  // have been removed. The Claude SDK handles tool summarization natively.
+  // Memory extraction will be rebuilt as a short-lived SDK instance launched pre-compaction.
+
+  /** @deprecated Stub — will be rebuilt as short-lived SDK instance. Always returns empty string. */
+  async generateMemoryText(_params: {
+    systemPrompt: string;
+    userPrompt: string;
+    usagePurpose: string;
+    sessionIdPrefix?: string;
+    selection?: Pick<ActiveModelSelection, "providerId" | "modelId" | "thinkingLevel">;
+  }): Promise<string> {
+    return "";
   }
 
-  getMemorySelection(): MemoryModelSelection {
-    return this.secondaryDispatch.getMemorySelection();
+  /** @deprecated Stub — will be rebuilt. */
+  getReflectionSelection(): { providerId: ModelProviderId; modelId: string; thinkingLevel: ThinkingLevel } {
+    return { providerId: "claude", modelId: "claude-sonnet-4-5", thinkingLevel: "minimal" };
   }
 
-  getMemoryRecallSelection(): MemoryModelSelection {
-    return this.secondaryDispatch.getMemoryRecallSelection();
+  /** @deprecated Stub — will be rebuilt. */
+  async summarizeToolResult(_params: {
+    toolName: string;
+    goal: string;
+    output: string;
+  }): Promise<string> {
+    return "insufficient evidence";
   }
 
-  async resolveMemoryRecallModel(): Promise<ResolvedRuntimeModel> {
-    const selection = this.getMemoryRecallSelection();
-    return this.secondaryDispatch.resolveRuntimeModelForSelection({
-      ...selection,
-      extendedContextEnabled: false,
-      updatedAt: timestamp(),
-    });
-  }
-
-  getHeartbeatSelection(): HeartbeatModelSelection {
-    return this.secondaryDispatch.getHeartbeatSelection();
-  }
-
-  getReflectionSelection(): ReflectionModelSelection {
-    return this.secondaryDispatch.getReflectionSelection();
+  /** @deprecated Stub — will be rebuilt. */
+  async benchmarkActiveModel(_params?: {
+    prompt?: string;
+    maxTokens?: number;
+  }): Promise<ActiveModelBenchmark> {
+    throw new Error("benchmarkActiveModel has been removed. Will be rebuilt with direct API call.");
   }
 
   async getActiveModel(): Promise<ActiveModelSelection> {
@@ -748,8 +728,8 @@ export class ModelService {
 
   async getActiveExtendedContextStatus(): Promise<ActiveExtendedContextStatus> {
     const active = await this.getActiveModel();
-    const runtimeCatalog = getRuntimeCatalog(active.providerId);
-    const runtimeModel = resolveRuntimeModelIdentifier(active.modelId, [...runtimeCatalog.values()]);
+    const catalog = getClaudeModelCatalog();
+    const runtimeModel = resolveRuntimeModelIdentifier(active.modelId, [...catalog.values()]);
     const runtimeContextWindow = runtimeModel?.contextWindow;
     const extendedContextWindow = getExtendedContextWindowOverride(active.providerId, active.modelId);
     const supported = extendedContextWindow !== undefined;
@@ -766,7 +746,10 @@ export class ModelService {
   }
 
   async listProviderModels(providerId: ModelProviderId): Promise<ListedProviderModel[]> {
-    const runtimeModels = getModels(PROVIDER_RUNTIME_MAP[providerId]);
+    if (providerId !== "claude") {
+      return [];
+    }
+    const runtimeModels = CLAUDE_MODEL_CATALOG;
     const active = await this.getActiveModel();
 
     return runtimeModels.map((model) => ({
@@ -864,40 +847,17 @@ export class ModelService {
     return nextSelection;
   }
 
-  async summarizeToolResult(params: {
-    toolName: string;
-    goal: string;
-    output: string;
-  }) {
-    return this.secondaryDispatch.summarizeToolResult(params);
-  }
-
-  async generateMemoryText(params: {
-    systemPrompt: string;
-    userPrompt: string;
-    usagePurpose: string;
-    sessionIdPrefix?: string;
-    selection?: Pick<ActiveModelSelection, "providerId" | "modelId" | "thinkingLevel">;
-  }) {
-    return this.secondaryDispatch.generateMemoryText(params);
-  }
-
-  async resolveActiveRuntimeModel(): Promise<ResolvedRuntimeModel> {
-    return this.secondaryDispatch.resolveActiveRuntimeModel(() => this.getActiveModel());
-  }
-
   async resolveModelForPurpose(purpose?: string): Promise<ResolvedRuntimeModel> {
-    return this.secondaryDispatch.resolveModelForPurpose(() => this.getActiveModel(), purpose);
-  }
-
-  private async resolveRuntimeModelForSelection(
-    selection: ActiveModelSelection,
-  ): Promise<ResolvedRuntimeModel> {
-    return this.secondaryDispatch.resolveRuntimeModelForSelection(selection);
-  }
-
-  private async resolveApiKeyForProvider(providerId: ModelProviderId) {
-    return this.secondaryDispatch.resolveApiKeyForProvider(providerId);
+    const selection = await this.getActiveModel();
+    const apiKey = resolveClaudeToken(this.profile.id);
+    const catalog = getClaudeModelCatalog();
+    const model = resolveRuntimeModelIdentifier(selection.modelId, [...catalog.values()]);
+    return {
+      selection,
+      apiKey,
+      contextWindow: model?.contextWindow,
+      maxOutputTokens: model?.maxTokens,
+    };
   }
 
   async inspectContextWindowUsage(params: {
@@ -906,29 +866,29 @@ export class ModelService {
     messages: Message[];
     tools: Tool[];
   }): Promise<ContextWindowUsage> {
-    const resolved = await this.resolveActiveRuntimeModel();
+    const resolved = await this.resolveModelForPurpose();
     const maxContextTokens = getSelectedContextWindow(
       this.profile,
       resolved.selection,
-      resolved.runtimeModel.contextWindow,
+      resolved.contextWindow,
     );
     if (!maxContextTokens) {
       throw new ConfigurationError(`No context window metadata is available for ${resolved.selection.modelId}.`);
     }
 
-    const method = resolved.selection.providerId === "claude" ? "provider_count" : "heuristic_estimate";
+    const method: ContextWindowUsage["method"] = "provider_count";
     const breakdown = approximateConversationTokenBreakdown(params);
-    const usedTokens = resolved.selection.providerId === "claude"
-      ? await this.countAnthropicTokens({
-          modelId: resolved.runtimeModel.id,
-          apiKey: resolved.apiKey,
-          systemPrompt: params.systemPrompt,
-          messages: params.messages,
-          tools: params.tools,
-        })
-      : approximateConversationTokens(params);
+    const catalog = getClaudeModelCatalog();
+    const model = resolveRuntimeModelIdentifier(resolved.selection.modelId, [...catalog.values()]);
+    const usedTokens = await this.countAnthropicTokens({
+      modelId: model?.id ?? resolved.selection.modelId,
+      apiKey: resolved.apiKey,
+      systemPrompt: params.systemPrompt,
+      messages: params.messages,
+      tools: params.tools,
+    });
     const remainingTokens = Math.max(0, maxContextTokens - usedTokens);
-    const maxOutputTokens = resolved.runtimeModel.maxTokens;
+    const maxOutputTokens = resolved.maxOutputTokens;
     const utilizationPercent = Number(((usedTokens / maxContextTokens) * 100).toFixed(2));
 
     return {
@@ -982,97 +942,7 @@ export class ModelService {
     return this.usageService.inspectRecordedUsageByLocalDate(params);
   }
 
-  async benchmarkActiveModel(params?: {
-    prompt?: string;
-    maxTokens?: number;
-  }): Promise<ActiveModelBenchmark> {
-    const prompt = params?.prompt?.trim() || [
-      "Output the numbers 1 through 200 separated by single spaces.",
-      "Do not add any prose, labels, or punctuation other than spaces.",
-    ].join(" ");
-    const maxTokens = Math.min(Math.max(params?.maxTokens ?? 384, 32), 1_024);
-
-    return traceSpan(
-      "model.benchmark",
-      async () => {
-        const resolved = await this.resolveActiveRuntimeModel();
-        const context: PiContext = {
-          systemPrompt:
-            "You are running a throughput benchmark. Follow the user instruction exactly and return only the requested output.",
-          messages: [
-            {
-              role: "user",
-              content: prompt,
-              timestamp: Date.now(),
-            } satisfies PiMessage,
-          ],
-        };
-
-        const startedAt = process.hrtime.bigint();
-        let firstOutputAt: bigint | null = null;
-        const responseStream = streamSimple(resolved.runtimeModel, context, {
-          apiKey: resolved.apiKey,
-          maxTokens,
-          reasoning: resolved.selection.thinkingLevel,
-        });
-
-        for await (const event of responseStream) {
-          if (
-            event.type === "text_delta" ||
-            event.type === "thinking_delta" ||
-            event.type === "toolcall_delta" ||
-            event.type === "text_end" ||
-            event.type === "thinking_end" ||
-            event.type === "toolcall_end"
-          ) {
-            firstOutputAt ??= process.hrtime.bigint();
-          }
-        }
-
-        const completed = await responseStream.result();
-        const endedAt = process.hrtime.bigint();
-        const generatedText = completed.content
-          .filter((block) => block.type === "text")
-          .map((block) => block.text)
-          .join("");
-        const outputTokens = completed.usage.output > 0
-          ? completed.usage.output
-          : approximateTextTokens(generatedText);
-        const outputTokenSource = completed.usage.output > 0
-          ? "provider_usage"
-          : "heuristic_estimate";
-        const totalLatencyMs = hrtimeMs(startedAt, endedAt);
-        const ttftMs = firstOutputAt ? hrtimeMs(startedAt, firstOutputAt) : null;
-        const generationLatencyMs = firstOutputAt ? hrtimeMs(firstOutputAt, endedAt) : null;
-        const tokensPerSecond =
-          generationLatencyMs && generationLatencyMs > 0
-            ? Number((outputTokens / (generationLatencyMs / 1_000)).toFixed(2))
-            : null;
-
-        return {
-          providerId: resolved.selection.providerId,
-          modelId: resolved.selection.modelId,
-          prompt,
-          maxTokens,
-          ttftMs: ttftMs === null ? null : Number(ttftMs.toFixed(2)),
-          totalLatencyMs: Number(totalLatencyMs.toFixed(2)),
-          generationLatencyMs:
-            generationLatencyMs === null ? null : Number(generationLatencyMs.toFixed(2)),
-          outputTokens,
-          outputTokenSource,
-          tokensPerSecond,
-          stopReason: completed.stopReason,
-          contentChars: generatedText.length,
-        };
-      },
-      {
-        attributes: {
-          promptLength: prompt.length,
-          maxTokens,
-        },
-      },
-    );
-  }
+  // TODO: benchmarkActiveModel removed (used pi-ai streamSimple). Rebuild with direct API call if needed.
 
   private async countAnthropicTokens(params: {
     modelId: string;

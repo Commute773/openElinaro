@@ -1,5 +1,4 @@
 import type { ChatPromptContent, AppProgressEvent } from "../../domain/assistant";
-import { coreOwnsFeature, featureIsShared } from "../../core/tool-split";
 import { chatPromptContentToString } from "./chat-helpers";
 
 import type {
@@ -47,27 +46,18 @@ export class AgentChatService {
           }
         }
 
-        const core = this.deps.coreFactory({
-          modelConfig: {
-            providerId: resolved.selection.providerId,
-            modelId: resolved.selection.modelId,
-            apiKey: resolved.apiKey,
-            reasoning: resolved.selection.thinkingLevel,
-            providerOptions: {
-              sessionId: job.execution.providerSessionId ?? job.conversationKey,
-              sdkSessionHandle: sessionState.sdkSessionHandle,
-              resumeSessionId,
-            },
-            runtimeModel: resolved.runtimeModel,
+        const core = this.deps.createCore({
+          modelId: resolved.selection.modelId,
+          apiKey: resolved.apiKey,
+          reasoning: resolved.selection.thinkingLevel,
+          providerOptions: {
+            sessionId: job.execution.providerSessionId ?? job.conversationKey,
+            sdkSessionHandle: sessionState.sdkSessionHandle,
+            resumeSessionId,
           },
         });
 
-        // Skip harness compaction when the core handles it
-        const coreHandlesCompaction = coreOwnsFeature(core.manifest, "compaction")
-          || featureIsShared(core.manifest, "compaction");
-        if (!coreHandlesCompaction) {
-          await this.turnRunner.compactIfNeeded(job, this.sessionManager.getSession(job.conversationKey));
-        }
+        // The Claude SDK handles compaction natively via the PreCompact hook.
         return this.turnRunner.runTurn(job, core, resolved);
       },
       appendAssistantMessage: async (job) => {

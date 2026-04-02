@@ -1,10 +1,4 @@
 export type {
-  AgentCore,
-  CoreManifest,
-  CoreFeatureId,
-  CoreFeatureDeclaration,
-  CoreRequirements,
-  NativeToolMapping,
   CoreMessage,
   CoreUserMessage,
   CoreAssistantMessage,
@@ -20,29 +14,12 @@ export type {
   CoreHarnessHooks,
   CoreRunOptions,
   CoreRunResult,
-  CoreFactory,
   CoreModelConfig,
   CoreThinkingLevel,
 } from "./types";
 
-export { PiCore, PI_CORE_MANIFEST } from "./pi-core";
-export type { PiCoreConfig } from "./pi-core";
-
-export { ClaudeSdkCore, CLAUDE_SDK_MANIFEST } from "./claude-sdk-core";
+export { ClaudeSdkCore, CLAUDE_SDK_NATIVE_TOOLS, CLAUDE_SDK_SUPPRESSED_TOOLS } from "./claude-sdk-core";
 export type { ClaudeSdkCoreConfig } from "./claude-sdk-core";
 export { ClaudeSdkSession } from "./claude-sdk-session";
 
-export {
-  piMessageToCore,
-  piMessagesToCore,
-  piAssistantMessageToCore,
-  piToolResultMessageToCore,
-  piToolCallToCore,
-  piToolToCoreDef,
-  coreMessageToPi,
-  coreMessagesToPi,
-  coreAssistantMessageToPi,
-  coreToolCallToPi,
-} from "./message-bridge";
-
-export { splitToolsForCore, coreOwnsFeature, featureIsShared } from "./tool-split";
+export { filterNativeTools } from "./tool-split";

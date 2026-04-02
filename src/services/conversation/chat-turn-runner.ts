@@ -16,9 +16,11 @@ import { wrapInjectedMessage } from "../injected-message-service";
 import { telemetry } from "../infrastructure/telemetry";
 import { createTraceSpan } from "../../utils/telemetry-helpers";
 import { fireAndForget } from "../../utils/result";
-import { splitToolsForCore, coreOwnsFeature, featureIsShared } from "../../core/tool-split";
-import { COMPACTION_THRESHOLD_PERCENT, CHAT_MAX_STEPS, CORE_INACTIVITY_TIMEOUT_MS } from "../../config/service-constants";
-import type { AgentCore, CoreToolExecutor, CoreToolDefinition } from "../../core/types";
+import { filterNativeTools } from "../../core/tool-split";
+import { CLAUDE_SDK_NATIVE_TOOLS, CLAUDE_SDK_SUPPRESSED_TOOLS } from "../../core/claude-sdk-core";
+import type { ClaudeSdkCore } from "../../core/claude-sdk-core";
+import { CHAT_MAX_STEPS, CORE_INACTIVITY_TIMEOUT_MS } from "../../config/service-constants";
+import type { CoreToolExecutor, CoreToolDefinition } from "../../core/types";
 
 import {
   CoreInactivityTimeoutError,
@@ -51,13 +53,13 @@ export class ChatTurnRunner {
     this.timezoneProvider = provider;
   }
 
-  async runTurn(job: QueuedChatJob, core: AgentCore, resolved: { selection: any; apiKey: string; runtimeModel: any }) {
+  async runTurn(job: QueuedChatJob, core: ClaudeSdkCore, resolved: { selection: any; apiKey: string }) {
     return traceSpan(
       "agent_chat.reply",
       async () => {
         const session = this.sessionManager.getSession(job.conversationKey);
         session.stopRequested = false;
-        const conversation = await this.loadConversationForJob(job, core.manifest.id);
+        const conversation = await this.loadConversationForJob(job, "claude-sdk");
         const backgroundExecNotifications = job.execution.includeBackgroundExecNotifications
           ? this.deps.routineTools.consumePendingBackgroundExecNotifications(job.conversationKey)
           : [];
@@ -95,10 +97,8 @@ export class ChatTurnRunner {
 
         const toolSet = this.buildChatToolSet(job.conversationKey, session, job.onToolUse);
 
-        // Check what the core needs from the harness
-        const coreNeedsHistory = core.manifest.requires.messageHistory;
-        const coreHandlesPersistence = coreOwnsFeature(core.manifest, "session_persistence")
-          || featureIsShared(core.manifest, "session_persistence");
+        // The Claude SDK manages its own session history and persistence.
+        // We don't send full message history — only the current turn's messages.
         const sdkSessionId = conversation.sdkSessionId;
 
         // Build the core tool executor that delegates to ToolRegistry
@@ -115,17 +115,18 @@ export class ChatTurnRunner {
           };
         };
 
-        // Filter out tools the core handles natively
-        const coreToolDefs = splitToolsForCore(
+        // Filter out tools the Claude SDK handles natively
+        const coreToolDefs = filterNativeTools(
           toolSet.tools as CoreToolDefinition[],
-          core.manifest,
+          CLAUDE_SDK_NATIVE_TOOLS,
+          CLAUDE_SDK_SUPPRESSED_TOOLS,
         );
 
         agentChatTelemetry.event(
           "agent_chat.run_turn",
           {
             conversationKey: job.conversationKey,
-            coreId: core.manifest.id,
+            coreId: "claude-sdk",
             messageCount: (
               conversation.messages.length
               + backgroundExecMessages.length
@@ -141,17 +142,11 @@ export class ChatTurnRunner {
         );
         this.sessionManager.throwIfStopRequested(session);
 
-        // Build input messages: include full history only when the core needs it
-        const inputMessages: Message[] = coreNeedsHistory
-          ? [
-            ...conversation.messages,
-            ...backgroundExecMessages,
-            userMessage(userMessageText),
-          ]
-          : [
-            ...backgroundExecMessages,
-            userMessage(userMessageText),
-          ];
+        // The SDK manages its own history — only send current turn messages
+        const inputMessages: Message[] = [
+          ...backgroundExecMessages,
+          userMessage(userMessageText),
+        ];
 
         try {
           // Inactivity watchdog: abort if the core goes silent for too long.
@@ -172,7 +167,7 @@ export class ChatTurnRunner {
               firstActivityAt = now;
               agentChatTelemetry.event("agent_chat.watchdog_armed", {
                 conversationKey: job.conversationKey,
-                coreId: core.manifest.id,
+                coreId: "claude-sdk",
                 timeoutMs: CORE_INACTIVITY_TIMEOUT_MS,
                 firstActivityType: activityType,
                 elapsedSinceTurnStartMs: now - turnStartedAt,
@@ -188,7 +183,7 @@ export class ChatTurnRunner {
               const elapsedSinceTurnStart = Date.now() - turnStartedAt;
               agentChatTelemetry.event("agent_chat.inactivity_timeout", {
                 conversationKey: job.conversationKey,
-                coreId: core.manifest.id,
+                coreId: "claude-sdk",
                 timeoutMs: CORE_INACTIVITY_TIMEOUT_MS,
                 lastActivityType,
                 lastActivityAgoMs: elapsedSinceLastActivity,
@@ -247,7 +242,7 @@ export class ChatTurnRunner {
                   resetInactivityTimer(controller, "usage");
                   agentChatTelemetry.event("agent_chat.core_usage", {
                     conversationKey: job.conversationKey,
-                    coreId: core.manifest.id,
+                    coreId: "claude-sdk",
                     inputTokens: usage.input,
                     outputTokens: usage.output,
                     cacheReadTokens: usage.cacheRead,
@@ -259,7 +254,7 @@ export class ChatTurnRunner {
                 resetInactivityTimer(controller, `log:${event}`);
                 agentChatTelemetry.event(`agent_chat.core.${event}`, {
                   conversationKey: job.conversationKey,
-                  coreId: core.manifest.id,
+                  coreId: "claude-sdk",
                   ...data,
                 }, { level: "debug" });
               },
@@ -295,13 +290,10 @@ export class ChatTurnRunner {
             };
           }
 
-          // Persist the user message and response for harness-side visibility.
-          // When the core handles persistence internally, we still save the
-          // user prompt and final response for conversation search/history.
+          // Persist the user message and final response for harness-side visibility.
+          // The SDK handles full persistence internally — we save a log for search/history.
           if (job.execution.persistConversation) {
-            const messagesToPersist = coreHandlesPersistence
-              ? [...pendingTurnMessages, ...(result.finalMessage ? [result.finalMessage] : [])]
-              : [...pendingTurnMessages, ...result.newMessages];
+            const messagesToPersist = [...pendingTurnMessages, ...(result.finalMessage ? [result.finalMessage] : [])];
             await this.deps.conversations.appendMessages(
               job.conversationKey,
               messagesToPersist,
@@ -355,112 +347,6 @@ export class ChatTurnRunner {
         },
       },
     );
-  }
-
-  async compactIfNeeded(
-    job: QueuedChatJob,
-    session: ConversationSessionState,
-  ) {
-    if (!job.execution.enableCompaction || !job.execution.persistConversation) {
-      return;
-    }
-
-    this.sessionManager.throwIfStopRequested(session);
-    const conversation = await this.deps.conversations.get(job.conversationKey);
-    if (conversation.messages.length === 0) {
-      return;
-    }
-    if (!conversation.systemPrompt) {
-      return; // No system prompt set yet — nothing to compact against
-    }
-
-    const systemPrompt = composeSystemPrompt(conversation.systemPrompt.text);
-
-    const usage = await this.deps.models.inspectContextWindowUsage({
-      conversationKey: job.conversationKey,
-      systemPrompt: systemPrompt.text,
-      messages: conversation.messages,
-      tools: this.deps.routineTools.getToolDefinitions(),
-    });
-
-    const projectedReplyReserve = Math.min(
-      usage.maxOutputTokens ?? 0,
-      Math.max(4_096, Math.floor(usage.maxContextTokens * 0.2)),
-    );
-    const projectedUtilizationPercent = Number(
-      (((usage.usedTokens + projectedReplyReserve) / usage.maxContextTokens) * 100).toFixed(2),
-    );
-    const effectiveUtilizationPercent = usage.breakdownMethod === "heuristic_estimate"
-      ? Math.max(usage.utilizationPercent, projectedUtilizationPercent)
-      : usage.utilizationPercent;
-
-    if (effectiveUtilizationPercent < COMPACTION_THRESHOLD_PERCENT) {
-      return;
-    }
-
-    session.compacting = true;
-    try {
-      await job.onToolUse?.(
-        { type: "compaction", trigger: `usage_${effectiveUtilizationPercent}%` },
-      );
-      let compacted;
-      try {
-        compacted = await this.sessionManager.runAbortableModelCall(session, (signal) =>
-          this.deps.transitions.compactForContinuation({
-            conversationKey: job.conversationKey,
-            onProgress: job.onToolUse,
-            signal,
-          })
-        );
-      } catch (error) {
-        if (error instanceof AgentRunStoppedError) {
-          throw error;
-        }
-        agentChatTelemetry.event("agent_chat.compaction.failed", {
-          conversationKey: job.conversationKey,
-          queuedMessages: session.queue.length,
-          utilizationPercent: effectiveUtilizationPercent,
-          error: error instanceof Error ? error.message : String(error),
-        }, {
-          level: "warn",
-          outcome: "error",
-        });
-        await job.onToolUse?.(
-          { type: "status", message: "Compaction failed. Continuing without compaction for this turn." },
-        );
-        return;
-      }
-      this.sessionManager.throwIfStopRequested(session);
-      agentChatTelemetry.event("agent_chat.compaction.completed", {
-        conversationKey: job.conversationKey,
-        memoryFilePath: compacted.memoryFilePath,
-        summaryLength: compacted.summary.length,
-        queuedMessages: session.queue.length,
-        utilizationPercent: effectiveUtilizationPercent,
-      });
-      this.deps.autonomousTime?.queueCompactionReflection({
-        summary: compacted.summary,
-        conversationKey: job.conversationKey,
-      });
-      // Fire structured memory management in the background — never block the chat turn
-      if (this.deps.structuredMemory) {
-        fireAndForget(
-          () => this.deps.structuredMemory!.processTranscript({
-            transcript: compacted.summary,
-            conversationKey: job.conversationKey,
-            source: "compaction",
-          }),
-          { operation: "agent_chat.structured_memory", conversationKey: job.conversationKey },
-        );
-      }
-      await job.onToolUse?.(
-        { type: "status", message: compacted.memoryFilePath
-          ? `Compaction finished. Durable memory saved to ${compacted.memoryFilePath}.`
-          : "Compaction finished. No durable memory was extracted." },
-      );
-    } finally {
-      session.compacting = false;
-    }
   }
 
   async loadConversationForJob(job: QueuedChatJob, coreId?: string) {

@@ -37,9 +37,7 @@ export const PROFILE_ACTION_CHOICES = [
 
 export const PROFILE_AUTH_PROVIDER_CHOICES = [
   { name: "status", value: "status" },
-  { name: "codex", value: "codex" },
   { name: "claude", value: "claude" },
-  { name: "zai", value: "zai" },
 ] as const;
 
 export const THINKING_LEVEL_CHOICES =
@@ -91,7 +89,7 @@ function formatLaunchableProfileLine(activeProfileId: string, targetProfileId: s
   const targetProfile = getDiscordTargetProfile(activeProfileId, targetProfileId);
   const auth = getAuthStatus(targetProfile.id);
   const authSummary = auth.any
-    ? [auth.codex ? "codex" : "", auth.claude ? "claude" : ""].filter(Boolean).join(", ")
+    ? auth.claude ? "claude" : ""
     : "missing";
   return [
     `- ${targetProfile.id} (${targetProfile.name})`,

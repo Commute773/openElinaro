@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
-import type { OAuthCredentials } from "@mariozechner/pi-ai/oauth";
+/** OAuth credentials shape (previously from pi-ai/oauth). */
+type OAuthCredentials = { access: string; refresh?: string; expires_at?: number };
 import { getDefaultProfileId } from "../services/profiles";
 import { assertTestRuntimeRootIsIsolated, resolveRuntimePath } from "../services/runtime-root";
 import { type ProviderAuthSecret, SecretStoreService } from "../services/infrastructure/secret-store-service";
@@ -215,12 +216,6 @@ export function getZaiApiKey(profileId = getDefaultProfileId()): string | null {
 }
 
 export function hasProviderAuth(provider: ProviderId, profileId = getDefaultProfileId()): boolean {
-  if (provider === "openai-codex") {
-    return hasUsableCodexCredentials(getStoredCodexCredential(profileId));
-  }
-  if (provider === "zai") {
-    return hasUsableZaiToken(getStoredZaiCredential(profileId));
-  }
   return hasUsableClaudeToken(getStoredClaudeCredential(profileId));
 }
 
