@@ -128,7 +128,30 @@ export class ClaudeSdkSession {
   }
 
   get isAlive(): boolean {
-    return this._alive;
+    if (!this._alive) return false;
+    // Double-check via transport readiness — the exit listener may have missed
+    // the subprocess death if SDK internals changed shape.
+    if (!this.checkTransportReady()) {
+      this._alive = false;
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Best-effort check of whether the SDK transport is still ready.
+   * Falls back to true if the SDK internals are inaccessible.
+   */
+  private checkTransportReady(): boolean {
+    try {
+      const transport = (this.queryInstance as any)?.transport as ProcessTransportLike | undefined;
+      if (typeof transport?.isReady === "function") {
+        return transport.isReady();
+      }
+    } catch {
+      // SDK internals inaccessible — assume alive, reactive detection is the fallback
+    }
+    return true;
   }
 
   /** Access the underlying Query for advanced control (setMcpServers, etc.). */

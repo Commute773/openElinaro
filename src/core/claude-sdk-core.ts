@@ -69,6 +69,8 @@ export interface ClaudeSdkCoreConfig {
   session?: ClaudeSdkSession;
   /** SDK session ID to resume from disk when no live session handle is available. */
   resumeSessionId?: string;
+  /** Internal retry counter — prevents infinite recursion on persistent errors. */
+  _retryCount?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +217,9 @@ export class ClaudeSdkCore {
       ...(signal ? { abortController: abortControllerFromSignal(signal) } : {}),
     };
 
+    // Wrap the external signal so we can abort programmatically (e.g. on first-message timeout)
+    const wrappedController = signal ? abortControllerFromSignal(signal) : undefined;
+
     // Run the query
     const newMessages: CoreAssistantMessage[] = [];
     let finalText = "";
@@ -224,6 +229,7 @@ export class ClaudeSdkCore {
     const onLog = options.onLog;
 
     const FIRST_MESSAGE_TIMEOUT_MS = 120_000;
+    const MAX_RETRIES = 2;
 
     // Helper to emit progress without blocking the stream
     const progress = onProgress
@@ -253,6 +259,11 @@ export class ClaudeSdkCore {
       toolCount: harnessTools.length,
     }, { level: "debug" });
 
+    // Update MCP tools on reused sessions so the subprocess sees current tool definitions.
+    if (sessionReused) {
+      session.query.setMcpServers({ openelinaro: mcpServer });
+    }
+
     // Push the user message to start this turn
     session.sendMessage(prompt);
 
@@ -267,8 +278,8 @@ export class ClaudeSdkCore {
           elapsedMs: Date.now() - runStartedAt,
         }, { level: "warn", outcome: "error" });
         // The SDK is hanging — likely an auth or model error it didn't surface.
-        // Abort so the error propagates instead of hanging forever.
-        signal?.dispatchEvent?.(new Event("abort"));
+        // Abort via the wrapped controller so signal.aborted becomes true.
+        wrappedController?.abort("first message timeout");
       }
     }, FIRST_MESSAGE_TIMEOUT_MS);
 
@@ -429,19 +440,21 @@ export class ClaudeSdkCore {
           // If the session died or we got an opaque "unknown" error, close and
           // retry with a fresh session. "unknown" usually means the subprocess
           // died without surfacing a meaningful error.
+          const retryCount = this.config._retryCount ?? 0;
           const isRecoverable = isStaleSessionError(new Error(errorText)) || errorText === "unknown";
-          if (isRecoverable && (this.config.session || resumingFromDisk)) {
+          if (isRecoverable && retryCount < MAX_RETRIES && (this.config.session || resumingFromDisk)) {
             sdkCoreTelemetry.event("claude_sdk_core.error_result_retry", {
               sessionReused,
               resumingFromDisk,
               sessionId: session.sessionId,
               errorText,
+              retryCount: retryCount + 1,
               elapsedMs: Date.now() - runStartedAt,
             }, { level: "warn" });
-            onLog?.("sdk_session_died_retry", { error: errorText });
+            onLog?.("sdk_session_died_retry", { error: errorText, retryCount: retryCount + 1 });
             progress?.({ type: "status", message: "Session error, retrying with fresh session" });
             session.close();
-            const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined, resumeSessionId: undefined });
+            const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined, resumeSessionId: undefined, _retryCount: retryCount + 1 });
             return freshCore.run(options);
           }
 
@@ -553,26 +566,28 @@ export class ClaudeSdkCore {
         abortReason: signal?.aborted ? String(signal.reason) : undefined,
       }, { level: "warn", outcome: "error" });
 
+      const retryCount = this.config._retryCount ?? 0;
       // If we haven't received any messages yet and the session died,
       // close it and retry with a fresh session.
-      if (!receivedFirstMessage && this.config.session && isStaleSessionError(err)) {
-        onLog?.("sdk_session_died_retry", { error: String(err) });
+      if (!receivedFirstMessage && retryCount < MAX_RETRIES && this.config.session && isStaleSessionError(err)) {
+        onLog?.("sdk_session_died_retry", { error: String(err), retryCount: retryCount + 1 });
         progress?.({ type: "status", message: "Session expired, starting fresh" });
         session.close();
-        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined, resumeSessionId: undefined });
+        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined, resumeSessionId: undefined, _retryCount: retryCount + 1 });
         return freshCore.run(options);
       }
       // If resume from disk failed, fall back to a completely fresh session.
-      if (!receivedFirstMessage && resumingFromDisk) {
+      if (!receivedFirstMessage && retryCount < MAX_RETRIES && resumingFromDisk) {
         sdkCoreTelemetry.event("claude_sdk_core.resume_failed_fallback", {
           resumeSessionId: this.config.resumeSessionId,
           error: err instanceof Error ? err.message : String(err),
+          retryCount: retryCount + 1,
           elapsedMs: Date.now() - runStartedAt,
         }, { level: "warn" });
-        onLog?.("sdk_resume_failed_fallback", { error: String(err) });
+        onLog?.("sdk_resume_failed_fallback", { error: String(err), retryCount: retryCount + 1 });
         progress?.({ type: "status", message: "Session resume failed, starting fresh" });
         session.close();
-        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined, resumeSessionId: undefined });
+        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined, resumeSessionId: undefined, _retryCount: retryCount + 1 });
         return freshCore.run(options);
       }
       throw err;
@@ -584,14 +599,16 @@ export class ClaudeSdkCore {
     if (!receivedFirstMessage && !signal?.aborted) {
       // If we reused a session that silently died (subprocess gone, no messages),
       // retry once with a fresh session instead of surfacing the error.
-      if (sessionReused && this.config.session) {
+      const deadRetryCount = this.config._retryCount ?? 0;
+      if (sessionReused && this.config.session && deadRetryCount < MAX_RETRIES) {
         sdkCoreTelemetry.event("claude_sdk_core.dead_session_retry", {
           sessionId: session.sessionId,
           sessionAlive: session.isAlive,
+          retryCount: deadRetryCount + 1,
           elapsedMs: Date.now() - runStartedAt,
         }, { level: "warn" });
         session.close();
-        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined });
+        const freshCore = new ClaudeSdkCore({ ...this.config, session: undefined, _retryCount: deadRetryCount + 1 });
         return freshCore.run(options);
       }
       throw new Error("Claude Agent SDK timed out waiting for the first response. This usually means an auth or model configuration error.");
