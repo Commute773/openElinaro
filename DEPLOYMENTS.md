@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.02.3
+- Released at: 2026-04-02T13:03:50Z
+- Release id: 20260402T130350Z-48a80d7
+- Previous version: 2026.04.02.2
+- Trigger: ci/release workflow
+
+- fix: media_status killing active playback via destructive status scan
+
 ## 2026.04.02.2
 - Released at: 2026-04-02T12:30:34Z
 - Release id: 20260402T123034Z-56ad988
