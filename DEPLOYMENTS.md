@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.02
+- Released at: 2026-04-02T12:27:04Z
+- Release id: 20260402T122704Z-721a1f4
+- Previous version: 2026.04.01.17
+- Trigger: ci/release workflow
+
+- feat: resume SDK sessions from disk after subprocess death
+
 ## 2026.04.01.17
 - Released at: 2026-04-01T21:23:31Z
 - Release id: 20260401T212331Z-ecbe4c1
