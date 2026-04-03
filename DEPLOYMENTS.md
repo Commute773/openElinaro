@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.03.4
+- Released at: 2026-04-03T01:40:05Z
+- Release id: 20260403T014005Z-d16a0b1
+- Previous version: 2026.04.03.3
+- Trigger: ci/release workflow
+
+- fix: clear persisted SDK session ID on new_chat so fresh conversations actually start fresh
+
 ## 2026.04.03.3
 - Released at: 2026-04-03T00:23:51Z
 - Release id: 20260403T002351Z-c237b50
