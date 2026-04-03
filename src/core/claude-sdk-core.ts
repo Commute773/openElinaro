@@ -211,9 +211,14 @@ export class ClaudeSdkCore {
       thinking: { type: "adaptive" },
       hooks: sdkHooks,
       ...(maxSteps ? { maxTurns: maxSteps } : {}),
-      ...(this.config.apiKey
-        ? { env: { ...process.env, ...buildAuthEnv(this.config.apiKey) } }
-        : {}),
+      env: {
+        ...process.env,
+        // Disable the SDK's internal inactivity timer — it doesn't reset on MCP tool
+        // responses (anthropics/claude-agent-sdk-typescript#114), causing false kills.
+        // Our own watchdog in chat-turn-runner handles inactivity detection instead.
+        CLAUDE_CODE_STREAM_CLOSE_TIMEOUT: String(Number.MAX_SAFE_INTEGER),
+        ...(this.config.apiKey ? buildAuthEnv(this.config.apiKey) : {}),
+      },
       ...(signal ? { abortController: abortControllerFromSignal(signal) } : {}),
     };
 

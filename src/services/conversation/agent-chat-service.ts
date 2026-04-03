@@ -31,9 +31,18 @@ export class AgentChatService {
 
     this.sessionManager = new ChatSessionManager({
       processJob: async (job) => {
-        // Resolve the core early so we can check feature ownership
         const resolved = await this.deps.models.resolveModelForPurpose(job.execution.usagePurpose);
         const sessionState = this.sessionManager.getSession(job.conversationKey);
+
+        // Recycle sessions older than 30 minutes to avoid OOM from CLI memory leak.
+        // The SDK subprocess accumulates memory over time (anthropics/claude-code#4953).
+        const SESSION_MAX_AGE_MS = 30 * 60 * 1000;
+        if (sessionState.sdkSessionHandle && sessionState.sdkSessionCreatedAt) {
+          const age = Date.now() - sessionState.sdkSessionCreatedAt;
+          if (age > SESSION_MAX_AGE_MS) {
+            this.sessionManager.recycleSdkSession(sessionState, job.conversationKey);
+          }
+        }
 
         // Determine resume session ID: prefer in-memory (from a recently closed
         // handle) then fall back to the persisted value from the conversation store

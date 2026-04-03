@@ -413,6 +413,20 @@ export class ChatSessionManager {
     }
   }
 
+  /**
+   * Recycle an SDK session that has exceeded its max age.
+   * Closes the subprocess gracefully and preserves the session ID for disk resume.
+   * This prevents OOM kills from the CLI's memory leak (anthropics/claude-code#4953).
+   */
+  recycleSdkSession(session: ConversationSessionState, conversationKey: string) {
+    agentChatTelemetry.event("agent_chat.session_recycled", {
+      conversationKey,
+      ageMs: session.sdkSessionCreatedAt ? Date.now() - session.sdkSessionCreatedAt : undefined,
+    }, { level: "info" });
+    this.closeSdkSessionHandle(session);
+    session.sdkSessionCreatedAt = undefined;
+  }
+
   private closeSdkSessionHandle(session: ConversationSessionState | undefined) {
     if (!session?.sdkSessionHandle) return;
     const handle = session.sdkSessionHandle as { close?: () => void; sessionId?: string };

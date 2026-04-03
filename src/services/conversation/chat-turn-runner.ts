@@ -312,6 +312,7 @@ export class ChatTurnRunner {
           // Clear lastSdkSessionId — the live handle now owns continuity.
           if (result.sessionHandle) {
             session.sdkSessionHandle = result.sessionHandle;
+            session.sdkSessionCreatedAt ??= Date.now();
             session.lastSdkSessionId = undefined;
           }
 

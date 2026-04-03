@@ -47,7 +47,7 @@
     "vite": "^8.0.0"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.87",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.91",
     "@google/genai": "1.44.0",
     "discord.js": "^14.25.1",
     "imapflow": "^1.2.16",

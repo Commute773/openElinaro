@@ -86,6 +86,8 @@ export type ConversationSessionState = {
   sdkSessionHandle?: unknown;
   /** SDK session ID from the last closed session — used to resume context after subprocess death. */
   lastSdkSessionId?: string;
+  /** Timestamp when the current SDK session subprocess was created. Used for age-based recycling. */
+  sdkSessionCreatedAt?: number;
 };
 
 export type ChatDependencies = {
