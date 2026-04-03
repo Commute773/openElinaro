@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.03.6
+- Released at: 2026-04-03T17:18:11Z
+- Release id: 20260403T171811Z-6b82143
+- Previous version: 2026.04.03.5
+- Trigger: ci/release workflow
+
+- Heartbeats run on main thread; lights_set uses human-readable interface
+
 ## 2026.04.03.5
 - Released at: 2026-04-03T01:59:42Z
 - Release id: 20260403T015942Z-0183940
