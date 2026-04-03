@@ -240,4 +240,17 @@ export class ConversationStore {
       sdkSessionId,
     });
   }
+
+  /**
+   * Remove the persisted SDK session ID so the next turn creates a fresh
+   * session instead of resuming the old one.  Used during conversation resets.
+   */
+  async clearSdkSessionId(key: string): Promise<void> {
+    const store = await readStore();
+    const existing = store.conversations[key];
+    if (!existing || !existing.sdkSessionId) return;
+    delete existing.sdkSessionId;
+    existing.updatedAt = timestamp();
+    await writeStore(store);
+  }
 }

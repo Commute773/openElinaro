@@ -126,6 +126,10 @@ export class ConversationStateTransitionService {
       activeSnapshot,
     );
 
+    // Clear the persisted SDK session ID so the next turn creates a fresh
+    // session instead of resuming the old conversation context from disk.
+    await this.conversations.clearSdkSessionId(params.conversationKey);
+
     return {
       conversation: savedConversation,
       openingLine,
@@ -148,11 +152,11 @@ export class ConversationStateTransitionService {
   }
 
   private fallbackConversationOpeningText(): string {
-    return "What do you want to work on next?";
+    return "🫡";
   }
 
   private fallbackConversationOpening(): AssistantMessage {
-    return assistantTextMessage("What do you want to work on next?");
+    return assistantTextMessage("🫡");
   }
 
   private async buildConversationOpening(
