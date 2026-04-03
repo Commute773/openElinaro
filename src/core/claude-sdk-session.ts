@@ -143,15 +143,14 @@ export class ClaudeSdkSession {
    * Falls back to true if the SDK internals are inaccessible.
    */
   private checkTransportReady(): boolean {
-    try {
+    const result = attempt(() => {
       const transport = (this.queryInstance as any)?.transport as ProcessTransportLike | undefined;
       if (typeof transport?.isReady === "function") {
         return transport.isReady();
       }
-    } catch {
-      // SDK internals inaccessible — assume alive, reactive detection is the fallback
-    }
-    return true;
+      return true; // SDK internals inaccessible — assume alive
+    });
+    return result.ok ? result.value : true;
   }
 
   /** Access the underlying Query for advanced control (setMcpServers, etc.). */

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zigbee Light Control</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, system-ui, sans-serif; background: #111; color: #ddd; padding: 20px; min-height: 100vh; }
+  h1 { font-size: 1.3em; margin-bottom: 12px; color: #fff; }
+  .status { padding: 6px 10px; background: #1a2a40; border-radius: 6px; font-size: 0.8em; color: #7ec8e3; margin-bottom: 16px; }
+  .card { background: #1a1a1a; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .name { font-size: 1.1em; font-weight: 600; }
+  .model { color: #666; font-size: 0.8em; }
+  .power { width: 50px; height: 50px; border-radius: 50%; border: 2px solid #333; background: #1a1a1a; color: #555; font-size: 1.1em; cursor: pointer; transition: all 0.15s; }
+  .power.on { border-color: #f0c040; color: #f0c040; background: #2a2510; }
+  .ch { margin: 14px 0; }
+  .ch-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .ch-label { font-size: 0.85em; font-weight: 500; }
+  .ch-val { font-size: 0.8em; color: #888; min-width: 36px; text-align: right; }
+  input[type=range] { width: 100%; height: 6px; -webkit-appearance: none; background: #222; border-radius: 3px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid #444; }
+  .h-thumb::-webkit-slider-thumb { background: linear-gradient(135deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+  .s-thumb::-webkit-slider-thumb { background: #e0e0e0; }
+  .v-thumb::-webkit-slider-thumb { background: #aaa; }
+  .w-thumb::-webkit-slider-thumb { background: #ffe4b5; }
+  .c-thumb::-webkit-slider-thumb { background: #b5d4ff; }
+  .hue-bar { height: 6px; border-radius: 3px; background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); margin-bottom: 2px; }
+  .preview { width: 100%; height: 60px; border-radius: 8px; border: 1px solid #333; margin-top: 16px; transition: background 0.1s; }
+  .send-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .btn { flex: 1; min-width: 70px; padding: 10px; border-radius: 8px; border: 1px solid #333; background: #222; color: #ccc; font-size: 0.85em; cursor: pointer; text-align: center; }
+  .btn:hover { background: #2a2a2a; border-color: #555; }
+  .btn.active { border-color: #f0c040; color: #f0c040; }
+  .btn.danger { border-color: #f04040; color: #f04040; }
+  .section-title { font-size: 0.8em; color: #888; text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 10px; }
+  .patterns { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+  .pat-btn { padding: 12px 8px; border-radius: 8px; border: 1px solid #333; background: #222; color: #ccc; font-size: 0.8em; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .pat-btn:hover { border-color: #555; background: #2a2a2a; }
+  .pat-btn.running { border-color: #40f080; color: #40f080; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+  .pat-config label { font-size: 0.8em; color: #888; }
+  .pat-config input[type=number] { width: 70px; background: #222; border: 1px solid #444; border-radius: 4px; color: #ddd; padding: 4px 8px; font-size: 0.85em; }
+  .timeline { margin-top: 12px; display: flex; gap: 4px; height: 30px; align-items: end; }
+  .timeline-step { flex: 1; border-radius: 3px 3px 0 0; min-width: 4px; }
+</style>
+</head>
+<body>
+
+<h1>Zigbee Light Control</h1>
+<div class="status" id="status">Connecting...</div>
+<div id="app"></div>
+
+<script>
+const API = 'http://127.0.0.1:8085';
+
+// State: HSV + WC
+let H = 0, S = 100, V = 100, W = 0, C = 0;
+let on = true;
+let device = null;
+let sendMode = 'rgb-only';
+
+// Pattern engine
+let patternRunning = null;
+let patternTimer = null;
+let patternStep = 0;
+let patternSpeed = 30;
+let patternGradations = 60;
+let patternSending = false;
+
+// --- Color math ---
+
+function hsvToRgb(h, s, v) {
+  h = ((h % 360) + 360) % 360;
+  s /= 100; v /= 100;
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+  let r, g, b;
+  if (h < 60)       { r=c; g=x; b=0; }
+  else if (h < 120) { r=x; g=c; b=0; }
+  else if (h < 180) { r=0; g=c; b=x; }
+  else if (h < 240) { r=0; g=x; b=c; }
+  else if (h < 300) { r=x; g=0; b=c; }
+  else              { r=c; g=0; b=x; }
+  return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+}
+
+function previewHsv(h, s, v) {
+  const [r,g,b] = hsvToRgb(h, s, v);
+  return `rgb(${r},${g},${b})`;
+}
+
+function previewFull(h, s, v, w, c) {
+  const [r,g,b] = hsvToRgb(h, s, v);
+  const pr = Math.min(255, r + w + Math.round(c * 0.8));
+  const pg = Math.min(255, g + Math.round(w * 0.85) + Math.round(c * 0.9));
+  const pb = Math.min(255, b + Math.round(w * 0.6) + c);
+  return `rgb(${pr},${pg},${pb})`;
+}
+
+function preview() { return previewFull(H, S, V, W, C); }
+
+function wcToMirek(w, c) {
+  const total = w + c;
+  if (total === 0) return 370;
+  return Math.round(153 + (w / total) * (500 - 153));
+}
+
+// --- Interpolation in HSV space ---
+
+function lerpAngle(a, b, t) {
+  // Shortest path around the hue circle
+  let d = ((b - a + 540) % 360) - 180;
+  return ((a + d * t) % 360 + 360) % 360;
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function interpolateSteps(keyframes, gradations, noLoop) {
+  if (keyframes.length < 2) return keyframes;
+  const result = [];
+  const count = noLoop ? keyframes.length - 1 : keyframes.length;
+  for (let i = 0; i < count; i++) {
+    const a = keyframes[i];
+    const b = keyframes[(i + 1) % keyframes.length];
+    for (let t = 0; t < gradations; t++) {
+      const f = t / gradations;
+      result.push({
+        H: Math.round(noLoop ? lerp(a.H, b.H, f) : lerpAngle(a.H, b.H, f)),
+        S: Math.round(lerp(a.S, b.S, f)),
+        V: Math.round(lerp(a.V, b.V, f)),
+        W: Math.round(lerp(a.W, b.W, f)),
+        C: Math.round(lerp(a.C, b.C, f)),
+      });
+    }
+  }
+  return result;
+}
+
+// --- Patterns (HSV keyframes) ---
+
+const PATTERN_KEYFRAMES = {
+  'Rainbow': {
+    // Perceptually-spaced hue keyframes: more time in red/orange/yellow/magenta,
+    // less in green/cyan where HSV hue covers a wide perceptual range.
+    keys: [
+      { H:0,   S:100, V:100, W:0, C:0 },  // red
+      { H:15,  S:100, V:100, W:0, C:0 },  // red-orange
+      { H:35,  S:100, V:100, W:0, C:0 },  // orange
+      { H:55,  S:100, V:100, W:0, C:0 },  // yellow
+      { H:80,  S:100, V:100, W:0, C:0 },  // chartreuse
+      { H:130, S:100, V:100, W:0, C:0 },  // green (fast)
+      { H:175, S:100, V:100, W:0, C:0 },  // cyan (fast)
+      { H:220, S:100, V:100, W:0, C:0 },  // blue
+      { H:260, S:100, V:100, W:0, C:0 },  // indigo
+      { H:290, S:100, V:100, W:0, C:0 },  // violet
+      { H:320, S:100, V:100, W:0, C:0 },  // magenta
+      { H:345, S:100, V:100, W:0, C:0 },  // pink
+      { H:360, S:100, V:100, W:0, C:0 },  // back to red
+    ],
+    mode: 'rgb-only',
+    noLoop: true,
+  },
+  'Fire': {
+    keys: [
+      { H:0,  S:100, V:100, W:0, C:0 },
+      { H:25, S:100, V:100, W:0, C:0 },
+      { H:5,  S:100, V:70,  W:0, C:0 },
+      { H:35, S:90,  V:100, W:0, C:0 },
+      { H:10, S:100, V:60,  W:0, C:0 },
+    ],
+    mode: 'rgb-only',
+  },
+  'Ocean': {
+    keys: [
+      { H:200, S:100, V:100, W:0, C:0 },
+      { H:190, S:80,  V:80,  W:0, C:0 },
+      { H:220, S:100, V:100, W:0, C:0 },
+      { H:180, S:90,  V:70,  W:0, C:0 },
+    ],
+    mode: 'rgb-only',
+  },
+  'Sunset': {
+    keys: [
+      { H:15,  S:100, V:100, W:0, C:0 },
+      { H:350, S:80,  V:100, W:0, C:0 },
+      { H:330, S:85,  V:75,  W:0, C:0 },
+      { H:20,  S:95,  V:100, W:0, C:0 },
+    ],
+    mode: 'rgb-only',
+  },
+  'Pulse': {
+    keys: [
+      { H:0, S:0, V:0, W:10,  C:0 },
+      { H:0, S:0, V:0, W:255, C:0 },
+    ],
+    mode: 'cct-only',
+  },
+  'Warm-Cool': {
+    keys: [
+      { H:0, S:0, V:0, W:255, C:0 },
+      { H:0, S:0, V:0, W:0,   C:255 },
+    ],
+    mode: 'cct-only',
+  },
+  'Police': {
+    keys: [
+      { H:0,   S:100, V:100, W:0, C:0 },
+      { H:0,   S:100, V:0,   W:0, C:0 },
+      { H:240, S:100, V:100, W:0, C:0 },
+      { H:240, S:100, V:0,   W:0, C:0 },
+    ],
+    mode: 'rgb-only',
+  },
+  'Aurora': {
+    keys: [
+      { H:140, S:100, V:100, W:0, C:0 },
+      { H:180, S:90,  V:80,  W:0, C:0 },
+      { H:230, S:80,  V:100, W:0, C:0 },
+      { H:270, S:100, V:80,  W:0, C:0 },
+      { H:210, S:100, V:100, W:0, C:0 },
+    ],
+    mode: 'rgb-only',
+  },
+  'Candle': {
+    keys: [
+      { H:0, S:0, V:0, W:140, C:0 },
+      { H:0, S:0, V:0, W:240, C:0 },
+      { H:0, S:0, V:0, W:160, C:0 },
+      { H:0, S:0, V:0, W:230, C:0 },
+    ],
+    mode: 'cct-only',
+  },
+};
+
+function getPatternSteps(name) {
+  const pat = PATTERN_KEYFRAMES[name];
+  if (!pat) return [];
+  return interpolateSteps(pat.keys, patternGradations, pat.noLoop);
+}
+function getPatternMode(name) {
+  return PATTERN_KEYFRAMES[name]?.mode || 'rgb-only';
+}
+
+// --- API ---
+
+async function api(path, body) {
+  const opts = body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {};
+  return (await fetch(API + path, opts)).json();
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function sendHSV(h, s, v, w, c, mode) {
+  if (!device) return;
+  const hasColor = v > 0 && s > 0;
+  const hasWhite = w > 0 || c > 0;
+
+  if (mode === 'rgb-only') {
+    if (hasColor || v > 0) {
+      await api('/device/set', { device, state: { color: { h: Math.round(h), s: Math.round(s) }, brightness: Math.max(1, Math.round(v / 100 * 254)) } });
+    } else {
+      await api('/device/set', { device, state: { state: 'OFF' } });
+    }
+  } else if (mode === 'cct-only') {
+    if (hasWhite) {
+      const mirek = wcToMirek(w, c);
+      const bri = Math.max(1, Math.round((Math.max(w, c) / 255) * 254));
+      await api('/device/set', { device, state: { color_temp: mirek, brightness: bri } });
+    } else {
+      await api('/device/set', { device, state: { state: 'OFF' } });
+    }
+  }
+}
+
+async function send() {
+  await sendHSV(H, S, V, W, C, sendMode);
+  document.getElementById('status').textContent = `Sent (${sendMode})`;
+}
+
+// --- Pattern engine ---
+
+async function startPattern(name) {
+  stopPattern();
+  if (!PATTERN_KEYFRAMES[name]) return;
+  patternRunning = name;
+  patternStep = 0;
+  render();
+
+  function tick() {
+    if (patternRunning !== name) return;
+    const steps = getPatternSteps(name);
+    const mode = getPatternMode(name);
+    if (steps.length === 0) return;
+
+    const step = steps[patternStep % steps.length];
+    H = step.H; S = step.S; V = step.V; W = step.W; C = step.C;
+
+    for (const ch of ['H','S','V','W','C']) {
+      const valEl = document.getElementById(ch + '-val');
+      const sliderEl = document.getElementById(ch + '-slider');
+      if (valEl) valEl.textContent = step[ch] + (ch === 'H' ? '°' : ch === 'S' || ch === 'V' ? '%' : '');
+      if (sliderEl) sliderEl.value = step[ch];
+    }
+    const prevEl = document.getElementById('preview');
+    if (prevEl) prevEl.style.background = preview();
+
+    const totalSteps = steps.length;
+    const keyIdx = Math.floor((patternStep % totalSteps) / patternGradations);
+    updateTimeline(PATTERN_KEYFRAMES[name].keys, keyIdx);
+
+    if (!patternSending) {
+      patternSending = true;
+      sendHSV(H, S, V, W, C, mode).catch(() => {}).finally(() => { patternSending = false; });
+    }
+
+    patternStep++;
+    if (patternRunning === name) {
+      patternTimer = setTimeout(tick, patternSpeed);
+    }
+  }
+
+  tick();
+}
+
+function stopPattern() {
+  patternRunning = null;
+  if (patternTimer) { clearTimeout(patternTimer); patternTimer = null; }
+  render();
+}
+
+function updateTimeline(keys, currentIdx) {
+  const container = document.getElementById('timeline');
+  if (!container) return;
+  container.innerHTML = keys.map((k, i) => {
+    const color = previewFull(k.H, k.S, k.V, k.W, k.C);
+    const active = i === currentIdx;
+    return `<div class="timeline-step" style="background:${color};height:${active ? 30 : 18}px;opacity:${active ? 1 : 0.5}"></div>`;
+  }).join('');
+}
+
+function updateVal(ch, val) {
+  if (ch === 'H') H = val; else if (ch === 'S') S = val; else if (ch === 'V') V = val;
+  else if (ch === 'W') W = val; else if (ch === 'C') C = val;
+  const suffix = ch === 'H' ? '°' : ch === 'S' || ch === 'V' ? '%' : '';
+  document.getElementById(ch + '-val').textContent = val + suffix;
+  document.getElementById('preview').style.background = preview();
+  if (patternRunning) stopPattern();
+}
+
+function render() {
+  document.getElementById('app').innerHTML = `
+    <div class="card">
+      <div class="header">
+        <div>
+          <div class="name" id="dev-name">${device || 'No device'}</div>
+          <div class="model" id="dev-model"></div>
+        </div>
+        <button class="power ${on ? 'on' : ''}" onclick="togglePower()">&#x23FB;</button>
+      </div>
+
+      <div class="ch">
+        <div class="ch-head"><span class="ch-label" style="color:#f88">Hue</span><span class="ch-val" id="H-val">${H}°</span></div>
+        <div class="hue-bar"></div>
+        <input type="range" class="h-thumb" id="H-slider" min="0" max="360" value="${H}" oninput="updateVal('H',+this.value)" onchange="send()">
+      </div>
+      <div class="ch">
+        <div class="ch-head"><span class="ch-label" style="color:#ccc">Saturation</span><span class="ch-val" id="S-val">${S}%</span></div>
+        <input type="range" class="s-thumb" id="S-slider" min="0" max="100" value="${S}" oninput="updateVal('S',+this.value)" onchange="send()">
+      </div>
+      <div class="ch">
+        <div class="ch-head"><span class="ch-label" style="color:#999">Value</span><span class="ch-val" id="V-val">${V}%</span></div>
+        <input type="range" class="v-thumb" id="V-slider" min="0" max="100" value="${V}" oninput="updateVal('V',+this.value)" onchange="send()">
+      </div>
+      <div class="ch">
+        <div class="ch-head"><span class="ch-label" style="color:#ffe4b5">Warm White</span><span class="ch-val" id="W-val">${W}</span></div>
+        <input type="range" class="w-thumb" id="W-slider" min="0" max="255" value="${W}" oninput="updateVal('W',+this.value)" onchange="send()">
+      </div>
+      <div class="ch">
+        <div class="ch-head"><span class="ch-label" style="color:#b5d4ff">Cool White</span><span class="ch-val" id="C-val">${C}</span></div>
+        <input type="range" class="c-thumb" id="C-slider" min="0" max="255" value="${C}" oninput="updateVal('C',+this.value)" onchange="send()">
+      </div>
+
+      <div class="preview" id="preview" style="background:${preview()}"></div>
+
+      <div class="send-row">
+        <div class="btn ${sendMode==='rgb-only'?'active':''}" onclick="sendMode='rgb-only';render()">RGB</div>
+        <div class="btn ${sendMode==='cct-only'?'active':''}" onclick="sendMode='cct-only';render()">CCT</div>
+      </div>
+    </div>
+
+    <div class="section-title">Patterns</div>
+    <div class="card">
+      <div class="pat-config" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <div>
+          <label>Step ms: </label>
+          <input type="number" id="speed" value="${patternSpeed}" min="10" max="10000" step="10"
+            onchange="patternSpeed=+this.value">
+        </div>
+        <div>
+          <label>Gradations: </label>
+          <input type="number" id="grads" value="${patternGradations}" min="1" max="500" step="1"
+            onchange="patternGradations=+this.value">
+        </div>
+        ${patternRunning ? `<span style="color:#40f080">${patternRunning} (${getPatternSteps(patternRunning).length} steps, ${(getPatternSteps(patternRunning).length * patternSpeed / 1000).toFixed(1)}s cycle)</span>` : ''}
+      </div>
+
+      <div class="timeline" id="timeline" style="margin:12px 0;display:flex;gap:4px;height:30px;align-items:end"></div>
+
+      <div class="patterns" style="margin-top:12px">
+        ${Object.keys(PATTERN_KEYFRAMES).map(name => `
+          <div class="pat-btn ${patternRunning===name?'running':''}" onclick="${patternRunning===name ? 'stopPattern()' : `startPattern('${name}')`}">
+            ${name}
+          </div>
+        `).join('')}
+      </div>
+
+      ${patternRunning ? `
+        <div class="send-row" style="margin-top:12px">
+          <div class="btn danger" onclick="stopPattern()">Stop</div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+async function togglePower() {
+  if (!device) return;
+  on = !on;
+  if (!on) stopPattern();
+  await api('/device/set', { device, state: { state: on ? 'ON' : 'OFF' } });
+  render();
+}
+
+async function init() {
+  try {
+    const data = await api('/devices');
+    if (data.devices?.length) {
+      device = data.devices[0].friendlyName;
+      const d = data.devices[0];
+      render();
+      document.getElementById('dev-model').textContent =
+        (d.definition ? d.definition.vendor + ' ' + d.definition.model + ' — ' + d.definition.description : d.modelID || '') + ' · ' + d.type;
+      document.getElementById('status').textContent = 'Connected · ' + device;
+    } else {
+      document.getElementById('status').textContent = 'No devices paired';
+    }
+  } catch (e) {
+    document.getElementById('status').textContent = 'Error: ' + e.message;
+  }
+}
+
+render();
+init();
+</script>
+</body>
+</html>

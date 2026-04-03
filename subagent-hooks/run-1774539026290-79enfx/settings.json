@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/elinaro/Documents/openElinaro/subagent-hooks/run-1774539026290-79enfx/hook.sh Stop"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/elinaro/Documents/openElinaro/subagent-hooks/run-1774539026290-79enfx/hook.sh Notification"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+Create a file called /tmp/elinaro-test.txt containing hello from a subagent and then read it back to confirm it was written correctly.
