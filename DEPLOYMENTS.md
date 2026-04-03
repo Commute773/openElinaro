@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.03.5
+- Released at: 2026-04-03T01:59:42Z
+- Release id: 20260403T015942Z-0183940
+- Previous version: 2026.04.03.4
+- Trigger: ci/release workflow
+
+- Remove artificial agent limits; add session error diagnostics
+
 ## 2026.04.03.4
 - Released at: 2026-04-03T01:40:05Z
 - Release id: 20260403T014005Z-d16a0b1
