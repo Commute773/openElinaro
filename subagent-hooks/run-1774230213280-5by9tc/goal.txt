@@ -1,1 +1,0 @@
-Read the top-level directory listing and package.json in the current repo, then write a 5-line summary of what this project is to /tmp/repo-summary.md

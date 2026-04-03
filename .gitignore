@@ -70,3 +70,9 @@ projects/*/workspace/
 .venv*/
 projects/telecorder/whiplash-stack/
 projects/trim-control/README.md
+
+# Claude Code local state
+.claude/worktrees/
+.claude/settings.local.json
+subagent-hooks/
+subagent-runs.json
