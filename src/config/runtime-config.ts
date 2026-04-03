@@ -31,7 +31,6 @@ const DEFAULT_CORE_INSTANCE = {
 const DEFAULT_CORE_HEARTBEAT = {
   model: "",
   provider: "",
-  contextMode: "isolated" as const,
 };
 const DEFAULT_CORE_APP = {
   automaticConversationMemoryEnabled: true,
@@ -159,7 +158,6 @@ export const RuntimeConfigSchema = z.object({
       heartbeat: z.object({
         model: z.string().default(""),
         provider: z.string().default(""),
-        contextMode: z.enum(["isolated", "full"]).default("isolated"),
       }).default(DEFAULT_CORE_HEARTBEAT),
     }).default(DEFAULT_CORE_APP),
     http: z.object({

@@ -34,14 +34,17 @@ export class ChatSessionManager {
   private conversationActivityNotifier?: (params: { conversationKey: string; active: boolean }) => void;
   private processJob: ProcessJobCallback;
   private appendAssistantMessage: (job: { conversationKey: string; message: string }) => Promise<void>;
+  private appendUserMessage: (job: { conversationKey: string; message: string }) => Promise<void>;
 
   constructor(params: {
     processJob: ProcessJobCallback;
     appendAssistantMessage: (job: { conversationKey: string; message: string }) => Promise<void>;
+    appendUserMessage: (job: { conversationKey: string; message: string }) => Promise<void>;
     conversationActivityNotifier?: (params: { conversationKey: string; active: boolean }) => void;
   }) {
     this.processJob = params.processJob;
     this.appendAssistantMessage = params.appendAssistantMessage;
+    this.appendUserMessage = params.appendUserMessage;
     this.conversationActivityNotifier = params.conversationActivityNotifier;
   }
 
@@ -132,6 +135,11 @@ export class ChatSessionManager {
         this.refreshConversationActivity(conversationKey, session);
         if (job.kind === "assistant_message") {
           await this.appendAssistantMessage(job);
+          job.resolve();
+          continue;
+        }
+        if (job.kind === "user_message") {
+          await this.appendUserMessage(job);
           job.resolve();
           continue;
         }

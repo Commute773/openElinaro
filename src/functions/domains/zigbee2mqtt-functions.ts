@@ -11,27 +11,95 @@ import { formatResult } from "../formatters";
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Convert warm/cool white channel values (0-255) to mirek + brightness. */
-function wcToMirek(w: number, c: number): { color_temp: number; brightness: number } {
-  const total = w + c;
-  if (total === 0) return { color_temp: 370, brightness: 1 };
-  const color_temp = Math.round(153 + (w / total) * (500 - 153));
-  const brightness = Math.max(1, Math.round((Math.max(w, c) / 255) * 254));
-  return { color_temp, brightness };
+/** Kelvin to mireds (clamped to Zigbee range 153-500). */
+function kelvinToMireds(k: number): number {
+  return Math.max(153, Math.min(500, Math.round(1_000_000 / k)));
+}
+
+/** Named color/temperature presets → Zigbee state. */
+const COLOR_PRESETS: Record<string, Record<string, unknown>> = {
+  // Temperature presets
+  "warm":       { color_temp: kelvinToMireds(2700) },
+  "warm white": { color_temp: kelvinToMireds(2700) },
+  "soft":       { color_temp: kelvinToMireds(3000) },
+  "soft white": { color_temp: kelvinToMireds(3000) },
+  "neutral":    { color_temp: kelvinToMireds(4000) },
+  "cool":       { color_temp: kelvinToMireds(5500) },
+  "cool white": { color_temp: kelvinToMireds(5500) },
+  "daylight":   { color_temp: kelvinToMireds(6500) },
+  // RGB presets
+  "red":        { color: { r: 255, g: 0, b: 0 } },
+  "green":      { color: { r: 0, g: 255, b: 0 } },
+  "blue":       { color: { r: 0, g: 0, b: 255 } },
+  "cyan":       { color: { r: 0, g: 255, b: 255 } },
+  "magenta":    { color: { r: 255, g: 0, b: 255 } },
+  "yellow":     { color: { r: 255, g: 255, b: 0 } },
+  "orange":     { color: { r: 255, g: 165, b: 0 } },
+  "purple":     { color: { r: 128, g: 0, b: 255 } },
+  "pink":       { color: { r: 255, g: 105, b: 180 } },
+  "white":      { color_temp: kelvinToMireds(4000) },
+};
+
+/** Parse a hex color string (#RGB or #RRGGBB) to {r,g,b}. */
+function parseHex(hex: string): { r: number; g: number; b: number } | null {
+  const m = hex.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!m) return null;
+  const h = m[1]!;
+  if (h.length === 3) {
+    return { r: parseInt(h[0]! + h[0]!, 16), g: parseInt(h[1]! + h[1]!, 16), b: parseInt(h[2]! + h[2]!, 16) };
+  }
+  return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
+}
+
+/** Build the Zigbee state payload from the high-level lights_set input. */
+function buildLightState(input: {
+  color?: string;
+  kelvin?: number;
+  brightness?: number;
+}): Record<string, unknown> {
+  const state: Record<string, unknown> = {};
+
+  // Color / temperature
+  if (input.kelvin) {
+    state.color_temp = kelvinToMireds(input.kelvin);
+  } else if (input.color) {
+    const key = input.color.toLowerCase().trim();
+    const preset = COLOR_PRESETS[key];
+    if (preset) {
+      Object.assign(state, preset);
+    } else {
+      const rgb = parseHex(key);
+      if (rgb) {
+        state.color = rgb;
+      } else {
+        throw new Error(`Unknown color "${input.color}". Use a name (warm, cool, red, blue, daylight…), hex (#FF0000), or kelvin param.`);
+      }
+    }
+  }
+
+  // Brightness (0-100% → 1-254 Zigbee scale)
+  if (input.brightness != null) {
+    if (input.brightness === 0) return { state: "OFF" };
+    state.brightness = Math.max(1, Math.round((input.brightness / 100) * 254));
+  }
+
+  // Default: if nothing was set, just turn on
+  if (Object.keys(state).length === 0) {
+    state.state = "ON";
+  }
+
+  return state;
 }
 
 // ---------------------------------------------------------------------------
-// Schemas (same as zigbee2mqtt-tools.ts)
+// Schemas
 // ---------------------------------------------------------------------------
-
-const ch = z.number().int().min(0).max(255);
 
 const lightSetSchema = z.object({
   device: z.string().describe("Friendly name of the light"),
-  mode: z.enum(["rgb", "wc"]).describe("Channel mode: 'rgb' for color LEDs, 'wc' for warm/cool white LEDs"),
-  ch1: ch.describe("Red (rgb) or Warm white (wc) — 0-255"),
-  ch2: ch.describe("Green (rgb) or Cool white (wc) — 0-255"),
-  ch3: ch.optional().describe("Blue (rgb mode only) — 0-255"),
+  color: z.string().optional().describe("Color name (warm, cool, daylight, red, blue, purple, pink…), hex (#FF0000), or temperature name (warm white, cool white, soft, neutral)"),
+  kelvin: z.number().int().min(2000).max(6500).optional().describe("Color temperature in Kelvin (2000=warm, 4000=neutral, 6500=cool daylight)"),
+  brightness: z.number().int().min(0).max(100).optional().describe("Brightness percentage (0=off, 100=max)"),
 });
 
 const deviceNameSchema = z.object({
@@ -98,28 +166,13 @@ export const buildZigbee2MqttFunctions: FunctionDomainBuilder = (ctx) => [
   defineFunction({
     name: "lights_set",
     description:
-      "Set a light's channels directly. Mode 'rgb': ch1=Red, ch2=Green, ch3=Blue (0-255). Mode 'wc': ch1=Warm white, ch2=Cool white (0-255). All zeros turns the light off.",
+      "Set a light's color and brightness. Use color names (warm, cool, daylight, red, blue…), hex codes (#FF0000), kelvin values (2700=warm, 6500=cool), and brightness as a percentage (0-100). Examples: color='cool' brightness=80, color='red', kelvin=3000 brightness=50.",
     input: lightSetSchema,
     handler: async (input, fnCtx) => {
-      let state: Record<string, unknown>;
-      if (input.mode === "rgb") {
-        const r = input.ch1, g = input.ch2, b = input.ch3 ?? 0;
-        if (r === 0 && g === 0 && b === 0) {
-          state = { state: "OFF" };
-        } else {
-          state = { color: { r, g, b }, brightness: Math.max(1, Math.min(254, Math.max(r, g, b))) };
-        }
-      } else {
-        const w = input.ch1, c = input.ch2;
-        if (w === 0 && c === 0) {
-          state = { state: "OFF" };
-        } else {
-          state = wcToMirek(w, c);
-        }
-      }
+      const state = buildLightState(input);
       const desc = JSON.stringify(state);
       const result = await fnCtx.services.zigbee2mqtt.setDeviceState(input.device, state);
-      return `Set ${input.mode} → ${desc}\n\n${result}`;
+      return `Set → ${desc}\n\n${result}`;
     },
     format: formatResult,
     auth: { ...ZIGBEE_AUTH, note: "Sets a light's color, temperature, or brightness." },

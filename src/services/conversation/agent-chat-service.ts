@@ -72,6 +72,9 @@ export class AgentChatService {
       appendAssistantMessage: async (job) => {
         await this.turnRunner.appendAssistantMessage(job);
       },
+      appendUserMessage: async (job) => {
+        await this.turnRunner.appendUserMessage(job);
+      },
       conversationActivityNotifier,
     });
 
@@ -256,6 +259,28 @@ export class AgentChatService {
       const session = this.sessionManager.getSession(params.conversationKey);
       session.queue.push({
         kind: "assistant_message",
+        conversationKey: params.conversationKey,
+        message,
+        resolve,
+        reject,
+      });
+      this.sessionManager.kickSession(params.conversationKey);
+    });
+  }
+
+  async recordUserMessage(params: {
+    conversationKey: string;
+    message: string;
+  }): Promise<void> {
+    const message = params.message.trim();
+    if (!message) {
+      return;
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const session = this.sessionManager.getSession(params.conversationKey);
+      session.queue.push({
+        kind: "user_message",
         conversationKey: params.conversationKey,
         message,
         resolve,

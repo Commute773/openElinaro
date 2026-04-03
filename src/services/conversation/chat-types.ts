@@ -58,7 +58,15 @@ export type QueuedAssistantMessageJob = {
   reject: (error: unknown) => void;
 };
 
-export type QueuedConversationJob = QueuedChatJob | QueuedAssistantMessageJob;
+export type QueuedUserMessageJob = {
+  kind: "user_message";
+  conversationKey: string;
+  message: string;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+};
+
+export type QueuedConversationJob = QueuedChatJob | QueuedAssistantMessageJob | QueuedUserMessageJob;
 
 export type PendingSteeringMessage = {
   conversationKey: string;
