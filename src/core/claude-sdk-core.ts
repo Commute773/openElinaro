@@ -430,18 +430,20 @@ export class ClaudeSdkCore {
           onLog?.("sdk_result_error", {
             error: errorText,
             subtype: rawMessage.subtype,
-            // Log extra fields that might explain "unknown" errors
+            // Log the full raw message for post-mortem diagnostics
             rawErrorCount: errors.length,
             hasResult: !!rawMessage.result,
             resultPreview: rawMessage.result ? String(rawMessage.result).slice(0, 200) : undefined,
-            messageKeys: Object.keys(rawMessage).join(","),
+            rawMessage: JSON.stringify(rawMessage).slice(0, 1000),
           });
 
-          // If the session died or we got an opaque "unknown" error, close and
-          // retry with a fresh session. "unknown" usually means the subprocess
-          // died without surfacing a meaningful error.
+          // Retry with a fresh session when the error is transient:
+          // - Stale session errors (subprocess died, session expired)
+          // - "unknown" (subprocess died without meaningful error)
+          // - error_during_execution / ede_diagnostic (agent loop ended in unexpected state)
           const retryCount = this.config._retryCount ?? 0;
-          const isRecoverable = isStaleSessionError(new Error(errorText)) || errorText === "unknown";
+          const isEdeDiagnostic = rawMessage.subtype === "error_during_execution" || errorText.includes("[ede_diagnostic]");
+          const isRecoverable = isStaleSessionError(new Error(errorText)) || errorText === "unknown" || isEdeDiagnostic;
           if (isRecoverable && retryCount < MAX_RETRIES && (this.config.session || resumingFromDisk)) {
             sdkCoreTelemetry.event("claude_sdk_core.error_result_retry", {
               sessionReused,
