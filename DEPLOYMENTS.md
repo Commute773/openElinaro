@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.03.2
+- Released at: 2026-04-03T00:06:56Z
+- Release id: 20260403T000656Z-93d63fa
+- Previous version: 2026.04.03
+- Trigger: ci/release workflow
+
+- cleanup: remove accidentally committed local state, update gitignore
+
 ## 2026.04.03
 - Released at: 2026-04-03T00:06:17Z
 - Release id: 20260403T000617Z-872ec68
