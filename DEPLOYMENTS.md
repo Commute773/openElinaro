@@ -1,5 +1,15 @@
 # Deployments
 
+## 2026.04.03
+- Released at: 2026-04-03T00:06:17Z
+- Release id: 20260403T000617Z-872ec68
+- Previous version: 2026.04.02.4
+- Trigger: ci/release workflow
+
+- fix: ede_diagnostic recovery + CI error handling check
+- fix: handle ede_diagnostic (error_during_execution) as recoverable
+- fix: harden Claude SDK session management
+
 ## 2026.04.02.4
 - Released at: 2026-04-02T23:16:34Z
 - Release id: 20260402T231634Z-1c63350
