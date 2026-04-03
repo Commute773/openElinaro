@@ -1,5 +1,13 @@
 # Deployments
 
+## 2026.04.03.3
+- Released at: 2026-04-03T00:23:51Z
+- Release id: 20260403T002351Z-c237b50
+- Previous version: 2026.04.03.2
+- Trigger: ci/release workflow
+
+- fix: upgrade SDK to 0.2.91, disable broken inactivity timer, recycle sessions
+
 ## 2026.04.03.2
 - Released at: 2026-04-03T00:06:56Z
 - Release id: 20260403T000656Z-93d63fa
