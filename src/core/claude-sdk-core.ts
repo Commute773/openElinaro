@@ -273,6 +273,9 @@ export class ClaudeSdkCore {
     session.sendMessage(prompt);
 
     let receivedFirstMessage = false;
+    let lastMessageType = "";
+    let lastMessageSubtype = "";
+    let lastMessageAt = runStartedAt;
 
     const firstMessageTimer = setTimeout(() => {
       if (!receivedFirstMessage && !signal?.aborted) {
@@ -312,6 +315,11 @@ export class ClaudeSdkCore {
         }, { level: "debug" });
       }
       if (signal?.aborted) break;
+
+      // Track last message for diagnostics on session errors
+      lastMessageType = message.type;
+      lastMessageSubtype = (message as any).subtype ?? "";
+      lastMessageAt = Date.now();
 
       if (message.type === "assistant") {
         steps++;
@@ -454,8 +462,15 @@ export class ClaudeSdkCore {
               sessionReused,
               resumingFromDisk,
               sessionId: session.sessionId,
+              sessionAlive: session.isAlive,
               errorText,
+              errorSubtype: rawMessage.subtype,
               retryCount: retryCount + 1,
+              steps,
+              receivedFirstMessage,
+              lastMessageType,
+              lastMessageSubtype,
+              msSinceLastMessage: Date.now() - lastMessageAt,
               elapsedMs: Date.now() - runStartedAt,
             }, { level: "warn" });
             onLog?.("sdk_session_died_retry", { error: errorText, retryCount: retryCount + 1 });
@@ -562,13 +577,18 @@ export class ClaudeSdkCore {
       const elapsedMs = Date.now() - runStartedAt;
       sdkCoreTelemetry.event("claude_sdk_core.run_error", {
         sessionReused,
+        resumingFromDisk,
         sessionId: session.sessionId,
         sessionAlive: session.isAlive,
         receivedFirstMessage,
         steps,
+        lastMessageType,
+        lastMessageSubtype,
+        msSinceLastMessage: Date.now() - lastMessageAt,
         elapsedMs,
         error: err instanceof Error ? err.message : String(err),
         errorName: err instanceof Error ? err.name : "unknown",
+        errorStack: err instanceof Error ? err.stack?.slice(0, 500) : undefined,
         isAborted: signal?.aborted ?? false,
         abortReason: signal?.aborted ? String(signal.reason) : undefined,
       }, { level: "warn", outcome: "error" });

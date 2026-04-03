@@ -19,11 +19,10 @@ import { fireAndForget } from "../../utils/result";
 import { filterNativeTools } from "../../core/tool-split";
 import { CLAUDE_SDK_NATIVE_TOOLS, CLAUDE_SDK_SUPPRESSED_TOOLS } from "../../core/claude-sdk-core";
 import type { ClaudeSdkCore } from "../../core/claude-sdk-core";
-import { CHAT_MAX_STEPS, CORE_INACTIVITY_TIMEOUT_MS } from "../../config/service-constants";
+import { CHAT_MAX_STEPS } from "../../config/service-constants";
 import type { CoreToolExecutor, CoreToolDefinition } from "../../core/types";
 
 import {
-  CoreInactivityTimeoutError,
   type QueuedChatJob,
   type ConversationSessionState,
   type ChatDependencies,
@@ -154,50 +153,20 @@ export class ChatTurnRunner {
           // is allowed to think for as long as it needs before producing output.
           // Once output starts flowing, any gap longer than the timeout is
           // treated as a stuck process.
-          let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
           const turnStartedAt = Date.now();
           let firstActivityAt: number | undefined;
           let lastActivityAt: number | undefined;
           let lastActivityType: string | undefined;
           let activityCount = 0;
 
-          const resetInactivityTimer = (controller: AbortController, activityType: string) => {
+          const resetInactivityTimer = (_controller: AbortController, activityType: string) => {
             const now = Date.now();
             if (!firstActivityAt) {
               firstActivityAt = now;
-              agentChatTelemetry.event("agent_chat.watchdog_armed", {
-                conversationKey: job.conversationKey,
-                coreId: "claude-sdk",
-                timeoutMs: CORE_INACTIVITY_TIMEOUT_MS,
-                firstActivityType: activityType,
-                elapsedSinceTurnStartMs: now - turnStartedAt,
-              }, { level: "debug" });
             }
             lastActivityAt = now;
             lastActivityType = activityType;
             activityCount++;
-
-            if (inactivityTimer) clearTimeout(inactivityTimer);
-            inactivityTimer = setTimeout(() => {
-              const elapsedSinceLastActivity = Date.now() - (lastActivityAt ?? turnStartedAt);
-              const elapsedSinceTurnStart = Date.now() - turnStartedAt;
-              agentChatTelemetry.event("agent_chat.inactivity_timeout", {
-                conversationKey: job.conversationKey,
-                coreId: "claude-sdk",
-                timeoutMs: CORE_INACTIVITY_TIMEOUT_MS,
-                lastActivityType,
-                lastActivityAgoMs: elapsedSinceLastActivity,
-                turnElapsedMs: elapsedSinceTurnStart,
-                totalActivityCount: activityCount,
-                sessionAlive: !!(session.sdkSessionHandle as { isAlive?: boolean } | undefined)?.isAlive,
-              }, { level: "warn", outcome: "error" });
-              // Interrupt the SDK session so the subprocess actually stops
-              const handle = session.sdkSessionHandle as { interrupt?: () => Promise<void> } | undefined;
-              if (typeof handle?.interrupt === "function") {
-                void handle.interrupt();
-              }
-              controller.abort(new CoreInactivityTimeoutError());
-            }, CORE_INACTIVITY_TIMEOUT_MS);
           };
 
           const result = await this.sessionManager.runAbortableModelCall(session, (signal) => {
@@ -266,8 +235,6 @@ export class ChatTurnRunner {
                 resetInactivityTimer(controller, "assistant_message");
               },
             });
-          }).finally(() => {
-            if (inactivityTimer) clearTimeout(inactivityTimer);
           });
 
           // Check pending conversation reset before persistence
