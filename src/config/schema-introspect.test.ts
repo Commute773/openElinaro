@@ -212,10 +212,10 @@ describe("describeRuntimeConfigSchema", () => {
   });
 
   test("enum field describes values", () => {
-    const desc = describeRuntimeConfigSchema("core.app.heartbeat.contextMode");
-    // Should contain the enum values "isolated" and "full"
-    expect(desc).toContain("isolated");
-    expect(desc).toContain("full");
+    const desc = describeRuntimeConfigSchema("communications.vonage.defaultMessageChannel");
+    // Should contain some of the enum values
+    expect(desc).toContain("sms");
+    expect(desc).toContain("whatsapp");
   });
 
   test("boolean field", () => {

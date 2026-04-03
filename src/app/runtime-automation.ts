@@ -12,7 +12,6 @@ import type { HeartbeatService } from "../services/heartbeat-service";
 import type { CalendarSyncService } from "../services/calendar-sync-service";
 import type { AlarmNotificationService } from "../services/alarm-notification-service";
 import type { ScheduledAlarm } from "../services/alarm-service";
-import { getRuntimeConfig } from "../config/runtime-config";
 import { telemetry } from "../services/infrastructure/telemetry";
 import type { RuntimeScope } from "./runtime-scope";
 
@@ -98,6 +97,7 @@ export type AutomationContext = {
     },
   ) => Promise<AppResponse>;
   recordAssistantMessage: (conversationKey: string, message: string) => Promise<void>;
+  recordUserMessage: (conversationKey: string, message: string) => Promise<void>;
   getScope: () => RuntimeScope;
   buildHeartbeatWorkFocus: (reference?: Date) => string | undefined;
   routines: RoutinesService;
@@ -138,37 +138,36 @@ export async function runHourlyHeartbeat(
 
   const requestId = `heartbeat-${Date.now()}`;
   const scope = ctx.getScope();
-  const heartbeatConfig = getRuntimeConfig().core.app.heartbeat;
-  const useFullContext = heartbeatConfig.contextMode === "full";
   const workFocus = ctx.buildHeartbeatWorkFocus(options?.reference);
   const reminderSnapshot = ctx.routines.getHeartbeatReminderSnapshot(options?.reference);
   const localTime = reminderSnapshot.currentLocalTime;
   const reflectionEligible = scope.autonomousTime.isDailyReflectionEligible(options?.reference);
-  const heartbeatConversationKey = buildAutomationSessionKey("heartbeat", conversationKey);
   let reminderMarked = false;
   let userFacingMessageSent = false;
   const recordedMainThreadMessages = new Set<string>();
-  const recordHeartbeatMessageToMainThread = async (message: string, source: string) => {
+  const recordHeartbeatExchangeToMainThread = async (prompt: string, message: string, source: string) => {
     try {
+      await ctx.recordUserMessage(conversationKey, prompt);
       await ctx.recordAssistantMessage(conversationKey, message);
       ctx.appTelemetry.event("app.heartbeat.main_thread_handoff", {
         conversationKey,
-        heartbeatConversationKey,
         requestId,
         source,
+        promptChars: prompt.length,
         messageChars: message.length,
       });
     } catch (error) {
       ctx.appTelemetry.recordError(error, {
         conversationKey,
-        heartbeatConversationKey,
         requestId,
         source,
+        promptChars: prompt.length,
         messageChars: message.length,
         eventName: "app.heartbeat.main_thread_handoff",
       });
     }
   };
+  let lastHeartbeatPrompt = "";
   const finalizeHeartbeatMessage = async (rawMessage: string | undefined, source: string) => {
     const normalized = ctx.heartbeats.normalizeAssistantReply(rawMessage) ?? "";
     if (!normalized) {
@@ -176,7 +175,7 @@ export async function runHourlyHeartbeat(
     }
     if (!recordedMainThreadMessages.has(normalized)) {
       recordedMainThreadMessages.add(normalized);
-      await recordHeartbeatMessageToMainThread(normalized, source);
+      await recordHeartbeatExchangeToMainThread(lastHeartbeatPrompt, normalized, source);
     }
     userFacingMessageSent = true;
     if (!reminderMarked && reminderSnapshot.requiredCandidates.length > 0) {
@@ -202,7 +201,6 @@ export async function runHourlyHeartbeat(
     });
     ctx.appTelemetry.event("app.heartbeat.prompt_prepared", {
       conversationKey,
-      heartbeatConversationKey,
       requestId,
       promptChars: prompt.length,
       workFocusChars: workFocus?.length ?? 0,
@@ -210,9 +208,8 @@ export async function runHourlyHeartbeat(
       optionalCandidateCount: reminderSnapshot.optionalCandidates.length,
       reflectionEligible,
       hasDeliveryRequirement: Boolean(deliveryRequirement),
-      contextMode: heartbeatConfig.contextMode,
-      isolatedFromMainConversation: !useFullContext,
     });
+    lastHeartbeatPrompt = prompt;
     return prompt;
   };
   const runHeartbeatTurn = async (turnId: string, deliveryRequirement?: string) =>
@@ -220,7 +217,7 @@ export async function runHourlyHeartbeat(
       {
         id: turnId,
         text: buildHeartbeatPrompt(deliveryRequirement),
-        conversationKey: heartbeatConversationKey,
+        conversationKey,
       },
       {
         onBackgroundResponse: options?.onBackgroundResponse
@@ -235,13 +232,12 @@ export async function runHourlyHeartbeat(
         onToolUse: async () => {},
         typingEligible: false,
         chatOptions: {
-          contextConversationKey: useFullContext ? conversationKey : undefined,
           persistConversation: false,
           enableMemoryIngestion: false,
-          enableThreadStartContext: useFullContext,
+          enableThreadStartContext: true,
           enableCompaction: false,
           includeBackgroundExecNotifications: false,
-          providerSessionId: `${heartbeatConversationKey}-${turnId}`,
+          providerSessionId: `heartbeat-${conversationKey}-${turnId}`,
           usagePurpose: "automation_heartbeat_turn",
         },
       },

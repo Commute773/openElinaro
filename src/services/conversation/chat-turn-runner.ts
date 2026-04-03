@@ -379,6 +379,16 @@ export class ChatTurnRunner {
     ]);
   }
 
+  async appendUserMessage(job: { conversationKey: string; message: string }) {
+    await this.deps.conversations.ensureSystemPrompt(
+      job.conversationKey,
+      await this.deps.systemPrompts.load(),
+    );
+    await this.deps.conversations.appendMessages(job.conversationKey, [
+      userMessage(job.message),
+    ]);
+  }
+
   private async buildUserContentWithAutomaticContext(params: {
     conversationKey: string;
     systemContext?: string;

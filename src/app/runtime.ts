@@ -437,6 +437,10 @@ export class OpenElinaroApp {
     return this.getScope().chat.recordAssistantMessage({ conversationKey, message });
   }
 
+  recordUserMessage(conversationKey: string, message: string) {
+    return this.getScope().chat.recordUserMessage({ conversationKey, message });
+  }
+
   stopConversation(conversationKey: string) {
     return this.getScope().chat.stopConversation(conversationKey);
   }
@@ -548,6 +552,8 @@ export class OpenElinaroApp {
       handleRequest: this.handleRequest.bind(this),
       recordAssistantMessage: (conversationKey, message) =>
         this.recordAssistantMessage(conversationKey, message),
+      recordUserMessage: (conversationKey, message) =>
+        this.recordUserMessage(conversationKey, message),
       getScope: () => this.getScope(),
       buildHeartbeatWorkFocus: (reference) => this.buildHeartbeatWorkFocus(reference),
       routines: this.routines,
